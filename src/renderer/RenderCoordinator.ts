@@ -10,6 +10,7 @@
 
 import type { BlackHoleRenderer } from './BlackHoleRenderer.js';
 import type { CameraController } from '../camera/CameraController.js';
+import type { DebugViewMode } from '../app/state.js';
 
 export interface FrameTelemetrySample {
   frame: number;
@@ -63,7 +64,11 @@ export class RenderCoordinator {
 
     const moved = this.options.camera.update(cpuFrameMs / 1000);
     const basis = this.options.camera.getBasis();
-    this.options.renderer.renderFrame(this.options.camera.camera, basis);
+    this.options.renderer.renderFrame(
+      this.options.camera.camera,
+      basis,
+      this.options.getViewMode?.() ?? 'diagnostic'
+    );
 
     this.frame += 1;
     const instantFps = cpuFrameMs > 0 ? 1000 / cpuFrameMs : 0;

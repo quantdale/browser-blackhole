@@ -24,6 +24,13 @@ export type ToneMappingMode = 'neutral' | 'aces' | 'agx';
 export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra' | 'custom';
 export type BackendPreference = 'auto' | 'numerical' | 'lut';
 export type TargetFps = 30 | 60 | 90 | 120;
+/**
+ * Selects what the visible output shows (M1-05). 'diagnostic' keeps the
+ * direction-gradient frame; 'off' renders the flat clear color until a real
+ * background arrives. This is a debug-view selector, not a visual/artistic
+ * mode, so it lives under `debug`, separate from `visual.mode`.
+ */
+export type DebugViewMode = 'diagnostic' | 'off';
 export type DebugRenderView =
   | 'final'
   | 'classification'
@@ -112,6 +119,8 @@ export interface RenderingState {
 }
 
 export interface DebugState {
+  /** What the visible output shows: direction-gradient diagnostic or flat off state. */
+  viewMode: DebugViewMode;
   overlay: boolean;
   renderView: DebugRenderView;
   selectedPixel?: [number, number];
@@ -229,6 +238,7 @@ export const DEFAULT_STATE: AppState = {
     dynamicResolution: true
   },
   debug: {
+    viewMode: 'diagnostic',
     overlay: false,
     renderView: 'final',
     freezeTime: false,
@@ -791,6 +801,11 @@ function normalizeRendering(input: Record<string, unknown>): FieldResult<Renderi
 
 function normalizeDebug(input: Record<string, unknown>): FieldResult<DebugState> {
   const d = DEFAULT_STATE.debug;
+  const viewMode = normalizeEnum(pick(input, 'viewMode', d.viewMode), 'debug.viewMode', [
+    'diagnostic',
+    'off'
+  ] as const);
+  if (!viewMode.ok) return viewMode;
   const overlay = normalizeBool(pick(input, 'overlay', d.overlay), 'debug.overlay');
   if (!overlay.ok) return overlay;
   const renderView = normalizeEnum(pick(input, 'renderView', d.renderView), 'debug.renderView', [
@@ -815,6 +830,7 @@ function normalizeDebug(input: Record<string, unknown>): FieldResult<DebugState>
   if (!showTelemetry.ok) return showTelemetry;
 
   const result: DebugState = {
+    viewMode: viewMode.value,
     overlay: overlay.value ?? false,
     renderView: renderView.value,
     freezeTime: freezeTime.value ?? false,
@@ -986,6 +1002,9 @@ const INVALIDATION_MAP: Record<SubtreeKey, Record<string, Invalidation>> = {
     dynamicResolution: Invalidation.None
   },
   debug: {
+    // View selection only swaps what is displayed; it never invalidates
+    // accumulated geometry/radiance history.
+    viewMode: Invalidation.None,
     overlay: Invalidation.None,
     renderView: Invalidation.None,
     selectedPixel: Invalidation.None,

@@ -95,6 +95,12 @@ Normalize/clamp state at one boundary. UI widgets must not write arbitrary unifo
 
 Presets are versioned state snapshots. Include a schema version before adding shareable URLs/storage.
 
+## 3a. Canonical world frame
+
+World handedness, axes, black-hole center placement, default disk normal,
+and sky orientation are fixed in `docs/WORLD_FRAME.md` (implemented in
+`src/physics/worldFrame.ts`); no module may independently reinterpret axes.
+
 ## 4. Unit system
 
 Use geometric units for core formulas where useful. Recommended internal spatial unit is `r_g = GM/c^2` for the selected black hole. Keep user-facing conversions in `physics/units.ts`.

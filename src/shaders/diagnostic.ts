@@ -22,7 +22,7 @@ import {
   Scene,
   Vector3
 } from 'three/webgpu';
-import { attribute, float, normalize, uniform, varying, vec4 } from 'three/tsl';
+import { attribute, float, normalize, select, uniform, varying, vec4 } from 'three/tsl';
 import type { Vec3 } from './cameraRayMath.js';
 
 export interface DiagnosticUniformBlock {
@@ -33,6 +33,11 @@ export interface DiagnosticUniformBlock {
   cameraForward: { value: Vector3 };
   tanHalfFovY: { value: number };
   aspect: { value: number };
+  /**
+   * Debug view selector (M1-05): 0 = direction gradient ('diagnostic'),
+   * 1 = flat clear color ('off'). Scalar so the CPU side stays trivial.
+   */
+  viewOff: { value: number };
 }
 
 export interface DiagnosticPass {
@@ -54,6 +59,7 @@ export function createDiagnosticPass(): DiagnosticPass {
   // referencing it (Vector3 uniforms are fine either way — they are objects).
   const uTanHalfFovY = uniform(1);
   const uAspect = uniform(1);
+  const uViewOff = uniform(0);
 
   const uniforms: DiagnosticUniformBlock = {
     cameraPositionRg: vec3Uniform(),
@@ -61,7 +67,8 @@ export function createDiagnosticPass(): DiagnosticPass {
     cameraUp: vec3Uniform(),
     cameraForward: vec3Uniform(),
     tanHalfFovY: uTanHalfFovY,
-    aspect: uAspect
+    aspect: uAspect,
+    viewOff: uViewOff
   };
 
   const uRight = uniform(uniforms.cameraRight.value);
@@ -80,7 +87,14 @@ export function createDiagnosticPass(): DiagnosticPass {
     uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
   );
   const color = dir.mul(0.5).add(0.5);
-  material.fragmentNode = vec4(color, float(1));
+  // 'off' renders the flat clear color (black) until a real background
+  // (starfield) arrives in a later packet; the pass still covers the frame so
+  // coverage/aspect invariants stay testable in both modes.
+  material.fragmentNode = select(
+    uViewOff.lessThan(0.5),
+    vec4(color, float(1)),
+    vec4(float(0), float(0), float(0), float(1))
+  );
 
   const geometry = new BufferGeometry();
   geometry.setAttribute(
@@ -125,4 +139,16 @@ export function applyBasisToDiagnosticUniforms(
   pass.uniforms.cameraForward.value.set(...basis.forward);
   pass.uniforms.tanHalfFovY.value = basis.tanHalfFovY;
   pass.uniforms.aspect.value = basis.aspect;
+}
+
+/**
+ * Maps the canonical `debug.viewMode` (docs/STATE_SCHEMA.md section 8) onto
+ * the shader-side selector: 'diagnostic' -> direction gradient, 'off' -> flat
+ * clear color. Mirrors the CPU contract in src/app/state.ts.
+ */
+export function applyViewModeToDiagnosticUniforms(
+  pass: DiagnosticPass,
+  viewMode: 'diagnostic' | 'off'
+): void {
+  pass.uniforms.viewOff.value = viewMode === 'off' ? 1 : 0;
 }
