@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   cellHasStar,
   directionToCubeCell,
+  faceCoordsToDirection,
   hashU32,
   makeStarfieldParams,
   sampleBrightness,
@@ -9,7 +10,8 @@ import {
   starBrightness,
   starFaceCoords,
   u32ToUnit,
-  type StarfieldParams
+  type StarfieldParams,
+  type Vec3
 } from '../../src/shaders/starfield.js';
 
 function params(overrides: Partial<StarfieldParams> = {}): StarfieldParams {
@@ -254,34 +256,91 @@ describe('base radiance', () => {
 });
 
 describe('direction independence sanity', () => {
-  it('opposite directions generally differ', () => {
-    const p = params({ cellsPerFaceSide: 32 });
-    let differing = 0;
-    let compared = 0;
-    for (let k = 1; k < 60; k += 1) {
-      const d = normalize([k * 0.113, 0.37 - k * 0.004, 0.71]);
-      const rPos = sampleStarfieldRadiance(d, p);
-      const rNeg = sampleStarfieldRadiance([-d[0], -d[1], -d[2]], p);
-      if (rPos[0] !== rNeg[0] || rPos[1] !== rNeg[1] || rPos[2] !== rNeg[2]) {
-        differing += 1;
+  /**
+   * Enumerates up to `limit` star-center directions by walking cells until
+   * enough populated ones are found. Deterministic; exercises the same
+   * hash->projection roundtrip production sampling uses.
+   */
+  function starCenterDirections(p: StarfieldParams, limit: number): Vec3[] {
+    const dirs: Vec3[] = [];
+    outer: for (let f = 0; f < 6; f += 1) {
+      for (let i = 0; i < p.cellsPerFaceSide; i += 1) {
+        for (let j = 0; j < p.cellsPerFaceSide; j += 1) {
+          if (!cellHasStar(f, i, j, p)) continue;
+          const { fu, fv } = starFaceCoords(f, i, j, p);
+          dirs.push(normalize(faceCoordsToDirection(f, fu, fv)));
+          if (dirs.length >= limit) break outer;
+        }
       }
-      compared += 1;
     }
-    expect(differing).toBeGreaterThan(compared / 2);
+    return dirs;
+  }
+
+  /** Finds a direction inside a cell that hosts NO star. */
+  function emptyDirection(p: StarfieldParams): Vec3 {
+    for (let f = 0; f < 6; f += 1) {
+      for (let i = 0; i < p.cellsPerFaceSide; i += 1) {
+        for (let j = 0; j < p.cellsPerFaceSide; j += 1) {
+          if (cellHasStar(f, i, j, p)) continue;
+          // Cell center in face-plane coordinates.
+          const n = p.cellsPerFaceSide;
+          const fu = ((i + 0.5) / n) * 2 - 1;
+          const fv = ((j + 0.5) / n) * 2 - 1;
+          return normalize(faceCoordsToDirection(f, fu, fv));
+        }
+      }
+    }
+    throw new Error('no empty cell exists for the given parameters');
+  }
+
+  it('distinct star centers are visible and mutually different', () => {
+    const p = params();
+    const dirs = starCenterDirections(p, 8);
+    expect(dirs.length).toBeGreaterThanOrEqual(3);
+    const bg = p.backgroundRadiance;
+    const seen = new Set<string>();
+    for (const d of dirs) {
+      const rad = sampleStarfieldRadiance(d, p);
+      const brighter = rad[0] > bg[0] + 1e-9 || rad[1] > bg[1] + 1e-9 || rad[2] > bg[2] + 1e-9;
+      expect(brighter).toBe(true);
+      seen.add(rad.join(','));
+    }
+    // Different stars have independent brightness draws, so not all values
+    // may collapse into one number.
+    expect(seen.size).toBeGreaterThan(1);
   });
 
-  it('sampled field is not direction-symmetric garbage (stars exist)', () => {
-    const p = params({ starDensity: 0.3, cellsPerFaceSide: 32 });
-    let hits = 0;
-    for (let k = 0; k < 4000; k += 1) {
-      const t = k * 2.399963;
-      const z = 1 - (2 * (k + 0.5)) / 4000;
-      const r = Math.sqrt(Math.max(0, 1 - z * z));
-      const d = normalize([r * Math.cos(t), r * Math.sin(t), z]);
-      const bg = p.backgroundRadiance;
-      const rad = sampleStarfieldRadiance(d, p);
-      if (rad[0] > bg[0]) hits += 1;
-    }
-    expect(hits).toBeGreaterThan(50);
+  it('directions in star-free cells return exactly the background', () => {
+    const p = params();
+    const d = emptyDirection(p);
+    const rad = sampleStarfieldRadiance(d, p);
+    const bg = p.backgroundRadiance;
+    expect(rad[0]).toBe(bg[0]);
+    expect(rad[1]).toBe(bg[1]);
+    expect(rad[2]).toBe(bg[2]);
+    // The antipode lands in a different cell; unless it happens to host a
+    // star whose disk covers the direction, it must stay background too.
+  });
+
+  it('a star is not mirrored at the antipode of its center', () => {
+    const p = params({ cellsPerFaceSide: 32 });
+    const [d] = starCenterDirections(p, 1);
+    expect(d).toBeDefined();
+    const radPos = sampleStarfieldRadiance(d!, p);
+    const radNeg = sampleStarfieldRadiance([-d![0], -d![1], -d![2]], p);
+    // At least the star side must exceed background; the antipode is a
+    // different cell with an independent draw.
+    const bg = p.backgroundRadiance;
+    expect(radPos[0] > bg[0] + 1e-9 || radPos[1] > bg[1] + 1e-9 || radPos[2] > bg[2] + 1e-9).toBe(
+      true
+    );
+    // Direction-collapse guard: if the field were symmetric garbage, every
+    // direction would return this same brightened value. The antipode must
+    // either fall back to background or draw a different star value — never
+    // exactly the brightened center reading.
+    const negBright =
+      radNeg[0] > bg[0] + 1e-9 || radNeg[1] > bg[1] + 1e-9 || radNeg[2] > bg[2] + 1e-9;
+    const identical = radNeg[0] === radPos[0] && radNeg[1] === radPos[1] && radNeg[2] === radPos[2];
+    expect(identical && negBright).toBe(false);
   });
 });

@@ -308,15 +308,15 @@ export function starBrightness(face: number, i: number, j: number, p: StarfieldP
 
 /**
  * Smooth quadratic falloff: 1 at center, 0 at the angular radius edge.
- * Polynomial (not exp/sin) so CPU and TSL agree tightly.
+ * t runs 0 (edge) -> 1 (center); profile t*t. Polynomial (not exp/sin) so
+ * CPU and TSL agree tightly.
  */
 export function starFalloff(cosAngle: number, cosRadius: number): number {
   if (cosAngle <= cosRadius) {
     return 0;
   }
   const t = (cosAngle - cosRadius) / (1 - cosRadius);
-  const s = 1 - t;
-  return s * s;
+  return t * t;
 }
 
 // ---------------------------------------------------------------------------

@@ -272,15 +272,15 @@ export function createStarfieldSamplerNode(
     // cosAngle = direction . starDir (the CPU sums the same three products).
     const cosAngle = dot(vec3(dx, dy, dz), starDir);
 
-    // starFalloff: 0 when cosAngle <= cosRadius, else with
-    // t = (cosAngle - cosRadius) / (1 - cosRadius), s = 1 - t: s * s.
-    // Polynomial only, so CPU and TSL agree tightly.
+    // starFalloff: 0 when cosAngle <= cosRadius, else
+    // t = (cosAngle - cosRadius) / (1 - cosRadius), profile t*t
+    // (1 at the star center, 0 at the angular-radius edge). Polynomial only,
+    // so CPU and TSL agree tightly. Mirrors the corrected CPU starFalloff.
     const falloffT = cosAngle.sub(cosRadiusConst).div(float(1).sub(cosRadiusConst));
-    const falloffS = float(1).sub(falloffT);
     const falloff = select(
       cosAngle.lessThanEqual(cosRadiusConst),
       float(0),
-      falloffS.mul(falloffS)
+      falloffT.mul(falloffT)
     );
 
     // starBrightness: salted draw through the inverse CDF.
