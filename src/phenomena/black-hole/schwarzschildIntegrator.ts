@@ -67,7 +67,6 @@ import {
   Fn,
   If,
   Loop,
-  abs,
   and,
   attribute,
   clamp,
@@ -138,9 +137,6 @@ const FINITE_MAGNITUDE_BOUND = 1e30;
 
 /** Fixed bisection count for disk-crossing refinement (NM §10.2). */
 const DISK_BISECTION_ITERATIONS = 24;
-
-/** Floor of the photon-sphere step shrink factor (fraction of full step). */
-const PHOTON_SPHERE_STEP_FLOOR = 0.05;
 
 /** Fallback compile-time loop bound for an unrecognized quality tier. */
 const DEFAULT_LOOP_BOUND = 1024;
@@ -305,7 +301,11 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const uMinStep = uniform(0.001);
   const uMaxStep = uniform(100);
   const uEscapeRadiusRg = uniform(1000);
-  const uCaptureEpsilon = uniform(1e-4);
+  // Capture epsilon in units of M. 1e-4 (the CPU reference value) is
+  // unreachable within GPU tier step budgets because of the horizon
+  // coordinate stall; the f<1e-3 floor condition in the loop is the primary
+  // capture path and this epsilon stays as the outer band.
+  const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
 
   const uniforms: SchwarzschildIntegratorUniforms = {
@@ -509,18 +509,18 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
         });
 
         // --- Step-size policy (NM §9 QUALITY heuristic, not error control).
-        // Far field grows like the CPU reference's r^1.5 law; the horizon
-        // factor shrinks towards 2M; the photon-sphere factor shrinks the
-        // step linearly with |r - 3M| / (3M) ("~r/3 sensitivity"), floored.
+        // Matches the validated CPU reference policy (cpuReference
+        // stepSizeAt): far field grows like r^1.5 beyond 10M, horizon factor
+        // shrinks towards 2M with a 0.02 floor, clamped to [minStep,maxStep]
+        // scaled by M. (An earlier GPU-only extra shrink near the photon
+        // sphere multiplied winding-ray cost several-fold and pushed
+        // near-critical rays over the step budget — visible as a failure-
+        // colored ring around the shadow in first runtime validation. The
+        // CPU-validated policy is used verbatim instead.)
         const farScale = pow(max(r.div(uMassRg.mul(10)), float(1)), float(1.5));
         const nearScale = min(float(1), max(r.sub(uMassRg.mul(2)).div(uMassRg), float(0.02)));
-        const photonSphereScale = clamp(
-          abs(r.sub(uMassRg.mul(3))).div(uMassRg.mul(3)),
-          float(PHOTON_SPHERE_STEP_FLOOR),
-          float(1)
-        );
         const h = clamp(
-          uBaseStep.mul(uMassRg).mul(farScale).mul(nearScale).mul(photonSphereScale),
+          uBaseStep.mul(uMassRg).mul(farScale).mul(nearScale),
           uMinStep.mul(uMassRg),
           uMaxStep.mul(uMassRg)
         );
@@ -612,10 +612,42 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
         });
 
         // --- Horizon capture (NM §10.1), priority over escape.
+        // --- Horizon capture (NM §10.1 + coordinate-stall resolution) ---
+        // Two capture conditions:
+        //  1. r <= (2 + captureEpsilon) * M  (cpuReference §10.1 parity), or
+        //  2. f = 1 - 2M/r < 1e-3 while still infalling (pr < 0).
+        // Condition 2 resolves the COORDINATE STALL of these (t,r)-coordinates:
+        // dr/dlambda = f * pr shrinks proportionally to f, so with a bounded
+        // step budget a ray can spend its whole allowance crawling through the
+        // last ~1e-3 M above the horizon without ever reaching the epsilon
+        // band (this is exactly what the first runtime validation showed as a
+        // purple failure disc where the shadow belongs). Geodesically, a ray
+        // inside f < 1e-3 is already inside the photon-capture region for
+        // every practical purpose; the shadow-boundary error introduced is
+        // orders of magnitude below a pixel at any sane viewport.
         If(r.lessThanEqual(captureRadius), () => {
           status.assign(int(RAY_CAPTURED));
           Break();
         });
+        // Coordinate-stall capture (branch-free gate, see note above):
+        // captured iff pr < 0 AND f = 1 - 2M/r < 1e-3.
+        If(
+          select(pr.lessThan(0), float(1), float(0))
+            .mul(
+              select(
+                float(1)
+                  .sub(uMassRg.mul(2).div(max(r, uMassRg)))
+                  .lessThan(1e-3),
+                float(1),
+                float(0)
+              )
+            )
+            .greaterThan(0.5),
+          () => {
+            status.assign(int(RAY_CAPTURED));
+            Break();
+          }
+        );
 
         // --- Conservative escape (NM §10.3): beyond the radius AND outward.
         If(and(r.greaterThan(uEscapeRadiusRg), pr.greaterThan(0)), () => {

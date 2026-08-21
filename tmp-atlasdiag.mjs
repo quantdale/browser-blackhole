@@ -1,0 +1,15 @@
+import { preview } from 'vite';
+import { chromium } from '@playwright/test';
+const server = await preview({ preview: { port: 4180, host: '127.0.0.1' } });
+const browser = await chromium.launch({ channel: 'msedge' });
+const page = await browser.newPage({ viewport: { width: 800, height: 600 } });
+await page.goto('http://127.0.0.1:4180/atlas/black-hole');
+await page.waitForTimeout(6000);
+console.log('BH inventory:', JSON.stringify(await page.evaluate(() => window.__ATLAS_APP__.host.debugInventory()).catch(e => String(e))));
+await page.screenshot({ path: 'artifacts/validate-bh.png' });
+await page.evaluate(() => window.__ATLAS_APP__.navigate('neutron-star'));
+await page.waitForTimeout(7000);
+console.log('NS inventory:', JSON.stringify(await page.evaluate(() => window.__ATLAS_APP__.host.debugInventory()).catch(e => String(e))));
+await page.screenshot({ path: 'artifacts/validate-ns.png' });
+console.log('NS state:', JSON.stringify(await page.evaluate(() => window.__ATLAS_APP__.host.state.atlas)));
+await browser.close(); await server.close(); process.exit(0);

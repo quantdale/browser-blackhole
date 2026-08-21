@@ -28,6 +28,8 @@ export interface AtlasAppHandle {
 interface AtlasAppWindowHook {
   host: CosmicAtlasHost;
   navigate(destinationId: string, presetId?: string): NavigationIntent | null;
+  /** Renders one frame synchronously and samples a 5x5 grid (same-task readback). */
+  captureFrame(): string[] | null;
 }
 
 /** Top-level destination buttons (Phase 14 taxonomy order). */
@@ -111,10 +113,38 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     }
   });
 
-  // Test/inspection hook (mirrors __BLACKHOLE_APP__ convention from main.ts).
+  // Test/inspection hook (mirrors __BLACKHOLE_TEST__ convention from main.ts).
+  const captureFrame = (): string[] | null => {
+    const rect = viewport.getBoundingClientRect();
+    if (rect.width <= 0 || rect.height <= 0) return null;
+    host.frame(1 / 60); // one deterministic frame, same-task readback
+    const cw = canvas.width;
+    const ch = canvas.height;
+    if (cw <= 0 || ch <= 0) return null;
+    const scratch = document.createElement('canvas');
+    scratch.width = cw;
+    scratch.height = ch;
+    const ctx = scratch.getContext('2d');
+    if (!ctx) return null;
+    ctx.drawImage(canvas, 0, 0);
+    const pts: string[] = [];
+    for (let gy = 0; gy < 5; gy += 1) {
+      for (let gx = 0; gx < 5; gx += 1) {
+        const d = ctx.getImageData(
+          Math.floor(((gx + 0.5) / 5) * cw),
+          Math.floor(((gy + 0.5) / 5) * ch),
+          1,
+          1
+        ).data;
+        pts.push(`${d[0]},${d[1]},${d[2]}`);
+      }
+    }
+    return pts;
+  };
   const hook: AtlasAppWindowHook = {
     host,
-    navigate: (destinationId, presetId) => host.navigate(destinationId, presetId)
+    navigate: (destinationId, presetId) => host.navigate(destinationId, presetId),
+    captureFrame
   };
   (window as unknown as Record<string, unknown>)['__ATLAS_APP__'] = hook;
 
