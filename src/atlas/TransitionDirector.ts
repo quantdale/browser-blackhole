@@ -65,7 +65,7 @@ import type {
   ResourceScope,
   TransitionPhase,
   TransitionPublicState,
-  TransitionRuntimeState,
+  TransitionRuntimeState
 } from './types';
 import type { ResourceManager } from './ResourceManager';
 
@@ -88,7 +88,7 @@ export const DEFAULT_TRANSITION_TIMINGS: TransitionPhaseTimings = {
   outgoingMs: 550,
   hyperspaceMs: 900,
   arrivingMs: 850,
-  reducedMotionScale: 0.6,
+  reducedMotionScale: 0.6
 };
 
 export interface TransitionDirectorOptions {
@@ -137,7 +137,7 @@ export interface TransitionHostCallbacks {
    */
   resolveTarget(
     destinationId: DestinationId,
-    presetId?: string,
+    presetId?: string
   ): { descriptor: PhenomenonDescriptor; preset: PresetDescriptor };
   /** Run the target module's `prepare()`; resolution == minimum-ready. */
   prepare(request: TransitionPrepareRequest): Promise<PreparedPhenomenon>;
@@ -314,7 +314,7 @@ export class TransitionDirector {
     return {
       active: this.phase !== 'idle',
       phase: this.phase === 'idle' ? null : this.phase,
-      progress: this.getProgress(),
+      progress: this.getProgress()
     };
   }
 
@@ -330,7 +330,7 @@ export class TransitionDirector {
       outgoingSnapshot: this.outgoingSnapshot,
       minimumReady: this.minimumReady,
       error: this.error,
-      reducedMotion: this.reducedMotion,
+      reducedMotion: this.reducedMotion
     };
   }
 
@@ -357,7 +357,7 @@ export class TransitionDirector {
   getOverlay(): { texture: Texture | null; opacity: number } {
     return {
       texture: this.pass?.texture ?? null,
-      opacity: this.lastOverlayOpacity,
+      opacity: this.lastOverlayOpacity
     };
   }
 
@@ -398,7 +398,7 @@ export class TransitionDirector {
         detailLabel: null,
         fraction01: null,
         elapsedMs: 0,
-        destinationId: request.destinationId,
+        destinationId: request.destinationId
       });
       return;
     }
@@ -426,12 +426,7 @@ export class TransitionDirector {
       resolved = this.deps.callbacks.resolveTarget(request.destinationId, request.presetId);
     } catch (err) {
       this.error = `Failed to resolve destination '${request.destinationId}': ${errorMessage(err)}`;
-      this.emitError(
-        this.error,
-        request.destinationId,
-        gen,
-        false,
-      );
+      this.emitError(this.error, request.destinationId, gen, false);
       // Never strand the machine in a preparing phase with no active prepare.
       this.resetToIdle(gen);
       return;
@@ -455,7 +450,7 @@ export class TransitionDirector {
       detailLabel: null,
       fraction01: null,
       elapsedMs: 0,
-      destinationId: this.targetId,
+      destinationId: this.targetId
     });
 
     void this.runPrepare(gen, controller, resolved.descriptor, resolved.preset);
@@ -545,7 +540,7 @@ export class TransitionDirector {
     gen: number,
     controller: AbortController,
     descriptor: PhenomenonDescriptor,
-    preset: PresetDescriptor,
+    preset: PresetDescriptor
   ): Promise<void> {
     try {
       const prepared = await this.deps.callbacks.prepare({
@@ -555,7 +550,7 @@ export class TransitionDirector {
         signal: controller.signal,
         reportProgress: (fraction01: number, label?: string) => {
           this.onPrepareProgress(gen, descriptor.id, fraction01, label);
-        },
+        }
       });
 
       // Generation check before EVERY async commit (STATE_AND_ROUTES §5):
@@ -583,14 +578,19 @@ export class TransitionDirector {
     }
   }
 
-  private onPrepareProgress(gen: number, destinationId: DestinationId, fraction01: number, label?: string): void {
+  private onPrepareProgress(
+    gen: number,
+    destinationId: DestinationId,
+    fraction01: number,
+    label?: string
+  ): void {
     if (this.stale(gen)) return; // stale reports never reach the UI
     this.latestProgress = { fraction01: clamp01(fraction01), label: label ?? null };
     this.emitProgress({
       destinationId,
       fraction01: clamp01(fraction01),
       label: label ?? null,
-      generation: gen,
+      generation: gen
     });
   }
 
@@ -610,7 +610,7 @@ export class TransitionDirector {
       detailLabel: this.latestProgress?.label ?? null,
       fraction01: this.latestProgress?.fraction01 ?? null,
       elapsedMs: this.prepareElapsedMs,
-      destinationId: this.targetId,
+      destinationId: this.targetId
     });
   }
 
@@ -690,7 +690,7 @@ export class TransitionDirector {
         `Outgoing disposal failed during handoff: ${errorMessage(err)}`,
         this.sourceId,
         gen,
-        false,
+        false
       );
     }
     this.sourceId = null;
@@ -716,11 +716,11 @@ export class TransitionDirector {
     // (CA1-11 integration listens for this status event).
     this.emitStatus({
       kind: 'route-commit',
-      message: `Arrived at ${prepared.descriptor.title}`,
+      message: `Arrived at ${prepared.module.descriptor.title}`,
       detailLabel: prepared.preset.displayName,
       fraction01: null,
       elapsedMs: 0,
-      destinationId: prepared.preset.destinationId,
+      destinationId: prepared.preset.destinationId
     });
 
     // The frozen frame is obsolete once the target renders underneath.
@@ -760,7 +760,10 @@ export class TransitionDirector {
 
     const t = easeInOutCubic(p);
     const from = this.departureTransform ?? targetPreset;
-    this.deps.cameraRig.applyArrivalPreset(interpolatePresets(from, targetPreset, t, this.tmpA, this.tmpB), 0);
+    this.deps.cameraRig.applyArrivalPreset(
+      interpolatePresets(from, targetPreset, t, this.tmpA, this.tmpB),
+      0
+    );
     if (p >= 1) this.arrivalApplied = true;
   }
 
@@ -876,7 +879,12 @@ export class TransitionDirector {
       this.pass = new HyperspacePass({ seed: Math.floor(rng() * 1e6) + 1 });
       // Track the offscreen target/material in the owned scope so repeated
       // navigation shows bounded resources in the debug inventory (CA0-09).
-      this.scope.track('renderTarget', this.pass, () => this.pass?.dispose(), this.pass.byteEstimate);
+      this.scope.track(
+        'renderTarget',
+        this.pass,
+        () => this.pass?.dispose(),
+        this.pass.byteEstimate
+      );
     }
     return this.pass;
   }
@@ -934,7 +942,7 @@ export class TransitionDirector {
       phase: this.phase,
       generation: this.generation,
       sourceId: this.sourceId,
-      targetId: this.targetId,
+      targetId: this.targetId
     };
     for (const cb of Array.from(this.phaseListeners)) cb(event);
   }
@@ -947,7 +955,12 @@ export class TransitionDirector {
     for (const cb of Array.from(this.statusListeners)) cb(event);
   }
 
-  private emitError(message: string, destinationId: DestinationId | null, generation: number, fatal: boolean): void {
+  private emitError(
+    message: string,
+    destinationId: DestinationId | null,
+    generation: number,
+    fatal: boolean
+  ): void {
     const event: TransitionErrorEvent = { message, destinationId, generation, fatal };
     for (const cb of Array.from(this.errorListeners)) cb(event);
   }
@@ -1038,18 +1051,18 @@ function interpolatePresets(
   to: CameraArrivalPreset,
   t: number,
   scratchA: Vector3,
-  scratchB: Vector3,
+  scratchB: Vector3
 ): CameraArrivalPreset {
   const position = [
     from.position[0] + (to.position[0] - from.position[0]) * t,
     from.position[1] + (to.position[1] - from.position[1]) * t,
-    from.position[2] + (to.position[2] - from.position[2]) * t,
+    from.position[2] + (to.position[2] - from.position[2]) * t
   ] as [number, number, number];
 
   const target = [
     from.target[0] + (to.target[0] - from.target[0]) * t,
     from.target[1] + (to.target[1] - from.target[1]) * t,
-    from.target[2] + (to.target[2] - from.target[2]) * t,
+    from.target[2] + (to.target[2] - from.target[2]) * t
   ] as [number, number, number];
 
   const upFrom = from.up ?? [0, 1, 0];
@@ -1070,7 +1083,7 @@ function interpolatePresets(
     fovDeg = from.fovDeg;
   }
 
-  return { position, target, up, fovDeg };
+  return fovDeg === undefined ? { position, target, up } : { position, target, up, fovDeg };
 }
 
 function errorMessage(err: unknown): string {

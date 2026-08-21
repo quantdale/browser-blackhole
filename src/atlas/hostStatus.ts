@@ -20,13 +20,7 @@ import type { BackendInfo, CapabilityId, CapabilityRequirement } from './types';
 // Stages
 // ---------------------------------------------------------------------------
 
-export type InitStage =
-  | 'capabilities'
-  | 'renderer'
-  | 'services'
-  | 'registry'
-  | 'ready'
-  | 'failed';
+export type InitStage = 'capabilities' | 'renderer' | 'services' | 'registry' | 'ready' | 'failed';
 
 /** Linear boot order. `failed` is terminal and reached only via `fail()`. */
 export const INIT_STAGE_ORDER: readonly InitStage[] = [
@@ -34,7 +28,7 @@ export const INIT_STAGE_ORDER: readonly InitStage[] = [
   'renderer',
   'services',
   'registry',
-  'ready',
+  'ready'
 ];
 
 /** Human-readable per-stage messages used as default transition text. */
@@ -44,7 +38,7 @@ export const INIT_STAGE_DESCRIPTIONS: Record<InitStage, string> = {
   services: 'Starting shared renderer services…',
   registry: 'Loading destination registry…',
   ready: 'Ready.',
-  failed: 'Initialization failed.',
+  failed: 'Initialization failed.'
 };
 
 /**
@@ -141,12 +135,12 @@ export class InitStatusTracker {
   begin(stage: InitStage, message?: string): void {
     if (!isLinearStage(stage)) {
       throw new Error(
-        `InitStatusTracker.begin: '${stage}' is not a linear stage (use fail() for failures).`,
+        `InitStatusTracker.begin: '${stage}' is not a linear stage (use fail() for failures).`
       );
     }
     if (this.currentStage === 'ready' || this.currentStage === 'failed') {
       throw new Error(
-        `InitStatusTracker.begin: cannot advance from terminal stage '${this.currentStage}' (call reset() first).`,
+        `InitStatusTracker.begin: cannot advance from terminal stage '${this.currentStage}' (call reset() first).`
       );
     }
     const nextIndex = INIT_STAGE_ORDER.indexOf(stage);
@@ -154,7 +148,7 @@ export class InitStatusTracker {
       this.currentStage === null ? -1 : INIT_STAGE_ORDER.indexOf(this.currentStage);
     if (nextIndex <= currentIndex) {
       throw new Error(
-        `InitStatusTracker.begin: illegal stage move ${String(this.currentStage)} -> '${stage}'.`,
+        `InitStatusTracker.begin: illegal stage move ${String(this.currentStage)} -> '${stage}'.`
       );
     }
 
@@ -222,7 +216,7 @@ export class InitStatusTracker {
       progress: this.progressValue,
       errorCode: this.errorCodeValue,
       ready: this.ready,
-      failed: this.failed,
+      failed: this.failed
     });
   }
 
@@ -242,7 +236,7 @@ export class InitStatusTracker {
       errorCode: this.errorCodeValue,
       ready: this.ready,
       failed: this.failed,
-      previousStage: this.previousStageValue,
+      previousStage: this.previousStageValue
     });
     for (const listener of this.listeners) {
       listener(event);
@@ -274,39 +268,40 @@ const CAPABILITY_COPY: Record<CapabilityId, CapabilityCopy> = {
     code: 'ENV_WEBGPU_UNAVAILABLE',
     summary: 'WebGPU is required but this browser does not expose it.',
     suggestion:
-      'Open the atlas in a WebGPU-capable browser (Chrome or Edge 113+, or a recent Firefox/Safari) over HTTPS or localhost.',
+      'Open the atlas in a WebGPU-capable browser (Chrome or Edge 113+, or a recent Firefox/Safari) over HTTPS or localhost.'
   },
   'webgpu-compute': {
     code: 'ENV_WEBGPU_COMPUTE_UNAVAILABLE',
     summary: 'GPU compute is required but the active backend does not provide it.',
     suggestion:
-      'Switch to a destination/preset with a non-compute fallback, or use a browser/device whose WebGPU implementation supports compute.',
+      'Switch to a destination/preset with a non-compute fallback, or use a browser/device whose WebGPU implementation supports compute.'
   },
   'storage-buffers': {
     code: 'GPU_STORAGE_BUFFERS_UNSUPPORTED',
-    summary: 'The active GPU adapter does not support the storage buffers this destination requires.',
+    summary:
+      'The active GPU adapter does not support the storage buffers this destination requires.',
     suggestion:
-      'Choose a preset that avoids storage-buffer paths, or try a device with a newer GPU/driver.',
+      'Choose a preset that avoids storage-buffer paths, or try a device with a newer GPU/driver.'
   },
   'float-render-target': {
     code: 'GPU_FLOAT_RENDER_TARGET_UNSUPPORTED',
     summary:
       'Float render targets are required for this destination’s HDR path but are unsupported here.',
     suggestion:
-      'Select a lower-fidelity preset, or use a device whose GPU supports floating-point rendering.',
+      'Select a lower-fidelity preset, or use a device whose GPU supports floating-point rendering.'
   },
   'timestamp-query': {
     code: 'GPU_TIMESTAMP_QUERY_UNSUPPORTED',
     summary: 'GPU timestamp queries are required here but the adapter does not expose them.',
     suggestion:
-      'Continue without GPU timing (CPU wall timing will be labeled as such) or use an adapter with timestamp-query support.',
+      'Continue without GPU timing (CPU wall timing will be labeled as such) or use an adapter with timestamp-query support.'
   },
   'compressed-textures': {
     code: 'GPU_COMPRESSED_TEXTURES_UNSUPPORTED',
     summary: 'A required compressed texture format is unavailable on this device.',
     suggestion:
-      'Use a preset with uncompressed assets, or a device/GPU supporting the needed compressed texture formats.',
-  },
+      'Use a preset with uncompressed assets, or a device/GPU supporting the needed compressed texture formats.'
+  }
 };
 
 export interface MissingCapabilityFinding {
@@ -347,7 +342,7 @@ function capabilitySatisfied(capability: CapabilityId, backend: BackendInfo | nu
  */
 export function evaluateCapabilitySupport(
   backend: BackendInfo | null,
-  required: readonly CapabilityRequirement[],
+  required: readonly CapabilityRequirement[]
 ): CapabilitySupportReport {
   const missingHard: MissingCapabilityFinding[] = [];
   const missingSoft: MissingCapabilityFinding[] = [];
@@ -358,7 +353,7 @@ export function evaluateCapabilitySupport(
     const finding: MissingCapabilityFinding = {
       capability: requirement.capability,
       code: copy.code,
-      summary: copy.summary,
+      summary: copy.summary
     };
     if (requirement.hard) {
       missingHard.push(finding);
@@ -372,7 +367,7 @@ export function evaluateCapabilitySupport(
 
 /** Compose missing-capability findings into one human-readable sentence list. */
 export function formatMissingCapabilityReasons(
-  findings: readonly MissingCapabilityFinding[],
+  findings: readonly MissingCapabilityFinding[]
 ): string {
   return findings.map((finding) => finding.summary).join(' ');
 }
@@ -396,67 +391,69 @@ interface ReasonCopy {
 }
 
 /** Curated copy keyed by stable codes (docs/FAILURE_RECOVERY.md §17). */
-const REASON_COPY: ReadonlyMap<string, ReasonCopy> = new Map(Object.entries({
-  ENV_WEBGPU_UNAVAILABLE: {
-    title: 'WebGPU is unavailable',
-    detail:
-      'This browser does not expose the WebGPU API, which Cosmic Atlas requires for rendering. The application cannot start.',
-    suggestions: [
-      'Use a WebGPU-capable browser such as Chrome or Edge 113+ (or a recent Firefox/Safari).',
-      'Serve the page over HTTPS or localhost — WebGPU requires a secure context.',
-      'Check that WebGPU is not disabled by browser flags or device policy.',
-    ],
-  },
-  ENV_WEBGL2_UNAVAILABLE: {
-    title: 'Graphics fallback unavailable',
-    detail:
-      'Neither WebGPU nor the WebGL2 fallback could be initialized, so there is no compatible rendering path on this system.',
-    suggestions: [
-      'Update your browser to the latest version.',
-      'Verify hardware acceleration is enabled in browser settings.',
-      'Try another device with a supported GPU.',
-    ],
-  },
-  GPU_ADAPTER_FAILED: {
-    title: 'Graphics adapter could not be selected',
-    detail:
-      'The browser could not provide a usable GPU adapter. Rendering cannot continue on this device right now.',
-    suggestions: [
-      'Reload the page to retry adapter acquisition.',
-      'Update your GPU driver and browser, then retry.',
-      'Try a different browser or device.',
-    ],
-  },
-  GPU_DEVICE_FAILED: {
-    title: 'Graphics device could not be created',
-    detail:
-      'A GPU adapter was found but the rendering device could not be created. The application cannot start rendering.',
-    suggestions: [
-      'Reload the page to retry.',
-      'Close other GPU-heavy applications and retry.',
-      'Update your GPU driver or try another browser.',
-    ],
-  },
-  GPU_DEVICE_LOST: {
-    title: 'Graphics device was lost',
-    detail:
-      'The GPU device was lost during or after startup. Recovery did not succeed, so the application cannot continue rendering on this device.',
-    suggestions: [
-      'Reload the page to restart with a fresh device.',
-      'If this repeats, lower quality settings once running, or update your GPU driver.',
-    ],
-  },
-  GPU_PIPELINE_FAILED: {
-    title: 'Renderer initialization failed',
-    detail:
-      'The rendering pipeline could not be compiled or configured for this device. Initialization stopped visibly instead of showing a degraded fake.',
-    suggestions: [
-      'Reload the page to retry initialization.',
-      'Update your browser/GPU driver, then retry.',
-      'If the failure persists, report the error code shown below.',
-    ],
-  },
-}));
+const REASON_COPY: ReadonlyMap<string, ReasonCopy> = new Map(
+  Object.entries({
+    ENV_WEBGPU_UNAVAILABLE: {
+      title: 'WebGPU is unavailable',
+      detail:
+        'This browser does not expose the WebGPU API, which Cosmic Atlas requires for rendering. The application cannot start.',
+      suggestions: [
+        'Use a WebGPU-capable browser such as Chrome or Edge 113+ (or a recent Firefox/Safari).',
+        'Serve the page over HTTPS or localhost — WebGPU requires a secure context.',
+        'Check that WebGPU is not disabled by browser flags or device policy.'
+      ]
+    },
+    ENV_WEBGL2_UNAVAILABLE: {
+      title: 'Graphics fallback unavailable',
+      detail:
+        'Neither WebGPU nor the WebGL2 fallback could be initialized, so there is no compatible rendering path on this system.',
+      suggestions: [
+        'Update your browser to the latest version.',
+        'Verify hardware acceleration is enabled in browser settings.',
+        'Try another device with a supported GPU.'
+      ]
+    },
+    GPU_ADAPTER_FAILED: {
+      title: 'Graphics adapter could not be selected',
+      detail:
+        'The browser could not provide a usable GPU adapter. Rendering cannot continue on this device right now.',
+      suggestions: [
+        'Reload the page to retry adapter acquisition.',
+        'Update your GPU driver and browser, then retry.',
+        'Try a different browser or device.'
+      ]
+    },
+    GPU_DEVICE_FAILED: {
+      title: 'Graphics device could not be created',
+      detail:
+        'A GPU adapter was found but the rendering device could not be created. The application cannot start rendering.',
+      suggestions: [
+        'Reload the page to retry.',
+        'Close other GPU-heavy applications and retry.',
+        'Update your GPU driver or try another browser.'
+      ]
+    },
+    GPU_DEVICE_LOST: {
+      title: 'Graphics device was lost',
+      detail:
+        'The GPU device was lost during or after startup. Recovery did not succeed, so the application cannot continue rendering on this device.',
+      suggestions: [
+        'Reload the page to restart with a fresh device.',
+        'If this repeats, lower quality settings once running, or update your GPU driver.'
+      ]
+    },
+    GPU_PIPELINE_FAILED: {
+      title: 'Renderer initialization failed',
+      detail:
+        'The rendering pipeline could not be compiled or configured for this device. Initialization stopped visibly instead of showing a degraded fake.',
+      suggestions: [
+        'Reload the page to retry initialization.',
+        'Update your browser/GPU driver, then retry.',
+        'If the failure persists, report the error code shown below.'
+      ]
+    }
+  })
+);
 
 const GENERIC_REASON_COPY: ReasonCopy = {
   title: 'Cosmic Atlas cannot run on this device',
@@ -465,8 +462,8 @@ const GENERIC_REASON_COPY: ReasonCopy = {
   suggestions: [
     'Reload the page and retry.',
     'Try a current version of Chrome, Edge, Firefox, or Safari.',
-    'If a specific feature was named in the message, choose a destination or preset that does not require it.',
-  ],
+    'If a specific feature was named in the message, choose a destination or preset that does not require it.'
+  ]
 };
 
 function capabilityReasonCopy(code: string): ReasonCopy | null {
@@ -499,7 +496,7 @@ function describeBackend(backend: BackendInfo | null): string {
  */
 export function buildUnsupportedMessage(
   backend: BackendInfo | null,
-  reason: string,
+  reason: string
 ): UnsupportedDeviceMessage {
   const normalizedCode = reason.trim().toUpperCase();
   let copy: ReasonCopy;
@@ -531,6 +528,6 @@ export function buildUnsupportedMessage(
     title: copy.title,
     detail: detailLines.join(' '),
     suggestions: [...copy.suggestions],
-    code,
+    code
   };
 }

@@ -9,27 +9,19 @@
  */
 
 import type * as THREE from 'three';
+import type { WebGPURenderer } from 'three/webgpu';
 
 // ---------------------------------------------------------------------------
 // Enums and primitive aliases
 // ---------------------------------------------------------------------------
 
 /** Declared scientific fidelity of a destination. Never overstate. */
-export type FidelityClass =
-  | 'DIRECT'
-  | 'DATA_DRIVEN'
-  | 'PROCEDURAL_SCIENTIFIC'
-  | 'CINEMATIC';
+export type FidelityClass = 'DIRECT' | 'DATA_DRIVEN' | 'PROCEDURAL_SCIENTIFIC' | 'CINEMATIC';
 
 export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra';
 export type QualityTier = 'low' | 'medium' | 'high' | 'ultra';
 
-export type DestinationGroup =
-  | 'compact'
-  | 'catastrophe'
-  | 'galactic'
-  | 'expansion'
-  | 'lab';
+export type DestinationGroup = 'compact' | 'catastrophe' | 'galactic' | 'expansion' | 'lab';
 
 export type DestinationId = string;
 
@@ -139,7 +131,7 @@ export interface ResourceScope {
     kind: ResourceKind,
     handle: unknown,
     disposer: (() => void) | null,
-    estimatedBytes?: number,
+    estimatedBytes?: number
   ): void;
   /** Release a single previously tracked resource. */
   release(handle: unknown): void;
@@ -164,7 +156,7 @@ export interface BackendInfo {
   devicePixelRatio: number;
 }
 
-export type RendererLike = THREE.WebGPURenderer | THREE.WebGLRenderer;
+export type RendererLike = WebGPURenderer | THREE.WebGLRenderer;
 
 /**
  * TSL node-function alias. Density/emission callbacks are TSL `Fn` graph
@@ -285,7 +277,10 @@ export interface KeyframeTrack {
 export interface ITrajectoryService {
   /** Analytic Kepler orbit sampler returning world-space position at time t. */
   sampleKepler(elements: KeplerElements, tSeconds: number, out: THREE.Vector3): THREE.Vector3;
-  buildSpline(points: THREE.Vector3[], closed?: boolean): {
+  buildSpline(
+    points: THREE.Vector3[],
+    closed?: boolean
+  ): {
     sample(t01: number, out: THREE.Vector3): THREE.Vector3;
     arcLength(): number;
   };
@@ -319,7 +314,7 @@ export interface IFieldLineService {
     stepsPerLine: number,
     stepSize: number,
     color: [number, number, number],
-    opacity: number,
+    opacity: number
   ): THREE.LineSegments;
   dispose(): void;
 }
@@ -430,11 +425,7 @@ export interface PhaseMapping {
 // Atlas state schema (STATE_AND_ROUTES §1)
 // ---------------------------------------------------------------------------
 
-export type TransitionPhase =
-  | 'preparing'
-  | 'outgoing'
-  | 'hyperspace'
-  | 'arriving';
+export type TransitionPhase = 'preparing' | 'outgoing' | 'hyperspace' | 'arriving';
 
 export interface TransitionPublicState {
   active: boolean;

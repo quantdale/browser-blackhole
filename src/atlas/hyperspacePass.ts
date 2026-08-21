@@ -34,11 +34,14 @@ import {
   RenderTarget,
   UnsignedByteType,
   type Texture,
+  type WebGLRenderTarget
 } from 'three';
-import { MeshBasicNodeMaterial, QuadMesh } from 'three/webgpu';
+import { MeshBasicNodeMaterial, QuadMesh, type Node, type UniformNode } from 'three/webgpu';
 import {
-  atan2,
+  add,
+  atan,
   clamp,
+  div,
   exp,
   floor,
   fract,
@@ -46,21 +49,18 @@ import {
   length,
   max,
   mix,
+  mul,
   mx_fractal_noise_float,
   oneMinus,
   pow,
   smoothstep,
   step,
   sub,
-  add,
-  div,
-  mul,
   uv,
   uniform,
   vec2,
   vec3,
-  vec4,
-  type ShaderNodeObject,
+  vec4
 } from 'three/tsl';
 import type { RendererLike } from './types';
 
@@ -81,13 +81,17 @@ export interface HyperspacePassOptions {
 }
 
 /**
- * Canonical node-expression type produced by TSL operators. Every value this
- * file stores or passes between helpers is an operator result, so a single
- * alias keeps the graph code assignment-safe under strict TypeScript.
+ * Canonical scalar node-expression type produced by TSL operators. Streak
+ * layer contributions are float operator results, so this alias keeps the
+ * accumulation code assignment-safe under strict TypeScript.
  */
-type Fx = ReturnType<typeof add>;
+type Fx = Node<'float'>;
 
-type TravelUniform = ReturnType<typeof uniform<number>>;
+/** Float uniform node as produced by `uniform(<number>)`. */
+type TravelUniform = UniformNode<'float', number>;
+
+/** Render target accepted by either backend of `RendererLike`. */
+type AnyRenderTarget = WebGLRenderTarget | null;
 
 /** Hard cap so the transition can never allocate an oversized target. */
 const MAX_DIMENSION_PX = 2048;
@@ -167,7 +171,7 @@ export class HyperspacePass {
       wrapS: ClampToEdgeWrapping,
       wrapT: ClampToEdgeWrapping,
       format: RGBAFormat,
-      type: UnsignedByteType,
+      type: UnsignedByteType
     });
   }
 
@@ -180,7 +184,7 @@ export class HyperspacePass {
    * Output alpha is a dedicated uniform so the director fully controls the
    * composite envelope independent of the RGB content.
    */
-  private buildColorGraph(): ShaderNodeObject<ReturnType<typeof vec4>> {
+  private buildColorGraph(): Node<'vec4'> {
     const uv01 = uv();
     const centered = sub(uv01, 0.5);
     const p = mul(centered, vec2(this.uAspect, 1.0));
@@ -202,21 +206,18 @@ export class HyperspacePass {
     const tone = this.streakField(p, 53.17);
     const tinted = mul(streaks, mix(vec3(0.58, 0.7, 1.0), vec3(1.0, 0.97, 0.9), tone));
     // Restrained violet bloom on high-tone regions.
-    const bloomed = add(
-      tinted,
-      mul(vec3(0.42, 0.28, 0.85), mul(pow(tone, 2.0), 0.2)),
-    );
+    const bloomed = add(tinted, mul(vec3(0.42, 0.28, 0.85), mul(pow(tone, 2.0), 0.2)));
 
     // Domain-warped nebula wisps drifting slowly down the tunnel.
     const noisePos = vec3(
       mul(p.x, 2.3),
       mul(p.y, 2.3),
-      add(mul(this.uTravel, 0.06), mul(this.uSeed, 0.37)),
+      add(mul(this.uTravel, 0.06), mul(this.uSeed, 0.37))
     );
     const wisp = mx_fractal_noise_float(noisePos, 3, 2.0, 0.5);
     const withWisps = add(
       bloomed,
-      mul(max(wisp, 0.0), mul(vec3(0.45, 0.35, 0.85), mul(this.uIntensity, 0.16))),
+      mul(max(wisp, 0.0), mul(vec3(0.45, 0.35, 0.85), mul(this.uIntensity, 0.16)))
     );
 
     // Tunnel-end core glow: soft light at the convergence point.
@@ -250,9 +251,9 @@ export class HyperspacePass {
    * pass a radially scaled `p` for chromatic separation, or a seed shift to
    * decorrelate the tone sample from the color channels.
    */
-  private streakField(p: Fx, seedShift = 0) {
+  private streakField(p: Node<'vec2'>, seedShift = 0) {
     const r = add(length(p), 1e-4);
-    const angle01 = add(div(atan2(p.y, p.x), Math.PI * 2), 0.5);
+    const angle01 = add(div(atan(p.y, p.x), Math.PI * 2), 0.5);
     const seed = add(this.uSeed, seedShift);
     const contributions: Fx[] = [];
 
@@ -272,17 +273,12 @@ export class HyperspacePass {
       const q = div(1.0, r);
       const s = add(
         add(mul(q, mul(depthK, add(0.7, mul(h1, 0.6)))), mul(this.uTravel, speedMul)),
-        mul(h1, 37.7),
+        mul(h1, 37.7)
       );
       const zCell = floor(s);
       const fZ = fract(s);
 
-      const h2 = hash(
-        add(
-          add(mul(zCell, 91.7), mul(idA, 41.3)),
-          add(mul(seed, 3.1), layer * 5.9),
-        ),
-      );
+      const h2 = hash(add(add(mul(zCell, 91.7), mul(idA, 41.3)), add(mul(seed, 3.1), layer * 5.9)));
       const exist = step(existThreshold, h2);
 
       // Bright head with exponential tail along the travel direction; tail
@@ -292,23 +288,18 @@ export class HyperspacePass {
       const halfWidth = add(0.1, mul(h1, 0.25));
       const angularWindow = mul(
         smoothstep(0.0, halfWidth, fA),
-        oneMinus(smoothstep(sub(1.0, halfWidth), 1.0, fA)),
+        oneMinus(smoothstep(sub(1.0, halfWidth), 1.0, fA))
       );
       // Fade out the singular center and the far corners.
-      const radialMask = mul(
-        smoothstep(0.02, 0.2, r),
-        oneMinus(smoothstep(0.55, 1.45, r)),
-      );
+      const radialMask = mul(smoothstep(0.02, 0.2, r), oneMinus(smoothstep(0.55, 1.45, r)));
 
-      contributions.push(
-        mul(mul(mul(mul(head, angularWindow), exist), radialMask), brightness),
-      );
+      contributions.push(mul(mul(mul(mul(head, angularWindow), exist), radialMask), brightness));
     }
 
     // STREAK_LAYERS >= 1 guarantees at least one contribution.
-    let sum: Fx = contributions[0];
+    let sum: Fx = contributions[0]!;
     for (let i = 1; i < contributions.length; i++) {
-      sum = add(sum, contributions[i]);
+      sum = add(sum, contributions[i]!);
     }
     return clamp(sum, 0.0, 1.0);
   }
@@ -367,11 +358,11 @@ export class HyperspacePass {
   render(renderer: RendererLike): void {
     if (this.disposed || !this.target) return;
     const previous = renderer.getRenderTarget();
-    renderer.setRenderTarget(this.target);
+    renderer.setRenderTarget(this.target as AnyRenderTarget);
     // WebGPURenderer satisfies QuadMesh's Renderer parameter; three r180
     // drives both WebGPU and WebGL2 backends through WebGPURenderer.
     (this.quad.render as (r: RendererLike) => void)(renderer);
-    renderer.setRenderTarget(previous);
+    renderer.setRenderTarget(previous as AnyRenderTarget);
   }
 
   /** Release the render target and material. Idempotent. */

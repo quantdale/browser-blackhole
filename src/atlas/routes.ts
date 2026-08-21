@@ -55,9 +55,7 @@ export interface ParsedRoute {
 // ---------------------------------------------------------------------------
 
 /** Either a bare destination id, or an id paired with its URL route token. */
-export type KnownDestinationEntry =
-  | string
-  | { id: DestinationId; route?: string };
+export type KnownDestinationEntry = string | { id: DestinationId; route?: string };
 
 /**
  * Maps URL/route tokens and ids to canonical destination ids. `null` until
@@ -156,9 +154,7 @@ export function parseRoute(pathname: string, search: string): ParsedRoute {
 
   const destinationToken = segments[1];
   const destination =
-    destinationToken !== undefined && destinationToken.trim().length > 0
-      ? destinationToken
-      : null;
+    destinationToken !== undefined && destinationToken.trim().length > 0 ? destinationToken : null;
 
   const queryString = rawSearch.startsWith('?') ? rawSearch.slice(1) : rawSearch;
   let preset: string | null = null;
@@ -211,8 +207,7 @@ export function buildRoute(destinationId: string, presetId?: string): string {
  * registry lookup). Never throws.
  */
 export function resolveDestination(parsed: ParsedRoute): DestinationId {
-  const token =
-    parsed && typeof parsed.destination === 'string' ? parsed.destination.trim() : '';
+  const token = parsed && typeof parsed.destination === 'string' ? parsed.destination.trim() : '';
   if (token.length === 0) return DEFAULT_DESTINATION;
   if (destinationIndex === null) return token;
 
@@ -286,7 +281,8 @@ export interface HistoryRoutingHandle {
  * All methods are total; a missing `onNavigate` degrades to a no-op.
  */
 export function installHistoryRouting(callbacks: HistoryRoutingCallbacks): HistoryRoutingHandle {
-  const notify = callbacks && typeof callbacks.onNavigate === 'function' ? callbacks.onNavigate : () => {};
+  const notify =
+    callbacks && typeof callbacks.onNavigate === 'function' ? callbacks.onNavigate : () => {};
 
   const canUseHistory =
     typeof window !== 'undefined' &&
@@ -297,19 +293,19 @@ export function installHistoryRouting(callbacks: HistoryRoutingCallbacks): Histo
 
   const applyRoute = (route: ParsedRoute, method: 'push' | 'replace'): void => {
     const safeRoute: ParsedRoute =
-      route && typeof route === 'object'
-        ? route
-        : { destination: null, preset: null };
+      route && typeof route === 'object' ? route : { destination: null, preset: null };
     const url = buildRoute(
       safeRoute.destination ?? DEFAULT_DESTINATION,
-      safeRoute.preset ?? undefined,
+      safeRoute.preset ?? undefined
     );
 
     if (canUseHistory) {
       let currentUrl: string | null = null;
       try {
+        const currentParsed = parseRoute(window.location.pathname, window.location.search);
         currentUrl = buildRoute(
-          parseRoute(window.location.pathname, window.location.search),
+          currentParsed.destination ?? DEFAULT_DESTINATION,
+          currentParsed.preset ?? undefined
         );
       } catch {
         currentUrl = null;
@@ -347,6 +343,6 @@ export function installHistoryRouting(callbacks: HistoryRoutingCallbacks): Histo
       if (canUseHistory) {
         window.removeEventListener('popstate', onPopState);
       }
-    },
+    }
   };
 }

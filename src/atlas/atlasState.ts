@@ -22,7 +22,7 @@ import type {
   DestinationId,
   TransitionPhase,
   TransitionPublicState,
-  VersionedDestinationState,
+  VersionedDestinationState
 } from './types';
 
 // ---------------------------------------------------------------------------
@@ -127,7 +127,10 @@ export interface AtlasStateKnownIds {
   presetIdsByDestination?: Readonly<Record<string, readonly string[] | ReadonlySet<string>>>;
 }
 
-function idListContains(ids: ReadonlySet<string> | readonly string[] | undefined, id: string): boolean {
+function idListContains(
+  ids: ReadonlySet<string> | readonly string[] | undefined,
+  id: string
+): boolean {
   if (ids === undefined) return true;
   return typeof (ids as ReadonlySet<string>).has === 'function'
     ? (ids as ReadonlySet<string>).has(id)
@@ -145,7 +148,7 @@ function idListContains(ids: ReadonlySet<string> | readonly string[] | undefined
  * enter (ARCHITECTURE §4).
  */
 export function createDefaultAtlasState(
-  activeDestination: DestinationId = DEFAULT_ACTIVE_DESTINATION,
+  activeDestination: DestinationId = DEFAULT_ACTIVE_DESTINATION
 ): CosmicAtlasStateV1 {
   return {
     schemaVersion: 1,
@@ -154,30 +157,30 @@ export function createDefaultAtlasState(
       activePreset: DEFAULT_ACTIVE_PRESET,
       targetDestination: null,
       targetPreset: null,
-      transition: { active: false, phase: null, progress: 0 },
+      transition: { active: false, phase: null, progress: 0 }
     },
     sharedVisual: {
       exposure: 1,
       bloomEnabled: true,
       bloomStrength: 0.5,
-      toneMapping: 'aces-filmic',
+      toneMapping: 'aces-filmic'
     },
     rendering: {
       qualityMode: 'auto',
       targetFps: 60,
-      renderScaleOverride: null,
+      renderScaleOverride: null
     },
     accessibility: {
       reducedMotion: false,
-      highContrastUi: false,
+      highContrastUi: false
     },
     camera: {
       azimuthDeg: 0,
       polarDeg: 90,
       distance: 20,
-      fovDeg: 60,
+      fovDeg: 60
     },
-    destinations: {},
+    destinations: {}
   };
 }
 
@@ -208,7 +211,7 @@ export function createDefaultAtlasState(
  */
 export function validateAtlasState(
   input: unknown,
-  knownIds?: AtlasStateKnownIds,
+  knownIds?: AtlasStateKnownIds
 ): CosmicAtlasStateV1 {
   const defaults = createDefaultAtlasState();
   if (!isPlainObject(input)) return defaults;
@@ -264,7 +267,7 @@ export function validateAtlasState(
   const transition: TransitionPublicState = {
     active: boolOr(transitionRaw['active'], false),
     phase: transitionPhase,
-    progress: clampFinite(transitionRaw['progress'], 0, 1, 0),
+    progress: clampFinite(transitionRaw['progress'], 0, 1, 0)
   };
 
   // --- sharedVisual ----------------------------------------------------------
@@ -301,7 +304,7 @@ export function validateAtlasState(
       activePreset,
       targetDestination,
       targetPreset,
-      transition,
+      transition
     },
     sharedVisual: {
       exposure: clampFinite(visualRaw['exposure'], EXPOSURE_RANGE.min, EXPOSURE_RANGE.max, 1),
@@ -310,9 +313,9 @@ export function validateAtlasState(
         visualRaw['bloomStrength'],
         BLOOM_STRENGTH_RANGE.min,
         BLOOM_STRENGTH_RANGE.max,
-        0.5,
+        0.5
       ),
-      toneMapping: enumOr(visualRaw['toneMapping'], TONE_MAPPING_VALUES, 'aces-filmic'),
+      toneMapping: enumOr(visualRaw['toneMapping'], TONE_MAPPING_VALUES, 'aces-filmic')
     },
     rendering: {
       qualityMode: enumOr(renderingRaw['qualityMode'], QUALITY_MODE_VALUES, 'auto'),
@@ -320,37 +323,37 @@ export function validateAtlasState(
       renderScaleOverride: clampFiniteOrNull(
         renderingRaw['renderScaleOverride'],
         RENDER_SCALE_OVERRIDE_RANGE.min,
-        RENDER_SCALE_OVERRIDE_RANGE.max,
-      ),
+        RENDER_SCALE_OVERRIDE_RANGE.max
+      )
     },
     accessibility: {
       reducedMotion: boolOr(accessRaw['reducedMotion'], false),
-      highContrastUi: boolOr(accessRaw['highContrastUi'], false),
+      highContrastUi: boolOr(accessRaw['highContrastUi'], false)
     },
     camera: {
       azimuthDeg: normalizeAzimuthDeg(
-        clampFinite(cameraRaw['azimuthDeg'], -3600, 3600, defaults.camera.azimuthDeg),
+        clampFinite(cameraRaw['azimuthDeg'], -3600, 3600, defaults.camera.azimuthDeg)
       ),
       polarDeg: clampFinite(
         cameraRaw['polarDeg'],
         CAMERA_POLAR_DEG_RANGE.min,
         CAMERA_POLAR_DEG_RANGE.max,
-        defaults.camera.polarDeg,
+        defaults.camera.polarDeg
       ),
       distance: clampFinite(
         cameraRaw['distance'],
         CAMERA_DISTANCE_RANGE.min,
         CAMERA_DISTANCE_RANGE.max,
-        defaults.camera.distance,
+        defaults.camera.distance
       ),
       fovDeg: clampFinite(
         cameraRaw['fovDeg'],
         CAMERA_FOV_DEG_RANGE.min,
         CAMERA_FOV_DEG_RANGE.max,
-        defaults.camera.fovDeg,
-      ),
+        defaults.camera.fovDeg
+      )
     },
-    destinations,
+    destinations
   };
 }
 
@@ -465,7 +468,7 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
       activePreset: preset ?? DEFAULT_ACTIVE_PRESET,
       targetDestination: null,
       targetPreset: null,
-      transition: { active: false, phase: null, progress: 0 },
+      transition: { active: false, phase: null, progress: 0 }
     };
   }
 
@@ -473,21 +476,32 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
   const bloomEnabled = read('b');
   const bloomStrength = read('bs');
   const toneMapping = read('t');
-  if (exposure !== null || bloomEnabled !== null || bloomStrength !== null || toneMapping !== null) {
+  if (
+    exposure !== null ||
+    bloomEnabled !== null ||
+    bloomStrength !== null ||
+    toneMapping !== null
+  ) {
     result.sharedVisual = {
       exposure:
         exposure !== null
           ? clampFinite(Number(exposure), EXPOSURE_RANGE.min, EXPOSURE_RANGE.max, 1)
           : defaults.sharedVisual.exposure,
-      bloomEnabled: bloomEnabled !== null ? bloomEnabled !== '0' : defaults.sharedVisual.bloomEnabled,
+      bloomEnabled:
+        bloomEnabled !== null ? bloomEnabled !== '0' : defaults.sharedVisual.bloomEnabled,
       bloomStrength:
         bloomStrength !== null
-          ? clampFinite(Number(bloomStrength), BLOOM_STRENGTH_RANGE.min, BLOOM_STRENGTH_RANGE.max, 0.5)
+          ? clampFinite(
+              Number(bloomStrength),
+              BLOOM_STRENGTH_RANGE.min,
+              BLOOM_STRENGTH_RANGE.max,
+              0.5
+            )
           : defaults.sharedVisual.bloomStrength,
       toneMapping:
         toneMapping !== null
           ? enumOr(toneMapping, TONE_MAPPING_VALUES, 'aces-filmic')
-          : defaults.sharedVisual.toneMapping,
+          : defaults.sharedVisual.toneMapping
     };
   }
 
@@ -496,7 +510,7 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
     result.rendering = {
       qualityMode: enumOr(qualityMode, QUALITY_MODE_VALUES, 'auto'),
       targetFps: defaults.rendering.targetFps,
-      renderScaleOverride: defaults.rendering.renderScaleOverride,
+      renderScaleOverride: defaults.rendering.renderScaleOverride
     };
   }
 
@@ -504,7 +518,7 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
   if (reducedMotion !== null) {
     result.accessibility = {
       reducedMotion: reducedMotion !== '0' && reducedMotion !== '',
-      highContrastUi: defaults.accessibility.highContrastUi,
+      highContrastUi: defaults.accessibility.highContrastUi
     };
   }
 

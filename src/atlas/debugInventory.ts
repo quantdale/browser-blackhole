@@ -19,14 +19,15 @@ import type {
   GovernorActivityMode,
   IPerformanceGovernor,
   QualityTier,
-  ResourceScopeCounters,
+  ResourceScopeCounters
 } from './types';
+import type { ScopeInventory } from './ResourceManager';
 
 // ---------------------------------------------------------------------------
 // Structural inputs (kept minimal so this module only depends on what it reads)
 // ---------------------------------------------------------------------------
 
-/** One scope entry as exposed by `ResourceManager.debugInventory()` (CA0-04). */
+/** One scope entry as rendered by the inventory view. */
 export interface ResourceScopeInventoryEntry {
   readonly name: string;
   readonly disposed: boolean;
@@ -35,17 +36,12 @@ export interface ResourceScopeInventoryEntry {
 
 /**
  * Minimal structural contract assumed for `ResourceManager.debugInventory()`.
- * The ResourceManager worker owns the real signature; this module only relies
- * on a `scopes` array of `{ name, disposed, counters }` entries and computes
- * all aggregates itself, so integration only has to satisfy this shape.
+ * The real manager signature returns `ScopeInventory[]` — rows of
+ * `{ name, snapshot }` covering LIVE scopes only (disposed scopes are pruned
+ * by the manager before reporting, so `disposed` is always false here).
  */
-export interface ResourceDebugInventory {
-  readonly scopes: readonly ResourceScopeInventoryEntry[];
-}
-
-/** Resource provider piece; `null` before services are initialized. */
 export type DebugInventoryResourceSource = {
-  debugInventory(): ResourceDebugInventory;
+  debugInventory(): ScopeInventory[];
 } | null;
 
 /** Governor piece narrowed to the fields the inventory reports. */
@@ -109,7 +105,7 @@ function emptyCounters(): ResourceScopeCounters {
     listener: 0,
     timer: 0,
     pendingFetch: 0,
-    estimatedGpuBytes: 0,
+    estimatedGpuBytes: 0
   };
 }
 
@@ -142,8 +138,15 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
 
   if (pieces.resources !== null) {
     try {
+      // ResourceManager.debugInventory() reports live scopes as
+      // `{ name, snapshot }` rows; disposed scopes never appear (the manager
+      // prunes them), so `disposed` is false for every reported entry.
       const inventory = pieces.resources.debugInventory();
-      scopes = inventory.scopes;
+      scopes = inventory.map((row) => ({
+        name: row.name,
+        disposed: false,
+        counters: row.snapshot
+      }));
       resourceInventoryAvailable = true;
     } catch (error) {
       resourceInventoryError =
@@ -174,7 +177,7 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
         : {
             tier: pieces.governor.currentTier,
             renderScale: pieces.governor.renderScale,
-            activityMode: pieces.governor.activityMode,
+            activityMode: pieces.governor.activityMode
           },
     backend: pieces.backend,
     resourceScopes: scopes,
@@ -183,7 +186,7 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
     liveScopeCount,
     disposedScopeCount,
     totalResourceCounts: totals,
-    totalEstimatedGpuBytes: totals.estimatedGpuBytes,
+    totalEstimatedGpuBytes: totals.estimatedGpuBytes
   };
 }
 
@@ -244,9 +247,7 @@ export function formatInventoryText(view: DebugInventoryView): string {
   }
 
   lines.push(`${label('renderer generation')}${view.rendererGeneration}`);
-  lines.push(
-    `${label('active destination')}${view.activeDestinationId ?? 'none'}`,
-  );
+  lines.push(`${label('active destination')}${view.activeDestinationId ?? 'none'}`);
   lines.push(`${label('pending prepares')}${view.pendingPrepares}`);
 
   if (view.governor !== null) {
@@ -263,7 +264,7 @@ export function formatInventoryText(view: DebugInventoryView): string {
     lines.push(
       view.resourceInventoryError !== null
         ? `unavailable (${view.resourceInventoryError})`
-        : 'unavailable (ResourceManager not initialized)',
+        : 'unavailable (ResourceManager not initialized)'
     );
   } else {
     lines.push(`${label('live scopes')}${view.liveScopeCount}`);
@@ -274,7 +275,7 @@ export function formatInventoryText(view: DebugInventoryView): string {
       `${label('totals')}tex=${c.texture} cube=${c.cubeTexture} vol=${c.volumeTexture}` +
         ` buf=${c.buffer} sbuf=${c.storageBuffer} geo=${c.geometry} rt=${c.renderTarget}` +
         ` mat=${c.material} workers=${c.worker} listeners=${c.listener} timers=${c.timer}` +
-        ` fetch=${c.pendingFetch}`,
+        ` fetch=${c.pendingFetch}`
     );
     for (const scope of view.resourceScopes) {
       lines.push(formatScopeLine(scope));

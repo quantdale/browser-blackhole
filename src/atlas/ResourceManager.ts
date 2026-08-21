@@ -15,12 +15,9 @@
 import {
   RESOURCE_COUNTER_KEYS,
   ResourceScope,
-  createEmptyCounters,
+  createEmptyCounters
 } from '../renderer/shared/ResourceScope';
-import type {
-  ResourceScope as ResourceScopeContract,
-  ResourceScopeCounters,
-} from './types';
+import type { ResourceScope as ResourceScopeContract, ResourceScopeCounters } from './types';
 
 /** Default shared-cache byte budget: 256 MB. */
 const DEFAULT_CACHE_BUDGET_BYTES = 256 * 1024 * 1024;
@@ -83,7 +80,7 @@ export class ResourceManager {
   constructor(byteBudget: number = DEFAULT_CACHE_BUDGET_BYTES) {
     if (!(byteBudget > 0)) {
       throw new Error(
-        `ResourceManager: byteBudget must be a positive finite number, got ${byteBudget}.`,
+        `ResourceManager: byteBudget must be a positive finite number, got ${byteBudget}.`
       );
     }
     this.budgetBytes = byteBudget;
@@ -128,7 +125,7 @@ export class ResourceManager {
       key,
       entry,
       bytes: Math.max(0, bytes),
-      disposer,
+      disposer
     };
     this.cache.set(key, record);
     this.cacheBytes += record.bytes;
@@ -138,7 +135,7 @@ export class ResourceManager {
     if (errors.length > 0) {
       const messages = errors.map(describeError);
       throw new Error(
-        `ResourceManager: ${errors.length} cache disposer(s) threw while inserting "${key}": ${messages.join('; ')}`,
+        `ResourceManager: ${errors.length} cache disposer(s) threw while inserting "${key}": ${messages.join('; ')}`
       );
     }
   }
@@ -169,7 +166,7 @@ export class ResourceManager {
       scopeCount: this.scopes.length,
       cacheEntryCount: this.cache.size,
       cacheEstimatedBytes: this.cacheBytes,
-      totalEstimatedBytes: 0,
+      totalEstimatedBytes: 0
     };
     for (const scope of this.scopes) {
       const snapshot = scope.snapshot();
@@ -186,7 +183,7 @@ export class ResourceManager {
     this.pruneDisposedScopes();
     return this.scopes.map((scope) => ({
       name: scope.name,
-      snapshot: scope.snapshot(),
+      snapshot: scope.snapshot()
     }));
   }
 
@@ -204,7 +201,7 @@ export class ResourceManager {
     this.scopes = [];
     for (let i = scopes.length - 1; i >= 0; i--) {
       try {
-        scopes[i].disposeAll();
+        scopes[i]?.disposeAll();
       } catch (error) {
         errors.push(error);
       }
@@ -214,6 +211,7 @@ export class ResourceManager {
     const keys = [...this.cache.keys()];
     for (let i = keys.length - 1; i >= 0; i--) {
       const key = keys[i];
+      if (key === undefined) continue;
       const record = this.cache.get(key);
       this.cache.delete(key);
       if (!record) {
@@ -231,7 +229,7 @@ export class ResourceManager {
     if (errors.length > 0) {
       const messages = errors.map(describeError);
       throw new Error(
-        `ResourceManager.disposeAll: ${errors.length} disposer(s) threw: ${messages.join('; ')}`,
+        `ResourceManager.disposeAll: ${errors.length} disposer(s) threw: ${messages.join('; ')}`
       );
     }
   }
@@ -262,7 +260,7 @@ export class ResourceManager {
 
   private pruneDisposedScopes(): void {
     for (let i = this.scopes.length - 1; i >= 0; i--) {
-      if (this.scopes[i].disposed) {
+      if (this.scopes[i]?.disposed) {
         this.scopes.splice(i, 1);
       }
     }

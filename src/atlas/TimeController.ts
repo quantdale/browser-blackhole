@@ -69,7 +69,7 @@ const IDENTITY_MAPPING: PhaseMapping = {
   label: 'Normalized',
   forward: (phase01) => clamp01(phase01),
   inverse: (internal) => clamp01(internal),
-  formatDisplay: (internal) => `${(clamp01(internal) * 100).toFixed(1)}%`,
+  formatDisplay: (internal) => `${(clamp01(internal) * 100).toFixed(1)}%`
 };
 
 export interface TimeControllerOptions {
@@ -135,7 +135,7 @@ export class TimeController {
       typeof mapping.formatDisplay !== 'function'
     ) {
       throw new TypeError(
-        `TimeController.registerPhaseMapping: mapping '${id}' must provide forward, inverse and formatDisplay functions.`,
+        `TimeController.registerPhaseMapping: mapping '${id}' must provide forward, inverse and formatDisplay functions.`
       );
     }
     this.mappings.set(id, mapping);
@@ -152,9 +152,9 @@ export class TimeController {
     const mapping = this.mappings.get(id);
     if (mapping === undefined) {
       throw new Error(
-        `TimeController.setPhaseMapping: no mapping registered under id '${id}' (known: ${[
-          ...this.mappings.keys(),
-        ].join(', ') || 'none'}).`,
+        `TimeController.setPhaseMapping: no mapping registered under id '${id}' (known: ${
+          [...this.mappings.keys()].join(', ') || 'none'
+        }).`
       );
     }
     this.activateMapping(mapping);
@@ -208,7 +208,7 @@ export class TimeController {
     this.internalTime = clamp(
       this.internalTime + this.rateValue * dt,
       this.internalMin,
-      this.internalMax,
+      this.internalMax
     );
     this.refreshDerived();
   }
@@ -283,7 +283,7 @@ export class TimeController {
       simulationPhase: this.simulationPhaseValue,
       physicalTime: this.physicalTimeValue,
       playbackRate: this.rateValue,
-      paused: this.pausedValue,
+      paused: this.pausedValue
     };
   }
 
