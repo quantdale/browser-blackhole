@@ -1,12 +1,14 @@
 # Durable project state
 
-Last planning update: 2026-08-21
+Last planning update: 2026-08-21 (M0 checkpoint)
 
 ## Current phase
 
-**READY_FOR_IMPLEMENTATION — M0 Repository and rendering foundation**
+**M0 IMPLEMENTATION COMPLETE — checkpoint committed; M1 not started.**
 
-No application code has been implemented yet. The repository now contains a detailed product, physics, numerical, renderer, performance, CI, UI, recovery, provenance, and agent-execution blueprint sufficient for a fresh autonomous coding agent to begin M0 without originating chat context.
+M0 work packets M0-01 through M0-09 are implemented and gated. M0-10 evidence is
+recorded here; the M0 completion rule (below) is satisfied in the local
+supported environment. Kerr/physics milestones remain untouched.
 
 ## Locked architectural direction
 
@@ -26,74 +28,97 @@ No application code has been implemented yet. The repository now contains a deta
 - Numerical failures remain explicit and are never merged into the physical shadow.
 - External code/assets/data require provenance/license review.
 
-## Immediate next actions
+## Completed packets / backlog IDs
 
-Execute detailed M0 work packets in `docs/MILESTONE_WORK_PACKETS.md`:
+- `M0-01` — exact toolchain versions pinned, lockfile created (commit `6e65596`).
+- `M0-02` — strict Vite/TypeScript source skeleton (`src/app`, `src/camera`, `src/renderer`, `src/shaders`, `src/ui`).
+- `M0-03` — capability snapshot + backend decision + truthful actual-backend readback (`src/app/capability.ts`, `src/renderer/BlackHoleRenderer.ts`).
+- `M0-04` — deterministic full-screen diagnostic TSL pass with CPU-mirrored ray contract (`src/shaders/diagnostic.ts`, `src/shaders/cameraRayMath.ts`).
+- `M0-05` — camera abstraction: PerspectiveCamera + OrbitControls + canonical basis export (`src/camera/CameraController.ts`).
+- `M0-06` — resize/internal-resolution/DPR policy hook (`src/renderer/ResizeController.ts`, `src/renderer/renderSize.ts`).
+- `M0-07` — schema-v1 canonical state, presets, invalidation classification (`src/app/state.ts`, `src/app/presets.ts`).
+- `M0-08` — Vitest + Playwright + npm scripts + GitHub Actions CI baseline (`.github/workflows/ci.yml`, `tests/unit`, `tests/browser`).
+- `M0-09` — visible initialization/unsupported/error UX + status/control panels (`src/ui/statusPanel.ts`, `src/ui/controlPanel.ts`, `src/app/runtimeStatus.ts`).
+- `M0-10` — this STATE.md update, recorded commands/results/environment, screenshot artifact.
+  Checkpoint commit for M0-02..M0-09 implementation: `fa96e769c829bf0dc3d3ff67ef54f9b40dafaa39`.
 
-1. `M0-01` — resolve/pin current compatible toolchain/dependency versions and create lockfile;
-2. `M0-02` — initialize strict Vite/TypeScript source skeleton;
-3. `M0-03` — implement capability snapshot and `WebGPURenderer` startup/fallback status;
-4. `M0-04` — deterministic full-screen diagnostic TSL pass;
-5. `M0-05` — camera abstraction + OrbitControls + canonical basis;
-6. `M0-06` — resize/internal resolution/DPR policy hook;
-7. `M0-07` — schema-v1 canonical state/default preset/invalidation skeleton;
-8. `M0-08` — Vitest/Playwright/scripts/CI baseline;
-9. `M0-09` — visible initialization/unsupported/error UX;
-10. `M0-10` — run M0 exit gates and persist evidence.
+## Exact commands and results (this cycle)
 
-## Required implementation references for M0
+| Command | Result |
+| --- | --- |
+| `npm run check` (format:check → lint → tsc --noEmit → vitest run → build) | PASS (40/40 unit tests, clean build) |
+| `npm run e2e` (Playwright, 3 smoke tests) | 3 passed (~13 s) |
 
-- `.agent/START_HERE.md`
-- `.agent/EXECUTION_PROTOCOL.md`
-- `.agent/QUALITY_GATES.md`
-- `docs/IMPLEMENTATION_PLAYBOOK.md`
-- `docs/ARCHITECTURE.md`
-- `docs/STATE_SCHEMA.md`
-- `docs/SHADER_CONTRACTS.md`
-- `docs/DEPENDENCIES.md`
-- `docs/CI_CD.md`
-- `docs/FAILURE_RECOVERY.md`
-- `docs/DEPLOYMENT_COMPATIBILITY.md`
+Browser smoke coverage: boot to ready/fallback with valid canvas + clean console;
+camera drag/wheel without uncaught errors while rendering continues; portrait/
+landscape resize keeps aspect within tolerance without errors.
 
-## Current blockers
+## Environment actually tested
 
-None known.
+- OS: Windows (local workstation), Node v22.23.2.
+- Browser: Microsoft Edge 151.0.4129.93, headless, via Playwright channel `msedge`.
+- Backend: WebGPU active (adapter via Dawn); WebGL2 fallback path compiled but not exercised in this environment.
+- Internal render size at 1280×800 viewport: 1000 × 800 (DPR 1).
 
-## Current gate status
+## Artifacts
 
-- Gate A Repository health: NOT YET EXECUTED — no application/toolchain yet.
-- Gate B Browser health: NOT YET EXECUTED.
-- Gate C Physics correctness: NOT YET APPLICABLE until M2, except unit convention planning complete.
-- Gate D Visual correctness: NOT YET APPLICABLE until M1+.
-- Gate E Performance: NOT YET APPLICABLE until renderer exists; budgets defined.
-- Gate F Compatibility: NOT YET EXECUTED.
+- `artifacts/m0-diagnostic.png` — deterministic diagnostic gradient frame
+  (red increases left→right, green increases toward top, blue encodes camera-ray
+  depth axis), captured by the boot smoke test.
+
+## Bugs found and fixed this cycle
+
+1. **Empty-scene render (root cause of all-black frames):**
+   `BlackHoleRenderer.init()` re-added `pass.mesh` to a second renderer-owned
+   `Scene`; three.js objects have exactly one parent, so the mesh was silently
+   detached from `pass.scene` and every frame rendered an empty scene (clear
+   color). Symptom: "Ready" status, ~149 FPS, zero console errors, uniform black
+   screenshots. Fix: removed the redundant scene; only `pass.scene` is rendered.
+2. **Dead status wiring:** `controlPanel.update()` existed but was never
+   subscribed, so Backend/Internal-size readouts stayed at "—". Fix: App
+   subscribes panel readouts to `StatusStore`.
+
+## Quality-gate status
+
+- Gate A Repository health: PASS (`npm run check` locally).
+- Gate B Browser health: PASS (3/3 Playwright smokes, WebGPU backend).
+- Gate C Physics correctness: NOT YET APPLICABLE until M2.
+- Gate D Visual correctness: diagnostic-gradient assertions pass; physics visuals N/A until M1+.
+- Gate E Performance: budgets defined; no benchmark run yet (renderer exists as of this cycle).
+- Gate F Compatibility: PARTIAL — local Edge/Windows verified; CI matrix pending first GitHub Actions run.
 - Gate G Release: NOT YET APPLICABLE.
 
-## Planning evidence available
+## Known limitations / debt
 
-- Repository began essentially empty, allowing greenfield architecture.
-- Primary research/prior art catalogued in `docs/RESEARCH_REFERENCES.md`.
-- Numerical Schwarzschild equations/event policy specified in `docs/NUMERICAL_METHODS.md`.
-- Validation corpus defined in `docs/VALIDATION_VECTORS.md`.
-- Performance budgets/benchmark schema defined.
-- LUT and Kerr future backends have explicit entry gates and research constraints.
-- M0–M11 have detailed work packets and Definition of Done.
+- LOW: WebGL2 fallback (`forceWebGL`) path is implemented but never exercised
+  end-to-end here because WebGPU is always available locally; needs a forced
+  fallback test hook or CI runner without WebGPU.
+- LOW: FPS EMA first-sample assumes 16.7 ms, so the first reported value spikes;
+  cosmetic only.
+- LOW: CI workflow (.github/workflows/ci.yml) has not yet run on GitHub; Gate F
+  stays PARTIAL until observed green.
+- INFO: branch is ahead of `origin/main`; push intentionally deferred pending
+  user confirmation.
 
-## Completion rule for M0
+## Deferred environment gates
 
-Do not advance STATE to M1 until a clean checkout can install exact dependencies, run deterministic quality commands, build, launch, render the deterministic diagnostic scene, operate camera/resize safely, expose actual backend status, and pass browser smoke in the available supported target environment without uncaught errors.
+- GitHub Actions CI execution (Gate F).
+- A WebGPU-less environment run to prove the terminal unsupported UX.
 
-## Future state update format
+## Next actions
 
-After implementation starts, maintain:
+1. Push `main` / open PR after user confirmation, then verify GitHub Actions CI green.
+2. Add a forced-fallback test path (e.g., env/test hook that decides `webgl2`)
+   to exercise the WebGL2 backend and unsupported UX under automation.
+3. Start M1-01 camera-ray reconstruction: unit tests for center/corners/edges,
+   odd/even resolutions, portrait/landscape, plus CPU-vs-GPU selected-pixel parity.
+4. Record a first performance baseline (CPU frame time, internal dimensions) per
+   docs/PERFORMANCE.md once M1 rendering lands.
 
-- current milestone/status;
-- exact commit SHA;
-- completed packet/backlog IDs;
-- quality-gate status;
-- exact commands/tests and results;
-- browser/backend/GPU environment actually tested;
-- screenshot/fixture/benchmark artifact paths;
-- known limitations/debt with severity;
-- deferred environment gates;
-- next 3–7 concrete actions.
+## Completion rule for M0 (satisfied)
+
+A clean checkout can install exact dependencies, run deterministic quality
+commands, build, launch, render the deterministic diagnostic scene, operate
+camera/resize safely, expose actual backend status, and pass browser smoke in
+the available supported target environment without uncaught errors — verified
+this cycle on Windows/Edge-headless/WebGPU.
