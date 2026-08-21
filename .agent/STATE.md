@@ -4,11 +4,15 @@ Last planning update: 2026-08-21 (M0 checkpoint)
 
 ## Current phase
 
-**M0 IMPLEMENTATION COMPLETE — checkpoint committed; M1 not started.**
+**M0 COMPLETE AND COMMITTED. Follow-up cycle validated and green, UNCOMMITTED
+(pending user confirmation): backend-override test path + M1-01 ray-parity
+groundwork.**
 
-M0 work packets M0-01 through M0-09 are implemented and gated. M0-10 evidence is
-recorded here; the M0 completion rule (below) is satisfied in the local
-supported environment. Kerr/physics milestones remain untouched.
+M0 packets M0-01..M0-09 are implemented, gated, and committed (`fa96e76`,
+`61de188`). A follow-up session implemented the two recorded next actions
+(forced-fallback test path, M1-01 camera-ray parity groundwork); this cycle
+validated both gates green and fixed one real shader bug found by the new
+parity test. Kerr/physics milestones remain untouched.
 
 ## Locked architectural direction
 
@@ -41,17 +45,31 @@ supported environment. Kerr/physics milestones remain untouched.
 - `M0-09` — visible initialization/unsupported/error UX + status/control panels (`src/ui/statusPanel.ts`, `src/ui/controlPanel.ts`, `src/app/runtimeStatus.ts`).
 - `M0-10` — this STATE.md update, recorded commands/results/environment, screenshot artifact.
   Checkpoint commit for M0-02..M0-09 implementation: `fa96e769c829bf0dc3d3ff67ef54f9b40dafaa39`.
+- Follow-up (uncommitted): forced-backend override `?backend=webgpu|webgl2|unsupported`
+  (`src/app/testHooks.ts`, `src/app/App.ts`, terminal-state test hooks,
+  `tests/unit/backendOverride.test.ts`, two new smokes in `tests/browser/smoke.spec.ts`,
+  `E2E_PORT` support in `playwright.config.ts`) — exercises WebGL2 fallback and
+  unsupported UX on capable machines per docs/CI_CD.md §6.
+- Follow-up (uncommitted): M1-01 groundwork — `pixelToNdc` shared pixel-center
+  convention (`src/shaders/cameraRayMath.ts`), edge/corner/aspect/pixelToNdc unit
+  cases (`tests/unit/camera.test.ts`), CPU-vs-GPU selected-pixel parity spec
+  (`tests/browser/ray-parity.spec.ts`) with shared harness
+  (`tests/browser/support/appHarness.ts`).
 
 ## Exact commands and results (this cycle)
 
 | Command | Result |
 | --- | --- |
-| `npm run check` (format:check → lint → tsc --noEmit → vitest run → build) | PASS (40/40 unit tests, clean build) |
-| `npm run e2e` (Playwright, 3 smoke tests) | 3 passed (~13 s) |
+| `npm run check` (format:check → lint → tsc --noEmit → vitest run → build) | PASS (52/52 unit tests, clean build) — re-verified independently this cycle |
+| `npm run e2e` (Playwright, 6 tests) | 6 passed (~47 s) via `E2E_PORT=4174 npm run e2e` — re-verified independently this cycle |
 
-Browser smoke coverage: boot to ready/fallback with valid canvas + clean console;
-camera drag/wheel without uncaught errors while rendering continues; portrait/
-landscape resize keeps aspect within tolerance without errors.
+Browser coverage now additionally: forced `?backend=webgl2` renders the
+diagnostic gradient; forced `?backend=unsupported` shows terminal unsupported
+UX; M1-01 CPU-vs-GPU parity at 10 sampled NDC points within ±4/255 after sRGB
+encoding (ran against the real WebGPU backend, not a fallback skip).
+
+Local note: port 4173 is occupied by an unrelated dev server on this
+workstation; e2e must run with `E2E_PORT=<free port>` until it is stopped.
 
 ## Environment actually tested
 
@@ -77,28 +95,43 @@ landscape resize keeps aspect within tolerance without errors.
 2. **Dead status wiring:** `controlPanel.update()` existed but was never
    subscribed, so Backend/Internal-size readouts stayed at "—". Fix: App
    subscribes panel readouts to `StatusStore`.
+3. **Scalar TSL uniforms snapshotted (found by the new M1-01 parity test):**
+   `createDiagnosticPass` built scalar uniforms as
+   `uniform(uniforms.tanHalfFovY.value)`, snapshotting the number `1`; per-frame
+   writes to the block's `.value` never reached the shader, so the GPU rendered
+   with `tanHalfFovY=1, aspect=1` regardless of camera. Fix: create uniform
+   nodes first and expose the nodes themselves as block fields. Vector3
+   uniforms were unaffected (passed by reference).
 
 ## Quality-gate status
 
 - Gate A Repository health: PASS (`npm run check` locally).
-- Gate B Browser health: PASS (3/3 Playwright smokes, WebGPU backend).
+- Gate B Browser health: PASS (6/6 Playwright tests incl. forced-webgl2,
+  forced-unsupported, and M1-01 CPU-vs-GPU ray parity; WebGPU backend).
 - Gate C Physics correctness: NOT YET APPLICABLE until M2.
-- Gate D Visual correctness: diagnostic-gradient assertions pass; physics visuals N/A until M1+.
+- Gate D Visual correctness: diagnostic-gradient and CPU-vs-GPU parity
+  assertions pass; physics visuals N/A until M1+.
 - Gate E Performance: budgets defined; no benchmark run yet (renderer exists as of this cycle).
 - Gate F Compatibility: PARTIAL — local Edge/Windows verified; CI matrix pending first GitHub Actions run.
 - Gate G Release: NOT YET APPLICABLE.
 
 ## Known limitations / debt
 
-- LOW: WebGL2 fallback (`forceWebGL`) path is implemented but never exercised
-  end-to-end here because WebGPU is always available locally; needs a forced
-  fallback test hook or CI runner without WebGPU.
+- RESOLVED this cycle: WebGL2 fallback and unsupported UX are now exercisable
+  end-to-end via the forced-backend override (`?backend=`) and covered by
+  browser tests on the local WebGPU-capable machine.
+- LOW: CI workflow (.github/workflows/ci.yml) has not yet run on GitHub; Gate F
+  stays PARTIAL until observed green. Audit found no config gaps; residual risk
+  is SwiftShader software-GL precision vs the ±4/255 parity tolerance and
+  zero-console-error assertions on the ubuntu runner — settle with the first
+  real CI run, loosen tolerance only if it demonstrably flakes.
 - LOW: FPS EMA first-sample assumes 16.7 ms, so the first reported value spikes;
   cosmetic only.
-- LOW: CI workflow (.github/workflows/ci.yml) has not yet run on GitHub; Gate F
-  stays PARTIAL until observed green.
 - INFO: branch is ahead of `origin/main`; push intentionally deferred pending
-  user confirmation.
+  user confirmation. This cycle's follow-up work is also uncommitted for the
+  same reason.
+- INFO: local workstation has a foreign dev server on port 4173; use
+  `E2E_PORT` for local e2e runs.
 
 ## Deferred environment gates
 
@@ -107,11 +140,13 @@ landscape resize keeps aspect within tolerance without errors.
 
 ## Next actions
 
-1. Push `main` / open PR after user confirmation, then verify GitHub Actions CI green.
-2. Add a forced-fallback test path (e.g., env/test hook that decides `webgl2`)
-   to exercise the WebGL2 backend and unsupported UX under automation.
-3. Start M1-01 camera-ray reconstruction: unit tests for center/corners/edges,
-   odd/even resolutions, portrait/landscape, plus CPU-vs-GPU selected-pixel parity.
+1. Commit the follow-up cycle (backend override + M1-01 groundwork + diagnostic
+   uniform fix) after user confirmation, as a coherent checkpoint separate from
+   the M0 commits.
+2. Push `main` / open PR after user confirmation, then verify GitHub Actions CI
+   green (first real Gate F evidence; watch SwiftShader tolerance risk above).
+3. Continue M1: deterministic procedural star/environment backend (M1-02),
+   backend/debug overlay, first visual golden tests per docs/ROADMAP.md.
 4. Record a first performance baseline (CPU frame time, internal dimensions) per
    docs/PERFORMANCE.md once M1 rendering lands.
 
