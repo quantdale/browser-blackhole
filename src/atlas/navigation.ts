@@ -183,16 +183,49 @@ export class NavigationController {
   }
 
   /**
-   * Reflect a committed destination/preset into the URL via `replaceState`.
-   * Called by the host at the director's route-commit point so redirects and
-   * fallbacks end up canonicalized without adding history entries.
+   * Reflect a committed destination/preset into the URL via `replaceState`
+   * AND adopt it as the current selection. Called by the host at the
+   * director's route-commit point so redirects and fallbacks end up
+   * canonicalized without adding history entries.
+   *
+   * Selection adoption matters for targets the director started WITHOUT a
+   * navigation intent — the latest-wins queue drain inside
+   * TransitionDirector calls requestTransition directly, so without this the
+   * controller's selection (and therefore atlas.activeDestination and every
+   * later echo-suppression decision) would keep pointing at the previous
+   * destination after the swap. Validation campaign: found by the rapid
+   * retarget race test.
    */
   commitRoute(destinationId: DestinationId, presetId?: string): void {
-    if (this.disposed || this.historyHandle === null) return;
+    if (this.disposed) return;
+    const selection = this.resolveSelectionSilent(destinationId, presetId);
+    if (selection !== null) this.selectionValue = selection;
+    if (this.historyHandle === null) return;
     this.historyHandle.replace({
-      destination: destinationId,
-      preset: typeof presetId === 'string' && presetId.length > 0 ? presetId : null
+      destination: selection?.destinationId ?? destinationId,
+      preset:
+        typeof presetId === 'string' && presetId.length > 0
+          ? presetId
+          : (selection?.presetId ?? null)
     });
+  }
+
+  /**
+   * resolveSelection without user-facing warnings — route commits are
+   * machine-generated; invalid ids fall back to the default silently.
+   */
+  private resolveSelectionSilent(
+    destinationId: DestinationId,
+    presetId?: string
+  ): NavigationSelection | null {
+    const descriptor = this.registry.get(destinationId) ?? this.registry.get(DEFAULT_DESTINATION);
+    if (!descriptor) return null;
+    const id = descriptor.descriptor.id;
+    const presets = this.registry.presetsFor(id);
+    const preset =
+      presets.find((p) => p.id === presetId) ?? this.registry.defaultPreset(id) ?? presets[0];
+    if (!preset) return null;
+    return { destinationId: id, presetId: preset.id };
   }
 
   // -------------------------------------------------------------------------
