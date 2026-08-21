@@ -14,35 +14,72 @@ The renderer is intentionally staged:
 4. optimize the non-rotating renderer using adaptive integration, temporal techniques, dynamic resolution, and eventually precomputed ray/beam lookup tables;
 5. add a Kerr renderer and observer motion only after Schwarzschild correctness and performance are proven.
 
-Do not start by building a black sphere with ordinary meshes and calling the surrounding distortion "lensing." The central visual problem is photon propagation through curved spacetime; Three.js is the application/rendering framework around that GPU calculation.
+Do not start by building a black sphere with ordinary meshes and calling the surrounding distortion “lensing.” The central visual problem is photon propagation through curved spacetime; Three.js is the application/rendering framework around that GPU calculation.
 
 ## Autonomous agent quick start
 
-A fresh coding agent can begin immediately with:
+A fresh coding agent starts with **[`.agent/START_HERE.md`](.agent/START_HERE.md)**. Long-running sessions follow **[`.agent/EXECUTION_PROTOCOL.md`](.agent/EXECUTION_PROTOCOL.md)** and report checkpoints with **[`.agent/CHECKPOINT_TEMPLATE.md`](.agent/CHECKPOINT_TEMPLATE.md)**.
 
-**[`.agent/START_HERE.md`](.agent/START_HERE.md)**
+The durable current milestone and continuation point is **[`.agent/STATE.md`](.agent/STATE.md)**. No originating chat context is required.
 
-That file contains the executable handoff prompt and points to the current milestone in `.agent/STATE.md`. No originating chat context is required.
+## Documentation map
 
-## Required reading
+### Agent control plane
 
-1. [`AGENTS.md`](AGENTS.md) — repository operating contract.
-2. [`.agent/STATE.md`](.agent/STATE.md) — durable current state and next milestone.
-3. [`.agent/QUALITY_GATES.md`](.agent/QUALITY_GATES.md) — cumulative completion gates.
-4. [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) — product scope and user-visible requirements.
-5. [`docs/DECISIONS.md`](docs/DECISIONS.md) — locked architecture/product decisions.
-6. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — target software/rendering architecture.
-7. [`docs/PHYSICS.md`](docs/PHYSICS.md) — scientific conventions and correctness rules.
-8. [`docs/RENDERING_PIPELINE.md`](docs/RENDERING_PIPELINE.md) — GPU rendering design.
-9. [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — optimization strategy and profiling requirements.
-10. [`docs/UI_UX.md`](docs/UI_UX.md) — controls, modes, presets, interaction, accessibility.
-11. [`docs/TESTING.md`](docs/TESTING.md) — correctness, visual, browser, and performance gates.
-12. [`docs/ROADMAP.md`](docs/ROADMAP.md) — M0–M11 milestone sequence and exit criteria.
-13. [`docs/BACKLOG.md`](docs/BACKLOG.md) — concrete `BH-*` implementation work packets.
-14. [`docs/PARALLEL_WORK.md`](docs/PARALLEL_WORK.md) — safe sub-agent/parallel boundaries.
-15. [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) — dependency/version/tooling policy.
-16. [`docs/DEPLOYMENT_COMPATIBILITY.md`](docs/DEPLOYMENT_COMPATIBILITY.md) — browser/deployment policy.
-17. [`docs/RESEARCH_REFERENCES.md`](docs/RESEARCH_REFERENCES.md) — primary references and prior art.
+- [`AGENTS.md`](AGENTS.md) — repository-wide operating contract.
+- [`.agent/START_HERE.md`](.agent/START_HERE.md) — executable fresh-agent handoff.
+- [`.agent/EXECUTION_PROTOCOL.md`](.agent/EXECUTION_PROTOCOL.md) — long-session work selection, evidence, sub-agent, commit, and handoff rules.
+- [`.agent/STATE.md`](.agent/STATE.md) — current milestone, evidence, blockers, and next actions.
+- [`.agent/QUALITY_GATES.md`](.agent/QUALITY_GATES.md) — cumulative gates.
+- [`.agent/CHECKPOINT_TEMPLATE.md`](.agent/CHECKPOINT_TEMPLATE.md) — required checkpoint evidence format.
+
+### Product and architecture
+
+- [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) — product scope and outcomes.
+- [`docs/DECISIONS.md`](docs/DECISIONS.md) — locked architecture/product decisions.
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — target module/runtime architecture.
+- [`docs/STATE_SCHEMA.md`](docs/STATE_SCHEMA.md) — canonical application state, validation, presets, invalidation.
+- [`docs/SHADER_CONTRACTS.md`](docs/SHADER_CONTRACTS.md) — CPU/GPU/TSL interfaces and debug outputs.
+- [`docs/RENDERING_PIPELINE.md`](docs/RENDERING_PIPELINE.md) — render passes and image formation.
+
+### Physics and numerical correctness
+
+- [`docs/PHYSICS.md`](docs/PHYSICS.md) — scientific model/conventions.
+- [`docs/NUMERICAL_METHODS.md`](docs/NUMERICAL_METHODS.md) — tetrad mapping, Hamiltonian equations, integration, event detection, convergence.
+- [`docs/VALIDATION_VECTORS.md`](docs/VALIDATION_VECTORS.md) — deterministic analytic/reference scenarios.
+- [`docs/KERR_RESEARCH_PLAN.md`](docs/KERR_RESEARCH_PLAN.md) — deferred rotating-hole research/implementation constraints.
+- [`docs/LUT_BACKEND_SPEC.md`](docs/LUT_BACKEND_SPEC.md) — optimized Schwarzschild precomputation/backend contract.
+
+### UX and visual controls
+
+- [`docs/UI_UX.md`](docs/UI_UX.md) — interaction/layout/accessibility principles.
+- [`docs/UI_CONTROL_CATALOG.md`](docs/UI_CONTROL_CATALOG.md) — control-by-control semantics and safety.
+
+### Performance and diagnostics
+
+- [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — optimization strategy.
+- [`docs/PERFORMANCE_BUDGETS.md`](docs/PERFORMANCE_BUDGETS.md) — frame budgets, DPR, dynamic resolution, temporal/memory policy.
+- [`docs/BENCHMARK_MATRIX.md`](docs/BENCHMARK_MATRIX.md) — reproducible benchmark presets/metadata/reporting.
+- [`docs/OBSERVABILITY_DIAGNOSTICS.md`](docs/OBSERVABILITY_DIAGNOSTICS.md) — runtime telemetry, probes, debug events.
+- [`docs/FAILURE_RECOVERY.md`](docs/FAILURE_RECOVERY.md) — device loss, unsupported paths, numerical/data failures.
+
+### Testing, CI, deployment, provenance
+
+- [`docs/TESTING.md`](docs/TESTING.md) — overall testing strategy.
+- [`docs/CI_CD.md`](docs/CI_CD.md) — CI jobs, browser/golden automation, release pipeline.
+- [`docs/DEPLOYMENT_COMPATIBILITY.md`](docs/DEPLOYMENT_COMPATIBILITY.md) — browser/deployment policy.
+- [`docs/ASSET_PROVENANCE.md`](docs/ASSET_PROVENANCE.md) — licensing, external data/assets, security/privacy rules.
+- [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) — dependency/version/tooling policy.
+- [`docs/RESEARCH_REFERENCES.md`](docs/RESEARCH_REFERENCES.md) — primary references/prior art.
+
+### Execution plan
+
+- [`docs/IMPLEMENTATION_PLAYBOOK.md`](docs/IMPLEMENTATION_PLAYBOOK.md) — concrete implementation workflow.
+- [`docs/ROADMAP.md`](docs/ROADMAP.md) — M0–M11 integration sequence.
+- [`docs/MILESTONE_WORK_PACKETS.md`](docs/MILESTONE_WORK_PACKETS.md) — detailed executable packets for every milestone.
+- [`docs/BACKLOG.md`](docs/BACKLOG.md) — stable `BH-*` backlog units.
+- [`docs/PARALLEL_WORK.md`](docs/PARALLEL_WORK.md) — safe sub-agent ownership boundaries.
+- [`docs/DEFINITION_OF_DONE.md`](docs/DEFINITION_OF_DONE.md) — evidence required to call work complete.
 
 ## Proposed stack
 
@@ -50,24 +87,27 @@ That file contains the executable handoff prompt and points to the current miles
 - Vite
 - Three.js
 - `WebGPURenderer`
-- Three.js Shading Language (TSL), using WGSL/WebGPU and a WebGL2-capable fallback where practical
-- Vitest for deterministic unit/physics tests
+- Three.js Shading Language (TSL), targeting WebGPU and WebGL2-compatible fallback where practical
+- Vitest for deterministic unit/reference physics tests
 - Playwright for browser/E2E/visual checks
-- Optional Rust/WASM reference solver later; never use CPU/WASM as the primary per-pixel renderer
+- optional Rust/WASM reference/precomputation tooling later; never the primary per-pixel renderer
 
-Dependency versions are deliberately not pinned in the planning-only bootstrap. Milestone M0 must check the current stable versions, pin exact compatible versions, create the lockfile, and record the choices.
+Dependency versions are deliberately not pinned in the planning-only bootstrap. M0 verifies current compatible releases, pins exact versions, commits the lockfile, and records the selection.
 
 ## Non-negotiable engineering rules
 
 - GPU-first per-pixel rendering; no JavaScript pixel loops.
-- Correctness before optimization; optimization must be measured.
+- Numerical Schwarzschild correctness before LUT optimization or Kerr.
+- Physics equations/conventions have independent reference tests.
 - Scientific controls and cinematic controls remain visibly separate.
-- Mass is represented consistently; normalized and physical-distance modes must not imply false scale dependence.
-- Schwarzschild must be validated before Kerr.
-- WebGPU-only accelerators must degrade gracefully rather than making the whole app unusable on WebGL2-capable fallback paths.
-- Every milestone ends with a buildable, runnable, documented checkpoint.
-- Any copied/adapted external implementation must receive an explicit license/provenance review first.
+- Mass/scale handling must preserve normalized GR scale invariance.
+- Numerical failure is explicit and never painted as the black-hole shadow.
+- WebGPU-only accelerators degrade explicitly; fallback claims must be tested truthfully.
+- Compute shaders and Workers are introduced only for a measured algorithmic/runtime reason.
+- Every milestone ends with a buildable, evidence-backed checkpoint.
+- External code/assets/data require provenance/license review.
+- Performance claims include backend, internal resolution, quality settings, hardware/browser, and frame-time statistics.
 
 ## Current status
 
-Planning/bootstrap only. No application code has been implemented yet. The next executable milestone is **M0 — Repository and rendering foundation** in [`docs/ROADMAP.md`](docs/ROADMAP.md).
+**Planning/bootstrap complete; implementation has not started.** The durable state is `READY_FOR_IMPLEMENTATION` at **M0 — Repository and rendering foundation**. Start with `.agent/START_HERE.md`.

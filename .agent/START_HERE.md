@@ -4,59 +4,106 @@ Use this file as the first instruction for a fresh coding agent.
 
 ## Mission
 
-Implement `browser-blackhole` from the planning blueprint into a production-quality interactive browser black-hole renderer. Work autonomously, preserve scientific correctness, keep the repository buildable, and update durable project state after each coherent checkpoint.
+Implement `browser-blackhole` from the repository blueprint into a production-quality interactive browser black-hole renderer. Work autonomously, preserve scientific correctness, keep each checkpoint buildable, use evidence rather than appearance to prove correctness/performance, and maintain durable project state so another fresh agent can continue without chat history.
 
-## Before writing code
+## Authority order
 
-1. Read `AGENTS.md` completely.
-2. Read `.agent/STATE.md` and `.agent/QUALITY_GATES.md`.
-3. Read `docs/PRODUCT_SPEC.md`, `docs/ARCHITECTURE.md`, `docs/PHYSICS.md`, `docs/RENDERING_PIPELINE.md`, `docs/PERFORMANCE.md`, `docs/TESTING.md`, `docs/ROADMAP.md`, and `docs/BACKLOG.md`.
-4. Inspect the current Git branch, status, recent commits, and existing files/tests.
-5. Treat `docs/RESEARCH_REFERENCES.md` as research input, not as permission to copy third-party code without a license review.
+When instructions conflict, use this order:
+
+1. actual repository/code/test evidence;
+2. `AGENTS.md` and explicit user instructions;
+3. `.agent/STATE.md` current phase;
+4. locked `docs/DECISIONS.md` / physics conventions;
+5. milestone/quality-gate documents;
+6. lower-level planning notes.
+
+If actual state contradicts docs, investigate and repair docs rather than blindly following stale text.
+
+## Required first read
+
+Read completely before editing:
+
+1. `AGENTS.md`;
+2. `.agent/STATE.md`;
+3. `.agent/EXECUTION_PROTOCOL.md`;
+4. `.agent/QUALITY_GATES.md`;
+5. current milestone section of `docs/ROADMAP.md`;
+6. matching milestone section of `docs/MILESTONE_WORK_PACKETS.md`;
+7. `docs/DEFINITION_OF_DONE.md`.
+
+Then read domain specs required by the packet. For initial M0 also read:
+
+- `docs/IMPLEMENTATION_PLAYBOOK.md`;
+- `docs/ARCHITECTURE.md`;
+- `docs/STATE_SCHEMA.md`;
+- `docs/SHADER_CONTRACTS.md`;
+- `docs/DEPENDENCIES.md`;
+- `docs/CI_CD.md`;
+- `docs/FAILURE_RECOVERY.md`;
+- `docs/DEPLOYMENT_COMPATIBILITY.md`.
+
+Before M2 physics work, additionally read `PHYSICS.md`, `NUMERICAL_METHODS.md`, and `VALIDATION_VECTORS.md` completely. Before M6 read the performance/benchmark docs. Before M8 read `LUT_BACKEND_SPEC.md`. Before M9 read `KERR_RESEARCH_PLAN.md` and perform the required ADR/research rather than coding Kerr from memory.
+
+## Repository inspection
+
+Before writing code:
+
+- inspect branch and `git status`;
+- inspect recent commits;
+- inspect current source/tests/configuration;
+- verify `.agent/STATE.md` matches reality;
+- identify current packet IDs and acceptance evidence.
+
+Do not ask the user to repeat information already encoded in the repository.
 
 ## Execute now
 
-Begin at the exact milestone named in `.agent/STATE.md`. At initial bootstrap that is `M0 — Repository and rendering foundation`.
+Begin at the exact milestone named in `.agent/STATE.md`. Initially this is **M0 — Repository and rendering foundation**.
 
-Do not ask the user to break M0 into smaller tasks. Break it down internally and execute it. Use sub-agents/workers only for independent bounded work as described in `docs/PARALLEL_WORK.md`; the main agent remains responsible for integration and final validation.
+Execute M0 packets in `docs/MILESTONE_WORK_PACKETS.md`, normally in dependency order:
 
-For M0, the expected sequence is:
+`M0-01 -> M0-02 -> M0-03 -> M0-04 -> M0-05 -> M0-06 -> M0-07 -> M0-08 -> M0-09 -> M0-10`.
 
-1. verify the current stable compatible versions of Node tooling, Vite, TypeScript, Three.js, Vitest, Playwright, lint/format tooling, and any minimal UI helper actually needed;
-2. initialize the project and commit an exact lockfile;
-3. create the minimal target source/test structure, avoiding empty speculative modules;
-4. implement Three.js `WebGPURenderer` startup and explicit capability/error handling;
-5. render a deterministic full-screen TSL diagnostic shader;
-6. add PerspectiveCamera + OrbitControls behind a small camera abstraction;
-7. implement resize/internal-render-size handling and a conservative DPR policy hook;
-8. create the canonical application-state/preset skeleton;
-9. add deterministic unit tests and a Playwright browser smoke test that fails on page/console errors;
-10. add `format`, `lint`, `typecheck`, `test`, `build`, and browser-test scripts;
-11. add CI for gates that the environment can genuinely run;
-12. run all M0 exit gates, fix failures, and update `.agent/STATE.md` with exact evidence.
+Parallelize only independent bounded work under `docs/PARALLEL_WORK.md`; the main agent integrates and validates.
+
+## M0 concrete outcome
+
+A clean checkout must be able to:
+
+1. install exact dependencies from lockfile;
+2. format/lint/typecheck/test/build successfully;
+3. launch over the supported local dev origin;
+4. initialize Three.js `WebGPURenderer` with explicit backend/capability status;
+5. render a deterministic full-screen TSL diagnostic frame;
+6. reconstruct/transport camera basis through a small abstraction with OrbitControls;
+7. resize safely with bounded effective DPR/internal resolution;
+8. load normalized schema-v1 AppState/default preset;
+9. show useful unsupported/failure UX instead of blank canvas;
+10. pass Playwright smoke without uncaught page/console failures;
+11. report the backend actually used;
+12. leave `.agent/STATE.md` with exact evidence and M1 next packets.
+
+Do not implement speculative black-hole physics during M0 merely to make the demo exciting.
 
 ## Hard constraints
 
-- Do not implement the black hole as an ordinary black sphere plus screen distortion and declare the scientific renderer complete.
-- Do not ray trace pixels on the CPU.
-- Do not begin Kerr before the Schwarzschild roadmap gates pass.
-- Do not use a Web Worker or compute shader merely because it sounds faster; profile and use the architecture in `docs/PERFORMANCE.md`.
-- Do not hide shader/numerical failure as a black pixel.
-- Do not silently change unit conventions.
-- Do not let UI controls write raw shader uniforms outside the validated state/render mapping.
-- Do not disable tests to obtain a green checkpoint.
+- Do not implement the scientific renderer as a black sphere plus arbitrary UV distortion.
+- Do not ray trace production pixels on the CPU.
+- Do not begin Kerr before Schwarzschild gates pass.
+- Do not use Worker/compute merely because it sounds faster.
+- Do not hide `MAX_STEPS`, NaN, or invalid state as captured/shadow pixels.
+- Do not silently change units, metric signature, momentum orientation, radiometric convention, or spin convention.
+- Do not let controls write shader uniforms outside canonical validated state mapping.
+- Do not loosen tolerances/update goldens solely to obtain green tests.
+- Do not claim fallback/browser/GPU validation that did not actually execute.
+- Do not copy reference code/assets without provenance/license review.
 
-## Checkpoint/report format
+## Checkpoint requirement
 
-At the end of every coherent checkpoint, report and persist:
+At each coherent checkpoint use `.agent/CHECKPOINT_TEMPLATE.md`. Persist the continuation-critical subset in `.agent/STATE.md`.
 
-- milestone and completed backlog IDs;
-- files changed and key design decisions;
-- commands/tests run and exact pass/fail status;
-- browser/backend/GPU environment actually tested;
-- screenshots/benchmark evidence when relevant;
-- known limitations/deferred debt;
-- next highest-priority work items;
-- resulting commit SHA.
+Record exact commands, result counts/status, browser/backend actually tested, screenshots/fixtures/benchmarks when relevant, known debt, deferred-environment gates, commit SHA, and next packet IDs.
 
-Then update `.agent/STATE.md` so another fresh agent can continue without this prompt or previous chat context.
+## Completion behavior
+
+Continue autonomously through the current coherent packet/checkpoint. If a genuinely environment-only gate cannot run, complete all executable work, mark it `DEFERRED_ENVIRONMENT` with exact reason/required environment, and continue only where doing so does not invalidate correctness. Never convert an unrun gate into `PASS`.
