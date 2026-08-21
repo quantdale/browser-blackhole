@@ -18,7 +18,7 @@
 import type {
   ResourceKind,
   ResourceScope as ResourceScopeContract,
-  ResourceScopeCounters,
+  ResourceScopeCounters
 } from '../../atlas/types';
 
 /** Every numeric field of `ResourceScopeCounters`, including `estimatedGpuBytes`. */
@@ -35,7 +35,7 @@ export const RESOURCE_COUNTER_KEYS: ReadonlyArray<keyof ResourceScopeCounters> =
   'listener',
   'timer',
   'pendingFetch',
-  'estimatedGpuBytes',
+  'estimatedGpuBytes'
 ];
 
 /** Fresh zeroed counters. Shared with `ResourceManager` aggregation. */
@@ -95,23 +95,19 @@ export class ResourceScope implements ResourceScopeContract {
     kind: ResourceKind,
     handle: unknown,
     disposer: (() => void) | null,
-    estimatedBytes?: number,
+    estimatedBytes?: number
   ): void {
     if (this.disposedState) {
-      throw new Error(
-        `ResourceScope "${this.name}": cannot track ${kind} after disposal.`,
-      );
+      throw new Error(`ResourceScope "${this.name}": cannot track ${kind} after disposal.`);
     }
     if (this.byHandle.has(handle)) {
-      throw new Error(
-        `ResourceScope "${this.name}": handle is already tracked (${kind}).`,
-      );
+      throw new Error(`ResourceScope "${this.name}": handle is already tracked (${kind}).`);
     }
     const entry: TrackedResource = {
       kind,
       handle,
       disposer,
-      estimatedBytes: Math.max(0, estimatedBytes ?? 0),
+      estimatedBytes: Math.max(0, estimatedBytes ?? 0)
     };
     this.entries.push(entry);
     this.byHandle.set(handle, entry);
@@ -144,6 +140,7 @@ export class ResourceScope implements ResourceScopeContract {
     this.entries = [];
     for (let i = ownEntries.length - 1; i >= 0; i--) {
       const entry = ownEntries[i];
+      if (!entry) continue;
       try {
         entry.disposer?.();
       } catch (error) {
@@ -159,6 +156,7 @@ export class ResourceScope implements ResourceScopeContract {
     this.children = [];
     for (let i = children.length - 1; i >= 0; i--) {
       const child = children[i];
+      if (!child) continue;
       try {
         child.disposeAll();
       } catch (error) {
@@ -172,7 +170,7 @@ export class ResourceScope implements ResourceScopeContract {
     if (errors.length > 0) {
       const messages = errors.map(describeError);
       throw new Error(
-        `ResourceScope "${this.name}": ${errors.length} disposer(s) threw during disposeAll: ${messages.join('; ')}`,
+        `ResourceScope "${this.name}": ${errors.length} disposer(s) threw during disposeAll: ${messages.join('; ')}`
       );
     }
   }
@@ -186,7 +184,7 @@ export class ResourceScope implements ResourceScopeContract {
   createChild(name: string): ResourceScope {
     if (this.disposedState) {
       throw new Error(
-        `ResourceScope "${this.name}": cannot create child "${name}" after disposal.`,
+        `ResourceScope "${this.name}": cannot create child "${name}" after disposal.`
       );
     }
     const child = new ResourceScope(name, this);

@@ -120,9 +120,7 @@ function clamp(value: number, min: number, max: number): number {
 /** Validates a numeric input, failing loudly on contract violations. */
 function requireFinite(value: number, label: string): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
-    throw new TypeError(
-      `CameraRig: ${label} must be a finite number (got ${String(value)}).`,
-    );
+    throw new TypeError(`CameraRig: ${label} must be a finite number (got ${String(value)}).`);
   }
   return value;
 }
@@ -181,17 +179,11 @@ export class CameraRig implements ICameraRig {
 
   constructor(options: CameraRigOptions = {}) {
     this.canvas = options.canvas ?? null;
-    const min = requireFinite(
-      options.minDistance ?? DISTANCE_DEFAULT_MIN,
-      'options.minDistance',
-    );
-    const max = requireFinite(
-      options.maxDistance ?? DISTANCE_DEFAULT_MAX,
-      'options.maxDistance',
-    );
+    const min = requireFinite(options.minDistance ?? DISTANCE_DEFAULT_MIN, 'options.minDistance');
+    const max = requireFinite(options.maxDistance ?? DISTANCE_DEFAULT_MAX, 'options.maxDistance');
     if (!(min > 0) || !(max > min)) {
       throw new RangeError(
-        `CameraRig: distance bounds must satisfy 0 < minDistance < maxDistance (got [${min}, ${max}]).`,
+        `CameraRig: distance bounds must satisfy 0 < minDistance < maxDistance (got [${min}, ${max}]).`
       );
     }
     this.minDistance = min;
@@ -226,17 +218,17 @@ export class CameraRig implements ICameraRig {
       this.polarDeg = clamp(
         MathUtils.radToDeg(this.scratchSpherical.phi),
         POLAR_MIN_DEG,
-        POLAR_MAX_DEG,
+        POLAR_MAX_DEG
       );
       this.distance = clamp(
         this.scratchSpherical.radius > 0 ? this.scratchSpherical.radius : this.distance,
         this.minDistance,
-        this.maxDistance,
+        this.maxDistance
       );
       this.fovDeg = clamp(
         Number.isFinite(camera.fov) ? camera.fov : this.fovDeg,
         FOV_MIN_DEG,
-        FOV_MAX_DEG,
+        FOV_MAX_DEG
       );
       if (camera.up.lengthSq() > UP_EPSILON_SQ) {
         this.up.copy(camera.up).normalize();
@@ -249,19 +241,19 @@ export class CameraRig implements ICameraRig {
     const toTarget = new Vector3(
       requireFinite(preset.target[0], 'preset.target[0]'),
       requireFinite(preset.target[1], 'preset.target[1]'),
-      requireFinite(preset.target[2], 'preset.target[2]'),
+      requireFinite(preset.target[2], 'preset.target[2]')
     );
     const toPosition = new Vector3(
       requireFinite(preset.position[0], 'preset.position[0]'),
       requireFinite(preset.position[1], 'preset.position[1]'),
-      requireFinite(preset.position[2], 'preset.position[2]'),
+      requireFinite(preset.position[2], 'preset.position[2]')
     );
     let toUp: Vector3;
     if (preset.up !== undefined) {
       toUp = new Vector3(
         requireFinite(preset.up[0], 'preset.up[0]'),
         requireFinite(preset.up[1], 'preset.up[1]'),
-        requireFinite(preset.up[2], 'preset.up[2]'),
+        requireFinite(preset.up[2], 'preset.up[2]')
       );
       if (toUp.lengthSq() > UP_EPSILON_SQ) toUp.normalize();
       else toUp.copy(this.up);
@@ -269,11 +261,9 @@ export class CameraRig implements ICameraRig {
       toUp = this.up.clone();
     }
     const toFov = clamp(
-      preset.fovDeg !== undefined
-        ? requireFinite(preset.fovDeg, 'preset.fovDeg')
-        : this.fovDeg,
+      preset.fovDeg !== undefined ? requireFinite(preset.fovDeg, 'preset.fovDeg') : this.fovDeg,
       FOV_MIN_DEG,
-      FOV_MAX_DEG,
+      FOV_MAX_DEG
     );
 
     // Convert the world-space framing into orbit coordinates. Out-of-range
@@ -315,7 +305,7 @@ export class CameraRig implements ICameraRig {
       fromTarget: this.target.clone(),
       deltaTarget: toTarget.sub(this.target),
       fromUp: this.up.clone(),
-      deltaUp: toUp.sub(this.up),
+      deltaUp: toUp.sub(this.up)
     };
     this.dirty = true;
   }
@@ -324,16 +314,14 @@ export class CameraRig implements ICameraRig {
     this.scratchSpherical.set(
       this.distance,
       MathUtils.degToRad(this.polarDeg),
-      MathUtils.degToRad(this.azimuthDeg),
+      MathUtils.degToRad(this.azimuthDeg)
     );
-    const position = this.scratchVector
-      .setFromSpherical(this.scratchSpherical)
-      .add(this.target);
+    const position = this.scratchVector.setFromSpherical(this.scratchSpherical).add(this.target);
     return {
       position: [position.x, position.y, position.z],
       target: [this.target.x, this.target.y, this.target.z],
       up: [this.up.x, this.up.y, this.up.z],
-      fovDeg: this.fovDeg,
+      fovDeg: this.fovDeg
     };
   }
 
@@ -341,16 +329,8 @@ export class CameraRig implements ICameraRig {
     this.cancelAnimation();
     this.configured = true;
     this.azimuthDeg = requireFinite(azimuthDeg, 'azimuthDeg');
-    this.polarDeg = clamp(
-      requireFinite(polarDeg, 'polarDeg'),
-      POLAR_MIN_DEG,
-      POLAR_MAX_DEG,
-    );
-    this.distance = clamp(
-      requireFinite(distance, 'distance'),
-      this.minDistance,
-      this.maxDistance,
-    );
+    this.polarDeg = clamp(requireFinite(polarDeg, 'polarDeg'), POLAR_MIN_DEG, POLAR_MAX_DEG);
+    this.distance = clamp(requireFinite(distance, 'distance'), this.minDistance, this.maxDistance);
     this.dirty = true;
   }
 
@@ -358,7 +338,7 @@ export class CameraRig implements ICameraRig {
     return {
       azimuthDeg: this.azimuthDeg,
       polarDeg: this.polarDeg,
-      distance: this.distance,
+      distance: this.distance
     };
   }
 
@@ -368,7 +348,7 @@ export class CameraRig implements ICameraRig {
     this.target.set(
       requireFinite(target.x, 'target.x'),
       requireFinite(target.y, 'target.y'),
-      requireFinite(target.z, 'target.z'),
+      requireFinite(target.z, 'target.z')
     );
     this.dirty = true;
   }
@@ -396,26 +376,25 @@ export class CameraRig implements ICameraRig {
     const animation = this.animation;
     if (animation !== null) {
       animation.elapsedSeconds = Math.min(animation.elapsedSeconds + dt, animation.durationSeconds);
-      const t = animation.durationSeconds > 0
-        ? animation.elapsedSeconds / animation.durationSeconds
-        : 1;
+      const t =
+        animation.durationSeconds > 0 ? animation.elapsedSeconds / animation.durationSeconds : 1;
       const s = smoothstep(t);
 
       this.azimuthDeg = animation.fromAzimuthDeg + animation.deltaAzimuthDeg * s;
       this.polarDeg = clamp(
         animation.fromPolarDeg + animation.deltaPolarDeg * s,
         POLAR_MIN_DEG,
-        POLAR_MAX_DEG,
+        POLAR_MAX_DEG
       );
       this.distance = clamp(
         animation.fromDistance + animation.deltaDistance * s,
         this.minDistance,
-        this.maxDistance,
+        this.maxDistance
       );
       this.fovDeg = clamp(
         animation.fromFovDeg + animation.deltaFovDeg * s,
         FOV_MIN_DEG,
-        FOV_MAX_DEG,
+        FOV_MAX_DEG
       );
       this.target.copy(animation.fromTarget).addScaledVector(animation.deltaTarget, s);
       this.up.copy(animation.fromUp).addScaledVector(animation.deltaUp, s);
@@ -461,7 +440,7 @@ export class CameraRig implements ICameraRig {
     this.scratchSpherical.set(
       this.distance,
       MathUtils.degToRad(this.polarDeg),
-      MathUtils.degToRad(this.azimuthDeg),
+      MathUtils.degToRad(this.azimuthDeg)
     );
     camera.position
       .copy(this.target)
@@ -485,18 +464,14 @@ export class CameraRig implements ICameraRig {
     this.polarDeg = clamp(
       animation.fromPolarDeg + animation.deltaPolarDeg,
       POLAR_MIN_DEG,
-      POLAR_MAX_DEG,
+      POLAR_MAX_DEG
     );
     this.distance = clamp(
       animation.fromDistance + animation.deltaDistance,
       this.minDistance,
-      this.maxDistance,
+      this.maxDistance
     );
-    this.fovDeg = clamp(
-      animation.fromFovDeg + animation.deltaFovDeg,
-      FOV_MIN_DEG,
-      FOV_MAX_DEG,
-    );
+    this.fovDeg = clamp(animation.fromFovDeg + animation.deltaFovDeg, FOV_MIN_DEG, FOV_MAX_DEG);
     this.target.copy(animation.fromTarget).add(animation.deltaTarget);
     this.up.copy(animation.fromUp).add(animation.deltaUp);
     if (this.up.lengthSq() > UP_EPSILON_SQ) this.up.normalize();
@@ -557,7 +532,7 @@ export class CameraRig implements ICameraRig {
     this.polarDeg = clamp(
       this.polarDeg - deltaY * DRAG_DEGREES_PER_PIXEL,
       POLAR_MIN_DEG,
-      POLAR_MAX_DEG,
+      POLAR_MAX_DEG
     );
     this.dirty = true;
   };

@@ -44,10 +44,10 @@ import type { ISharedPost, RendererLike, ResourceScope } from '../../atlas/types
 
 /** Tone-mapping enum -> THREE constant applied to the canvas-present path. */
 const TONE_MAPPING_CONSTANTS = {
-	'aces-filmic': THREE.ACESFilmicToneMapping,
-	'agx': THREE.AgXToneMapping,
-	'neutral': THREE.NeutralToneMapping,
-	'linear': THREE.LinearToneMapping,
+  'aces-filmic': THREE.ACESFilmicToneMapping,
+  agx: THREE.AgXToneMapping,
+  neutral: THREE.NeutralToneMapping,
+  linear: THREE.LinearToneMapping
 } as const;
 
 /**
@@ -61,273 +61,266 @@ const BLOOM_THRESHOLD = 1.0;
 type BloomNodeObject = ReturnType<typeof bloom>;
 
 export class SharedPost implements ISharedPost {
+  private readonly renderer: RendererLike;
+  private readonly scope: ResourceScope;
 
-	private readonly renderer: RendererLike;
-	private readonly scope: ResourceScope;
+  private hdrTarget: THREE.WebGLRenderTarget | null = null;
+  private snapshotTarget: THREE.WebGLRenderTarget | null = null;
 
-	private hdrTarget: THREE.WebGLRenderTarget | null = null;
-	private snapshotTarget: THREE.WebGLRenderTarget | null = null;
+  private exposure = 1;
+  private bloomEnabled = false;
+  private bloomStrength = 0;
 
-	private cssWidth = 0;
-	private cssHeight = 0;
-	private renderScale = 1;
+  /** Cached composite inputs; rebuilds the TSL graphs when any part changes. */
+  private graphKey: string | null = null;
+  private overlayTexture: THREE.Texture | null = null;
+  private bloomNode: BloomNodeObject | null = null;
 
-	private exposure = 1;
-	private toneMappingMode: keyof typeof TONE_MAPPING_CONSTANTS = 'linear';
-	private bloomEnabled = false;
-	private bloomStrength = 0;
+  private readonly overlayOpacityU = uniform(0);
 
-	/** Cached composite inputs; rebuilds the TSL graphs when any part changes. */
-	private graphKey: string | null = null;
-	private overlayTexture: THREE.Texture | null = null;
-	private bloomNode: BloomNodeObject | null = null;
+  private readonly scene = new THREE.Scene();
+  /** Orthographic camera matching three's QuadMesh: NDC-space pass-through. */
+  private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  private readonly triangleGeometry = SharedPost.createFullscreenTriangleGeometry();
+  private readonly mesh = new THREE.Mesh(this.triangleGeometry);
+  private readonly presentMaterial = new MeshBasicNodeMaterial();
+  private readonly copyMaterial = new MeshBasicNodeMaterial();
 
-	private readonly overlayOpacityU = uniform(0);
+  private disposed = false;
 
-	private readonly scene = new THREE.Scene();
-	/** Orthographic camera matching three's QuadMesh: NDC-space pass-through. */
-	private readonly camera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
-	private readonly triangleGeometry = SharedPost.createFullscreenTriangleGeometry();
-	private readonly mesh = new THREE.Mesh(this.triangleGeometry);
-	private readonly presentMaterial = new MeshBasicNodeMaterial();
-	private readonly copyMaterial = new MeshBasicNodeMaterial();
+  constructor(services: { renderer: RendererLike; scope: ResourceScope }) {
+    this.renderer = services.renderer;
+    this.scope = services.scope;
 
-	private disposed = false;
+    for (const material of [this.presentMaterial, this.copyMaterial]) {
+      material.depthTest = false;
+      material.depthWrite = false;
+      material.blending = THREE.NoBlending;
+      material.side = THREE.DoubleSide;
+    }
 
-	constructor(services: { renderer: RendererLike; scope: ResourceScope }) {
-		this.renderer = services.renderer;
-		this.scope = services.scope;
+    this.mesh.frustumCulled = false;
+    this.mesh.material = this.presentMaterial;
+    this.scene.add(this.mesh);
+  }
 
-		for (const material of [this.presentMaterial, this.copyMaterial]) {
-			material.depthTest = false;
-			material.depthWrite = false;
-			material.blending = THREE.NoBlending;
-			material.side = THREE.DoubleSide;
-		}
+  /** Single full-screen triangle covering clip space (mirrors QuadGeometry). */
+  private static createFullscreenTriangleGeometry(): THREE.BufferGeometry {
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute(
+      'position',
+      new THREE.Float32BufferAttribute([-1, 3, 0, -1, -1, 0, 3, -1, 0], 3)
+    );
+    // UVs interpolate to exactly [0,1] across the visible screen area.
+    geometry.setAttribute('uv', new THREE.Float32BufferAttribute([0, -1, 0, 1, 2, 1], 2));
+    return geometry;
+  }
 
-		this.mesh.frustumCulled = false;
-		this.mesh.material = this.presentMaterial;
-		this.scene.add(this.mesh);
-	}
+  ensureSize(widthPx: number, heightPx: number, renderScale: number): void {
+    if (this.disposed) return;
 
-	/** Single full-screen triangle covering clip space (mirrors QuadGeometry). */
-	private static createFullscreenTriangleGeometry(): THREE.BufferGeometry {
-		const geometry = new THREE.BufferGeometry();
-		geometry.setAttribute(
-			'position',
-			new THREE.Float32BufferAttribute([-1, 3, 0, -1, -1, 0, 3, -1, 0], 3),
-		);
-		// UVs interpolate to exactly [0,1] across the visible screen area.
-		geometry.setAttribute(
-			'uv',
-			new THREE.Float32BufferAttribute([0, -1, 0, 1, 2, 1], 2),
-		);
-		return geometry;
-	}
+    const scale = Number.isFinite(renderScale) && renderScale > 0 ? renderScale : 1;
+    const width = Math.max(1, Math.floor(widthPx * scale));
+    const height = Math.max(1, Math.floor(heightPx * scale));
 
-	ensureSize(widthPx: number, heightPx: number, renderScale: number): void {
-		if (this.disposed) return;
+    if (
+      this.hdrTarget !== null &&
+      this.hdrTarget.width === width &&
+      this.hdrTarget.height === height
+    ) {
+      return;
+    }
 
-		const scale = Number.isFinite(renderScale) && renderScale > 0 ? renderScale : 1;
-		const width = Math.max(1, Math.floor(widthPx * scale));
-		const height = Math.max(1, Math.floor(heightPx * scale));
+    const previous = this.hdrTarget;
+    this.hdrTarget = this.createHdrTarget(width, height);
+    if (previous !== null) {
+      this.releaseTarget(previous);
+    }
+    // Force graph rebuild against the new texture on the next present/capture.
+    this.graphKey = null;
+  }
 
-		this.cssWidth = widthPx;
-		this.cssHeight = heightPx;
-		this.renderScale = scale;
+  getHdrTarget(): THREE.Texture | null {
+    return this.disposed || this.hdrTarget === null ? null : this.hdrTarget.texture;
+  }
 
-		if (this.hdrTarget !== null && this.hdrTarget.width === width && this.hdrTarget.height === height) {
-			return;
-		}
+  setExposure(exposure: number): void {
+    this.exposure = Number.isFinite(exposure) ? Math.max(0, exposure) : 1;
+    // Presentation state only: renders into the HDR target are unaffected.
+    this.renderer.toneMappingExposure = this.exposure;
+  }
 
-		const previous = this.hdrTarget;
-		this.hdrTarget = this.createHdrTarget(width, height);
-		if (previous !== null) {
-			this.releaseTarget(previous);
-		}
-		// Force graph rebuild against the new texture on the next present/capture.
-		this.graphKey = null;
-	}
+  setBloom(enabled: boolean, strength: number): void {
+    const nextStrength = Number.isFinite(strength) ? Math.max(0, strength) : 0;
+    if (enabled !== this.bloomEnabled) {
+      this.bloomEnabled = enabled;
+      // Toggle changes the graph shape (bloom cost must vanish when off).
+      this.graphKey = null;
+    }
+    this.bloomStrength = nextStrength;
+    if (this.bloomNode !== null) {
+      this.bloomNode.strength.value = nextStrength;
+    }
+  }
 
-	getHdrTarget(): THREE.Texture | null {
-		return this.disposed || this.hdrTarget === null ? null : this.hdrTarget.texture;
-	}
+  setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void {
+    // Presentation state only: three invalidates its output pipeline when
+    // renderer.toneMapping changes, and never applies it to off-screen targets.
+    this.renderer.toneMapping = TONE_MAPPING_CONSTANTS[mode];
+  }
 
-	setExposure(exposure: number): void {
-		this.exposure = Number.isFinite(exposure) ? Math.max(0, exposure) : 1;
-		// Presentation state only: renders into the HDR target are unaffected.
-		this.renderer.toneMappingExposure = this.exposure;
-	}
+  present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void {
+    if (this.disposed || this.hdrTarget === null) return;
 
-	setBloom(enabled: boolean, strength: number): void {
-		const nextStrength = Number.isFinite(strength) ? Math.max(0, strength) : 0;
-		if (enabled !== this.bloomEnabled) {
-			this.bloomEnabled = enabled;
-			// Toggle changes the graph shape (bloom cost must vanish when off).
-			this.graphKey = null;
-		}
-		this.bloomStrength = nextStrength;
-		if (this.bloomNode !== null) {
-			this.bloomNode.strength.value = nextStrength;
-		}
-	}
+    this.overlayTexture = transitionOverlay;
+    this.overlayOpacityU.value = clamp01(transitionOpacity);
 
-	setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void {
-		this.toneMappingMode = mode;
-		// Presentation state only: three invalidates its output pipeline when
-		// renderer.toneMapping changes, and never applies it to off-screen targets.
-		this.renderer.toneMapping = TONE_MAPPING_CONSTANTS[mode];
-	}
+    this.syncGraphs();
 
-	present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void {
-		if (this.disposed || this.hdrTarget === null) return;
+    this.mesh.material = this.presentMaterial;
+    this.renderer.setRenderTarget(null);
+    this.renderer.render(this.scene, this.camera);
+  }
 
-		this.overlayTexture = transitionOverlay;
-		this.overlayOpacityU.value = clamp01(transitionOpacity);
+  captureSnapshot(): THREE.Texture | null {
+    if (this.disposed || this.hdrTarget === null) return null;
 
-		this.syncGraphs();
+    const width = this.hdrTarget.width;
+    const height = this.hdrTarget.height;
 
-		this.mesh.material = this.presentMaterial;
-		this.renderer.setRenderTarget(null);
-		this.renderer.render(this.scene, this.camera);
-	}
+    if (this.snapshotTarget === null) {
+      this.snapshotTarget = this.createHdrTarget(width, height, 'SharedPost.Snapshot');
+    } else if (this.snapshotTarget.width !== width || this.snapshotTarget.height !== height) {
+      // Same tracked handle; byte estimate drifts slightly until disposal.
+      this.snapshotTarget.setSize(width, height);
+    }
 
-	captureSnapshot(): THREE.Texture | null {
-		if (this.disposed || this.hdrTarget === null) return null;
+    this.syncGraphs();
 
-		const width = this.hdrTarget.width;
-		const height = this.hdrTarget.height;
+    // Raw copy: rendering into an off-screen target bypasses tone mapping
+    // and color conversion, so the snapshot stays linear HDR.
+    this.mesh.material = this.copyMaterial;
+    this.renderer.setRenderTarget(this.snapshotTarget);
+    this.renderer.render(this.scene, this.camera);
+    return this.snapshotTarget.texture;
+  }
 
-		if (this.snapshotTarget === null) {
-			this.snapshotTarget = this.createHdrTarget(width, height, 'SharedPost.Snapshot');
-		} else if (this.snapshotTarget.width !== width || this.snapshotTarget.height !== height) {
-			// Same tracked handle; byte estimate drifts slightly until disposal.
-			this.snapshotTarget.setSize(width, height);
-		}
+  releaseSnapshot(): void {
+    if (this.disposed || this.snapshotTarget === null) return;
+    const target = this.snapshotTarget;
+    this.snapshotTarget = null;
+    this.releaseTarget(target);
+  }
 
-		this.syncGraphs();
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
 
-		// Raw copy: rendering into an off-screen target bypasses tone mapping
-		// and color conversion, so the snapshot stays linear HDR.
-		this.mesh.material = this.copyMaterial;
-		this.renderer.setRenderTarget(this.snapshotTarget);
-		this.renderer.render(this.scene, this.camera);
-		return this.snapshotTarget.texture;
-	}
+    if (this.hdrTarget !== null) {
+      const target = this.hdrTarget;
+      this.hdrTarget = null;
+      this.releaseTarget(target);
+    }
+    if (this.snapshotTarget !== null) {
+      const snapshot = this.snapshotTarget;
+      this.snapshotTarget = null;
+      this.releaseTarget(snapshot);
+    }
 
-	releaseSnapshot(): void {
-		if (this.disposed || this.snapshotTarget === null) return;
-		const target = this.snapshotTarget;
-		this.snapshotTarget = null;
-		this.releaseTarget(target);
-	}
+    if (this.bloomNode !== null) {
+      this.bloomNode.dispose();
+      this.bloomNode = null;
+    }
+    this.graphKey = null;
+    this.overlayTexture = null;
 
-	dispose(): void {
-		if (this.disposed) return;
-		this.disposed = true;
+    this.presentMaterial.dispose();
+    this.copyMaterial.dispose();
+    this.triangleGeometry.dispose();
+    this.scene.remove(this.mesh);
+  }
 
-		if (this.hdrTarget !== null) {
-			const target = this.hdrTarget;
-			this.hdrTarget = null;
-			this.releaseTarget(target);
-		}
-		if (this.snapshotTarget !== null) {
-			const snapshot = this.snapshotTarget;
-			this.snapshotTarget = null;
-			this.releaseTarget(snapshot);
-		}
+  /**
+   * Rebuilds the present/copy TSL graphs when the HDR texture, overlay
+   * texture or bloom gate changed. Uniform values persist across rebuilds.
+   */
+  private syncGraphs(): void {
+    if (this.hdrTarget === null) return;
+    const hdrTexture = this.hdrTarget.texture;
+    const overlayTexture = this.overlayTexture;
 
-		if (this.bloomNode !== null) {
-			this.bloomNode.dispose();
-			this.bloomNode = null;
-		}
-		this.graphKey = null;
-		this.overlayTexture = null;
+    const key = `${hdrTexture.id}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}`;
+    if (key === this.graphKey) return;
+    this.graphKey = key;
 
-		this.presentMaterial.dispose();
-		this.copyMaterial.dispose();
-		this.triangleGeometry.dispose();
-		this.scene.remove(this.mesh);
-	}
+    // Raw copy graph for captureSnapshot().
+    this.copyMaterial.fragmentNode = texture(hdrTexture);
+    this.copyMaterial.needsUpdate = true;
 
-	/**
-	 * Rebuilds the present/copy TSL graphs when the HDR texture, overlay
-	 * texture or bloom gate changed. Uniform values persist across rebuilds.
-	 */
-	private syncGraphs(): void {
-		if (this.hdrTarget === null) return;
-		const hdrTexture = this.hdrTarget.texture;
-		const overlayTexture = this.overlayTexture;
+    // Present graph: HDR -> (+ additive bloom) -> overlay lerp -> tonemap/sRGB
+    // (the last step is the renderer's automatic canvas-present transform).
+    const hdrNode = texture(hdrTexture);
+    let rgb = hdrNode.rgb;
 
-		const key = `${hdrTexture.id}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}`;
-		if (key === this.graphKey) return;
-		this.graphKey = key;
+    if (this.bloomEnabled) {
+      if (this.bloomNode === null) {
+        this.bloomNode = bloom(hdrNode, this.bloomStrength, BLOOM_RADIUS, BLOOM_THRESHOLD);
+      } else {
+        this.bloomNode.inputNode = hdrNode;
+      }
+      this.bloomNode.strength.value = this.bloomStrength;
+      this.bloomNode.radius.value = BLOOM_RADIUS;
+      this.bloomNode.threshold.value = BLOOM_THRESHOLD;
+      rgb = rgb.add(this.bloomNode.rgb);
+    } else if (this.bloomNode !== null) {
+      this.bloomNode.dispose();
+      this.bloomNode = null;
+    }
 
-		// Raw copy graph for captureSnapshot().
-		this.copyMaterial.fragmentNode = texture(hdrTexture);
-		this.copyMaterial.needsUpdate = true;
+    if (overlayTexture !== null) {
+      rgb = mix(rgb, texture(overlayTexture).rgb, this.overlayOpacityU);
+    }
 
-		// Present graph: HDR -> (+ additive bloom) -> overlay lerp -> tonemap/sRGB
-		// (the last step is the renderer's automatic canvas-present transform).
-		const hdrNode = texture(hdrTexture);
-		let rgb = hdrNode.rgb;
+    this.presentMaterial.colorNode = vec4(rgb, 1);
+    this.presentMaterial.needsUpdate = true;
+  }
 
-		if (this.bloomEnabled) {
-			if (this.bloomNode === null) {
-				this.bloomNode = bloom(hdrNode, this.bloomStrength, BLOOM_RADIUS, BLOOM_THRESHOLD);
-			} else {
-				this.bloomNode.inputNode = hdrNode;
-			}
-			this.bloomNode.strength.value = this.bloomStrength;
-			this.bloomNode.radius.value = BLOOM_RADIUS;
-			this.bloomNode.threshold.value = BLOOM_THRESHOLD;
-			rgb = rgb.add(this.bloomNode.rgb);
-		} else if (this.bloomNode !== null) {
-			this.bloomNode.dispose();
-			this.bloomNode = null;
-		}
+  private createHdrTarget(
+    width: number,
+    height: number,
+    name = 'SharedPost.HDR'
+  ): THREE.WebGLRenderTarget {
+    // WebGLRenderTarget extends RenderTarget and is accepted by both
+    // WebGPURenderer and WebGLRenderer. RGBA16F is natively renderable on
+    // WebGPU and on WebGL2 with float-buffer extensions (required by the
+    // backend's own intermediate targets anyway).
+    const target = new THREE.WebGLRenderTarget(width, height, {
+      type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat,
+      depthBuffer: true,
+      stencilBuffer: false,
+      generateMipmaps: false,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter
+    });
+    target.texture.name = name;
+    // ~12 bytes/px: 4 channels x half float + 4-byte depth estimate.
+    this.scope.track('renderTarget', target, () => target.dispose(), width * height * 12);
+    return target;
+  }
 
-		if (overlayTexture !== null) {
-			rgb = mix(rgb, texture(overlayTexture).rgb, this.overlayOpacityU);
-		}
-
-		this.presentMaterial.colorNode = vec4(rgb, 1);
-		this.presentMaterial.needsUpdate = true;
-	}
-
-	private createHdrTarget(width: number, height: number, name = 'SharedPost.HDR'): THREE.WebGLRenderTarget {
-		// WebGLRenderTarget extends RenderTarget and is accepted by both
-		// WebGPURenderer and WebGLRenderer. RGBA16F is natively renderable on
-		// WebGPU and on WebGL2 with float-buffer extensions (required by the
-		// backend's own intermediate targets anyway).
-		const target = new THREE.WebGLRenderTarget(width, height, {
-			type: THREE.HalfFloatType,
-			format: THREE.RGBAFormat,
-			depthBuffer: true,
-			stencilBuffer: false,
-			generateMipmaps: false,
-			minFilter: THREE.LinearFilter,
-			magFilter: THREE.LinearFilter,
-		});
-		target.texture.name = name;
-		// ~12 bytes/px: 4 channels x half float + 4-byte depth estimate.
-		this.scope.track('renderTarget', target, () => target.dispose(), width * height * 12);
-		return target;
-	}
-
-	private releaseTarget(target: THREE.WebGLRenderTarget): void {
-		try {
-			// The registered disposer calls target.dispose().
-			this.scope.release(target);
-		} catch {
-			// Scope already disposed or handle unknown; still free the GPU object.
-			target.dispose();
-		}
-	}
-
+  private releaseTarget(target: THREE.WebGLRenderTarget): void {
+    try {
+      // The registered disposer calls target.dispose().
+      this.scope.release(target);
+    } catch {
+      // Scope already disposed or handle unknown; still free the GPU object.
+      target.dispose();
+    }
+  }
 }
 
 function clamp01(value: number): number {
-	if (!Number.isFinite(value)) return 0;
-	return value < 0 ? 0 : value > 1 ? 1 : value;
+  if (!Number.isFinite(value)) return 0;
+  return value < 0 ? 0 : value > 1 ? 1 : value;
 }

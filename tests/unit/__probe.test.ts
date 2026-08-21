@@ -1,7 +1,11 @@
 import { describe, it } from 'vitest';
 import {
-  cellHasStar, directionToCubeCell, makeStarfieldParams,
-  sampleStarfieldRadiance, starFaceCoords, faceCoordsToDirection
+  cellHasStar,
+  directionToCubeCell,
+  makeStarfieldParams,
+  sampleStarfieldRadiance,
+  starFaceCoords,
+  faceCoordsToDirection
 } from '../../src/shaders/starfield.js';
 
 describe('probe', () => {

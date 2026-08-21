@@ -84,7 +84,7 @@ export const CAPABILITY_IDS: readonly CapabilityId[] = [
   'storage-buffers',
   'float-render-target',
   'timestamp-query',
-  'compressed-textures',
+  'compressed-textures'
 ];
 
 /** Human-readable labels for host status UI. */
@@ -94,7 +94,7 @@ export const CAPABILITY_LABELS: Readonly<Record<CapabilityId, string>> = {
   'storage-buffers': 'Storage buffers',
   'float-render-target': 'Float render targets',
   'timestamp-query': 'GPU timestamp queries',
-  'compressed-textures': 'Compressed texture formats',
+  'compressed-textures': 'Compressed texture formats'
 };
 
 /** Fixed honesty note displayed next to capability flags in the UI. */
@@ -134,7 +134,10 @@ function hasAnyPrefix(set: Iterable<string> | null, prefix: string): boolean {
   return false;
 }
 
-function gpuFeatureSupported(features: GpuFeatureSetLike | null | undefined, name: string): boolean {
+function gpuFeatureSupported(
+  features: GpuFeatureSetLike | null | undefined,
+  name: string
+): boolean {
   if (features === null || features === undefined) return false;
   try {
     return features.has(name);
@@ -164,7 +167,7 @@ export function detectCapabilityFlags(probe: RendererProbe): CapabilityFlags {
       'compressed-textures':
         gpuFeatureSupported(features, 'texture-compression-bc') ||
         gpuFeatureSupported(features, 'texture-compression-astc') ||
-        gpuFeatureSupported(features, 'texture-compression-etc2'),
+        gpuFeatureSupported(features, 'texture-compression-etc2')
     };
   }
 
@@ -177,7 +180,7 @@ export function detectCapabilityFlags(probe: RendererProbe): CapabilityFlags {
       webglExtensions.has('EXT_color_buffer_float') ||
       webglExtensions.has('EXT_color_buffer_half_float'),
     'timestamp-query': webglExtensions.has('EXT_disjoint_timer_query_webgl2'),
-    'compressed-textures': hasAnyPrefix(webglExtensions, 'WEBGL_compressed_texture_'),
+    'compressed-textures': hasAnyPrefix(webglExtensions, 'WEBGL_compressed_texture_')
   };
 }
 
@@ -191,7 +194,11 @@ function resolveMaxTextureSize(probe: RendererProbe): number {
   }
 
   const fromCapabilities = probe.capabilities?.maxTextureSize;
-  if (typeof fromCapabilities === 'number' && Number.isFinite(fromCapabilities) && fromCapabilities > 0) {
+  if (
+    typeof fromCapabilities === 'number' &&
+    Number.isFinite(fromCapabilities) &&
+    fromCapabilities > 0
+  ) {
     return Math.floor(fromCapabilities);
   }
 
@@ -221,7 +228,7 @@ export function detectCapabilities(probe: RendererProbe): BackendInfo {
     floatRenderTargets: flags['float-render-target'],
     timestampQuery: flags['timestamp-query'],
     storageBuffers: flags['storage-buffers'],
-    devicePixelRatio: probe.devicePixelRatio ?? 1,
+    devicePixelRatio: probe.devicePixelRatio ?? 1
   };
 }
 
@@ -261,7 +268,7 @@ function emptyFlags(): CapabilityFlags {
 /** Assemble the debug/status-panel summary from kernel state. */
 export function summarizeCapabilities(
   backend: BackendInfo | null,
-  flags: CapabilityFlags | null,
+  flags: CapabilityFlags | null
 ): CapabilitySummary {
   return {
     ready: backend !== null,
@@ -271,7 +278,7 @@ export function summarizeCapabilities(
     devicePixelRatio: backend?.devicePixelRatio ?? 1,
     flags: flags !== null ? { ...flags } : emptyFlags(),
     labels: CAPABILITY_LABELS,
-    disclosure: CAPABILITY_DISCLOSURE,
+    disclosure: CAPABILITY_DISCLOSURE
   };
 }
 

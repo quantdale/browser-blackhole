@@ -33,7 +33,7 @@ import {
   gravitationalRedshiftStatic,
   integratePhoton,
   launchFromImpactParameter,
-  type Vec3,
+  type Vec3
 } from './cpuReference';
 
 /** JSON-friendly scalar value carried by vector inputs/expected/actual. */
@@ -55,7 +55,11 @@ export interface ValidationVector {
 }
 
 function close(actual: number, expected: number, toleranceAbs: number): boolean {
-  return Number.isFinite(actual) && Number.isFinite(expected) && Math.abs(actual - expected) <= toleranceAbs;
+  return (
+    Number.isFinite(actual) &&
+    Number.isFinite(expected) &&
+    Math.abs(actual - expected) <= toleranceAbs
+  );
 }
 
 function radiusOf(p: Vec3): number {
@@ -71,7 +75,7 @@ const WEAK_FIELD_CASES: ReadonlyArray<{ readonly b: number; readonly toleranceAb
   { b: 20, toleranceAbs: 0.04 },
   { b: 40, toleranceAbs: 0.01 },
   { b: 80, toleranceAbs: 0.0025 },
-  { b: 160, toleranceAbs: 0.00062 },
+  { b: 160, toleranceAbs: 0.00062 }
 ];
 
 const conventionVectors: ValidationVector[] = [
@@ -82,7 +86,7 @@ const conventionVectors: ValidationVector[] = [
     inputs: { massRg: 1 },
     expected: 2,
     toleranceAbs: 0,
-    evaluate: () => ({ actual: HORIZON_RG, pass: close(HORIZON_RG, 2, 0) }),
+    evaluate: () => ({ actual: HORIZON_RG, pass: close(HORIZON_RG, 2, 0) })
   },
   {
     id: 'convention-photon-sphere',
@@ -91,7 +95,7 @@ const conventionVectors: ValidationVector[] = [
     inputs: { massRg: 1 },
     expected: 3,
     toleranceAbs: 0,
-    evaluate: () => ({ actual: PHOTON_SPHERE_RG, pass: close(PHOTON_SPHERE_RG, 3, 0) }),
+    evaluate: () => ({ actual: PHOTON_SPHERE_RG, pass: close(PHOTON_SPHERE_RG, 3, 0) })
   },
   {
     id: 'convention-isco-radius',
@@ -100,8 +104,8 @@ const conventionVectors: ValidationVector[] = [
     inputs: { massRg: 1 },
     expected: 6,
     toleranceAbs: 0,
-    evaluate: () => ({ actual: ISCO_RG, pass: close(ISCO_RG, 6, 0) }),
-  },
+    evaluate: () => ({ actual: ISCO_RG, pass: close(ISCO_RG, 6, 0) })
+  }
 ];
 
 const criticalBoundaryVectors: ValidationVector[] = [
@@ -115,7 +119,7 @@ const criticalBoundaryVectors: ValidationVector[] = [
     evaluate: () => {
       const actual = criticalImpactParameter(1);
       return { actual, pass: close(actual, CRITICAL_IMPACT_PARAMETER_ANALYTIC_RG, 1e-4) };
-    },
+    }
   },
   {
     id: 'capture-boundary-below-b5',
@@ -127,7 +131,7 @@ const criticalBoundaryVectors: ValidationVector[] = [
     evaluate: () => {
       const result = launchFromImpactParameter(5, { startRadiusRg: 2000, escapeRadius: 4400 });
       return { actual: result.status, pass: result.status === 'captured' };
-    },
+    }
   },
   {
     id: 'escape-boundary-above-b5p4',
@@ -139,7 +143,7 @@ const criticalBoundaryVectors: ValidationVector[] = [
     evaluate: () => {
       const result = launchFromImpactParameter(5.4, { startRadiusRg: 2000, escapeRadius: 4400 });
       return { actual: result.status, pass: result.status === 'escaped' };
-    },
+    }
   },
   {
     id: 'near-critical-winding-growth',
@@ -153,15 +157,15 @@ const criticalBoundaryVectors: ValidationVector[] = [
       const alphas = bs.map((b) => deflectionAngleNumeric(b));
       const actual: Record<string, ValidationValue> = {};
       bs.forEach((b, i) => {
-        actual[`alpha_b_${b.toFixed(2)}`] = alphas[i];
+        actual[`alpha_b_${b.toFixed(2)}`] = alphas[i]!;
       });
       let pass = alphas.every((a) => Number.isFinite(a) && a > 0);
       for (let i = 1; i < alphas.length && pass; i += 1) {
-        pass = alphas[i] > alphas[i - 1];
+        pass = alphas[i]! > alphas[i - 1]!;
       }
       return { actual, pass };
-    },
-  },
+    }
+  }
 ];
 
 const radialVectors: ValidationVector[] = [
@@ -181,7 +185,7 @@ const radialVectors: ValidationVector[] = [
         finalRadius <= 2 + 0.001 &&
         finalRadius >= 2 - 0.25;
       return { actual: { status: result.status, finalRadiusRg: finalRadius }, pass };
-    },
+    }
   },
   {
     id: 'radial-outward-escape',
@@ -196,29 +200,27 @@ const radialVectors: ValidationVector[] = [
       const deviation = Math.max(Math.abs(d[0] - 1), Math.abs(d[1]), Math.abs(d[2]));
       return {
         actual: { status: result.status, maxDirectionDeviation: deviation },
-        pass: result.status === 'escaped' && deviation <= 1e-9,
+        pass: result.status === 'escaped' && deviation <= 1e-9
       };
-    },
-  },
+    }
+  }
 ];
 
 const weakFieldVectors: ValidationVector[] = [
-  ...WEAK_FIELD_CASES.map(
-    ({ b, toleranceAbs }): ValidationVector => ({
-      id: `weak-field-deflection-b${b}`,
-      description:
-        `Numerical total deflection at b = ${b} r_g agrees with the leading weak-field value ` +
-        `${deflectionAngleWeakField(b, 1)} rad within second-order GR headroom ` +
-        '(docs/VALIDATION_VECTORS.md §6; docs/NUMERICAL_METHODS.md §12).',
-      inputs: { b, massRg: 1 },
-      expected: deflectionAngleWeakField(b, 1),
-      toleranceAbs,
-      evaluate: () => {
-        const actual = deflectionAngleNumeric(b);
-        return { actual, pass: close(actual, deflectionAngleWeakField(b, 1), toleranceAbs) };
-      },
-    }),
-  ),
+  ...WEAK_FIELD_CASES.map(({ b, toleranceAbs }): ValidationVector => ({
+    id: `weak-field-deflection-b${b}`,
+    description:
+      `Numerical total deflection at b = ${b} r_g agrees with the leading weak-field value ` +
+      `${deflectionAngleWeakField(b, 1)} rad within second-order GR headroom ` +
+      '(docs/VALIDATION_VECTORS.md §6; docs/NUMERICAL_METHODS.md §12).',
+    inputs: { b, massRg: 1 },
+    expected: deflectionAngleWeakField(b, 1),
+    toleranceAbs,
+    evaluate: () => {
+      const actual = deflectionAngleNumeric(b);
+      return { actual, pass: close(actual, deflectionAngleWeakField(b, 1), toleranceAbs) };
+    }
+  })),
   {
     id: 'weak-field-convergence-monotonic',
     description:
@@ -235,14 +237,14 @@ const weakFieldVectors: ValidationVector[] = [
       });
       const actual: Record<string, ValidationValue> = {};
       bs.forEach((b, i) => {
-        actual[`relErr_b_${b}`] = relativeErrors[i];
+        actual[`relErr_b_${b}`] = relativeErrors[i]!;
       });
       let pass = relativeErrors.every((e) => Number.isFinite(e) && e > 0);
       for (let i = 1; i < relativeErrors.length && pass; i += 1) {
-        pass = relativeErrors[i] < relativeErrors[i - 1];
+        pass = relativeErrors[i]! < relativeErrors[i - 1]!;
       }
       return { actual, pass };
-    },
+    }
   },
   {
     id: 'weak-field-bends-toward-mass',
@@ -257,8 +259,8 @@ const weakFieldVectors: ValidationVector[] = [
       const dirY = result.finalDirection[1];
       const pass = result.status === 'escaped' && dirX > 0 && dirY < 0;
       return { actual: { status: result.status, dirX, dirY }, pass };
-    },
-  },
+    }
+  }
 ];
 
 const redshiftVectors: ValidationVector[] = [
@@ -272,7 +274,7 @@ const redshiftVectors: ValidationVector[] = [
     evaluate: () => {
       const actual = gravitationalRedshiftStatic(3, Number.POSITIVE_INFINITY, 1);
       return { actual, pass: close(actual, 0.5773502691896258, 1e-15) };
-    },
+    }
   },
   {
     id: 'redshift-static-r6-to-infinity',
@@ -284,7 +286,7 @@ const redshiftVectors: ValidationVector[] = [
     evaluate: () => {
       const actual = gravitationalRedshiftStatic(6, Number.POSITIVE_INFINITY, 1);
       return { actual, pass: close(actual, 0.816496580927726, 1e-15) };
-    },
+    }
   },
   {
     id: 'redshift-static-r10-to-r100',
@@ -296,7 +298,7 @@ const redshiftVectors: ValidationVector[] = [
     evaluate: () => {
       const actual = gravitationalRedshiftStatic(10, 100, 1);
       return { actual, pass: close(actual, 0.9035079029052513, 1e-15) };
-    },
+    }
   },
   {
     id: 'redshift-static-r100-to-infinity',
@@ -308,8 +310,8 @@ const redshiftVectors: ValidationVector[] = [
     evaluate: () => {
       const actual = gravitationalRedshiftStatic(100, Number.POSITIVE_INFINITY, 1);
       return { actual, pass: close(actual, 0.9899494936611665, 1e-15) };
-    },
-  },
+    }
+  }
 ];
 
 /**
@@ -322,7 +324,7 @@ export const VALIDATION_VECTORS: readonly ValidationVector[] = [
   ...radialVectors,
   ...criticalBoundaryVectors,
   ...weakFieldVectors,
-  ...redshiftVectors,
+  ...redshiftVectors
 ];
 
 export interface ValidationVectorRunResult {

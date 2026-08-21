@@ -79,9 +79,5 @@ export function directionToSky(direction: Vec3): SkyCoord {
  */
 export function skyToDirection(coord: SkyCoord): Vec3 {
   const sinTheta = Math.sin(coord.theta);
-  return [
-    sinTheta * Math.cos(coord.phi),
-    Math.cos(coord.theta),
-    sinTheta * Math.sin(coord.phi)
-  ];
+  return [sinTheta * Math.cos(coord.phi), Math.cos(coord.theta), sinTheta * Math.sin(coord.phi)];
 }

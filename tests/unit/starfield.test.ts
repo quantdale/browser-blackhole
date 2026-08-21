@@ -79,11 +79,7 @@ describe('directionToCubeCell', () => {
 describe('determinism', () => {
   it('same inputs produce identical radiance across calls', () => {
     const p = params();
-    const dirs = [
-      normalize([0.2, 0.5, -0.84]),
-      normalize([-0.9, 0.1, 0.42]),
-      normalize([0, 1, 0])
-    ];
+    const dirs = [normalize([0.2, 0.5, -0.84]), normalize([-0.9, 0.1, 0.42]), normalize([0, 1, 0])];
     for (const d of dirs) {
       const a = sampleStarfieldRadiance(d, p);
       const b = sampleStarfieldRadiance(d, p);
@@ -129,8 +125,7 @@ describe('seed sensitivity', () => {
     const pB = params({ seed: 8 });
     const sA = starFaceCoords(0, 3, 5, pA);
     const sB = starFaceCoords(0, 3, 5, pB);
-    const sameSpot =
-      Math.abs(sA.fu - sB.fu) < 1e-12 && Math.abs(sA.fv - sB.fv) < 1e-12;
+    const sameSpot = Math.abs(sA.fu - sB.fu) < 1e-12 && Math.abs(sA.fv - sB.fv) < 1e-12;
     expect(sameSpot).toBe(false);
     expect(starBrightness(0, 3, 5, pA)).not.toBe(starBrightness(0, 3, 5, pB));
   });
@@ -200,16 +195,13 @@ describe('brightness distribution', () => {
       sumSteep += sampleBrightness(x, steep);
       count += 1;
     }
-    expect(sumFlat / count).toBeGreaterThan(sumSteep / count * 2);
+    expect(sumFlat / count).toBeGreaterThan((sumSteep / count) * 2);
   });
 
   it('alpha=0 is uniform and alpha=1 is log-uniform between bounds', () => {
     const dims = { minBrightness: 1, maxBrightness: 4 };
     expect(sampleBrightness(0, params({ ...dims, brightnessExponent: 0 }))).toBeCloseTo(1, 12);
-    expect(sampleBrightness(0.999, params({ ...dims, brightnessExponent: 0 }))).toBeCloseTo(
-      4,
-      2
-    );
+    expect(sampleBrightness(0.999, params({ ...dims, brightnessExponent: 0 }))).toBeCloseTo(4, 2);
     expect(sampleBrightness(0, params({ ...dims, brightnessExponent: 1 }))).toBeCloseTo(1, 12);
     expect(sampleBrightness(1 - 1e-9, params({ ...dims, brightnessExponent: 1 }))).toBeCloseTo(
       4,
@@ -246,7 +238,9 @@ describe('base radiance', () => {
             [fu, fv, 1],
             [-fu, fv, -1]
           ];
-          const d = normalize(dirs[f]);
+          const raw = dirs[f];
+          if (!raw) continue;
+          const d = normalize(raw);
           found = sampleStarfieldRadiance(d, p);
           break outer;
         }
@@ -268,11 +262,7 @@ describe('direction independence sanity', () => {
       const d = normalize([k * 0.113, 0.37 - k * 0.004, 0.71]);
       const rPos = sampleStarfieldRadiance(d, p);
       const rNeg = sampleStarfieldRadiance([-d[0], -d[1], -d[2]], p);
-      if (
-        rPos[0] !== rNeg[0] ||
-        rPos[1] !== rNeg[1] ||
-        rPos[2] !== rNeg[2]
-      ) {
+      if (rPos[0] !== rNeg[0] || rPos[1] !== rNeg[1] || rPos[2] !== rNeg[2]) {
         differing += 1;
       }
       compared += 1;

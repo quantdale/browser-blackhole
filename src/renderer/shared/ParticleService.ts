@@ -45,7 +45,6 @@
 import * as THREE from 'three';
 import { PointsNodeMaterial, StorageInstancedBufferAttribute } from 'three/webgpu';
 import type { ComputeNode, Node, UniformNode } from 'three/webgpu';
-import type { ShaderNodeObject } from 'three/tsl';
 import {
   Fn,
   If,
@@ -72,18 +71,18 @@ import {
   uv,
   vec2,
   vec3,
-  vec4,
+  vec4
 } from 'three/tsl';
 import type {
   IParticleService,
   ParticleEmitterConfig,
   ParticleSystemConfig,
   ParticleSystemHandle,
-  RendererLike,
+  RendererLike
 } from '../../atlas/types';
 
-/** Any TSL shader-graph value. */
-type TslNode = ShaderNodeObject<Node>;
+/** Any float-valued TSL shader-graph node. */
+type TslFloat = Node<'float'>;
 
 /**
  * Disclosure string for destinations that compose this service. Describes the actual
@@ -121,7 +120,7 @@ function hash01(x: number): number {
 }
 
 /** TSL twin of {@link hash01}; compiles to f32 on the GPU. */
-function gpuHash01(s: TslNode): TslNode {
+function gpuHash01(s: TslFloat): TslFloat {
   return fract(sin(s.mul(12.9898)).mul(43758.5453));
 }
 
@@ -132,7 +131,7 @@ function nextSeed(s: number): number {
 }
 
 /** Advance a seed stream by one golden-ratio step (GPU). */
-function gpuNextSeed(s: TslNode): TslNode {
+function gpuNextSeed(s: TslFloat): TslFloat {
   return fract(s.add(SEED_STEP));
 }
 
@@ -182,13 +181,13 @@ function kindId(kind: ParticleEmitterConfig['kind']): number {
 function buildEmitterBlock(emitters: ParticleEmitterConfig[]): EmitterBlock {
   if (emitters.length === 0) {
     throw new Error(
-      'ParticleService: ParticleSystemConfig.emitters must contain at least one emitter.',
+      'ParticleService: ParticleSystemConfig.emitters must contain at least one emitter.'
     );
   }
   if (emitters.length > MAX_EMITTERS) {
     console.warn(
       `ParticleService: ${emitters.length} emitters requested, ` +
-        `only the first ${MAX_EMITTERS} are used.`,
+        `only the first ${MAX_EMITTERS} are used.`
     );
   }
   const count = Math.min(emitters.length, MAX_EMITTERS);
@@ -200,10 +199,11 @@ function buildEmitterBlock(emitters: ParticleEmitterConfig[]): EmitterBlock {
     radii: [],
     speeds: [],
     kinds: [],
-    count,
+    count
   };
   for (let i = 0; i < count; i++) {
-    const e = emitters[i];
+    // i < count <= emitters.length, so the element is invariantly defined.
+    const e = emitters[i]!;
     const origin = new THREE.Vector3(...(e.origin ?? [0, 0, 0]));
     const normal = new THREE.Vector3(...(e.normal ?? [0, 0, 1]));
     if (normal.lengthSq() < 1e-12) normal.set(0, 0, 1);
@@ -305,8 +305,8 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   private readonly mesh: THREE.Mesh;
   private readonly rampLut: THREE.DataTexture;
 
-  private readonly dtUniform: ShaderNodeObject<UniformNode<number>>;
-  private readonly computeUpdate: ShaderNodeObject<ComputeNode> | null;
+  private readonly dtUniform: UniformNode<'float', number>;
+  private readonly computeUpdate: ComputeNode | null;
   private drawnCount: number;
   private disposed = false;
 
@@ -328,7 +328,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     if (config.preferCompute && !this.hasComputeRenderer) {
       console.warn(
         'ParticleService: preferCompute requested but no compute-capable renderer was ' +
-          'provided; falling back to the CPU typed-array update path.',
+          'provided; falling back to the CPU typed-array update path.'
       );
     }
 
@@ -358,8 +358,8 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.material.blending =
       config.blending === 'additive' ? THREE.AdditiveBlending : THREE.NormalBlending;
 
-    const posRead = attribute('aParticlePos', 'vec4');
-    const lifeRead = attribute('aParticleLife', 'vec4');
+    const posRead = attribute<'vec4'>('aParticlePos', 'vec4');
+    const lifeRead = attribute<'vec4'>('aParticleLife', 'vec4');
     this.material.positionNode = posRead.xyz;
 
     // Per-particle size: mix(sizeMin, sizeMax, hash(seed)) in CSS pixels; the
@@ -392,7 +392,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   }
 
   /** Build the TSL compute kernel: integrate, then recycle dead particles. */
-  private buildComputeGraph(): ShaderNodeObject<ComputeNode> {
+  private buildComputeGraph(): ComputeNode {
     const cfg = this.config;
     const emitters = this.emitters;
 
@@ -400,13 +400,13 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     const velBuf = storage(this.velAttr, 'vec4', this.capacity);
     const lifeBuf = storage(this.lifeAttr, 'vec4', this.capacity);
 
-    const uOrigin = uniformArray(emitters.origins, 'vec3');
-    const uNormal = uniformArray(emitters.normals, 'vec3');
-    const uExtent = uniformArray(emitters.extents, 'vec3');
-    const uBias = uniformArray(emitters.biases, 'vec3');
-    const uRadius = uniformArray(emitters.radii, 'float');
-    const uSpeed = uniformArray(emitters.speeds, 'float');
-    const uKind = uniformArray(emitters.kinds, 'float');
+    const uOrigin = uniformArray<'vec3'>(emitters.origins, 'vec3');
+    const uNormal = uniformArray<'vec3'>(emitters.normals, 'vec3');
+    const uExtent = uniformArray<'vec3'>(emitters.extents, 'vec3');
+    const uBias = uniformArray<'vec3'>(emitters.biases, 'vec3');
+    const uRadius = uniformArray<'float'>(emitters.radii, 'float');
+    const uSpeed = uniformArray<'float'>(emitters.speeds, 'float');
+    const uKind = uniformArray<'float'>(emitters.kinds, 'float');
 
     const dtU = this.dtUniform;
     const lifeMinU = float(cfg.lifetimeSeconds[0]);
@@ -466,12 +466,10 @@ class ParticleSystemImpl implements ParticleSystemHandle {
         const rad = radius.mul(sqrt(r1));
         const ang = r2.mul(Math.PI * 2);
         const pDisc = origin.add(
-          basisU.mul(rad.mul(ang.cos())).add(basisV.mul(rad.mul(ang.sin()))),
+          basisU.mul(rad.mul(ang.cos())).add(basisV.mul(rad.mul(ang.sin())))
         );
 
-        const pBox = origin.add(
-          vec3(r1.sub(0.5), r2.sub(0.5), r3.sub(0.5)).mul(extent),
-        );
+        const pBox = origin.add(vec3(r1.sub(0.5), r2.sub(0.5), r3.sub(0.5)).mul(extent));
 
         const spawnPos = select(
           kind.equal(float(EMITTER_KIND_DISC)),
@@ -479,8 +477,8 @@ class ParticleSystemImpl implements ParticleSystemHandle {
           select(
             kind.equal(float(EMITTER_KIND_SHELL)),
             pShell,
-            select(kind.equal(float(EMITTER_KIND_BOX)), pBox, pPoint),
-          ),
+            select(kind.equal(float(EMITTER_KIND_BOX)), pBox, pPoint)
+          )
         );
 
         // Velocity: random unit direction, optionally collimated by directionBias.
@@ -517,7 +515,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     // in a steady-state mixture instead of pulsing in lock-step.
     for (let i = 0; i < this.capacity; i++) {
       const o = i * LIFE_STRIDE;
-      this.lifeParams[o] = this.lifeParams[o + 1] * rand();
+      this.lifeParams[o] = (this.lifeParams[o + 1] ?? 0) * rand();
     }
     this.posAttr.needsUpdate = true;
     this.velAttr.needsUpdate = true;
@@ -535,15 +533,17 @@ class ParticleSystemImpl implements ParticleSystemHandle {
 
     const emitterIndex = initial
       ? Math.floor(rand() * this.emitters.count) % this.emitters.count
-      : this.lifeParams[lo + 3];
+      : (this.lifeParams[lo + 3] ?? 0);
     const e = emitterIndex | 0;
-    const origin = this.emitters.origins[e];
-    const normal = this.emitters.normals[e];
-    const extent = this.emitters.extents[e];
-    const bias = this.emitters.biases[e];
-    const radius = this.emitters.radii[e];
-    const speed = this.emitters.speeds[e];
-    const kind = this.emitters.kinds[e];
+    // e is invariantly < this.emitters.count (initial path mods by count; the
+    // respawn path only ever stores a value previously produced that way).
+    const origin = this.emitters.origins[e]!;
+    const normal = this.emitters.normals[e]!;
+    const extent = this.emitters.extents[e]!;
+    const bias = this.emitters.biases[e]!;
+    const radius = this.emitters.radii[e]!;
+    const speed = this.emitters.speeds[e]!;
+    const kind = this.emitters.kinds[e]!;
 
     // Six draws, matching the GPU respawn sequence.
     let s = nextSeed(rand());
@@ -646,18 +646,17 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     let anyRespawn = false;
     for (let i = 0; i < cap; i++) {
       const lo = i * LIFE_STRIDE;
-      const age1 = life[lo] + dt;
-      if (age1 > life[lo + 1]) {
+      const age1 = (life[lo] ?? 0) + dt;
+      if (age1 > (life[lo + 1] ?? 0)) {
         this.spawn(i, this.respawnRand, false);
         anyRespawn = true;
         continue;
       }
       life[lo] = age1;
       const po = i * POS_STRIDE;
-      const vo = i * VEL_STRIDE;
-      pos[po] += vel[po] * dt;
-      pos[po + 1] += vel[po + 1] * dt;
-      pos[po + 2] += vel[po + 2] * dt;
+      pos[po] = (pos[po] ?? 0) + (vel[po] ?? 0) * dt;
+      pos[po + 1] = (pos[po + 1] ?? 0) + (vel[po + 1] ?? 0) * dt;
+      pos[po + 2] = (pos[po + 2] ?? 0) + (vel[po + 2] ?? 0) * dt;
     }
     this.posAttr.needsUpdate = true;
     this.lifeAttr.needsUpdate = true;
@@ -703,7 +702,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
       bufferBytes: this.capacity * BYTES_PER_PARTICLE,
       updatePath: this.useCompute ? 'compute' : 'cpu',
       computeAvailable: this.useCompute,
-      blending: this.config.blending,
+      blending: this.config.blending
     };
   }
 }
@@ -713,7 +712,7 @@ const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
 
 /** Uniform unit-sphere direction from two uniforms (GPU twin of sphereDirCpu). */
-function sphereDirGpu(u: TslNode, v: TslNode): TslNode {
+function sphereDirGpu(u: TslFloat, v: TslFloat): Node<'vec3'> {
   const cosT = u.mul(2).sub(1);
   const sinT = sqrt(float(1).sub(cosT.mul(cosT)).max(0));
   const phi = v.mul(Math.PI * 2);
@@ -726,7 +725,7 @@ function sphereDirGpu(u: TslNode, v: TslNode): TslNode {
  * destination-supplied values reach the shader unmodified.
  */
 function buildRampLut(
-  ramp: Array<{ t: number; color: [number, number, number]; alpha: number }>,
+  ramp: Array<{ t: number; color: [number, number, number]; alpha: number }>
 ): THREE.DataTexture {
   if (ramp.length === 0) {
     throw new Error('ParticleService: colorRamp must contain at least one stop.');
@@ -737,9 +736,10 @@ function buildRampLut(
     const t = i / (RAMP_LUT_SIZE - 1);
     // Locate surrounding stops (clamped at both ends).
     let i0 = 0;
-    while (i0 < stops.length - 2 && stops[i0 + 1].t <= t) i0++;
-    const a = stops[i0];
-    const b = stops[Math.min(i0 + 1, stops.length - 1)];
+    while (i0 < stops.length - 2 && stops[i0 + 1]!.t <= t) i0++;
+    // Both indices are clamped into [0, stops.length - 1].
+    const a = stops[i0]!;
+    const b = stops[Math.min(i0 + 1, stops.length - 1)]!;
     const span = b.t - a.t;
     const f = span > 0 ? Math.min(Math.max((t - a.t) / span, 0), 1) : 0;
     data[i * 4 + 0] = toByte(a.color[0] + (b.color[0] - a.color[0]) * f);
@@ -762,7 +762,7 @@ function toByte(x: number): number {
 }
 
 /** Sample the LUT at normalized coordinate `t` (GPU side). */
-function sampleLut(lut: THREE.DataTexture, t: TslNode): TslNode {
+function sampleLut(lut: THREE.DataTexture, t: TslFloat): Node<'vec4'> {
   return texture(lut, vec2(t, 0.5));
 }
 
@@ -777,13 +777,10 @@ function buildQuadGeometry(): THREE.InstancedBufferGeometry {
     'position',
     new THREE.BufferAttribute(
       new Float32Array([-0.5, -0.5, 0, 0.5, -0.5, 0, 0.5, 0.5, 0, -0.5, 0.5, 0]),
-      3,
-    ),
+      3
+    )
   );
-  geo.setAttribute(
-    'uv',
-    new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2),
-  );
+  geo.setAttribute('uv', new THREE.BufferAttribute(new Float32Array([0, 0, 1, 0, 1, 1, 0, 1]), 2));
   geo.setIndex([0, 1, 2, 0, 2, 3]);
   geo.boundingSphere = new THREE.Sphere(new THREE.Vector3(), Infinity);
   return geo;

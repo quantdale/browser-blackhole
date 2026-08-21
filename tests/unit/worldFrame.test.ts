@@ -11,11 +11,7 @@ import {
 } from '../../src/physics/worldFrame.js';
 
 function cross(a: Vec3, b: Vec3): Vec3 {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0]
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function expectVecClose(actual: Vec3, expected: Vec3, digits = 12): void {
@@ -65,7 +61,9 @@ describe('worldFrame: handedness', () => {
   it('disk normal is orthogonal to the equatorial plane directions', () => {
     for (const d of [X, Z, [1, 0, 1] as Vec3]) {
       expect(cross(DEFAULT_DISK_NORMAL, d)).not.toEqual([0, 0, 0]);
-      const dot = DEFAULT_DISK_NORMAL[0] * d[0] + DEFAULT_DISK_NORMAL[1] * d[1] +
+      const dot =
+        DEFAULT_DISK_NORMAL[0] * d[0] +
+        DEFAULT_DISK_NORMAL[1] * d[1] +
         DEFAULT_DISK_NORMAL[2] * d[2];
       expect(dot).toBeCloseTo(0, 12);
     }
@@ -113,7 +111,12 @@ describe('worldFrame: direction <-> sky round trip', () => {
   it('theta/phi ranges are respected', () => {
     expect(directionToSky([0, 1, 0]).theta).toBeCloseTo(0, 12);
     expect(directionToSky([0, -1, 0]).theta).toBeCloseTo(Math.PI, 12);
-    for (const d of [[1, 0, 0], [0, 0, 1], [-1, 0, 0], [0, 0, -1]] as Vec3[]) {
+    for (const d of [
+      [1, 0, 0],
+      [0, 0, 1],
+      [-1, 0, 0],
+      [0, 0, -1]
+    ] as Vec3[]) {
       expect(directionToSky(d).theta).toBeCloseTo(Math.PI / 2, 12);
     }
     // atan2(z, x) in (-PI, PI]: +Z-heavy directions get positive phi.

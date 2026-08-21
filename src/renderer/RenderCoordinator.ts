@@ -23,6 +23,11 @@ export interface RenderCoordinatorOptions {
   renderer: BlackHoleRenderer;
   camera: CameraController;
   onTelemetry?: (sample: FrameTelemetrySample) => void;
+  /**
+   * Optional debug-view selector consulted each frame (M1-05); when absent
+   * the coordinator renders the default diagnostic view.
+   */
+  getViewMode?: () => DebugViewMode;
 }
 
 export class RenderCoordinator {

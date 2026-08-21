@@ -121,9 +121,7 @@ export function validateStarfieldParams(p: StarfieldParams): void {
   }
 }
 
-export function makeStarfieldParams(
-  overrides: Partial<StarfieldParams> = {}
-): StarfieldParams {
+export function makeStarfieldParams(overrides: Partial<StarfieldParams> = {}): StarfieldParams {
   const p: StarfieldParams = { ...STARFIELD_DEFAULTS, ...overrides };
   validateStarfieldParams(p);
   return p;
@@ -146,10 +144,7 @@ export interface CubeCell {
  * Dominant-axis cube-face projection. Returns null only for a zero vector
  * (the caller decides how to degrade; the shader path never passes one).
  */
-export function directionToCubeCell(
-  direction: Vec3,
-  cellsPerFaceSide: number
-): CubeCell | null {
+export function directionToCubeCell(direction: Vec3, cellsPerFaceSide: number): CubeCell | null {
   const ax = Math.abs(direction[0]);
   const ay = Math.abs(direction[1]);
   const az = Math.abs(direction[2]);
@@ -192,8 +187,6 @@ export function directionToCubeCell(
 // u32 hash stream (exact in both TS and WGSL)
 // ---------------------------------------------------------------------------
 
-const U32 = 0xffffffff;
-
 function imul(a: number, b: number): number {
   return Math.imul(a, b) >>> 0;
 }
@@ -219,7 +212,7 @@ export function u32ToUnit(h: number): number {
 
 /** Linear cell key packing: unique for face,i,j < 2^10 each. */
 export function packCellKey(face: number, i: number, j: number): number {
-  return (((face * 1024 + i) * 1024 + j) >>> 0);
+  return ((face * 1024 + i) * 1024 + j) >>> 0;
 }
 
 // ---------------------------------------------------------------------------
@@ -235,7 +228,12 @@ export function cellHasStar(face: number, i: number, j: number, p: StarfieldPara
  * Star center expressed as face-plane coordinates (fu, fv) in [-1, 1],
  * inset by half a cell so stars never straddle a face border cell edge.
  */
-export function starFaceCoords(face: number, i: number, j: number, p: StarfieldParams): {
+export function starFaceCoords(
+  face: number,
+  i: number,
+  j: number,
+  p: StarfieldParams
+): {
   fu: number;
   fv: number;
 } {
@@ -254,17 +252,35 @@ export function faceCoordsToDirection(face: number, fu: number, fv: number): Vec
   let z: number;
   switch (face) {
     case 0:
-      x = 1; y = -fv; z = -fu; break;
+      x = 1;
+      y = -fv;
+      z = -fu;
+      break;
     case 1:
-      x = -1; y = -fv; z = fu; break;
+      x = -1;
+      y = -fv;
+      z = fu;
+      break;
     case 2:
-      x = fu; y = 1; z = fv; break;
+      x = fu;
+      y = 1;
+      z = fv;
+      break;
     case 3:
-      x = fu; y = -1; z = -fv; break;
+      x = fu;
+      y = -1;
+      z = -fv;
+      break;
     case 4:
-      x = fu; y = fv; z = 1; break;
+      x = fu;
+      y = fv;
+      z = 1;
+      break;
     default:
-      x = -fu; y = fv; z = -1; break;
+      x = -fu;
+      y = fv;
+      z = -1;
+      break;
   }
   const len = Math.hypot(x, y, z);
   return [x / len, y / len, z / len];
@@ -319,8 +335,7 @@ export function sampleStarfieldRadiance(direction: Vec3, p: StarfieldParams): Ve
   }
   const { fu, fv } = starFaceCoords(cell.face, cell.i, cell.j, p);
   const starDir = faceCoordsToDirection(cell.face, fu, fv);
-  const dot =
-    direction[0] * starDir[0] + direction[1] * starDir[1] + direction[2] * starDir[2];
+  const dot = direction[0] * starDir[0] + direction[1] * starDir[1] + direction[2] * starDir[2];
   const cosRadius = Math.cos(p.starAngularRadius);
   const falloff = starFalloff(dot, cosRadius);
   if (falloff === 0) {

@@ -15,7 +15,11 @@
 
 import { PerspectiveCamera, WebGPURenderer } from 'three/webgpu';
 import type { RenderBackend } from '../app/capability.js';
-import { applyBasisToDiagnosticUniforms, applyViewModeToDiagnosticUniforms, createDiagnosticPass } from '../shaders/diagnostic.js';
+import {
+  applyBasisToDiagnosticUniforms,
+  applyViewModeToDiagnosticUniforms,
+  createDiagnosticPass
+} from '../shaders/diagnostic.js';
 import type { DiagnosticPass } from '../shaders/diagnostic.js';
 import type { DebugViewMode } from '../app/state.js';
 import type { CameraBasis } from '../camera/CameraController.js';
@@ -83,7 +87,11 @@ export class BlackHoleRenderer {
   }
 
   /** Renders one frame of the diagnostic pass with the given camera basis. */
-  renderFrame(camera: PerspectiveCamera, basis: CameraBasis, viewMode: DebugViewMode = 'diagnostic'): void {
+  renderFrame(
+    camera: PerspectiveCamera,
+    basis: CameraBasis,
+    viewMode: DebugViewMode = 'diagnostic'
+  ): void {
     if (!this.renderer || !this.pass || this.disposed) return;
     applyBasisToDiagnosticUniforms(this.pass, basis);
     applyViewModeToDiagnosticUniforms(this.pass, viewMode);

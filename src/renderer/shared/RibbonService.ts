@@ -39,7 +39,7 @@ const EXPONENTIAL_TAPER_RATE = 3;
 const FRAME_SEED_AXES: readonly THREE.Vector3[] = [
   new THREE.Vector3(0, 1, 0),
   new THREE.Vector3(0, 0, 1),
-  new THREE.Vector3(1, 0, 0),
+  new THREE.Vector3(1, 0, 0)
 ];
 
 /** Taper factor applied to both width and alpha at normalized arc length s in [0, 1]. */
@@ -63,8 +63,7 @@ function taperFactor(mode: RibbonConfig['taper'], s: number): number {
 function buildStripIndices(capacityPoints: number): THREE.BufferAttribute {
   const quads = capacityPoints - 1;
   const vertexCount = capacityPoints * 2;
-  const indices =
-    vertexCount > 65535 ? new Uint32Array(quads * 6) : new Uint16Array(quads * 6);
+  const indices = vertexCount > 65535 ? new Uint32Array(quads * 6) : new Uint16Array(quads * 6);
   for (let i = 0; i < quads; i++) {
     const v = i * 2;
     const o = i * 6;
@@ -86,14 +85,18 @@ function resamplePolyline(points: readonly THREE.Vector3[], count: number): THRE
   const n = points.length;
   const cumulative = new Float64Array(n);
   for (let i = 1; i < n; i++) {
-    cumulative[i] = cumulative[i - 1] + points[i - 1].distanceTo(points[i]);
+    const prev = points[i - 1]!;
+    const curr = points[i]!;
+    cumulative[i] = cumulative[i - 1]! + prev.distanceTo(curr);
   }
-  const total = cumulative[n - 1];
+  // Callers guarantee n >= 1 (setSpine only resamples spines of >= 3 points).
+  const total = n > 0 ? (cumulative[n - 1] ?? 0) : 0;
 
   const out: THREE.Vector3[] = new Array(count);
   if (total <= DEGENERATE_EPSILON_SQ) {
+    const origin = points[0]!;
     for (let j = 0; j < count; j++) {
-      out[j] = points[0].clone();
+      out[j] = origin.clone();
     }
     return out;
   }
@@ -101,12 +104,14 @@ function resamplePolyline(points: readonly THREE.Vector3[], count: number): THRE
   let seg = 0;
   for (let j = 0; j < count; j++) {
     const d = total * (j / (count - 1));
-    while (seg < n - 2 && cumulative[seg + 1] < d) {
+    while (seg < n - 2 && (cumulative[seg + 1] ?? 0) < d) {
       seg++;
     }
-    const span = cumulative[seg + 1] - cumulative[seg];
-    const f = span > DEGENERATE_EPSILON_SQ ? (d - cumulative[seg]) / span : 0;
-    out[j] = new THREE.Vector3().lerpVectors(points[seg], points[seg + 1], f);
+    const cSeg = cumulative[seg] ?? 0;
+    const cNext = cumulative[seg + 1] ?? cSeg;
+    const span = cNext - cSeg;
+    const f = span > DEGENERATE_EPSILON_SQ ? (d - cSeg) / span : 0;
+    out[j] = new THREE.Vector3().lerpVectors(points[seg]!, points[seg + 1]!, f);
   }
   return out;
 }
@@ -132,7 +137,7 @@ class RibbonHandleImpl implements RibbonHandle {
     this.cfg = {
       ...config,
       colorStart: [...config.colorStart] as [number, number, number],
-      colorEnd: [...config.colorEnd] as [number, number, number],
+      colorEnd: [...config.colorEnd] as [number, number, number]
     };
     this.onRelease = onRelease;
     this.capacityPoints = Math.max(2, Math.floor(config.segments) + 1);
@@ -155,7 +160,7 @@ class RibbonHandleImpl implements RibbonHandle {
       transparent: true,
       depthWrite: false,
       side: THREE.DoubleSide,
-      blending: config.additive ? THREE.AdditiveBlending : THREE.NormalBlending,
+      blending: config.additive ? THREE.AdditiveBlending : THREE.NormalBlending
     });
 
     this.mesh = new THREE.Mesh(geometry, material);
@@ -175,9 +180,7 @@ class RibbonHandleImpl implements RibbonHandle {
     }
 
     const spine =
-      points.length > this.capacityPoints
-        ? resamplePolyline(points, this.capacityPoints)
-        : points;
+      points.length > this.capacityPoints ? resamplePolyline(points, this.capacityPoints) : points;
     const n = spine.length;
 
     this.computeTangents(spine, n);
@@ -195,7 +198,7 @@ class RibbonHandleImpl implements RibbonHandle {
       const halfWidth =
         0.5 * Math.max(0, THREE.MathUtils.lerp(cfg.widthStart, cfg.widthEnd, s)) * taper;
 
-      const p = spine[i];
+      const p = spine[i]!;
       const lx = this.lateral.x * halfWidth;
       const ly = this.lateral.y * halfWidth;
       const lz = this.lateral.z * halfWidth;
@@ -255,19 +258,19 @@ class RibbonHandleImpl implements RibbonHandle {
     const t = this.tangents;
     for (let i = 0; i < n; i++) {
       if (i === 0) {
-        this.vecA.subVectors(spine[1], spine[0]);
+        this.vecA.subVectors(spine[1]!, spine[0]!);
       } else if (i === n - 1) {
-        this.vecA.subVectors(spine[n - 1], spine[n - 2]);
+        this.vecA.subVectors(spine[n - 1]!, spine[n - 2]!);
       } else {
-        this.vecA.subVectors(spine[i], spine[i - 1]);
-        this.vecB.subVectors(spine[i + 1], spine[i]);
+        this.vecA.subVectors(spine[i]!, spine[i - 1]!);
+        this.vecB.subVectors(spine[i + 1]!, spine[i]!);
         this.vecA.add(this.vecB);
       }
       if (this.vecA.lengthSq() <= DEGENERATE_EPSILON_SQ) {
         if (i > 0) {
-          t[i * 3 + 0] = t[(i - 1) * 3 + 0];
-          t[i * 3 + 1] = t[(i - 1) * 3 + 1];
-          t[i * 3 + 2] = t[(i - 1) * 3 + 2];
+          t[i * 3 + 0] = t[(i - 1) * 3 + 0]!;
+          t[i * 3 + 1] = t[(i - 1) * 3 + 1]!;
+          t[i * 3 + 2] = t[(i - 1) * 3 + 2]!;
           continue;
         }
         this.vecA.set(0, 1, 0);
@@ -282,8 +285,8 @@ class RibbonHandleImpl implements RibbonHandle {
   /** Fixed-up heuristic: project the least-parallel seed axis onto the first tangent. */
   private seedLateralFrame(): void {
     const t = this.tangents;
-    this.vecB.set(t[0], t[1], t[2]);
-    let seed: THREE.Vector3 = FRAME_SEED_AXES[FRAME_SEED_AXES.length - 1];
+    this.vecB.set(t[0]!, t[1]!, t[2]!);
+    let seed: THREE.Vector3 = FRAME_SEED_AXES[FRAME_SEED_AXES.length - 1]!;
     for (const axis of FRAME_SEED_AXES) {
       if (Math.abs(axis.dot(this.vecB)) < PARALLEL_THRESHOLD) {
         seed = axis;
@@ -301,11 +304,11 @@ class RibbonHandleImpl implements RibbonHandle {
   /** Project the previous lateral direction onto the plane normal to tangent i. */
   private transportLateral(i: number): void {
     const t = this.tangents;
-    this.vecB.set(t[i * 3 + 0], t[i * 3 + 1], t[i * 3 + 2]);
+    this.vecB.set(t[i * 3 + 0]!, t[i * 3 + 1]!, t[i * 3 + 2]!);
     this.lateral.addScaledVector(this.vecB, -this.vecB.dot(this.lateral));
     if (this.lateral.lengthSq() <= DEGENERATE_EPSILON_SQ) {
       // Hairpin reversal put the tangent along the lateral axis: reseed from world up.
-      const up = FRAME_SEED_AXES[0];
+      const up = FRAME_SEED_AXES[0]!;
       this.lateral.copy(up).addScaledVector(this.vecB, -up.dot(this.vecB));
       if (this.lateral.lengthSq() <= DEGENERATE_EPSILON_SQ) {
         this.lateral.set(1, 0, 0);

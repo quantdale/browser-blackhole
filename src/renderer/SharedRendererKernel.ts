@@ -38,7 +38,7 @@ import type {
   ISharedPost,
   QualityTier,
   RenderContext,
-  RendererLike,
+  RendererLike
 } from '../atlas/types';
 import {
   CAPABILITY_IDS,
@@ -46,7 +46,7 @@ import {
   detectCapabilityFlags,
   resolveWebGPUAdapterName,
   satisfied,
-  summarizeCapabilities,
+  summarizeCapabilities
 } from './capabilities';
 import type { CapabilityFlags, CapabilitySummary, RendererProbe } from './capabilities';
 
@@ -208,7 +208,7 @@ export class SharedRendererKernel implements IRendererKernel {
       // Release the failed attempt's GPU resources before fallback/rethrow
       // (FAILURE_RECOVERY §15: bounded degraded retry, no leaked reallocations).
       try {
-        partialRenderer.dispose();
+        partialRenderer?.dispose();
       } catch {
         // backend already dead — nothing further to release
       }
@@ -228,8 +228,9 @@ export class SharedRendererKernel implements IRendererKernel {
     } catch (error) {
       this.generation += 1; // invalidate any partially attached listeners
       this.teardownLossWiring();
+      const liveRenderer = this.rendererValue as RendererLike | null;
       try {
-        this.rendererValue?.dispose();
+        liveRenderer?.dispose();
       } catch {
         // renderer never became usable — nothing further to release
       }
@@ -238,7 +239,7 @@ export class SharedRendererKernel implements IRendererKernel {
       this.capabilityFlags = null;
       throw new Error(
         `[ENV_WEBGPU_UNAVAILABLE / ENV_WEBGL2_UNAVAILABLE] SharedRendererKernel: no render backend could be initialized. ` +
-          `WebGPU attempt: ${describeError(webgpuError)}. WebGL2 attempt: ${describeError(error)}.`,
+          `WebGPU attempt: ${describeError(webgpuError)}. WebGL2 attempt: ${describeError(error)}.`
       );
     }
   }
@@ -276,7 +277,9 @@ export class SharedRendererKernel implements IRendererKernel {
     // 1) three r180's unified hook — invoked by both of its backends.
     const hookable = renderer as { onDeviceLost?: (info: DeviceLostInfoLike) => void };
     const previous =
-      typeof hookable.onDeviceLost === 'function' ? hookable.onDeviceLost.bind(renderer) : undefined;
+      typeof hookable.onDeviceLost === 'function'
+        ? hookable.onDeviceLost.bind(renderer)
+        : undefined;
     hookable.onDeviceLost = (info: DeviceLostInfoLike) => {
       if (previous !== undefined) previous(info);
       this.notifyDeviceLoss(generation, info?.reason ?? info?.message ?? 'unknown');
@@ -290,7 +293,11 @@ export class SharedRendererKernel implements IRendererKernel {
     const lostPromise = (
       renderer as { backend?: { device?: { lost?: Promise<DeviceLostInfoLike> } } }
     ).backend?.device?.lost;
-    if (lostPromise !== null && lostPromise !== undefined && typeof lostPromise.then === 'function') {
+    if (
+      lostPromise !== null &&
+      lostPromise !== undefined &&
+      typeof lostPromise.then === 'function'
+    ) {
       lostPromise
         .then((info) => {
           this.notifyDeviceLoss(generation, info?.reason ?? info?.message ?? 'unknown');
@@ -321,7 +328,7 @@ export class SharedRendererKernel implements IRendererKernel {
     this.deviceLost = true;
     console.error(
       `[GPU_DEVICE_LOST] SharedRendererKernel: rendering device lost (${reason}). ` +
-        'Subscribers notified; frame submission stops until recovery/re-init.',
+        'Subscribers notified; frame submission stops until recovery/re-init.'
     );
     for (const cb of [...this.deviceLostCallbacks]) {
       try {
@@ -344,7 +351,12 @@ export class SharedRendererKernel implements IRendererKernel {
   handleResize(cssWidth: number, cssHeight: number, renderScale: number): void {
     const renderer = this.rendererValue;
     if (renderer === null || this.disposed) return;
-    if (!Number.isFinite(cssWidth) || !Number.isFinite(cssHeight) || cssWidth <= 0 || cssHeight <= 0) {
+    if (
+      !Number.isFinite(cssWidth) ||
+      !Number.isFinite(cssHeight) ||
+      cssWidth <= 0 ||
+      cssHeight <= 0
+    ) {
       return;
     }
 
@@ -390,13 +402,16 @@ export class SharedRendererKernel implements IRendererKernel {
         const hdrTexture = this.options.post.getHdrTarget();
         const hdrTarget = this.resolveHdrTargetOrDegraded(hdrTexture);
 
-        renderer.setRenderTarget(hdrTarget);
+        // The union RendererLike spans WebGPURenderer (accepts base RenderTarget)
+        // and WebGLRenderer (whose d.ts narrows to WebGLRenderTarget); at runtime
+        // both accept the shared HDR target produced by post.
+        renderer.setRenderTarget(hdrTarget as THREE.WebGLRenderTarget | null);
         try {
           const renderContext: RenderContext = {
             renderer,
             camera: this.requireCamera(),
             scene: plan.scene,
-            hdrTarget: hdrTexture,
+            hdrTarget: hdrTexture
           };
           destination.render(renderContext);
         } finally {
@@ -418,14 +433,14 @@ export class SharedRendererKernel implements IRendererKernel {
     if (getServices === undefined) {
       throw new Error(
         '[SharedRendererKernel] options.getServices was not provided; ' +
-          'FrameContext.services cannot be synthesized by the kernel.',
+          'FrameContext.services cannot be synthesized by the kernel.'
       );
     }
     return {
       services: getServices(),
       time: this.options.getTimeInfo(),
       quality: this.options.getQuality(),
-      renderScale: this.options.governor.renderScale,
+      renderScale: this.options.governor.renderScale
     };
   }
 
@@ -433,12 +448,14 @@ export class SharedRendererKernel implements IRendererKernel {
     const getCamera = this.options.getCamera;
     if (getCamera === undefined) {
       throw new Error(
-        '[SharedRendererKernel] options.getCamera was not provided; the active camera cannot be resolved.',
+        '[SharedRendererKernel] options.getCamera was not provided; the active camera cannot be resolved.'
       );
     }
     const camera = getCamera();
     if (camera === null || camera === undefined) {
-      throw new Error('[SharedRendererKernel] options.getCamera returned no camera; cannot render.');
+      throw new Error(
+        '[SharedRendererKernel] options.getCamera returned no camera; cannot render.'
+      );
     }
     return camera;
   }
@@ -455,7 +472,7 @@ export class SharedRendererKernel implements IRendererKernel {
       this.hdrTargetContractWarned = true;
       console.error(
         '[SharedRendererKernel] ISharedPost.getHdrTarget() returned neither a RenderTarget nor a ' +
-          'texture carrying a .renderTarget back-reference; rendering to the canvas instead.',
+          'texture carrying a .renderTarget back-reference; rendering to the canvas instead.'
       );
     }
     return null;
@@ -472,10 +489,10 @@ export class SharedRendererKernel implements IRendererKernel {
     const flags = this.capabilityFlags;
     const requirements: CapabilityRequirement[] = CAPABILITY_IDS.map((capability) => ({
       capability,
-      hard: false,
+      hard: false
     }));
     return Object.assign(requirements, {
-      satisfied: (id: CapabilityId): boolean => satisfied(flags, id),
+      satisfied: (id: CapabilityId): boolean => satisfied(flags, id)
     });
   }
 
@@ -536,9 +553,8 @@ export class SharedRendererKernel implements IRendererKernel {
   }
 
   private buildProbe(renderer: RendererLike): RendererProbe {
-    const backendObj = (
-      renderer as { backend?: { isWebGPUBackend?: boolean; device?: unknown } }
-    ).backend;
+    const backendObj = (renderer as { backend?: { isWebGPUBackend?: boolean; device?: unknown } })
+      .backend;
     const isWebGpu = backendObj?.isWebGPUBackend === true;
     return {
       api: isWebGpu ? 'webgpu' : 'webgl2',
@@ -546,7 +562,7 @@ export class SharedRendererKernel implements IRendererKernel {
       gl: isWebGpu ? null : extractWebglContext(renderer),
       capabilities: extractCapabilities(renderer),
       adapterName: '',
-      devicePixelRatio: readDevicePixelRatio(),
+      devicePixelRatio: readDevicePixelRatio()
     };
   }
 

@@ -90,7 +90,7 @@ export const DEFAULT_PHOTON_INTEGRATION_OPTIONS: Readonly<PhotonIntegrationOptio
   maxStep: 250,
   escapeRadius: 1000,
   captureEpsilon: 1e-6,
-  pathStride: 0,
+  pathStride: 0
 };
 
 export interface PhotonIntegrationResult {
@@ -121,21 +121,44 @@ interface PlaneDerivatives {
  *   dphi/dlambda = L / r^2
  *   dp_r/dlambda = -0.5 E^2 f'/f^2 - 0.5 f' p_r^2 + L^2/r^3,  f' = 2M/r^2
  */
-function planeDerivatives(r: number, pr: number, massRg: number, angularMomentum: number): PlaneDerivatives {
+function planeDerivatives(
+  r: number,
+  pr: number,
+  massRg: number,
+  angularMomentum: number
+): PlaneDerivatives {
   const r2 = r * r;
   const f = 1 - (2 * massRg) / r;
   const fPrime = (2 * massRg) / r2;
   const dr = f * pr;
   const dphi = angularMomentum / r2;
-  const dpr = -0.5 * (fPrime / (f * f)) - 0.5 * fPrime * pr * pr + (angularMomentum * angularMomentum) / (r2 * r);
+  const dpr =
+    -0.5 * (fPrime / (f * f)) -
+    0.5 * fPrime * pr * pr +
+    (angularMomentum * angularMomentum) / (r2 * r);
   return { dr, dphi, dpr };
 }
 
 /** One classical RK4 step over (r, phi, p_r) — docs/NUMERICAL_METHODS.md §8.1. */
-function rk4PlaneStep(state: PlaneState, h: number, massRg: number, angularMomentum: number): PlaneState {
+function rk4PlaneStep(
+  state: PlaneState,
+  h: number,
+  massRg: number,
+  angularMomentum: number
+): PlaneState {
   const d1 = planeDerivatives(state.r, state.pr, massRg, angularMomentum);
-  const d2 = planeDerivatives(state.r + (h / 2) * d1.dr, state.pr + (h / 2) * d1.dpr, massRg, angularMomentum);
-  const d3 = planeDerivatives(state.r + (h / 2) * d2.dr, state.pr + (h / 2) * d2.dpr, massRg, angularMomentum);
+  const d2 = planeDerivatives(
+    state.r + (h / 2) * d1.dr,
+    state.pr + (h / 2) * d1.dpr,
+    massRg,
+    angularMomentum
+  );
+  const d3 = planeDerivatives(
+    state.r + (h / 2) * d2.dr,
+    state.pr + (h / 2) * d2.dpr,
+    massRg,
+    angularMomentum
+  );
   const d4 = planeDerivatives(state.r + h * d3.dr, state.pr + h * d3.dpr, massRg, angularMomentum);
   const r = state.r + (h / 6) * (d1.dr + 2 * d2.dr + 2 * d3.dr + d4.dr);
   const phi = state.phi + (h / 6) * (d1.dphi + 2 * d2.dphi + 2 * d3.dphi + d4.dphi);
@@ -147,7 +170,12 @@ function rk4PlaneStep(state: PlaneState, h: number, massRg: number, angularMomen
  * Normalized null-constraint residual R_H of docs/NUMERICAL_METHODS.md §6
  * with E = 1: R_H = |2H| / max(E^2/f, f p_r^2 + L^2/r^2, eps).
  */
-function constraintResidual(r: number, pr: number, massRg: number, angularMomentum: number): number {
+function constraintResidual(
+  r: number,
+  pr: number,
+  massRg: number,
+  angularMomentum: number
+): number {
   const f = 1 - (2 * massRg) / r;
   const kinetic = f * pr * pr + (angularMomentum * angularMomentum) / (r * r);
   const twoH = Math.abs(kinetic - 1 / f);
@@ -195,7 +223,7 @@ function copyVec3(v: Vec3): Vec3 {
 export function integratePhoton(
   pos: Vec3,
   dir: Vec3,
-  opts: Partial<PhotonIntegrationOptions> = {},
+  opts: Partial<PhotonIntegrationOptions> = {}
 ): PhotonIntegrationResult {
   const o: PhotonIntegrationOptions = { ...DEFAULT_PHOTON_INTEGRATION_OPTIONS, ...opts };
   const m = o.massRg;
@@ -214,7 +242,7 @@ export function integratePhoton(
       steps: 0,
       finalPosition: copyVec3(pos),
       finalDirection: copyVec3(dir),
-      pathSamples: [],
+      pathSamples: []
     };
   }
 
@@ -235,19 +263,13 @@ export function integratePhoton(
   const pr0 = nRadial / f0;
 
   // Stable plane basis (docs §3): e1 spans the initial tangential direction.
-  const e1: Vec3 = radialMode
-    ? [0, 0, 0]
-    : [tx / tangential, ty / tangential, tz / tangential];
+  const e1: Vec3 = radialMode ? [0, 0, 0] : [tx / tangential, ty / tangential, tz / tangential];
 
   const embed = (r: number, phi: number): Vec3 => {
     if (radialMode) return [r * e0[0], r * e0[1], r * e0[2]];
     const c = Math.cos(phi);
     const s = Math.sin(phi);
-    return [
-      r * (c * e0[0] + s * e1[0]),
-      r * (c * e0[1] + s * e1[1]),
-      r * (c * e0[2] + s * e1[2]),
-    ];
+    return [r * (c * e0[0] + s * e1[0]), r * (c * e0[1] + s * e1[1]), r * (c * e0[2] + s * e1[2])];
   };
 
   /**
@@ -278,7 +300,9 @@ export function integratePhoton(
   };
 
   const stride =
-    o.pathStride > 0 ? Math.max(1, Math.floor(o.pathStride)) : Math.max(1, Math.floor(o.maxSteps / 1024));
+    o.pathStride > 0
+      ? Math.max(1, Math.floor(o.pathStride))
+      : Math.max(1, Math.floor(o.maxSteps / 1024));
 
   const pathSamples: Vec3[] = [embed(r0, 0)];
   let lastSampleStep = 0;
@@ -335,7 +359,7 @@ export function integratePhoton(
     steps,
     finalPosition: embed(r, phi),
     finalDirection: localDirection(r, phi, pr),
-    pathSamples,
+    pathSamples
   };
 }
 
@@ -354,7 +378,7 @@ export interface ImpactParameterLaunchOptions extends Partial<PhotonIntegrationO
  */
 export function launchFromImpactParameter(
   bInvariant: number,
-  opts: ImpactParameterLaunchOptions = {},
+  opts: ImpactParameterLaunchOptions = {}
 ): PhotonIntegrationResult {
   const m = opts.massRg ?? DEFAULT_PHOTON_INTEGRATION_OPTIONS.massRg;
   const r0 = opts.startRadiusRg ?? Math.max(100 * Math.abs(bInvariant), 1e4) * m;
@@ -377,7 +401,10 @@ export function launchFromImpactParameter(
  * the ray is captured or integration fails — near b_c the deflection diverges
  * logarithmically (docs §11) and is genuinely undefined there.
  */
-export function deflectionAngleNumeric(impactParameter: number, opts: ImpactParameterLaunchOptions = {}): number {
+export function deflectionAngleNumeric(
+  impactParameter: number,
+  opts: ImpactParameterLaunchOptions = {}
+): number {
   const m = opts.massRg ?? DEFAULT_PHOTON_INTEGRATION_OPTIONS.massRg;
   if (!Number.isFinite(impactParameter) || impactParameter <= 0) return NaN;
   const r0 = opts.startRadiusRg ?? Math.max(100 * impactParameter, 1e4) * m;
@@ -389,7 +416,7 @@ export function deflectionAngleNumeric(impactParameter: number, opts: ImpactPara
     minStep: opts.minStep ?? 1e-9,
     maxStep: opts.maxStep ?? 250,
     maxSteps: opts.maxSteps ?? 2_000_000,
-    escapeRadius: opts.escapeRadius ?? 2.2 * r0,
+    escapeRadius: opts.escapeRadius ?? 2.2 * r0
   });
   if (result.status !== 'escaped') return NaN;
   const measured = Math.acos(clampUnit(result.finalDirection[0]));
@@ -413,10 +440,11 @@ const BISECTION_TIGHT_SETTINGS = {
   stepSize: 0.002,
   minStep: 1e-9,
   maxStep: 250,
-  maxSteps: 2_000_000,
+  maxSteps: 2_000_000
 } as const;
 
-let cachedCriticalImpactParameter: { readonly massRg: number; readonly value: number } | null = null;
+let cachedCriticalImpactParameter: { readonly massRg: number; readonly value: number } | null =
+  null;
 
 /**
  * Locate the critical impact parameter numerically by bisecting the capture
@@ -435,7 +463,7 @@ export function criticalImpactParameter(massRg = 1): number {
       massRg,
       startRadiusRg: r0,
       escapeRadius: 2.2 * r0,
-      ...BISECTION_TIGHT_SETTINGS,
+      ...BISECTION_TIGHT_SETTINGS
     }).status !== 'escaped';
 
   let lo = 4.5 * massRg; // safely below b_c: captured
@@ -465,7 +493,11 @@ export function criticalImpactParameter(massRg = 1): number {
  * (docs/NUMERICAL_METHODS.md §16; docs/VALIDATION_VECTORS.md §12).
  * Returns NaN if either radius is at/inside the horizon.
  */
-export function gravitationalRedshiftStatic(emitRadiusRg: number, obsRadiusRg: number, massRg = 1): number {
+export function gravitationalRedshiftStatic(
+  emitRadiusRg: number,
+  obsRadiusRg: number,
+  massRg = 1
+): number {
   const fEmit = 1 - (2 * massRg) / emitRadiusRg;
   const fObs = 1 - (2 * massRg) / obsRadiusRg;
   if (!(fEmit > 0) || !(fObs > 0)) return NaN;

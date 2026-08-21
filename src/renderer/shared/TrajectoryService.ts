@@ -96,7 +96,7 @@ class ArcLengthParametrizedSpline {
   /** Position at normalized arc-length fraction t01 in [0, 1] (clamped). */
   sample(t01: number, out: THREE.Vector3): THREE.Vector3 {
     if (this.totalLength <= DEGENERATE_EPSILON_SQ) {
-      out.copy(this.points[0]);
+      out.copy(this.points[0]!);
       return out;
     }
     const d = THREE.MathUtils.clamp(t01, 0, 1) * this.totalLength;
@@ -106,7 +106,7 @@ class ArcLengthParametrizedSpline {
     let hi = ARC_LENGTH_SAMPLES - 1;
     while (lo < hi) {
       const mid = (lo + hi) >> 1;
-      if (this.cumulativeLength[mid] < d) {
+      if ((this.cumulativeLength[mid] ?? 0) < d) {
         lo = mid + 1;
       } else {
         hi = mid;
@@ -114,12 +114,12 @@ class ArcLengthParametrizedSpline {
     }
 
     if (lo === 0) {
-      return this.evaluateRaw(this.sampleU[0], out);
+      return this.evaluateRaw(this.sampleU[0]!, out);
     }
-    const d0 = this.cumulativeLength[lo - 1];
-    const span = this.cumulativeLength[lo] - d0;
+    const d0 = this.cumulativeLength[lo - 1]!;
+    const span = this.cumulativeLength[lo]! - d0;
     const f = span > DEGENERATE_EPSILON_SQ ? (d - d0) / span : 0;
-    const u = this.sampleU[lo - 1] + f * (this.sampleU[lo] - this.sampleU[lo - 1]);
+    const u = this.sampleU[lo - 1]! + f * (this.sampleU[lo]! - this.sampleU[lo - 1]!);
     return this.evaluateRaw(u, out);
   }
 
@@ -160,7 +160,7 @@ class ArcLengthParametrizedSpline {
         (2 * p1.z +
           (-p0.z + p2.z) * s +
           (2 * p0.z - 5 * p1.z + 4 * p2.z - p3.z) * s2 +
-          (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * s3),
+          (-p0.z + 3 * p1.z - 3 * p2.z + p3.z) * s3)
     );
     return out;
   }
@@ -169,9 +169,9 @@ class ArcLengthParametrizedSpline {
   private control(index: number): THREE.Vector3 {
     const n = this.points.length;
     if (this.closed) {
-      return this.points[((index % n) + n) % n];
+      return this.points[((index % n) + n) % n]!;
     }
-    return this.points[Math.min(Math.max(index, 0), n - 1)];
+    return this.points[Math.min(Math.max(index, 0), n - 1)]!;
   }
 }
 
@@ -186,11 +186,7 @@ export class TrajectoryService implements ITrajectoryService {
     this.smoothstepKeyframes = options.smoothstepKeyframes === true;
   }
 
-  sampleKepler(
-    elements: KeplerElements,
-    tSeconds: number,
-    out: THREE.Vector3,
-  ): THREE.Vector3 {
+  sampleKepler(elements: KeplerElements, tSeconds: number, out: THREE.Vector3): THREE.Vector3 {
     const a = elements.semiMajor;
     const mu = elements.mu;
     if (!(a > 0) || !(mu > 0)) {
@@ -237,14 +233,14 @@ export class TrajectoryService implements ITrajectoryService {
     out.set(
       xp * (cosW * cosO - sinW * cosI * sinO) - yp * (sinW * cosO + cosW * cosI * sinO),
       xp * (cosW * sinO + sinW * cosI * cosO) + yp * (cosW * cosI * cosO - sinW * sinO),
-      (xp * sinW + yp * cosW) * sinI,
+      (xp * sinW + yp * cosW) * sinI
     );
     return out;
   }
 
   buildSpline(
     points: THREE.Vector3[],
-    closed?: boolean,
+    closed?: boolean
   ): {
     sample(t01: number, out: THREE.Vector3): THREE.Vector3;
     arcLength(): number;
@@ -264,10 +260,10 @@ export class TrajectoryService implements ITrajectoryService {
     const times = track.times;
     const positions = track.positions;
 
-    if (tSeconds <= times[0]) {
+    if (tSeconds <= times[0]!) {
       return this.readKeyframe(positions, 0, out);
     }
-    if (tSeconds >= times[keyCount - 1]) {
+    if (tSeconds >= times[keyCount - 1]!) {
       return this.readKeyframe(positions, keyCount - 1, out);
     }
 
@@ -276,15 +272,16 @@ export class TrajectoryService implements ITrajectoryService {
     let hi = keyCount - 1;
     while (hi - lo > 1) {
       const mid = (lo + hi) >>> 1;
-      if (times[mid] <= tSeconds) {
+      if ((times[mid] ?? Infinity) <= tSeconds) {
         lo = mid;
       } else {
         hi = mid;
       }
     }
 
-    const span = times[hi] - times[lo];
-    let s = span > 0 ? (tSeconds - times[lo]) / span : 0;
+    const tLo = times[lo]!;
+    const span = times[hi]! - tLo;
+    let s = span > 0 ? (tSeconds - tLo) / span : 0;
     if (this.smoothstepKeyframes) {
       s = s * s * (3 - 2 * s);
     }
@@ -292,9 +289,9 @@ export class TrajectoryService implements ITrajectoryService {
     const base = lo * 3;
     const next = hi * 3;
     out.set(
-      THREE.MathUtils.lerp(positions[base + 0], positions[next + 0], s),
-      THREE.MathUtils.lerp(positions[base + 1], positions[next + 1], s),
-      THREE.MathUtils.lerp(positions[base + 2], positions[next + 2], s),
+      THREE.MathUtils.lerp(positions[base + 0]!, positions[next + 0]!, s),
+      THREE.MathUtils.lerp(positions[base + 1]!, positions[next + 1]!, s),
+      THREE.MathUtils.lerp(positions[base + 2]!, positions[next + 2]!, s)
     );
     return out;
   }
@@ -315,6 +312,6 @@ export class TrajectoryService implements ITrajectoryService {
   }
 
   private readKeyframe(positions: Float32Array, key: number, out: THREE.Vector3): THREE.Vector3 {
-    return out.set(positions[key * 3], positions[key * 3 + 1], positions[key * 3 + 2]);
+    return out.set(positions[key * 3]!, positions[key * 3 + 1]!, positions[key * 3 + 2]!);
   }
 }

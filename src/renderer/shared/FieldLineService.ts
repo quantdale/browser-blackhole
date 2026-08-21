@@ -42,11 +42,7 @@ function mulberry32(seed: number): () => number {
  * The helper vector is chosen from the smallest axis component so the
  * basis is stable for every non-degenerate input orientation.
  */
-function buildPerpendicularBasis(
-  axis: THREE.Vector3,
-  e1: THREE.Vector3,
-  e2: THREE.Vector3,
-): void {
+function buildPerpendicularBasis(axis: THREE.Vector3, e1: THREE.Vector3, e2: THREE.Vector3): void {
   const absX = Math.abs(axis.x);
   const absY = Math.abs(axis.y);
   const absZ = Math.abs(axis.z);
@@ -93,7 +89,7 @@ export class FieldLineService implements IFieldLineService {
     const axis = new THREE.Vector3(
       config.momentAxis[0],
       config.momentAxis[1],
-      config.momentAxis[2],
+      config.momentAxis[2]
     );
     if (axis.lengthSq() < FIELD_EPSILON) {
       axis.set(0, 1, 0); // stable fallback for degenerate moment axis
@@ -171,7 +167,7 @@ export class FieldLineService implements IFieldLineService {
     const material = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      depthWrite: false,
+      depthWrite: false
     });
 
     const lines = new THREE.LineSegments(geometry, material);
@@ -202,7 +198,7 @@ export class FieldLineService implements IFieldLineService {
     stepsPerLine: number,
     stepSize: number,
     color: [number, number, number],
-    opacity: number,
+    opacity: number
   ): THREE.LineSegments {
     const steps = Math.max(0, Math.floor(stepsPerLine));
     const maxSegments = seeds.length * steps;
@@ -252,19 +248,13 @@ export class FieldLineService implements IFieldLineService {
 
     const geometry = new THREE.BufferGeometry();
     // Trim to the segments actually emitted (early termination shrinks lines).
-    geometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(positions.subarray(0, v * 3), 3),
-    );
-    geometry.setAttribute(
-      'color',
-      new THREE.BufferAttribute(colors.subarray(0, v * 3), 3),
-    );
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions.subarray(0, v * 3), 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors.subarray(0, v * 3), 3));
 
     const material = new THREE.LineBasicMaterial({
       vertexColors: true,
       transparent: true,
-      depthWrite: false,
+      depthWrite: false
     });
 
     const lines = new THREE.LineSegments(geometry, material);
