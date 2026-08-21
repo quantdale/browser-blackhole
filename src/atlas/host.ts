@@ -38,6 +38,7 @@ import { RibbonService } from '../renderer/shared/RibbonService.js';
 import { SharedPost } from '../renderer/shared/SharedPost.js';
 import { SharedRendererKernel } from '../renderer/SharedRendererKernel.js';
 import { TrajectoryService } from '../renderer/shared/TrajectoryService.js';
+import { NEUTRON_STAR_PRESETS } from '../phenomena/neutron-star/presets.js';
 import { collectInventory } from './debugInventory.js';
 import type { DebugInventoryView } from './debugInventory.js';
 import { PerformanceGovernor } from './governor.js';
@@ -375,12 +376,14 @@ export class CosmicAtlasHost {
 
   /** Dynamically import destination metadata + factories (lazy heavy paths). */
   private async registerDestinations(): Promise<void> {
-    const [diagnostic, blackHole] = await Promise.all([
+    const [diagnostic, blackHole, neutronStar] = await Promise.all([
       import('./destinations/diagnosticDestination.js'),
-      import('./destinations/blackHoleDestination.js')
+      import('./destinations/blackHoleDestination.js'),
+      import('../phenomena/neutron-star/neutronStarModule.js')
     ]);
     this.registry.register(diagnostic.diagnosticDescriptor, diagnostic.DIAGNOSTIC_PRESETS);
     this.registry.register(blackHole.blackHoleDescriptor, blackHole.BLACK_HOLE_PRESETS);
+    this.registry.register(neutronStar.NEUTRON_STAR_DESCRIPTOR, NEUTRON_STAR_PRESETS);
   }
 
   private wireParticles(backend: BackendInfo): void {
