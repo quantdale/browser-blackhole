@@ -1,0 +1,193 @@
+/**
+ * LensingService — shared gravitational-lensing capabilities.
+ *
+ * Spec sources:
+ * - docs/cosmic-atlas/RENDERING_SERVICES.md §8 (LensingService)
+ * - docs/NUMERICAL_METHODS.md (geodesic conventions the black-hole path follows)
+ * - docs/SHADER_CONTRACTS.md §1-2 (TSL boundaries, canonical GPU parameter groups)
+ * - src/atlas/types.ts (ILensingService, LensingPassParams, TslDensityFn)
+ *
+ * Two deliberately distinct backends are exposed (RENDERING_SERVICES.md §8
+ * forbids presenting one generic lens-distortion function as valid for all
+ * cases):
+ *
+ * 1. createBlackHoleLensingPass — full Schwarzschild backwards-ray-tracing
+ *    pass. The physics lives in the TSL integrator owned by the black-hole
+ *    phenomenon module (src/phenomena/black-hole/schwarzschildIntegrator.ts,
+ *    implemented per docs/NUMERICAL_METHODS.md); this service only wraps the
+ *    returned node material on a fullscreen triangle mesh and forwards
+ *    uniform-state updates and disposal.
+ *
+ * 2. createThinLensDisplacement — reduced weak-field thin-lens deflection
+ *    for non-black-hole destinations (lensing lab, AGN). It is NOT a
+ *    substitute for backend 1.
+ */
+
+import * as THREE from 'three';
+import type { Node, NodeMaterial } from 'three/webgpu';
+import {
+  add,
+  cos,
+  div,
+  dot,
+  length,
+  max,
+  min,
+  mul,
+  normalize,
+  sin,
+  sub,
+  vec3,
+} from 'three/tsl';
+import type {
+  ILensingService,
+  LensingPassParams,
+  TslDensityFn,
+} from '../../atlas/types';
+import { createLensingMaterial } from '../../phenomena/black-hole/schwarzschildIntegrator';
+
+/** Handle shape returned by createBlackHoleLensingPass (mirrors ILensingService). */
+interface BlackHoleLensingPassHandle {
+  object3d(): THREE.Mesh;
+  setUniformsFromState(state: Record<string, unknown>): void;
+  dispose(): void;
+}
+
+/**
+ * Disclosure for the reduced thin-lens model. UI surfaces exposing it must
+ * present this string so the approximation is never mistaken for the full
+ * Schwarzschild path (RENDERING_SERVICES.md §8).
+ */
+export const THIN_LENS_DISCLOSURE =
+  'Reduced thin-lens approximation: one-sided weak-field deflection ' +
+  'alpha = 2*r_g/b per sample, not a full strong-field geodesic trace.';
+
+/**
+ * Impact-parameter floor (in r_g scene units) guarding the 1/b singularity
+ * of the thin-lens formula. Numerical guard, not physics.
+ */
+const THIN_LENS_MIN_B = 1e-4;
+
+/**
+ * Upper bound on the applied deflection angle (radians). Beyond pi/2 the
+ * rotation would overshoot the lens direction; weak-field use cases stay
+ * orders of magnitude below this. Numerical guard, not physics.
+ */
+const THIN_LENS_MAX_ALPHA = Math.PI / 2;
+
+/**
+ * Fullscreen triangle geometry: three clip-space vertices covering the
+ * viewport with a single draw call (AGENTS.md "Rendering": prefer a single
+ * full-screen triangle). The integrator material maps positionLocal to
+ * clip space directly; frustum culling is disabled on the wrapping mesh.
+ */
+function createFullscreenTriangleGeometry(): THREE.BufferGeometry {
+  const geometry = new THREE.BufferGeometry();
+  const positions = new Float32Array([
+    -1, -1, 0,
+    3, -1, 0,
+    -1, 3, 0,
+  ]);
+  geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  return geometry;
+}
+
+export class LensingService implements ILensingService {
+  /** Live passes, so dispose() releases every created GPU resource. */
+  private readonly passes: BlackHoleLensingPassHandle[] = [];
+
+  /**
+   * Full Schwarzschild backwards-ray-tracing pass (black-hole destination).
+   *
+   * Delegates the geodesic integrator to the black-hole phenomenon module's
+   * TSL material factory (docs/NUMERICAL_METHODS.md governs its numerics),
+   * wraps the returned NodeMaterial on a fullscreen triangle Mesh, and
+   * exposes passthrough uniform-state updates and disposal. Created passes
+   * are tracked; LensingService.dispose() disposes any still alive.
+   */
+  createBlackHoleLensingPass(params: LensingPassParams): {
+    object3d(): THREE.Mesh;
+    setUniformsFromState(state: Record<string, unknown>): void;
+    dispose(): void;
+  } {
+    const delegate = createLensingMaterial(params);
+    const geometry = createFullscreenTriangleGeometry();
+    const mesh: THREE.Mesh = new THREE.Mesh(geometry, delegate.material);
+    mesh.frustumCulled = false;
+    mesh.name = 'black-hole-lensing-pass';
+
+    let disposed = false;
+    const handle: BlackHoleLensingPassHandle = {
+      object3d: () => mesh,
+      setUniformsFromState: (state: Record<string, unknown>) => {
+        delegate.setUniformsFromState(state);
+      },
+      dispose: () => {
+        if (disposed) return;
+        disposed = true;
+        const index = this.passes.indexOf(handle);
+        if (index >= 0) this.passes.splice(index, 1);
+        geometry.dispose();
+        delegate.dispose();
+      },
+    };
+    this.passes.push(handle);
+    return handle;
+  }
+
+  /**
+   * Reduced thin-lens displacement for non-black-hole destinations
+   * (lensing lab, AGN). Returns a TSL density-fn-shaped callback evaluated
+   * per sample position inside a march or ray graph.
+   *
+   * Model (weak-field point-mass lens, geometric units r_g = GM/c^2):
+   * the total Einstein deflection is alpha_total = 4 r_g / b; this fn
+   * applies the one-sided half contribution alpha = (2 r_g / b) scaled by
+   * `impactParameterScale`, where b is the impact parameter of the sample
+   * relative to a lens fixed at the world origin. Given (pos, dir) it
+   * returns the DEFLECTED unit direction: dir rotated by alpha toward the
+   * lens within the plane spanned by dir and the lensward perpendicular,
+   * i.e. normalize(dir*cos(alpha) + towardLens*sin(alpha)).
+   *
+   * Approximation disclosure: see THIN_LENS_DISCLOSURE. This is a reduced
+   * educational/visual model — it must not weaken or replace the full
+   * backwards-ray-traced black-hole pass (RENDERING_SERVICES.md §8), and
+   * it ignores capture, photon-sphere, and strong-field amplification.
+   */
+  createThinLensDisplacement(massRg: number, impactParameterScale: number): TslDensityFn {
+    // Bake constants into the JS closure; they become literal WGSL constants.
+    const twoMassRg = 2 * massRg;
+    const scale = impactParameterScale;
+
+    return ({ pos, dir }) => {
+      // Contract inputs are TSL vec3 nodes typed `unknown` in types.ts;
+      // cast once at this boundary and build pure node math below.
+      const posNode = vec3(pos as Node);
+      const dirNode = vec3(dir as Node);
+
+      // Impact-parameter vector: component of pos perpendicular to dir.
+      const alongDir = dot(dirNode, posNode);
+      const perp = sub(posNode, mul(dirNode, alongDir));
+
+      // alpha = (2 r_g / b) * scale, guarded against b -> 0 and alpha -> pi/2.
+      const b = max(length(perp), THIN_LENS_MIN_B);
+      const alpha = min(div(twoMassRg, b), THIN_LENS_MAX_ALPHA);
+      const scaledAlpha = mul(alpha, scale);
+
+      const towardLens = normalize(mul(perp, -1));
+
+      // Exact in-plane rotation of dir toward the lens (dir ⟂ towardLens).
+      return normalize(
+        add(mul(dirNode, cos(scaledAlpha)), mul(towardLens, sin(scaledAlpha))),
+      );
+    };
+  }
+
+  /** Dispose every still-live lensing pass created by this service. */
+  dispose(): void {
+    for (const handle of this.passes.slice()) {
+      handle.dispose();
+    }
+    this.passes.length = 0;
+  }
+}
