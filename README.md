@@ -16,21 +16,33 @@ The renderer is intentionally staged:
 
 Do not start by building a black sphere with ordinary meshes and calling the surrounding distortion "lensing." The central visual problem is photon propagation through curved spacetime; Three.js is the application/rendering framework around that GPU calculation.
 
-## Start here
+## Autonomous agent quick start
 
-A fresh implementation agent must read these files, in order:
+A fresh coding agent can begin immediately with:
+
+**[`.agent/START_HERE.md`](.agent/START_HERE.md)**
+
+That file contains the executable handoff prompt and points to the current milestone in `.agent/STATE.md`. No originating chat context is required.
+
+## Required reading
 
 1. [`AGENTS.md`](AGENTS.md) — repository operating contract.
 2. [`.agent/STATE.md`](.agent/STATE.md) — durable current state and next milestone.
-3. [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) — product scope and user-visible requirements.
-4. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — target software/rendering architecture.
-5. [`docs/PHYSICS.md`](docs/PHYSICS.md) — scientific conventions and correctness rules.
-6. [`docs/RENDERING_PIPELINE.md`](docs/RENDERING_PIPELINE.md) — GPU rendering design.
-7. [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — optimization strategy and profiling requirements.
-8. [`docs/TESTING.md`](docs/TESTING.md) — correctness, visual, browser, and performance gates.
-9. [`docs/ROADMAP.md`](docs/ROADMAP.md) — milestone sequence and exit criteria.
-10. [`docs/BACKLOG.md`](docs/BACKLOG.md) — concrete implementation work packets.
-11. [`docs/RESEARCH_REFERENCES.md`](docs/RESEARCH_REFERENCES.md) — primary references and prior art.
+3. [`.agent/QUALITY_GATES.md`](.agent/QUALITY_GATES.md) — cumulative completion gates.
+4. [`docs/PRODUCT_SPEC.md`](docs/PRODUCT_SPEC.md) — product scope and user-visible requirements.
+5. [`docs/DECISIONS.md`](docs/DECISIONS.md) — locked architecture/product decisions.
+6. [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) — target software/rendering architecture.
+7. [`docs/PHYSICS.md`](docs/PHYSICS.md) — scientific conventions and correctness rules.
+8. [`docs/RENDERING_PIPELINE.md`](docs/RENDERING_PIPELINE.md) — GPU rendering design.
+9. [`docs/PERFORMANCE.md`](docs/PERFORMANCE.md) — optimization strategy and profiling requirements.
+10. [`docs/UI_UX.md`](docs/UI_UX.md) — controls, modes, presets, interaction, accessibility.
+11. [`docs/TESTING.md`](docs/TESTING.md) — correctness, visual, browser, and performance gates.
+12. [`docs/ROADMAP.md`](docs/ROADMAP.md) — M0–M11 milestone sequence and exit criteria.
+13. [`docs/BACKLOG.md`](docs/BACKLOG.md) — concrete `BH-*` implementation work packets.
+14. [`docs/PARALLEL_WORK.md`](docs/PARALLEL_WORK.md) — safe sub-agent/parallel boundaries.
+15. [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) — dependency/version/tooling policy.
+16. [`docs/DEPLOYMENT_COMPATIBILITY.md`](docs/DEPLOYMENT_COMPATIBILITY.md) — browser/deployment policy.
+17. [`docs/RESEARCH_REFERENCES.md`](docs/RESEARCH_REFERENCES.md) — primary references and prior art.
 
 ## Proposed stack
 
