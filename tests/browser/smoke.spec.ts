@@ -1,4 +1,13 @@
-import { expect, type Page, test } from '@playwright/test';
+import { expect, test } from '@playwright/test';
+import {
+  collectErrors,
+  expectDiagnosticVariance,
+  gotoApp,
+  readStatus,
+  sampleFrameViaScreenshot,
+  waitForTerminalPhase,
+  type StatusView
+} from './support/appHarness.js';
 
 /**
  * M0 browser smoke (Gate B).
@@ -9,120 +18,10 @@ import { expect, type Page, test } from '@playwright/test';
  * frame, safe interaction/resize, and zero uncaught page/console errors.
  */
 
-interface StatusView {
-  phase: string;
-  backend: string;
-  errorCode: string | null;
-  internalWidth: number | null;
-  internalHeight: number | null;
-}
-
-interface PixelSampleView {
-  x: number;
-  y: number;
-  r: number;
-  g: number;
-  b: number;
-  a: number;
-}
-
-function parseStatus(raw: unknown): StatusView {
-  if (typeof raw !== 'object' || raw === null) throw new Error('runtime status missing');
-  const r = raw as Record<string, unknown>;
-  return {
-    phase: String(r['phase'] ?? ''),
-    backend: String(r['backend'] ?? ''),
-    errorCode: r['errorCode'] == null ? null : String(r['errorCode']),
-    internalWidth: typeof r['internalWidth'] === 'number' ? r['internalWidth'] : null,
-    internalHeight: typeof r['internalHeight'] === 'number' ? r['internalHeight'] : null
-  };
-}
-
-async function readStatus(page: Page): Promise<StatusView | null> {
-  const raw: unknown = await page.evaluate(() => {
-    const hooks = (window as unknown as Record<string, unknown>)['__BLACKHOLE_TEST__'];
-    if (typeof hooks !== 'object' || hooks === null) return null;
-    return (hooks as { getRuntimeStatus(): unknown }).getRuntimeStatus();
-  });
-  return raw === null ? null : parseStatus(raw);
-}
-
-async function waitForTerminalPhase(page: Page, timeoutMs = 30_000): Promise<StatusView> {
-  const deadline = Date.now() + timeoutMs;
-  // Hooks appear only after async renderer init; tolerate their absence while
-  // polling and fail with evidence if the app never exposes them.
-  let last: StatusView | null = null;
-  while (Date.now() < deadline) {
-    last = await readStatus(page);
-    if (last && ['ready', 'unsupported', 'failed'].includes(last.phase)) return last;
-    await page.waitForTimeout(250);
-  }
-  throw new Error(`renderer did not reach a terminal phase; last=${JSON.stringify(last)}`);
-}
-
-function collectErrors(page: Page): { consoleErrors: string[]; pageErrors: string[] } {
-  const consoleErrors: string[] = [];
-  const pageErrors: string[] = [];
-  page.on('console', (msg) => {
-    if (msg.type() === 'error') consoleErrors.push(msg.text());
-  });
-  page.on('pageerror', (err) => pageErrors.push(String(err)));
-  return { consoleErrors, pageErrors };
-}
-
-/**
- * Samples a 5x5 pixel grid from the PRESENTED frame by taking a clipped
- * screenshot and decoding it inside the browser. This works for every
- * backend: direct canvas readback of a WebGPU canvas returns transparent
- * black after present, so it cannot be used as render evidence.
- */
-async function sampleFrameViaScreenshot(page: Page): Promise<PixelSampleView[]> {
-  const canvas = page.locator('#scene');
-  const box = await canvas.boundingBox();
-  if (!box) throw new Error('canvas has no bounding box');
-  const shot = await page.screenshot({ clip: box });
-  const dataUrl = `data:image/png;base64,${shot.toString('base64')}`;
-  const raw: unknown = await page.evaluate(async (src: string) => {
-    const blob = await (await fetch(src)).blob();
-    const bmp = await createImageBitmap(blob);
-    const size = 64;
-    const c = document.createElement('canvas');
-    c.width = size;
-    c.height = size;
-    const ctx = c.getContext('2d');
-    if (!ctx) return null;
-    ctx.drawImage(bmp, 0, 0, size, size);
-    const out: { x: number; y: number; r: number; g: number; b: number; a: number }[] = [];
-    for (let gy = 0; gy < 5; gy += 1) {
-      for (let gx = 0; gx < 5; gx += 1) {
-        const x = Math.floor(((gx + 0.5) / 5) * size);
-        const y = Math.floor(((gy + 0.5) / 5) * size);
-        const d = ctx.getImageData(x, y, 1, 1).data;
-        out.push({ x, y, r: d[0] ?? 0, g: d[1] ?? 0, b: d[2] ?? 0, a: d[3] ?? 0 });
-      }
-    }
-    return out;
-  }, dataUrl);
-  expect(Array.isArray(raw), 'frame sampling must return samples').toBe(true);
-  return raw as PixelSampleView[];
-}
-
-/** Asserts the diagnostic gradient is actually rendered and oriented. */
-function expectDiagnosticVariance(samples: PixelSampleView[]): void {
-  const distinct = new Set(samples.map((s) => `${s.r},${s.g},${s.b}`));
-  expect(distinct.size, 'gradient should produce many distinct colors').toBeGreaterThan(8);
-  const topLeft = samples[0];
-  const bottomRight = samples[samples.length - 1];
-  if (!topLeft || !bottomRight) throw new Error('missing corner samples');
-  const dr = bottomRight.r - topLeft.r;
-  // Red increases left->right across the whole grid, so opposite corners differ.
-  expect(Math.abs(dr)).toBeGreaterThan(20);
-}
-
 test.describe('M0 smoke', () => {
   test('boots to ready/fallback with valid canvas and clean console', async ({ page }) => {
     const { consoleErrors, pageErrors } = collectErrors(page);
-    await page.goto('/');
+    await gotoApp(page);
     const status = await waitForTerminalPhase(page);
 
     if (status.phase === 'unsupported') {
@@ -154,7 +53,7 @@ test.describe('M0 smoke', () => {
 
   test('camera interaction does not throw and keeps rendering', async ({ page }) => {
     const { consoleErrors, pageErrors } = collectErrors(page);
-    await page.goto('/');
+    await gotoApp(page);
     const status = await waitForTerminalPhase(page);
     if (status.phase !== 'ready') test.skip(true, 'no usable backend in this environment');
 
@@ -190,7 +89,7 @@ test.describe('M0 smoke', () => {
 
   test('resize portrait/landscape keeps rendering without errors', async ({ page }) => {
     const { consoleErrors, pageErrors } = collectErrors(page);
-    await page.goto('/');
+    await gotoApp(page);
     const status = await waitForTerminalPhase(page);
     if (status.phase !== 'ready') test.skip(true, 'no usable backend in this environment');
 
@@ -219,6 +118,28 @@ test.describe('M0 smoke', () => {
       expectDiagnosticVariance(await sampleFrameViaScreenshot(page));
     }
 
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('forced webgl2 fallback renders the diagnostic gradient', async ({ page }) => {
+    const { consoleErrors, pageErrors } = collectErrors(page);
+    await gotoApp(page, '?backend=webgl2');
+    const status = await waitForTerminalPhase(page);
+    expect(status.phase, `errorCode=${status.errorCode ?? 'none'}`).toBe('ready');
+    expect(status.backend).toBe('webgl2');
+    expectDiagnosticVariance(await sampleFrameViaScreenshot(page));
+    expect(pageErrors).toEqual([]);
+    expect(consoleErrors).toEqual([]);
+  });
+
+  test('forced unsupported shows terminal unsupported UX', async ({ page }) => {
+    const { consoleErrors, pageErrors } = collectErrors(page);
+    await gotoApp(page, '?backend=unsupported');
+    const status = await waitForTerminalPhase(page);
+    expect(status.phase).toBe('unsupported');
+    await expect(page.locator('.status-region')).toBeVisible();
+    await expect(page.locator('.status-headline')).not.toHaveText('');
     expect(pageErrors).toEqual([]);
     expect(consoleErrors).toEqual([]);
   });

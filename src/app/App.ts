@@ -17,6 +17,7 @@ import { ERROR_CODES, StatusStore } from './runtimeStatus.js';
 import { classifyStateChange, type AppState, type Invalidation } from './state.js';
 import {
   installTestHooks,
+  readForcedBackend,
   removeTestHooks,
   type BlackHoleTestHooks,
   type PixelSample
@@ -78,7 +79,11 @@ export async function createApp(root: HTMLElement): Promise<AppHandle> {
   // --- capability probe and backend decision ------------------------------
   const capabilities = await snapshotCapabilities();
   statusStore.applyCapabilities(capabilities);
-  const decision = decideBackend(capabilities);
+  // Dev/test-only override (docs/CI_CD.md section 6): forces the decision so
+  // the WebGL2 fallback and unsupported UX stay exercisable on capable
+  // machines. Telemetry keeps reporting the real probes.
+  const forcedBackend = readForcedBackend(window.location.search);
+  const decision = forcedBackend ?? decideBackend(capabilities);
 
   if (decision === 'unsupported') {
     statusStore.patch({
@@ -207,11 +212,26 @@ export async function createApp(root: HTMLElement): Promise<AppHandle> {
     loadPreset: (id) => applyStateFromPreset(id),
     renderOnce: () => coordinator.renderOnce(),
     captureProbe,
+    getCameraBasis: () => camera.getBasis(),
     getUncaughtErrors: () => [...uncaughtErrors]
   };
   installTestHooks(hooks);
 
   function buildTerminalHandles(): AppHandle {
+    // Terminal paths (unsupported/failed) never reach the full hook
+    // installation below; install a reduced set so tests can observe the
+    // terminal status truthfully instead of polling into a timeout.
+    installTestHooks({
+      getRuntimeStatus: () => statusStore.get(),
+      getState: () => state,
+      loadPreset: () => false,
+      renderOnce: () => {},
+      captureProbe: () => null,
+      getCameraBasis: () => {
+        throw new Error('camera unavailable in terminal (unsupported/failed) state');
+      },
+      getUncaughtErrors: () => [...uncaughtErrors]
+    });
     return {
       dispose(): void {
         statusPanel.unsubscribe();

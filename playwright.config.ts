@@ -29,6 +29,10 @@ function resolveBrowserChannel(): string | undefined {
 
 const channel = resolveBrowserChannel();
 
+// E2E_PORT lets a run move off a colliding local port; the webServer identity
+// guard in the specs catches the case where a foreign app occupies the port.
+const e2ePort = Number(process.env.E2E_PORT ?? 4173);
+
 export default defineConfig({
   testDir: 'tests/browser',
   fullyParallel: true,
@@ -39,11 +43,11 @@ export default defineConfig({
     ...(channel ? { channel } : {}),
     ...devices['Desktop Chrome'],
     viewport: { width: 1280, height: 800 },
-    baseURL: 'http://127.0.0.1:4173'
+    baseURL: `http://127.0.0.1:${e2ePort}`
   },
   webServer: {
-    command: 'npm run preview -- --host 127.0.0.1 --port 4173 --strictPort',
-    url: 'http://127.0.0.1:4173',
+    command: `npm run preview -- --host 127.0.0.1 --port ${e2ePort} --strictPort`,
+    url: `http://127.0.0.1:${e2ePort}`,
     reuseExistingServer: !process.env.CI,
     timeout: 30_000
   }
