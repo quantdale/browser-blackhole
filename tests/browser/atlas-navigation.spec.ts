@@ -40,7 +40,11 @@ declare global {
 
 const ROUTE_IDS = ['black-hole', 'neutron-star', 'diagnostic'] as const;
 
-async function waitForArrival(page: Page, destinationId: string, timeoutMs = 25_000): Promise<void> {
+async function waitForArrival(
+  page: Page,
+  destinationId: string,
+  timeoutMs = 25_000
+): Promise<void> {
   await expect
     .poll(
       async () =>
@@ -49,7 +53,9 @@ async function waitForArrival(page: Page, destinationId: string, timeoutMs = 25_
           if (!app) return 'no-app';
           const t = app.host.state.atlas.transition;
           if (t.active) return 'transitioning';
-          return app.host.state.atlas.activeDestination === dest ? 'arrived' : `at:${app.host.state.atlas.activeDestination}`;
+          return app.host.state.atlas.activeDestination === dest
+            ? 'arrived'
+            : `at:${app.host.state.atlas.activeDestination}`;
         }, destinationId),
       { timeout: timeoutMs, intervals: [250] }
     )
@@ -61,10 +67,7 @@ function collectErrors(page: Page): string[] {
   page.on('pageerror', (e) => errors.push(`pageerror: ${String(e).slice(0, 160)}`));
   page.on('console', (m) => {
     const text = m.text();
-    if (
-      m.type() === 'error' &&
-      !/powerPreference|readback|Failed to load resource/.test(text)
-    ) {
+    if (m.type() === 'error' && !/powerPreference|readback|Failed to load resource/.test(text)) {
       errors.push(`console: ${text.slice(0, 160)}`);
     }
   });
@@ -90,13 +93,17 @@ test.describe('Atlas navigation validation', () => {
     expect(errors).toEqual([]);
   });
 
-  test('in-app transitions arrive at each destination through the hyperspace pass', async ({ page }) => {
+  test('in-app transitions arrive at each destination through the hyperspace pass', async ({
+    page
+  }) => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page, 'black-hole');
 
     await page.evaluate(() => window.__ATLAS_APP__!.navigate('neutron-star'));
     // The transition state machine must actually engage at some point.
-    await page.waitForFunction(() => window.__ATLAS_APP__!.host.state.atlas.transition.active === true);
+    await page.waitForFunction(
+      () => window.__ATLAS_APP__!.host.state.atlas.transition.active === true
+    );
     await waitForArrival(page, 'neutron-star');
 
     await page.evaluate(() => window.__ATLAS_APP__!.navigate('diagnostic'));
