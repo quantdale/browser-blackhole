@@ -48,20 +48,25 @@ function vec3Uniform(): { value: Vector3 } {
 }
 
 export function createDiagnosticPass(): DiagnosticPass {
+  // Scalar uniform NODES are created first and exposed through the block so
+  // that later `block.field.value = x` writes reach the shader: passing
+  // `uniform(block.scalar.value)` would snapshot the number instead of
+  // referencing it (Vector3 uniforms are fine either way — they are objects).
+  const uTanHalfFovY = uniform(1);
+  const uAspect = uniform(1);
+
   const uniforms: DiagnosticUniformBlock = {
     cameraPositionRg: vec3Uniform(),
     cameraRight: vec3Uniform(),
     cameraUp: vec3Uniform(),
     cameraForward: vec3Uniform(),
-    tanHalfFovY: { value: 1 },
-    aspect: { value: 1 }
+    tanHalfFovY: uTanHalfFovY,
+    aspect: uAspect
   };
 
   const uRight = uniform(uniforms.cameraRight.value);
   const uUp = uniform(uniforms.cameraUp.value);
   const uForward = uniform(uniforms.cameraForward.value);
-  const uTanHalfFovY = uniform(uniforms.tanHalfFovY.value);
-  const uAspect = uniform(uniforms.aspect.value);
 
   const positionAttr = attribute<'vec3'>('position', 'vec3');
 

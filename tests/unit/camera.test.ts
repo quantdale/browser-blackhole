@@ -5,7 +5,11 @@ import {
   lookAtMatrix,
   type CameraBasis
 } from '../../src/camera/CameraController.js';
-import { makeCameraRayDirection, type CameraRayParams } from '../../src/shaders/cameraRayMath.js';
+import {
+  makeCameraRayDirection,
+  pixelToNdc,
+  type CameraRayParams
+} from '../../src/shaders/cameraRayMath.js';
 
 function basisFor(eye: [number, number, number], target: [number, number, number]): CameraBasis {
   const m = lookAtMatrix(eye, target, [0, 1, 0]);
@@ -123,5 +127,100 @@ describe('makeCameraRayDirection: ray reconstruction contract', () => {
     const small = makeCameraRayDirection(1, 0, { ...params, tanHalfFovY: 0.2 }).direction;
     const large = makeCameraRayDirection(1, 0, { ...params, tanHalfFovY: 1.0 }).direction;
     expect(spreadAngle(small, params)).toBeLessThan(spreadAngle(large, params));
+  });
+
+  it('edge midpoints hit the exact horizontal/vertical half-angles', () => {
+    const t = params.tanHalfFovY;
+    const horizontal = Math.atan(t * (params.aspect ?? 1));
+    const vertical = Math.atan(t);
+    expect(spreadAngle(makeCameraRayDirection(1, 0, params).direction, params)).toBeCloseTo(
+      horizontal,
+      12
+    );
+    expect(spreadAngle(makeCameraRayDirection(-1, 0, params).direction, params)).toBeCloseTo(
+      horizontal,
+      12
+    );
+    expect(spreadAngle(makeCameraRayDirection(0, 1, params).direction, params)).toBeCloseTo(
+      vertical,
+      12
+    );
+    expect(spreadAngle(makeCameraRayDirection(0, -1, params).direction, params)).toBeCloseTo(
+      vertical,
+      12
+    );
+  });
+
+  it('corners hit the exact combined half-angle', () => {
+    const t = params.tanHalfFovY;
+    const cornerAngle = Math.atan(Math.hypot(t * (params.aspect ?? 1), t));
+    for (const [x, y] of [
+      [1, 1],
+      [1, -1],
+      [-1, 1],
+      [-1, -1]
+    ] as const) {
+      expect(spreadAngle(makeCameraRayDirection(x, y, params).direction, params)).toBeCloseTo(
+        cornerAngle,
+        12
+      );
+    }
+  });
+
+  it('portrait frames spread less horizontally than vertically; landscape the reverse', () => {
+    const portrait: CameraRayParams = { ...params, aspect: 0.5 };
+    const landscape: CameraRayParams = { ...params, aspect: 2 };
+    const hPortrait = spreadAngle(makeCameraRayDirection(1, 0, portrait).direction, portrait);
+    const vPortrait = spreadAngle(makeCameraRayDirection(0, 1, portrait).direction, portrait);
+    expect(hPortrait).toBeLessThan(vPortrait);
+    const hLandscape = spreadAngle(makeCameraRayDirection(1, 0, landscape).direction, landscape);
+    const vLandscape = spreadAngle(makeCameraRayDirection(0, 1, landscape).direction, landscape);
+    expect(hLandscape).toBeGreaterThan(vLandscape);
+  });
+});
+
+describe('pixelToNdc: pixel-center mapping', () => {
+  it('y axis flips: top row is +ndcY, bottom row is -ndcY', () => {
+    const top = pixelToNdc(3, 0, 8, 8);
+    const bottom = pixelToNdc(3, 7, 8, 8);
+    expect(top.ndcY).toBeGreaterThan(0);
+    expect(bottom.ndcY).toBeLessThan(0);
+    expect(top.ndcY).toBeCloseTo(-bottom.ndcY, 12);
+  });
+
+  it('odd-sized frames map their center pixel exactly to NDC (0, 0)', () => {
+    for (const size of [1, 5, 63, 1001]) {
+      const { ndcX, ndcY } = pixelToNdc((size - 1) / 2, (size - 1) / 2, size, size);
+      expect(ndcX).toBe(0);
+      expect(ndcY).toBe(0);
+    }
+  });
+
+  it('even-sized frames have symmetric pixel centers straddling NDC (0, 0)', () => {
+    const w = 64;
+    const h = 32;
+    const left = pixelToNdc(w / 2 - 1, h / 2 - 1, w, h);
+    const right = pixelToNdc(w / 2, h / 2, w, h);
+    expect(left.ndcX).toBeCloseTo(-right.ndcX, 12);
+    expect(left.ndcY).toBeCloseTo(-right.ndcY, 12);
+    expect(Math.abs(left.ndcX)).toBeCloseTo(1 / w, 12);
+  });
+
+  it('frame corners approach but never exceed ±1', () => {
+    const w = 320;
+    const h = 200;
+    const topLeft = pixelToNdc(0, 0, w, h);
+    const bottomRight = pixelToNdc(w - 1, h - 1, w, h);
+    expect(Math.abs(topLeft.ndcX)).toBeLessThan(1);
+    expect(topLeft.ndcY).toBeLessThan(1);
+    expect(Math.abs(bottomRight.ndcX)).toBeLessThan(1);
+    expect(bottomRight.ndcY).toBeGreaterThan(-1);
+  });
+
+  it('non-square frames keep independent x/y mappings', () => {
+    const { ndcX } = pixelToNdc(249, 0, 500, 200);
+    const { ndcY } = pixelToNdc(0, 99, 500, 200);
+    expect(ndcX).toBeCloseTo((249.5 / 500) * 2 - 1, 12);
+    expect(ndcY).toBeCloseTo(1 - (99.5 / 200) * 2, 12);
   });
 });

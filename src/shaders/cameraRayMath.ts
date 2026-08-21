@@ -51,3 +51,27 @@ export function makeCameraRayDirection(
     direction: [unnormalized[0] / safeLen, unnormalized[1] / safeLen, unnormalized[2] / safeLen]
   };
 }
+
+export interface PixelNdc {
+  ndcX: number;
+  ndcY: number;
+}
+
+/**
+ * Maps a pixel CENTER (integer coordinates, origin top-left, y down) to NDC
+ * (+x right, +y up). This is the single shared convention between the CPU
+ * reference and browser-side sampling; the full-screen triangle interpolates
+ * clip-space xy linearly, so pixel centers follow exactly this mapping for
+ * odd and even resolutions alike. Only an odd-sized frame has a pixel whose
+ * center is exactly NDC (0, 0).
+ */
+export function pixelToNdc(
+  pixelX: number,
+  pixelY: number,
+  width: number,
+  height: number
+): PixelNdc {
+  const ndcX = ((pixelX + 0.5) / width) * 2 - 1;
+  const ndcY = 1 - ((pixelY + 0.5) / height) * 2;
+  return { ndcX, ndcY };
+}
