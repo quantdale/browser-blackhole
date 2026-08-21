@@ -1,0 +1,54 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  quality:
+    # Deterministic non-GPU gates only. A green run here says nothing about
+    # GPU/WebGPU behavior (docs/CI_CD.md section 16).
+    name: quality (format/lint/typecheck/unit/build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Install from lockfile
+        run: npm ci
+      - run: npm run format:check
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run test
+      - run: npm run build
+
+  browser-smoke-webgl-fallback:
+    # Hosted runners provide no representative WebGPU adapter; this job runs
+    # the backend-agnostic smoke suite on Chromium (WebGL2 fallback expected).
+    # It must never be read as a WebGPU validation.
+    name: browser-smoke (Chromium, WebGL2 fallback expected)
+    needs: quality
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Playwright browser
+        run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npx playwright test
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-artifacts
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore

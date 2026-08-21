@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <link rel="icon" href="data:," />
+    <title>Browser Black Hole</title>
+  </head>
+  <body>
+    <div id="app">
+      <main id="viewport">
+        <canvas
+          id="scene"
+          role="img"
+          aria-label="Interactive black hole renderer canvas. The diagnostic view shows a deterministic color gradient derived from the camera ray direction of each pixel."
+        ></canvas>
+        <p id="canvas-description" class="visually-hidden">
+          During milestone M0 this canvas shows a deterministic diagnostic gradient: red increases
+          to the right, green increases toward the top, and blue encodes the depth axis of the
+          camera ray direction.
+        </p>
+      </main>
+      <aside id="panel" aria-label="Renderer status and controls"></aside>
+    </div>
+    <noscript>
+      <p class="noscript-warning">
+        This application requires JavaScript and a browser with WebGPU or WebGL2 support.
+      </p>
+    </noscript>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

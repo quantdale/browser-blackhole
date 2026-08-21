@@ -1,0 +1,9 @@
+package-lock.json
+node_modules/
+dist/
+artifacts/
+test-results/
+playwright-report/
+coverage/
+*.md
+docs/assets/*.png
