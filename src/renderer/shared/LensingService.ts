@@ -24,26 +24,9 @@
  */
 
 import * as THREE from 'three';
-import type { Node, NodeMaterial } from 'three/webgpu';
-import {
-  add,
-  cos,
-  div,
-  dot,
-  length,
-  max,
-  min,
-  mul,
-  normalize,
-  sin,
-  sub,
-  vec3,
-} from 'three/tsl';
-import type {
-  ILensingService,
-  LensingPassParams,
-  TslDensityFn,
-} from '../../atlas/types';
+import type { Node } from 'three/webgpu';
+import { add, cos, div, dot, length, max, min, mul, normalize, sin, sub, vec3 } from 'three/tsl';
+import type { ILensingService, LensingPassParams, TslDensityFn } from '../../atlas/types';
 import { createLensingMaterial } from '../../phenomena/black-hole/schwarzschildIntegrator';
 
 /** Handle shape returned by createBlackHoleLensingPass (mirrors ILensingService). */
@@ -83,11 +66,7 @@ const THIN_LENS_MAX_ALPHA = Math.PI / 2;
  */
 function createFullscreenTriangleGeometry(): THREE.BufferGeometry {
   const geometry = new THREE.BufferGeometry();
-  const positions = new Float32Array([
-    -1, -1, 0,
-    3, -1, 0,
-    -1, 3, 0,
-  ]);
+  const positions = new Float32Array([-1, -1, 0, 3, -1, 0, -1, 3, 0]);
   geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
   return geometry;
 }
@@ -129,7 +108,7 @@ export class LensingService implements ILensingService {
         if (index >= 0) this.passes.splice(index, 1);
         geometry.dispose();
         delegate.dispose();
-      },
+      }
     };
     this.passes.push(handle);
     return handle;
@@ -162,8 +141,8 @@ export class LensingService implements ILensingService {
     return ({ pos, dir }) => {
       // Contract inputs are TSL vec3 nodes typed `unknown` in types.ts;
       // cast once at this boundary and build pure node math below.
-      const posNode = vec3(pos as Node);
-      const dirNode = vec3(dir as Node);
+      const posNode = vec3(pos as Node<'vec3'>);
+      const dirNode = vec3(dir as Node<'vec3'>);
 
       // Impact-parameter vector: component of pos perpendicular to dir.
       const alongDir = dot(dirNode, posNode);
@@ -177,9 +156,7 @@ export class LensingService implements ILensingService {
       const towardLens = normalize(mul(perp, -1));
 
       // Exact in-plane rotation of dir toward the lens (dir ⟂ towardLens).
-      return normalize(
-        add(mul(dirNode, cos(scaledAlpha)), mul(towardLens, sin(scaledAlpha))),
-      );
+      return normalize(add(mul(dirNode, cos(scaledAlpha)), mul(towardLens, sin(scaledAlpha))));
     };
   }
 
