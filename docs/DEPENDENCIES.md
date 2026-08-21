@@ -2,6 +2,28 @@
 
 The planning repository intentionally does not freeze package versions. The first implementation milestone must resolve and pin exact compatible versions from current stable releases, then commit the lockfile.
 
+## Resolved toolchain (M0-01, pinned exact)
+
+Chosen package manager: **npm** (default per this document; lockfile: `package-lock.json`, lockfileVersion 3).
+
+Environment verified: Node v22.23.2 / npm 10.9.8 on Windows (Git Bash). All versions below are exact pins in `package.json`; no `^`/`~` ranges.
+
+| Package | Version | Role / rationale |
+| --- | --- | --- |
+| `three` | 0.185.1 | Runtime. Current stable release with `WebGPURenderer` + TSL. Import paths verified against the installed build: `three/webgpu` (`WebGPURenderer`, `PostProcessing`), `three/tsl` (`Fn`, `vec3`, `varying`, `uv`, ...), `three/addons/controls/OrbitControls.js`. MIT license. |
+| `vite` | 8.2.2 | Dev server/build. Current stable; requires Node `^20.19 || >=22.12` (satisfied). |
+| `typescript` | 5.9.3 | Latest stable 5.x line. TypeScript 7.x (native port) is excluded because `typescript-eslint@8.67.0` declares peer support only for `<6.1.0`. |
+| `vitest` | 4.1.11 | Unit test runner; supports Vite 8 as peer. |
+| `@playwright/test` | 1.62.1 | Browser smoke/E2E. Node >=20 satisfied. Browsers: local runs may use the system Edge channel or a Playwright-installed Chromium; CI installs its own pinned browser. Apache-2.0. |
+| `eslint` | 10.8.1 | Linter (flat config). Supported by `typescript-eslint@8.67.0` peer range (`^10.0.0`). |
+| `typescript-eslint` | 8.67.0 | TypeScript lint integration; peers allow eslint 10 and TS <6.1. |
+| `prettier` | 3.9.6 | Deterministic formatter. |
+| `@types/three` | 0.185.4 | Type declarations matching `three` 0.185.1 (three ships no bundled types). |
+| `@types/node` | 22.20.1 | Node types for config files, matching the Node 22 runtime line. |
+
+No frontend framework and no other runtime dependency is used (per policy below). Re-verify these import paths after any Three.js upgrade; upgrades happen in isolated commits.
+
+
 ## Required runtime dependencies
 
 ### Three.js
