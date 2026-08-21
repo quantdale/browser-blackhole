@@ -822,11 +822,16 @@ export function createNeutronStarModule(): PhenomenonModule {
     };
   }
 
-  function render(_ctx: RenderContext): void {
-    // Intentional pass-through (documented): SharedRendererKernel renders
-    // plan.scene itself (ARCHITECTURE section 4). Drawing ctx.scene here as
-    // well would double-render the frame. When the LensingService surface
-    // pass lands for this destination, it plugs in at this boundary.
+  function render(ctx: RenderContext): void {
+    // The destination owns its draw call, matching the diagnostic and
+    // black-hole destination modules: the kernel binds the shared HDR target
+    // and hands over the RenderContext; it does NOT traverse plan.scene
+    // itself. (The original pass-through assumption left the canvas showing
+    // the previous destination's last presented frame — found by first
+    // runtime validation of /atlas/neutron-star.)
+    if (ctx.scene && ctx.camera) {
+      ctx.renderer.render(ctx.scene, ctx.camera);
+    }
   }
 
   function exit(_ctx: ExitContext): void {
