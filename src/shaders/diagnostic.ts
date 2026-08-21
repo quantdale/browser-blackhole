@@ -23,7 +23,7 @@ import {
   Vector3
 } from 'three/webgpu';
 import type { Node } from 'three/webgpu';
-import { attribute, float, normalize, select, uniform, varying, vec4 } from 'three/tsl';
+import { attribute, float, normalize, uniform, varying, vec4 } from 'three/tsl';
 import type { Vec3 } from './cameraRayMath.js';
 import { createStarfieldSamplerNode } from './starfieldGpu.js';
 import { makeStarfieldParams } from './starfield.js';
@@ -89,6 +89,12 @@ export function createDiagnosticPass(): DiagnosticPass {
 
   const positionAttr = attribute<'vec3'>('position', 'vec3');
 
+  // NOTE: material.fragmentNode is built inside Fn(() => ...)(): composing
+  // reused subgraphs (e.g. the deterministic starfield sampler) directly as a
+  // bare expression leaves node reuse outside any stack context, which makes
+  // the WebGL2 backend's builder throw "Cannot read properties of undefined
+  // (reading 'addToStack')" and render black. Inside an Fn the builder has a
+  // proper stack for shared Vars on every backend.
   const material = new NodeMaterial();
   // Full-screen triangle: clip-space positions straight from the attribute.
   material.vertexNode = vec4(positionAttr.xy, float(0), float(1));
@@ -103,17 +109,19 @@ export function createDiagnosticPass(): DiagnosticPass {
   // camera ray (M1-04): the celestial background BEFORE any lensing. Values
   // are linear HDR and may exceed 1; the canvas clamps in this debug view.
   const envRadiance = createStarfieldSamplerNode(makeStarfieldParams());
-  // 'off' renders the flat clear color (black); the pass still covers the
-  // frame so coverage/aspect invariants stay testable in both modes.
-  material.fragmentNode = select(
-    uViewOff.lessThan(0.5),
-    select(
-      uViewEnvironment.greaterThan(0.5),
-      vec4(envRadiance(dir) as Node<'vec3'>, float(1)),
-      vec4(color, float(1))
-    ),
-    vec4(float(0), float(0), float(0), float(1))
-  );
+  // View selection is BRANCH-FREE arithmetic (same WebGL2 constraint as
+  // starfieldGpu.ts: nested select()/IsolateNode chains crash the GLSL flow
+  // stage). uViewOff/uViewEnvironment are driven as exact 0/1 floats:
+  //   rgb = gradient*(1-off)*(1-env) + environment*env*(1-off)
+  //   a   = 1-off
+  // 'environment' samples the deterministic starfield along the straight
+  // camera ray (M1-04), linear HDR; 'off' renders flat black.
+  const envRGB = envRadiance(dir) as Node<'vec3'>;
+  const one = float(1);
+  const visible = one.sub(uViewOff);
+  const envWeight = uViewEnvironment.mul(visible);
+  const gradWeight = visible.sub(envWeight);
+  material.fragmentNode = vec4(color.mul(gradWeight).add(envRGB.mul(envWeight)), one.sub(uViewOff));
 
   const geometry = new BufferGeometry();
   geometry.setAttribute(

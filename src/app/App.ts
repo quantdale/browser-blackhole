@@ -14,10 +14,16 @@ import { computeInternalRenderSize, type ViewportSize } from '../renderer/render
 import { decideBackend, snapshotCapabilities } from './capability.js';
 import { DIAGNOSTIC_PRESET, findPreset, loadPreset } from './presets.js';
 import { ERROR_CODES, StatusStore } from './runtimeStatus.js';
-import { classifyStateChange, type AppState, type Invalidation } from './state.js';
+import {
+  classifyStateChange,
+  normalizeAppState,
+  type AppState,
+  type Invalidation
+} from './state.js';
 import {
   installTestHooks,
   readForcedBackend,
+  readForcedViewMode,
   removeTestHooks,
   type BlackHoleTestHooks,
   type PixelSample
@@ -74,6 +80,17 @@ export async function createApp(root: HTMLElement): Promise<AppHandle> {
   let state: AppState = initialResult.state;
   let revision = 0;
 
+  // Dev/test-only view override (?view=environment|off|diagnostic): applied
+  // through the same normalization boundary as presets.
+  const forcedView = readForcedViewMode(window.location.search);
+  if (forcedView) {
+    const viewResult = normalizeAppState({
+      ...state,
+      debug: { ...state.debug, viewMode: forcedView }
+    });
+    if (viewResult.ok) state = viewResult.state;
+  }
+
   statusStore.patch({ phase: 'capability-check' });
 
   // --- capability probe and backend decision ------------------------------
@@ -84,7 +101,6 @@ export async function createApp(root: HTMLElement): Promise<AppHandle> {
   // machines. Telemetry keeps reporting the real probes.
   const forcedBackend = readForcedBackend(window.location.search);
   const decision = forcedBackend ?? decideBackend(capabilities);
-
   if (decision === 'unsupported') {
     statusStore.patch({
       phase: 'unsupported',
@@ -211,6 +227,12 @@ export async function createApp(root: HTMLElement): Promise<AppHandle> {
   const hooks: BlackHoleTestHooks = {
     getRuntimeStatus: () => statusStore.get(),
     getState: () => state,
+    setState: (partial) => {
+      const result = normalizeAppState(partial);
+      if (!result.ok) return false;
+      applyState(result.state);
+      return true;
+    },
     loadPreset: (id) => applyStateFromPreset(id),
     renderOnce: () => coordinator.renderOnce(),
     captureProbe,

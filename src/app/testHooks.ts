@@ -6,7 +6,7 @@
  * API minimal; do not add production behavior here.
  */
 
-import type { AppState } from './state.js';
+import type { AppState, DebugViewMode } from './state.js';
 import type { RenderBackend } from './capability.js';
 import type { RuntimeStatusSnapshot } from './runtimeStatus.js';
 import type { CameraBasis } from '../camera/CameraController.js';
@@ -23,6 +23,12 @@ export interface PixelSample {
 export interface BlackHoleTestHooks {
   getRuntimeStatus(): RuntimeStatusSnapshot;
   getState(): AppState;
+  /**
+   * Applies a partial canonical state (same normalization path as presets);
+   * returns success. Used by validation probes to aim the camera or switch
+   * debug views without preset round-trips.
+   */
+  setState?(partial: unknown): boolean;
   /** Loads a built-in preset through normalizeAppState; returns success. */
   loadPreset(id: string): boolean;
   /** Renders one frame synchronously. */
@@ -51,6 +57,20 @@ export function readForcedBackend(search: string): RenderBackend | null {
   const value = new URLSearchParams(search).get(BACKEND_OVERRIDE_PARAM);
   if (value === null || !BACKEND_OVERRIDE_VALUES.includes(value)) return null;
   return value as RenderBackend;
+}
+
+/**
+ * Dev/test-only debug-view override (same policy class as `?backend=`):
+ * `?view=diagnostic|environment|off` selects the initial `debug.viewMode`
+ * without going through a preset, so the straight-ray environment sampling
+ * path is exercisable in browser probes. Returns null when absent/invalid.
+ */
+export function readForcedViewMode(search: string): DebugViewMode | null {
+  const value = new URLSearchParams(search).get('view');
+  if (value === 'diagnostic' || value === 'environment' || value === 'off') {
+    return value;
+  }
+  return null;
 }
 
 export function installTestHooks(hooks: BlackHoleTestHooks): void {

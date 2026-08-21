@@ -62,7 +62,6 @@
 
 import {
   abs,
-  and,
   bitXor,
   clamp,
   dot,
@@ -182,30 +181,51 @@ export function createStarfieldSamplerNode(
     const dz = dir.z;
 
     // --- Dominant-axis cube-face decomposition (directionToCubeCell) ---
+    // WEBGL2 CONSTRAINT: TSL select()/and() wrap their branches in
+    // IsolateNodes; deeply NESTED conditionals make the WebGL2 backend's GLSL
+    // flow stage resolve types through an IsolateNode whose VarNode has no
+    // base stack ("Cannot read properties of undefined (reading
+    // 'addToStack')" in VarNode.build — WebGPU is unaffected). The whole
+    // sampler is therefore BRANCH-FREE: every decision below is a flat 0/1
+    // weight from a single-level select with constant leaves, combined by
+    // arithmetic. Semantics are identical to the CPU reference.
     const ax = abs(dx);
     const ay = abs(dy);
     const az = abs(dz);
 
-    // if (ax >= ay && ax >= az) ... else if (ay >= az) ... else ...
-    const useX = and(ax.greaterThanEqual(ay), ax.greaterThanEqual(az));
-    const useY = ay.greaterThanEqual(az);
+    const one = float(1);
+    const zero = float(0);
 
-    // face = direction[axis] >= 0 ? even : odd (0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z)
-    const face = select(
-      useX,
-      select(dx.lessThan(0), uint(1), uint(0)),
-      select(
-        useY,
-        select(dy.lessThan(0), uint(3), uint(2)),
-        select(dz.lessThan(0), uint(5), uint(4))
-      )
+    // Winning-axis weights (mutually exclusive, sum to exactly 1):
+    //   wX = (ax >= ay && ax >= az); wY = !wX && ay >= az; wZ = remainder.
+    const wX = select(ax.greaterThanEqual(ay), one, zero).mul(
+      select(ax.greaterThanEqual(az), one, zero)
     );
+    const cY = select(ay.greaterThanEqual(az), one, zero);
+    const wY = one.sub(wX).mul(cY);
+    const wZ = one.sub(wX).mul(one.sub(cY));
+
+    // Per-face weights: face k gets wAxis * signHalf. f0..f5 sum to 1.
+    const posX = select(dx.greaterThanEqual(0), one, zero);
+    const posY = select(dy.greaterThanEqual(0), one, zero);
+    const posZ = select(dz.greaterThanEqual(0), one, zero);
+    const f0 = wX.mul(posX);
+    const f1 = wX.mul(one.sub(posX));
+    const f2 = wY.mul(posY);
+    const f3 = wY.mul(one.sub(posY));
+    const f4 = wZ.mul(posZ);
+    const f5 = wZ.mul(one.sub(posZ));
+
+    // Face id for the cell key (weights are exact 0/1, so the weighted sum
+    // is the exact integer id): 0:+X 1:-X 2:+Y 3:-Y 4:+Z 5:-Z.
+    const faceF = f1.add(f2.mul(2)).add(f3.mul(3)).add(f4.mul(4)).add(f5.mul(5));
+    const face = uint(faceF);
 
     // Face-plane coordinates per the CPU sign conventions:
-    //   u: -z on +/-X faces, x otherwise; v: -y on +/-X and +/-Z faces, z on
-    //   +/-Y faces. useY false covers both the X and Z branches at once.
-    const u = select(useX, dz.mul(-1), dx);
-    const v = select(useY, dz, dy.mul(-1));
+    //   u: -z on +/-X faces, x otherwise; v: -y on +/-X and +/-Z faces,
+    //   z on +/-Y faces.
+    const u = wX.mul(dz.mul(-1)).add(wY.add(wZ).mul(dx));
+    const v = wY.mul(dz).add(wX.add(wZ).mul(dy.mul(-1)));
 
     // ma = max(|x|, |y|, |z|): equals the winning axis magnitude in every
     // branch, so the division below reproduces u / ma and v / ma exactly.
@@ -224,13 +244,13 @@ export function createStarfieldSamplerNode(
 
     // Zero direction (ma === 0) mirrors the CPU null-cell path: background
     // only, no star term.
-    const hasCell = ma.greaterThan(0);
+    const hasCellF = select(ma.greaterThan(0), one, zero);
 
     // --- Cell hash stream (exact vs CPU) ---
     const key = packCellKey(face, cellI, cellJ);
 
-    // cellHasStar: u32ToUnit(hash(key)) < starDensity
-    const hasStar = u32ToUnit(hashU32(key)).lessThan(densityConst);
+    // cellHasStar as a 0/1 weight: u32ToUnit(hash(key)) < starDensity.
+    const presenceF = select(u32ToUnit(hashU32(key)).lessThan(densityConst), one, zero);
 
     // starFaceCoords: salted position draws, inset by half a cell.
     const drawI = u32ToUnit(hashU32(key.bitXor(uint(0xa5a5f00d))));
@@ -240,34 +260,24 @@ export function createStarfieldSamplerNode(
     const starFu = float(cellI).add(0.5).add(drawI.sub(0.5)).div(nCells).mul(2).sub(1);
     const starFv = float(cellJ).add(0.5).add(drawJ.sub(0.5)).div(nCells).mul(2).sub(1);
 
-    // --- faceCoordsToDirection: rebuild the star direction and normalize ---
+    // --- faceCoordsToDirection via per-face weight tables ---
     // Component tables transcribed from the CPU switch:
     //   x: 1, -1, fu, fu, fu, -fu
     //   y: -fv, -fv, 1, -1, fv, fv
     //   z: -fu, fu, fv, -fv, 1, -1
-    const starDir = normalize(
-      vec3(
-        select(face.equal(uint(0)), float(1), select(face.equal(uint(1)), float(-1), starFu)),
-        select(
-          face.equal(uint(2)),
-          float(1),
-          select(
-            face.equal(uint(3)),
-            float(-1),
-            select(face.lessThan(uint(2)), starFv.mul(-1), starFv)
-          )
-        ),
-        select(
-          face.greaterThan(uint(3)),
-          select(face.equal(uint(4)), float(1), float(-1)),
-          select(
-            face.equal(uint(0)),
-            starFu.mul(-1),
-            select(face.equal(uint(1)), starFu, select(face.equal(uint(2)), starFv, starFv.mul(-1)))
-          )
-        )
-      )
-    );
+    const xC = f0
+      .add(f1.mul(-1))
+      .add(f2.add(f3).add(f4).mul(starFu))
+      .add(f5.mul(starFu.mul(-1)));
+    const yC = f0.add(f1).mul(starFv.mul(-1)).add(f2).add(f3.mul(-1)).add(f4.add(f5).mul(starFv));
+    const zC = f0
+      .mul(starFu.mul(-1))
+      .add(f1.mul(starFu))
+      .add(f2.mul(starFv))
+      .add(f3.mul(starFv.mul(-1)))
+      .add(f4)
+      .add(f5.mul(-1));
+    const starDir = normalize(vec3(xC, yC, zC));
 
     // cosAngle = direction . starDir (the CPU sums the same three products).
     const cosAngle = dot(vec3(dx, dy, dz), starDir);
@@ -276,19 +286,16 @@ export function createStarfieldSamplerNode(
     // t = (cosAngle - cosRadius) / (1 - cosRadius), profile t*t
     // (1 at the star center, 0 at the angular-radius edge). Polynomial only,
     // so CPU and TSL agree tightly. Mirrors the corrected CPU starFalloff.
-    const falloffT = cosAngle.sub(cosRadiusConst).div(float(1).sub(cosRadiusConst));
-    const falloff = select(
-      cosAngle.lessThanEqual(cosRadiusConst),
-      float(0),
-      falloffT.mul(falloffT)
-    );
+    const falloffT = max(cosAngle.sub(cosRadiusConst), 0).div(float(1).sub(cosRadiusConst));
+    const edgeGate = select(cosAngle.greaterThan(cosRadiusConst), one, zero);
+    const falloff = falloffT.mul(falloffT).mul(edgeGate);
 
     // starBrightness: salted draw through the inverse CDF.
     const brightness = sampleBrightness(u32ToUnit(hashU32(key.bitXor(uint(0x7f4a7c15)))));
 
     // The CPU early-outs (null cell / no star / zero falloff) all reduce to
     // adding exactly 0, so a single gated contribution reproduces them.
-    const contribution = select(and(hasCell, hasStar), brightness.mul(falloff), 0);
+    const contribution = brightness.mul(falloff).mul(presenceF).mul(hasCellF);
 
     // out = backgroundRadiance + b * falloff on every channel (linear HDR).
     return vec3(
