@@ -91,9 +91,10 @@ hyperspacePass) are static-checked but UNVALIDATED at runtime.
 ## Known limitations / debt
 
 - Runtime validation of all new TSL graphs pending (next campaign's purpose).
-- `HostServices.volumes` currently served by a fail-loud stub in host.ts; a
-  real VolumeService implementation is being added under
-  src/renderer/shared/ (CA2-05) and must then be wired into host.ts.
+- `HostServices.volumes` is served by the real VolumeService
+  (src/renderer/shared/VolumeService.ts, CA2-05: bounded raymarch, half-res
+  internal target, early termination, seeded jitter). Runtime-unvalidated like
+  all other new TSL graphs.
 - `backgroundEquirect` of LensingPassParams unused (procedural environment owns
   the sky until an equirect backend lands).
 - SchwarzschildIntegrator has no GPU constraint-residual monitor (§6) —

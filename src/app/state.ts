@@ -30,7 +30,7 @@ export type TargetFps = 30 | 60 | 90 | 120;
  * background arrives. This is a debug-view selector, not a visual/artistic
  * mode, so it lives under `debug`, separate from `visual.mode`.
  */
-export type DebugViewMode = 'diagnostic' | 'off';
+export type DebugViewMode = 'diagnostic' | 'environment' | 'off';
 export type DebugRenderView =
   | 'final'
   | 'classification'
@@ -803,6 +803,7 @@ function normalizeDebug(input: Record<string, unknown>): FieldResult<DebugState>
   const d = DEFAULT_STATE.debug;
   const viewMode = normalizeEnum(pick(input, 'viewMode', d.viewMode), 'debug.viewMode', [
     'diagnostic',
+    'environment',
     'off'
   ] as const);
   if (!viewMode.ok) return viewMode;

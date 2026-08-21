@@ -19,9 +19,9 @@
  *   governor.beginFrame()/endFrame() internally (SharedRendererKernel.renderFrame),
  *   so the host deliberately does NOT call them again — double-bracketing
  *   would corrupt the FPS EMA with ~0 ms samples.
- * - `IVolumeService` has no implementation under src/renderer/shared yet. Per
- *   campaign rules the host provides an honest fail-loud stub instead of a
- *   fake; any destination calling createVolume() gets a descriptive error.
+ * - `IVolumeService` is served by the real VolumeService
+ *   (src/renderer/shared/VolumeService.ts) since CA2-05 landed; destinations
+ *   create volumes through HostServices.volumes.
  * - `SharedPost` requires a live renderer at construction while the kernel
  *   creates that renderer during init(); `DeferredSharedPost` below is the
  *   host-local gluon that forwards calls once the inner instance exists.
@@ -38,6 +38,7 @@ import { RibbonService } from '../renderer/shared/RibbonService.js';
 import { SharedPost } from '../renderer/shared/SharedPost.js';
 import { SharedRendererKernel } from '../renderer/SharedRendererKernel.js';
 import { TrajectoryService } from '../renderer/shared/TrajectoryService.js';
+import { VolumeService } from '../renderer/shared/VolumeService.js';
 import { NEUTRON_STAR_PRESETS } from '../phenomena/neutron-star/presets.js';
 import { collectInventory } from './debugInventory.js';
 import type { DebugInventoryView } from './debugInventory.js';
@@ -58,16 +59,13 @@ import type {
   HostServices,
   IParticleService,
   ISharedPost,
-  IVolumeService,
   PreparedPhenomenon,
   PhenomenonDescriptor,
   PresetDescriptor,
   RenderContext,
   RendererLike,
   ResourceScope,
-  VersionedDestinationState,
-  VolumeConfig,
-  VolumeHandle
+  VersionedDestinationState
 } from './types.js';
 import { DestinationRegistry } from './registry.js';
 
@@ -163,24 +161,10 @@ class DeferredSharedPost implements ISharedPost {
 }
 
 /**
- * Honest placeholder for the not-yet-implemented volume service: fails loud
- * instead of pretending to march volumes (AGENTS.md: no fake science).
+ * Honest placeholder removed: VolumeService (src/renderer/shared/
+ * VolumeService.ts) now provides the CA2-05 bounding-volume raymarch
+ * foundation; destinations create volumes through HostServices.volumes.
  */
-class UnavailableVolumeService implements IVolumeService {
-  createVolume(_config: VolumeConfig): VolumeHandle {
-    throw new Error(
-      '[CosmicAtlasHost] IVolumeService has no implementation yet; volume destinations cannot run.'
-    );
-  }
-
-  setInternalScale(_scale: number): void {
-    // No-op: nothing to scale until a real service exists.
-  }
-
-  dispose(): void {
-    // Nothing owned.
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Host
@@ -211,7 +195,7 @@ export class CosmicAtlasHost {
 
   private readonly postScope: ResourceScope;
   private particlesService: IParticleService;
-  private readonly volumesService = new UnavailableVolumeService();
+  private readonly volumesService = new VolumeService();
   private readonly ribbonService = new RibbonService();
   private readonly trajectoryService = new TrajectoryService();
   private readonly fieldLineService = new FieldLineService();

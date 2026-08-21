@@ -22,8 +22,12 @@ import {
   Scene,
   Vector3
 } from 'three/webgpu';
+import type { Node } from 'three/webgpu';
 import { attribute, float, normalize, select, uniform, varying, vec4 } from 'three/tsl';
 import type { Vec3 } from './cameraRayMath.js';
+import { createStarfieldSamplerNode } from './starfieldGpu.js';
+import { makeStarfieldParams } from './starfield.js';
+import type { DebugViewMode } from '../app/state.js';
 
 export interface DiagnosticUniformBlock {
   /** Observer position in r_g (plumbed per docs/SHADER_CONTRACTS.md section 2). */
@@ -38,6 +42,12 @@ export interface DiagnosticUniformBlock {
    * 1 = flat clear color ('off'). Scalar so the CPU side stays trivial.
    */
   viewOff: { value: number };
+  /**
+   * Environment view selector (M1-04): 1 = straight-ray celestial environment
+   * sampling (deterministic starfield along the raw camera ray). Only
+   * consulted when `viewOff` is 0.
+   */
+  viewEnvironment: { value: number };
 }
 
 export interface DiagnosticPass {
@@ -60,6 +70,7 @@ export function createDiagnosticPass(): DiagnosticPass {
   const uTanHalfFovY = uniform(1);
   const uAspect = uniform(1);
   const uViewOff = uniform(0);
+  const uViewEnvironment = uniform(0);
 
   const uniforms: DiagnosticUniformBlock = {
     cameraPositionRg: vec3Uniform(),
@@ -68,7 +79,8 @@ export function createDiagnosticPass(): DiagnosticPass {
     cameraForward: vec3Uniform(),
     tanHalfFovY: uTanHalfFovY,
     aspect: uAspect,
-    viewOff: uViewOff
+    viewOff: uViewOff,
+    viewEnvironment: uViewEnvironment
   };
 
   const uRight = uniform(uniforms.cameraRight.value);
@@ -87,12 +99,19 @@ export function createDiagnosticPass(): DiagnosticPass {
     uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
   );
   const color = dir.mul(0.5).add(0.5);
-  // 'off' renders the flat clear color (black) until a real background
-  // (starfield) arrives in a later packet; the pass still covers the frame so
-  // coverage/aspect invariants stay testable in both modes.
+  // 'environment' samples the deterministic starfield along the straight
+  // camera ray (M1-04): the celestial background BEFORE any lensing. Values
+  // are linear HDR and may exceed 1; the canvas clamps in this debug view.
+  const envRadiance = createStarfieldSamplerNode(makeStarfieldParams());
+  // 'off' renders the flat clear color (black); the pass still covers the
+  // frame so coverage/aspect invariants stay testable in both modes.
   material.fragmentNode = select(
     uViewOff.lessThan(0.5),
-    vec4(color, float(1)),
+    select(
+      uViewEnvironment.greaterThan(0.5),
+      vec4(envRadiance(dir) as Node<'vec3'>, float(1)),
+      vec4(color, float(1))
+    ),
     vec4(float(0), float(0), float(0), float(1))
   );
 
@@ -143,12 +162,14 @@ export function applyBasisToDiagnosticUniforms(
 
 /**
  * Maps the canonical `debug.viewMode` (docs/STATE_SCHEMA.md section 8) onto
- * the shader-side selector: 'diagnostic' -> direction gradient, 'off' -> flat
- * clear color. Mirrors the CPU contract in src/app/state.ts.
+ * the shader-side selectors: 'diagnostic' -> direction gradient,
+ * 'environment' -> straight-ray starfield, 'off' -> flat clear color.
+ * Mirrors the CPU contract in src/app/state.ts.
  */
 export function applyViewModeToDiagnosticUniforms(
   pass: DiagnosticPass,
-  viewMode: 'diagnostic' | 'off'
+  viewMode: DebugViewMode
 ): void {
   pass.uniforms.viewOff.value = viewMode === 'off' ? 1 : 0;
+  pass.uniforms.viewEnvironment.value = viewMode === 'environment' ? 1 : 0;
 }

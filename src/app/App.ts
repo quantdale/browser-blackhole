@@ -150,6 +150,8 @@ export async function createApp(root: HTMLElement): Promise<AppHandle> {
   const coordinator = new RenderCoordinator({
     renderer,
     camera,
+    // debug.viewMode is the single source of truth for what the pass shows.
+    getViewMode: () => state.debug.viewMode,
     onTelemetry(sample: FrameTelemetrySample): void {
       telemetryThrottle = (telemetryThrottle + 1) % 10;
       if (telemetryThrottle === 0) controlPanel.updateTelemetry(sample.fpsEma);
