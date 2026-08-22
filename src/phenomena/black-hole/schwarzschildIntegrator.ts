@@ -67,7 +67,6 @@ import {
   Fn,
   If,
   Loop,
-  and,
   attribute,
   clamp,
   cos,
@@ -80,7 +79,6 @@ import {
   min,
   mix,
   normalize,
-  or,
   pow,
   select,
   sin,
@@ -408,10 +406,13 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
 
   // Degenerate cameras (inside capture band, at the center, or non-finite
   // radius) route to INVALID_INITIAL_STATE instead of integrating (§10.4).
-  const initValid = and(
-    and(r0.greaterThan(captureRadius), r0.lessThan(FINITE_MAGNITUDE_BOUND)),
-    f0.greaterThan(0)
-  );
+  // WebGL2 safety (9a152f6 defect class): no and()/or() IsolateNode chains —
+  // conditions compose as products of flat 0/1 gates (same idiom as the
+  // coordinate-stall capture below).
+  const initValid = select(r0.greaterThan(captureRadius), float(1), float(0))
+    .mul(select(r0.lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
+    .mul(select(f0.greaterThan(0), float(1), float(0)))
+    .greaterThan(0.5);
 
   // ---------------------------------------------------------------------------
   // Integrator sub-graphs (geometry only — SHADER_CONTRACTS §5)
@@ -547,14 +548,12 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
         pr.assign(next.z);
 
         // --- Non-finite proxy (§14): |x| >= 1e30 OR NaN (fails strict <).
+        // Flat gate arithmetic: fires iff any finite-gate is zero.
         If(
-          or(
-            or(
-              r.abs().lessThan(FINITE_MAGNITUDE_BOUND).not(),
-              pr.abs().lessThan(FINITE_MAGNITUDE_BOUND).not()
-            ),
-            phi.abs().lessThan(FINITE_MAGNITUDE_BOUND).not()
-          ),
+          select(r.abs().lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0))
+            .mul(select(pr.abs().lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
+            .mul(select(phi.abs().lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
+            .lessThan(0.5),
           () => {
             status.assign(int(RAY_NON_FINITE));
             Break();
@@ -593,35 +592,48 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
             const rHit = mix(rPrev, r, sCross);
             const phiHit = mix(phiPrev, phi, sCross);
 
-            // Accept only inside the annulus (NM §10.2).
-            If(and(rHit.greaterThanEqual(uDiskInnerRg), rHit.lessThanEqual(uDiskOuterRg)), () => {
-              // Circular-equatorial-emitter frequency ratio (NM §15/§16),
-              // GPU mirror of accretionDisk.diskRedshiftFactor:
-              //   u^t = 1/sqrt(1 - 3M/r), Omega = sqrt(M/r^3),
-              //   g = 1 / (u^t * (1 - Omega*b_z))
-              // with b_z derived in the module header. Guards mirror the
-              // CPU fn: no circular orbit for r <= 3M; denominator must be
-              // positive or the emitter state is unreachable/invisible.
-              const orbitArg = float(1).sub(uMassRg.mul(3).div(max(rHit, denomFloor)));
-              const ut = float(1).div(sqrt(max(orbitArg, denomFloor)));
-              const omega = sqrt(uMassRg.div(pow(max(rHit, denomFloor), 3)));
-              const dopplerDenom = float(1).sub(omega.mul(bzImpact));
-              const gFactor = select(
-                and(orbitArg.greaterThan(0), dopplerDenom.greaterThan(0)),
-                float(1).div(ut.mul(dopplerDenom)),
-                float(0)
-              );
-              // emit() applies the g^3 Liouville transform INTERNALLY (its
-              // contract) — pass raw g, never re-multiply (NM §17).
-              const emitted = diskEmission.emit({
-                r: rHit,
-                gFactor,
-                phi: phiHit
-              }) as Vec3Node;
-              // Additive accumulation: higher-order images emerge naturally
-              // because integration continues after every crossing.
-              radiance.addAssign(emitted);
-            });
+            // Accept only inside the annulus (NM §10.2); flat gate product
+            // for WebGL2 safety (no and()/or() nodes).
+            If(
+              select(rHit.greaterThanEqual(uDiskInnerRg), float(1), float(0))
+                .mul(select(rHit.lessThanEqual(uDiskOuterRg), float(1), float(0)))
+                .greaterThan(0.5),
+              () => {
+                // Circular-equatorial-emitter frequency ratio (NM §15/§16),
+                // GPU mirror of accretionDisk.diskRedshiftFactor:
+                //   u^t = 1/sqrt(1 - 3M/r), Omega = sqrt(M/r^3),
+                //   g = 1 / (u^t * (1 - Omega*b_z))
+                // with b_z derived in the module header. Guards mirror the
+                // CPU fn: no circular orbit for r <= 3M; denominator must be
+                // positive or the emitter state is unreachable/invisible.
+                const orbitArg = float(1).sub(uMassRg.mul(3).div(max(rHit, denomFloor)));
+                const ut = float(1).div(sqrt(max(orbitArg, denomFloor)));
+                const omega = sqrt(uMassRg.div(pow(max(rHit, denomFloor), 3)));
+                const dopplerDenom = float(1).sub(omega.mul(bzImpact));
+                // Gate as a flat 0/1 product; the denominator is floored through
+                // the same gate so BOTH select arms stay finite (a raw mix would
+                // smear NaN from the dead arm into radiance).
+                const gValid = select(orbitArg.greaterThan(0), float(1), float(0)).mul(
+                  select(dopplerDenom.greaterThan(0), float(1), float(0))
+                );
+                const dopplerDenomSafe = max(dopplerDenom.mul(gValid), denomFloor);
+                const gFactor = select(
+                  gValid.greaterThan(0.5),
+                  float(1).div(ut.mul(dopplerDenomSafe)),
+                  float(0)
+                );
+                // emit() applies the g^3 Liouville transform INTERNALLY (its
+                // contract) — pass raw g, never re-multiply (NM §17).
+                const emitted = diskEmission.emit({
+                  r: rHit,
+                  gFactor,
+                  phi: phiHit
+                }) as Vec3Node;
+                // Additive accumulation: higher-order images emerge naturally
+                // because integration continues after every crossing.
+                radiance.addAssign(emitted);
+              }
+            );
           });
         });
 
@@ -663,11 +675,17 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
           }
         );
 
-        // --- Conservative escape (NM §10.3): beyond the radius AND outward.
-        If(and(r.greaterThan(uEscapeRadiusRg), pr.greaterThan(0)), () => {
-          status.assign(int(RAY_ESCAPED));
-          Break();
-        });
+        // --- Conservative escape (NM §10.3): beyond the radius AND outward;
+        // flat gate product for WebGL2 safety.
+        If(
+          select(r.greaterThan(uEscapeRadiusRg), float(1), float(0))
+            .mul(select(pr.greaterThan(0), float(1), float(0)))
+            .greaterThan(0.5),
+          () => {
+            status.assign(int(RAY_ESCAPED));
+            Break();
+          }
+        );
       });
 
       // Budget >= compile-time bound without an event: exhausted (§10.4).

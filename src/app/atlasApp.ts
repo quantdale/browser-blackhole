@@ -18,8 +18,9 @@
  * (<= 0.25 s) so background-tab pauses cannot inject huge time steps.
  */
 
-import { CosmicAtlasHost } from '../atlas/host.js';
+import { CosmicAtlasHost, type CosmicAtlasHostOptions } from '../atlas/host.js';
 import type { NavigationIntent } from '../atlas/navigation.js';
+import { readForcedBackend } from './testHooks.js';
 
 export interface AtlasAppHandle {
   dispose(): void;
@@ -60,7 +61,16 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   status.setAttribute('role', 'status');
   panelHost.append(nav, status);
 
-  const host = new CosmicAtlasHost(canvas);
+  // Dev/test-only ?backend= override (docs/CI_CD.md §6): forward webgpu|webgl2
+  // to the kernel so the atlas fallback path is exercisable on capable machines.
+  // 'unsupported' is a root-app terminal-UX concept; the atlas shell reports
+  // its own boot failures through the InitStatusTracker instead.
+  const forcedBackend = readForcedBackend(window.location.search);
+  const hostOptions: CosmicAtlasHostOptions = {};
+  if (forcedBackend === 'webgpu' || forcedBackend === 'webgl2') {
+    hostOptions.forcedBackend = forcedBackend;
+  }
+  const host = new CosmicAtlasHost(canvas, hostOptions);
 
   for (const destination of NAV_DESTINATIONS) {
     const button = document.createElement('button');
@@ -155,7 +165,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       unsubscribeStatus();
       delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];
       host.dispose();
-      panelHost.innerHTML = '';
+      panelHost.replaceChildren();
     }
   };
 }

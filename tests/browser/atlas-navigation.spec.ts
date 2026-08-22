@@ -1,5 +1,8 @@
 import { expect, test, type Page } from '@playwright/test';
 
+// Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
+import './support/atlasHook.js';
+
 /**
  * Atlas navigation validation (validation campaign: lifecycle, races,
  * history, invalid routes, 20-switch resource bound).
@@ -9,34 +12,6 @@ import { expect, test, type Page } from '@playwright/test';
  * / console channels plus the app's own uncaught-error accounting via the
  * transition state machine (a stuck transition would time out arrivals).
  */
-
-interface AtlasStateView {
-  atlas: {
-    activeDestination: string;
-    activePreset: string;
-    transition: { active: boolean; phase: string | null; progress: number };
-  };
-}
-
-interface InventoryView {
-  liveScopeCount: number;
-  totalEstimatedGpuBytes: number;
-  pendingPrepares: number;
-}
-
-interface AtlasHook {
-  host: {
-    state: AtlasStateView;
-    debugInventory(): InventoryView;
-  };
-  navigate(destinationId: string, presetId?: string): unknown;
-}
-
-declare global {
-  interface Window {
-    __ATLAS_APP__?: AtlasHook;
-  }
-}
 
 const ROUTE_IDS = ['black-hole', 'neutron-star', 'diagnostic'] as const;
 

@@ -143,6 +143,14 @@ export interface SharedRendererKernelOptions {
   getCamera?: () => THREE.PerspectiveCamera;
   /** Device pixel ratio cap applied before render scaling (default 2). */
   dprCap?: number;
+  /**
+   * Dev/test-only backend decision override (docs/CI_CD.md §6, same policy
+   * class as the root app's `?backend=`): forces the init attempt so fallback
+   * behavior stays exercisable on capable machines. 'webgl2' skips the WebGPU
+   * attempt entirely; 'webgpu' removes the WebGL2 fallback on failure.
+   * Absent = documented WebGPU-preferred policy.
+   */
+  forcedBackend?: 'webgpu' | 'webgl2';
 }
 
 export class SharedRendererKernel implements IRendererKernel {
@@ -173,7 +181,8 @@ export class SharedRendererKernel implements IRendererKernel {
   /**
    * Initialize the renderer: WebGPU first (dynamic import keeps the heavy
    * `three/webgpu` build out of modules that merely reference the kernel),
-   * explicit WebGL2 fallback on rejection. Idempotent after success.
+   * explicit WebGL2 fallback via WebGPURenderer's forceWebGL backend.
+   * Idempotent after success.
    *
    * Note: three r180's WebGPURenderer may itself fall back to its internal
    * WebGLBackend; the active API is therefore read off the initialized backend
@@ -191,38 +200,59 @@ export class SharedRendererKernel implements IRendererKernel {
 
     let webgpuError: unknown;
     let partialRenderer: { dispose(): void } | null = null;
+    if (this.options.forcedBackend !== 'webgl2') {
+      try {
+        const webgpuModule = await import('three/webgpu');
+        const candidate = new webgpuModule.WebGPURenderer({ canvas, antialias: false });
+        partialRenderer = candidate;
+        await candidate.init();
+        if (this.disposed || generation !== this.generation) {
+          candidate.dispose();
+          throw new Error('[SharedRendererKernel] init() superseded by dispose()/re-init.');
+        }
+        this.adoptRenderer(candidate, generation);
+        await this.resolveAdapterName(generation);
+        return this.requireBackend();
+      } catch (error) {
+        webgpuError = error;
+        // Release the failed attempt's GPU resources before fallback/rethrow
+        // (FAILURE_RECOVERY §15: bounded degraded retry, no leaked reallocations).
+        try {
+          partialRenderer?.dispose();
+        } catch {
+          // backend already dead — nothing further to release
+        }
+        this.teardownLossWiring();
+        this.rendererValue = null;
+        this.backendValue = null;
+        this.capabilityFlags = null;
+        if (this.disposed || generation !== this.generation) throw error;
+        if (this.options.forcedBackend === 'webgpu') {
+          // Forced WebGPU must not silently degrade to WebGL2 — the whole point
+          // of the override is to pin the decision for tests/probes.
+          throw error;
+        }
+        // otherwise fall through to the documented WebGL2 fallback
+      }
+    }
+
     try {
+      // WebGL2 fallback: WebGPURenderer pinned to its WebGL2 backend. The
+      // classic THREE.WebGLRenderer cannot build TSL node materials in three
+      // r185 (its GLSL stage never receives node-generated shaders —
+      // resolveIncludes(undefined)), while the forceWebGL path runs the same
+      // node system on GLSL and keeps one code path for every destination.
       const webgpuModule = await import('three/webgpu');
-      const candidate = new webgpuModule.WebGPURenderer({ canvas, antialias: false });
-      partialRenderer = candidate;
+      const candidate = new webgpuModule.WebGPURenderer({
+        canvas,
+        antialias: false,
+        forceWebGL: true
+      });
       await candidate.init();
       if (this.disposed || generation !== this.generation) {
         candidate.dispose();
         throw new Error('[SharedRendererKernel] init() superseded by dispose()/re-init.');
       }
-      this.adoptRenderer(candidate, generation);
-      await this.resolveAdapterName(generation);
-      return this.requireBackend();
-    } catch (error) {
-      webgpuError = error;
-      // Release the failed attempt's GPU resources before fallback/rethrow
-      // (FAILURE_RECOVERY §15: bounded degraded retry, no leaked reallocations).
-      try {
-        partialRenderer?.dispose();
-      } catch {
-        // backend already dead — nothing further to release
-      }
-      this.teardownLossWiring();
-      this.rendererValue = null;
-      this.backendValue = null;
-      this.capabilityFlags = null;
-      if (this.disposed || generation !== this.generation) throw error;
-      // otherwise fall through to the documented WebGL2 fallback
-    }
-
-    try {
-      const threeModule = await import('three');
-      const candidate = new threeModule.WebGLRenderer({ canvas, antialias: false });
       this.adoptRenderer(candidate, generation);
       return this.requireBackend();
     } catch (error) {

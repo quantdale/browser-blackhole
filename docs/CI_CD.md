@@ -96,6 +96,23 @@ window.__BLACKHOLE_TEST__ = {
 
 Keep this API small and documented. Production may omit it if feasible.
 
+### URL decision overrides
+
+Dev/test-only query parameters force backend/debug decisions so fallback UX
+stays exercisable on capable machines (implemented in `src/app/testHooks.ts`,
+consumed by both application shells):
+
+- `?backend=webgpu|webgl2|unsupported` — pins the renderer decision. On the
+  root route it overrides the capability decision directly. On `/atlas/*`
+  routes it forwards `webgpu`/`webgl2` to the shared kernel (`forcedBackend`
+  option): `webgl2` boots `WebGPURenderer` pinned to its WebGL2 backend, and
+  a forced `webgpu` that fails will not silently degrade. `unsupported` is a
+  root-app terminal-UX concept; atlas boot failures surface through the atlas
+  status line instead.
+- `?view=diagnostic|environment|off` — root-route initial debug view.
+
+Capability telemetry always reports the REAL probes regardless of overrides.
+
 ## 7. Visual regression strategy
 
 Golden capture requires fixed:

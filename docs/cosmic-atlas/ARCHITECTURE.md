@@ -219,7 +219,11 @@ Repeated navigation must not produce monotonic growth outside bounded caches.
 Owns:
 
 - Three.js renderer instance;
-- WebGPU/WebGL2 backend selection;
+- WebGPU/WebGL2 backend selection. The WebGL2 fallback (and the dev/test
+  `?backend=webgl2` override) boots `WebGPURenderer` pinned to its WebGL2
+  backend (`forceWebGL`) — the classic `THREE.WebGLRenderer` cannot build TSL
+  node materials in three r185, so every destination compiles through the same
+  node system on both APIs;
 - device-loss recovery integration;
 - canvas sizing;
 - shared frame graph/post-processing;
@@ -243,8 +247,13 @@ Owns:
 - frame-time target;
 - render scale;
 - interaction/settling/stable quality mode;
-- quality downgrade/upgrade hysteresis;
-- destination-provided work multipliers;
+- quality downgrade/upgrade hysteresis (raise condition is refresh-aware:
+  the raise bar is capped by the estimated compositor cadence minus a small
+  margin so vsync-locked displays can still qualify; a wall-clock startup
+  grace window suppresses tier changes across pipeline compilation);
+- destination-provided work multipliers, resolved against the ACTIVE
+  destination (`setActiveDestination` host lifecycle hook); before any
+  activation signal the heaviest registered multiplier is used as fallback;
 - GPU timestamp integration when available.
 
 ### ParticleService
