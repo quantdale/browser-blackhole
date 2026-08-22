@@ -33,6 +33,7 @@ import {
   uToX
 } from '../../src/phenomena/black-hole/lut/domain.js';
 import {
+  DEFAULT_PHOTON_INTEGRATION_OPTIONS,
   rk4PlaneStep,
   stepSizeAt,
   type PhotonIntegrationOptions
@@ -82,8 +83,15 @@ export interface TrajectoryColumn {
   readonly rByTexel: Float64Array;
   /** Valid (non-NaN) texels from index 0; also the enumeration extent. */
   readonly validTexels: number;
-  /** Physical span covered by valid data (radians). */
+  /** Physical span covered by valid data (radians), BEFORE budget capping. */
   readonly psiDataEnd: number;
+  /**
+   * Span the stored texel grid actually covers (radians):
+   * min(psiDataEnd, psiMax). Texel centers live at
+   * (i + 0.5)/height * psiStoredSpan — this is the value runtime coordinate
+   * mapping must use.
+   */
+  readonly psiStoredSpan: number;
   /** Apsis azimuth in launch coordinates (escaping class only, else NaN). */
   readonly psiApsis: number;
   /** Periapsis radius (escaping class only, else NaN). */
@@ -161,13 +169,28 @@ export function integrateTrajectoryColumn(opts: TrajectoryColumnOptions): Trajec
   let psiEscapeOut = NaN;
   let terminalOut: [number, number] = [NaN, NaN];
   // Incoming-side crossing of the escape radius (mirror source for captured
-  // class terminal directions; unused otherwise).
+  // class terminal directions) plus the radial momentum AT that exact
+  // radius (linear within-step estimate), so the time-reversed climber's
+  // direction needs no nearest-sample approximation.
   let psiEscapeInMirror = NaN;
+  let prMirrorCross = NaN;
   let prevPr = pr;
   let prevR = r;
+  // Merged once outside the hot loop: stepSizeAt only reads the five fields
+  // below, and per-step object spreading showed up as generator GC churn.
+  const walkOptions: PhotonIntegrationOptions = {
+    massRg: intOpts.massRg,
+    stepSize: intOpts.stepSize,
+    minStep: intOpts.minStep,
+    maxStep: intOpts.maxStep,
+    maxSteps: intOpts.maxSteps,
+    escapeRadius: DEFAULT_PHOTON_INTEGRATION_OPTIONS.escapeRadius,
+    captureEpsilon: intOpts.captureEpsilon,
+    pathStride: DEFAULT_PHOTON_INTEGRATION_OPTIONS.pathStride
+  };
 
   while (steps < intOpts.maxSteps) {
-    const h = stepSizeAt(r, { ...(intOpts as PhotonIntegrationOptions) });
+    const h = stepSizeAt(r, walkOptions);
     const next = rk4PlaneStep({ r, phi, pr }, h, m, b);
     const nR_ = next.r;
     const nPhi = next.phi;
@@ -186,16 +209,20 @@ export function integrateTrajectoryColumn(opts: TrajectoryColumnOptions): Trajec
 
     // Apsis detection: inward -> outward radial-momentum sign change.
     if (Number.isNaN(psiApsis) && prevPr < 0 && pr >= 0) {
-      // Linear root estimate within the step (tight steps => sub-micro-rad).
+      // Linear root estimate within the step; the periapsis RADIUS gets the
+      // same interpolation instead of recording the post-step overshoot.
       const t = prevPr === pr ? 0.5 : prevPr / (prevPr - pr);
       psiApsis = phi - h + t * h;
-      rMin = r;
+      rMin = prevR + t * (r - prevR);
     }
-    // Outgoing escape-radius crossing (escaping class row end).
+    // Outgoing escape-radius crossing (escaping class row end). Terminal
+    // direction is evaluated AT the crossing (interpolated momentum), not
+    // at the post-step state that overshot the radius by up to one step.
     if (!Number.isNaN(psiApsis) && Number.isNaN(psiEscapeOut) && prevR < escapeR && r >= escapeR) {
       const t = (escapeR - prevR) / (r - prevR);
       psiEscapeOut = phi - h + t * h;
-      terminalOut = terminalComponents(r, pr, b, m);
+      const prCross = prevPr + t * (pr - prevPr);
+      terminalOut = terminalComponents(escapeR, prCross, b, m);
     }
     // Incoming-side escape-radius crossing (captured-class mirror source):
     // first descent through escapeR before any apsis exists.
@@ -205,7 +232,9 @@ export function integrateTrajectoryColumn(opts: TrajectoryColumnOptions): Trajec
       prevR > escapeR &&
       r <= escapeR
     ) {
-      psiEscapeInMirror = phi - h + t01(prevR, r, escapeR) * h;
+      const tMirror = t01(prevR, r, escapeR);
+      psiEscapeInMirror = phi - h + tMirror * h;
+      prMirrorCross = prevPr + tMirror * (pr - prevPr);
     }
     // Horizon capture.
     if (r <= 2 * m + intOpts.captureEpsilon * m) {
@@ -228,19 +257,15 @@ export function integrateTrajectoryColumn(opts: TrajectoryColumnOptions): Trajec
   // --- incoming sub-path at the escape radius (module docs).          ---
   let terminal: [number, number] = terminalOut;
   if (!escapingClass && !Number.isNaN(psiCapture)) {
-    const mirrorPsi = psiEscapeInMirror;
-    if (mirrorPsi !== undefined && Number.isFinite(mirrorPsi)) {
-      // Find the raw sample nearest the incoming escape crossing.
-      let best = raw[0]!;
-      for (const s of raw) {
-        if (Math.abs(s.psi - mirrorPsi) < Math.abs(best.psi - mirrorPsi)) best = s;
-      }
+    if (Number.isFinite(prMirrorCross)) {
       // Time-reversal negates ALL momenta (dr/dlambda AND dphi/dlambda:
       // the outward climber carries effective L = -b in launch coordinates),
       // so the climber's local direction is the FULL NEGATION of the
-      // descending state's tetrad components at the same radius. Verified
-      // against direct outward integrations in lutGenerate.test.ts.
-      const c = terminalComponents(best.r, best.pr, b, m);
+      // descending state's tetrad components at the SAME radius — evaluated
+      // exactly at the interpolated escape-radius crossing above rather than
+      // a nearby strided sample. Verified against direct outward
+      // integrations in lutGenerate.test.ts.
+      const c = terminalComponents(escapeR, prMirrorCross, b, m);
       terminal = [-c[0], -c[1]];
     } else {
       terminal = [NaN, NaN];
@@ -257,6 +282,7 @@ export function integrateTrajectoryColumn(opts: TrajectoryColumnOptions): Trajec
       : psiCapture;
   const psiSpan = Math.min(dataEnd, opts.psiMax);
   const truncated = dataEnd > opts.psiMax + 1e-9;
+  void psiSpan;
 
   // Map each raw sample into row coordinates and piecewise-linearly fill the
   // texel grid. Row coordinate: psi_row = |psi - anchorOffset| (escaping) or
@@ -300,6 +326,7 @@ export function integrateTrajectoryColumn(opts: TrajectoryColumnOptions): Trajec
     rByTexel,
     validTexels,
     psiDataEnd: dataEnd,
+    psiStoredSpan: psiSpan,
     psiApsis,
     rMin,
     psiCapture,
