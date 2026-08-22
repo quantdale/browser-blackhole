@@ -120,8 +120,13 @@ interface PlaneDerivatives {
  *   dr/dlambda  = f p_r
  *   dphi/dlambda = L / r^2
  *   dp_r/dlambda = -0.5 E^2 f'/f^2 - 0.5 f' p_r^2 + L^2/r^3,  f' = 2M/r^2
+ *
+ * EXPORTED (M8-03): the offline LUT generator integrates the SAME validated
+ * RHS/RK4 primitives (see tools/generate-luts) so generated tables share
+ * this exact formulation; docs/ASSET_PROVENANCE.md §3.1 records that
+ * lineage. Export-only — behavior unchanged.
  */
-function planeDerivatives(
+export function planeDerivatives(
   r: number,
   pr: number,
   massRg: number,
@@ -139,8 +144,9 @@ function planeDerivatives(
   return { dr, dphi, dpr };
 }
 
-/** One classical RK4 step over (r, phi, p_r) — docs/NUMERICAL_METHODS.md §8.1. */
-function rk4PlaneStep(
+/** One classical RK4 step over (r, phi, p_r) — docs/NUMERICAL_METHODS.md §8.1.
+ * EXPORTED (M8-03) for the offline LUT generator (see planeDerivatives). */
+export function rk4PlaneStep(
   state: PlaneState,
   h: number,
   massRg: number,
@@ -187,8 +193,9 @@ function constraintResidual(
  * Step-size heuristic of docs/NUMERICAL_METHODS.md §9: base resolution in the
  * strong field, growing with r^1.5 far away, shrinking towards the horizon,
  * always clamped to [minStep, maxStep] (scaled by massRg).
+ * EXPORTED (M8-03) for the offline LUT generator.
  */
-function stepSizeAt(r: number, o: PhotonIntegrationOptions): number {
+export function stepSizeAt(r: number, o: PhotonIntegrationOptions): number {
   const m = o.massRg;
   const farScale = Math.max(1, Math.pow(r / (10 * m), 1.5));
   const nearScale = Math.min(1, Math.max(0.02, (r - 2 * m) / m));
