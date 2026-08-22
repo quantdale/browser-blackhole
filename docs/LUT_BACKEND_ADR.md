@@ -103,20 +103,30 @@ their environment sample equals the numerical result within tolerance.
 ## 6. Critical-region behavior
 
 Near `x = 1` the total winding diverges logarithmically and `r(psi; x)`
-varies steeply across rows. Mitigations, selected by measurement (M8-04):
+varies steeply across rows. Mitigations, selected by measurement (M8-04,
+tools/generate-luts/study.ts, 12 off-grid oracle-compared columns per
+config):
 
-- NONLINEAR `x` AXIS concentrating samples near `x = 1`
-  (candidate remaps: piecewise-linear with dense band around 1; smoothmap
-  analogous to the reference's `1/(1+6 e^2)`).
-- FINITE WINDING BUDGET: rows are truncated at `psi_max` (~ several turns);
-  the aux flags mark truncated rows. Rays whose required winding exceeds the
-  budget are routed to the NUMERICAL backend (explicit hybrid rule, no clamp
-  masquerading as physics). The angular width of the affected band is
-  measured during generation and recorded in the manifest validation block.
-- Classification near the boundary is EXPLICIT: `b < b_c => captured` is an
-  exact analytic statement for inward rays; no interpolation across the
-  capture boundary is permitted to blur class membership (aux flag lookup is
-  nearest-exact in the flag channel).
+- NONLINEAR `x` AXIS — MEASURED WINNER: piecewise-linear knots
+  `xKnots = [0, 0.70, 1.30, 3]` (one third of columns inside
+  [0.70, 1.30]). It beat both a default [.85, 1.15] split and a tight
+  [.95, 1.05] band on BOTH radius-error statistics at w=1024
+  (max 3.05e-2 r_g, rms 1.18e-2 vs 5.20e-2/2.21e-2 and 7.63e-2/2.58e-2);
+  over-concentrating columns near criticality starves [0.85, 0.95)
+  where strong-lensing disk hits live.
+- ROW RESOLUTION: psi is NOT the bottleneck — h=2048 measured within
+  noise of h=1024 while h=512 regressed; h=1024 frozen.
+- FINITE WINDING BUDGET: psiMax=16 rad; MEASURED winding grows only like
+  ~(1/2)ln(1/(x-1)) (x=1.001 -> 4.65 rad), so no numerically reachable
+  column truncates; hybridBandHalfWidthX=0 for the shipped family and
+  the runtime still honors it as an explicit fallback trigger.
+- STEEP OUTER RIM (documented limitation): beyond ~16 r_g the row tail
+  turns nearly radial (dr/dpsi > 100 r_g/rad); disk-hit error sampling
+  excludes it via slope guard, and M8-07 image equivalence owns the
+  rim's visual verdict.
+- Classification near the boundary is EXACT by construction: escaping
+  class <=> b > b_c analytically; measured mismatch rate 0 across every
+  generated family (manifest validation block).
 
 ## 7. Disk intersection implications
 

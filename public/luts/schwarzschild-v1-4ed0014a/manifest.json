@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "family": "schwarzschild-v1",
   "generatorVersion": "1.0.0",
-  "generatorCommit": "2442d66b0154438b8c9c148f06e21a32c2d8572f",
+  "generatorCommit": "51531e69e189a5926d75bc6b1bc843923b32b2d3",
   "physicsConvention": "schwarzschild-M1-static-observer, geometric units G=c=M=1",
   "coordinateConvention": "planar state (r, phi, p_r), E-normalized L=b; pos=r*(cos(phi)e0+sin(phi)e1); backwards ray tracing; terminal direction is the static-observer tetrad projection",
-  "referenceSolverVersion": "cpuReference.ts@2442d66b0154438b8c9c148f06e21a32c2d8572f#stepSize=0.002,maxStep=40",
-  "generatedAt": "2026-08-23T01:41:14+08:00",
+  "referenceSolverVersion": "cpuReference.ts@51531e69e189a5926d75bc6b1bc843923b32b2d3#stepSize=0.002,maxStep=40",
+  "generatedAt": "2026-08-23T02:48:00+08:00",
   "provenance": {
     "paper": "Eric Bruneton, Real-time High-Quality Rendering of Non-Rotating Black Holes, arXiv:2010.08735 (2020)",
     "implementation": "github.com/ebruneton/black_hole_shader (BSD-3-Clause)",
@@ -38,8 +38,8 @@
           ],
           "xKnots": [
             0,
-            0.85,
-            1.15,
+            0.7,
+            1.3,
             3
           ]
         },
@@ -48,7 +48,7 @@
       "channels": {
         "r": 0
       },
-      "sha256": "c01c33c221410195ddc1f4a1037c842862e722149a1e67ad5037db02a3005629",
+      "sha256": "d0ce658d148ee7a4ef1af88ee2a22c07e5baf8953dfe2eb90aa5e3d1d8c2906e",
       "byteLength": 2097152
     },
     {
@@ -69,8 +69,8 @@
           ],
           "xKnots": [
             0,
-            0.85,
-            1.15,
+            0.7,
+            1.3,
             3
           ]
         }
@@ -81,17 +81,17 @@
         "psiExit": 2,
         "psiApsis": 3
       },
-      "sha256": "cbdad5f241610b84b5c88d9d7a9491be64c97e46d1c1c177036aaaf8a93dc9c9",
+      "sha256": "f3f91fdc3810b5d24d125e4bd7d29b304e654e0fe4c47b9cd3117364b5827cd4",
       "byteLength": 8192
     }
   ],
   "validation": {
     "classificationMismatchRate": 0,
-    "escapeDirectionAngularErrorRadMax": 0.00009279102905789032,
-    "escapeDirectionAngularErrorRadRms": 0.00005305453986981041,
+    "escapeDirectionAngularErrorRadMax": 0.00012013852919879527,
+    "escapeDirectionAngularErrorRadRms": 0.00004595748223154419,
     "gFactorRelativeErrorMax": 0,
-    "diskHitRadiusErrorRgMax": 0.09108438106480321,
-    "diskHitRadiusErrorRgRms": 0.012783208680179747
+    "diskHitRadiusErrorRgMax": 0.06754037977440497,
+    "diskHitRadiusErrorRgRms": 0.009407171474190585
   },
   "hybridBandHalfWidthX": 0
 }

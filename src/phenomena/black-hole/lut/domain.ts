@@ -27,20 +27,26 @@ import type { LutAxisMapping } from './types.js';
 /** Critical impact parameter b_c = 3*sqrt(3)*M in r_g (NUMERICAL_METHODS §11). */
 export const B_CRITICAL_RG = 3 * Math.sqrt(3);
 
-/** Generator default: reference sphere where rows begin/end (ADR §4). */
+/**
+ * Generator default: reference sphere where rows begin/end (ADR §4). */
 export const DEFAULT_R_REF_RG = 64;
 
 /** Generator default: escape radius used by the validation corpus (r_g). */
 export const DEFAULT_ESCAPE_RADIUS_RG = 32;
 
 /**
- * Default normalized-axis knots (mission §15: simplest encoding that meets
- * the error budget). One third of the columns resolve x in [0.85, 1.15]
- * around criticality; the outer thirds cover [0, 0.85) and (1.15, 3].
+ * MEASURED normalized-axis knots (M8-04, tools/generate-luts/study.ts):
+ * among {default [.85,1.15], tight [.95,1.05], wide [.70,1.30]} at widths
+ * 512..1536, the WIDE critical band won BOTH statistics at w=1024
+ * (radiusErrMax 3.05e-2 r_g, rms 1.18e-2, angular <=5.4e-5 rad, 2 MiB).
+ * The tight mapping was consistently WORST: concentrating columns inside
+ * [0.95,1.05] starves [0.85,0.95) where strong-lensing disk hits live.
+ * Height sweep showed psi resolution is not the bottleneck (h=2048 within
+ * noise of h=1024). Do not retune without re-running lut:study.
  */
 export const DEFAULT_AXIS_X: LutAxisMapping = {
   uBreakpoints: [0, 1 / 3, 2 / 3, 1],
-  xKnots: [0, 0.85, 1.15, 3]
+  xKnots: [0, 0.7, 1.3, 3]
 };
 
 // ---------------------------------------------------------------------------
