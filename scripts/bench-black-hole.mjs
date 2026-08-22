@@ -84,10 +84,14 @@ const samples = await page.evaluate(
 );
 
 const sorted = [...samples].sort((a, b) => a - b);
-const pick = (q) => +(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))]).toFixed(2);
+const pick = (q) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))].toFixed(2);
 
-const adapter = await page.evaluate(() => window.__ATLAS_APP__.host.debugInventory().backend.adapterName);
-const backendApi = await page.evaluate(() => window.__ATLAS_APP__.host.debugInventory().backend.api);
+const adapter = await page.evaluate(
+  () => window.__ATLAS_APP__.host.debugInventory().backend.adapterName
+);
+const backendApi = await page.evaluate(
+  () => window.__ATLAS_APP__.host.debugInventory().backend.api
+);
 
 const record = {
   label,
