@@ -27,8 +27,11 @@ Atlas must reuse existing control semantics rather than redefining mass/spin/dis
 
 ### Scenario
 
-- `default`, `cinematic-orbit` — presentation presets over the full numerical
+- `default` (Schwarzschild Classic), `cinematic-orbit` — presentation presets over the full numerical
   Schwarzschild backwards ray tracer;
+- `face-on-disk`, `edge-on-lensing`, `photon-ring`, `doppler-demo` — production observation
+  presets (M5): identical lensing/disk model, different arrival camera and DISPLAY
+  recommendation only (`PresetDescriptor.display`; physics untouched);
 - `debug-parity` — DEBUG TOOL: encoded terminal escape direction
   (`rgb = dir*0.5+0.5`, linear), black captured rays, failure-magenta failures,
   disk disabled. Not a presentation view; consumed by the integrator parity

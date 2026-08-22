@@ -25,9 +25,20 @@ interface CosmicAtlasStateV1 {
     toneMapping: string;
   };
 
+  // M5 productization (campaign §4/§5):
+  experience: {
+    mode: 'scientific' | 'cinematic' | 'debug';
+  };
+
+  debug: {
+    diagnosticsEnabled: boolean;
+  };
+
   rendering: {
     qualityMode: 'auto' | 'low' | 'medium' | 'high' | 'ultra';
     targetFps: 30 | 60;
+    /** True while the governor owns the render scale (no manual override). */
+    dynamicResolution: boolean;
     renderScaleOverride: number | null;
   };
 
@@ -45,6 +56,25 @@ interface CosmicAtlasStateV1 {
 ```
 
 Runtime-only handles/resources do not live in serialized state.
+
+### Experience modes (M5)
+
+- `scientific` (default): physical readability first. Display defaults:
+  exposure 1, bloom OFF, aces-filmic tone mapping. Bloom is never required
+  for scientific output and numerical failures stay visible.
+- `cinematic`: the SAME physical simulation; display defaults change only
+  (exposure 1.1, bloom on at 0.6). Physics/model state is untouched by mode
+  switches.
+- `debug`: enables the diagnostics surface (`debug.diagnosticsEnabled`), the
+  developer Diagnostic destination chip in the top bar, and technical
+  readouts (backend/tier/render scale/fps/activity/inventory).
+
+Switching modes applies the documented per-mode DISPLAY defaults through the
+host (`setExperienceMode`) — never destination physics. Presets may carry an
+optional `display` recommendation (PresetDescriptor.display) applied on
+activation on top of the mode defaults; presets also carry an advisory
+`recommendedQuality`. Share links encode the mode as `mode=` when it differs
+from `scientific`.
 
 ## 2. Route parsing
 
