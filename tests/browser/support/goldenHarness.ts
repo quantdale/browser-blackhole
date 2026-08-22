@@ -66,6 +66,8 @@ export interface GoldenSpec {
    * it is paused and scrubbed to phase 0 for determinism.
    */
   pauseTimeline?: boolean;
+  /** Deterministic timeline position captured while paused (default 0). */
+  scrubPhase?: number;
   settleMs?: number;
   special?: 'hyperspace-mid';
   tolerance: GoldenTolerance;
@@ -199,7 +201,7 @@ async function waitForCameraSettle(page: Page, timeoutMs = 10_000): Promise<void
  */
 async function applyDeterminismForcing(page: Page, spec: GoldenSpec): Promise<void> {
   await page.evaluate(
-    ({ tier, pauseTimeline }) => {
+    ({ tier, pauseTimeline, scrubPhase }) => {
       const host = window.__ATLAS_APP__!.host as unknown as {
         governor: { setForcedTier(tier: 'low' | 'medium' | 'high' | 'ultra'): void };
         time: { pause(): void; scrubTo(phase01: number): void };
@@ -209,7 +211,7 @@ async function applyDeterminismForcing(page: Page, spec: GoldenSpec): Promise<vo
       host.governor.setForcedTier(tier);
       if (pauseTimeline !== false) {
         host.time.pause();
-        host.time.scrubTo(0);
+        host.time.scrubTo(scrubPhase ?? 0);
       }
       // Pure monotonic display chain (mirrors integrator-parity.spec.ts).
       const post = window.__ATLAS_APP__!.host.post;
@@ -217,7 +219,11 @@ async function applyDeterminismForcing(page: Page, spec: GoldenSpec): Promise<vo
       post.setExposure(1);
       post.setToneMapping('linear');
     },
-    { tier: spec.pinTier ?? 'low', pauseTimeline: spec.pauseTimeline ?? true }
+    {
+      tier: spec.pinTier ?? 'low',
+      pauseTimeline: spec.pauseTimeline ?? true,
+      scrubPhase: spec.scrubPhase ?? 0
+    }
   );
   // Re-apply sizing AFTER the tier pin (renderScale changes with the tier).
   const box = await page.locator('#viewport').boundingBox();
@@ -404,5 +410,62 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 25, pctPixelsBeyond: 48, perChannelThreshold: 35 },
     notes:
       'Mid-transition hyperspace field between Black Hole and Neutron Star. Generous tolerance: the exact frame captured depends on transition timing jitter; asserts the transition system renders AT ALL (streak field present, scene handoff not black).'
+  },
+  // --- Stellar Explosion goldens (CA4) --------------------------------------
+  // Timeline positions are deterministic: the destination enters paused and
+  // the harness scrubs to `scrubPhase` before capture; volume jitter is off.
+  {
+    name: 'SN_PROGENITOR',
+    url: '/atlas/stellar-explosion?preset=core-collapse',
+    scrubPhase: 0.03,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 4, pctPixelsBeyond: 1.5, perChannelThreshold: 32 },
+    notes:
+      'Red-supergiant progenitor before collapse; catches missing progenitor surface, tint/gain regressions, camera/preset breakage.'
+  },
+  {
+    name: 'SN_FLASH',
+    url: '/atlas/stellar-explosion?preset=core-collapse',
+    scrubPhase: 0.24,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2.5, perChannelThreshold: 40 },
+    notes:
+      'Shock-flash window (hot blue-white peak luminosity proxy); catches emissivity-evolution and volume-ignition regressions.'
+  },
+  {
+    name: 'SN_EXPANSION',
+    url: '/atlas/stellar-explosion?preset=core-collapse',
+    scrubPhase: 0.55,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'Expanding-ejecta phase (shell + clumping + particles); catches lost volume, broken particle population, gross morphology drift.'
+  },
+  {
+    name: 'SN_HYPERNOVA',
+    url: '/atlas/stellar-explosion?preset=hypernova',
+    scrubPhase: 0.55,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'Hypernova at matched phase — structurally distinct model state (higher velocity scale, stronger anisotropy), NOT a brightness scalar.'
+  },
+  {
+    name: 'SN_GRB_ON',
+    url: '/atlas/stellar-explosion?preset=long-grb-on-axis',
+    scrubPhase: 0.42,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Long-GRB bipolar jet viewed on-axis (beamed response saturated); catches lost-jet and viewing-response regressions.'
+  },
+  {
+    name: 'SN_GRB_OFF',
+    url: '/atlas/stellar-explosion?preset=long-grb-off-axis',
+    scrubPhase: 0.42,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Same GRB engine viewed off-axis — must differ from SN_GRB_ON geometrically; catches flat-multiplier regressions of viewing response.'
   }
 ];

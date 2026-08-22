@@ -52,6 +52,12 @@ A golden passes iff `meanAbsDelta <= tolerance.meanAbsDelta` AND
 | NS_PULSAR | `/atlas/neutron-star?preset=pulsar` | Pulse geometry at phase 0 (spot placement, beam orientation) | 6 / 2 / 32 | hardware WebGPU baseline |
 | NS_MAGNETAR | `/atlas/neutron-star?preset=magnetar` | Flare envelope value and tint at fixed flarePhase | 6 / 2 / 32 | hardware WebGPU baseline |
 | ATLAS_HYPERSPACE_BH_NS | `/atlas/black-hole` -> navigate neutron-star | Transition system renders AT ALL: streak field present, scene handoff not black, no stuck transition | 25 / 48 / 35 | generous by design: captured frame depends on transition timing jitter |
+| SN_PROGENITOR | `/atlas/stellar-explosion?preset=core-collapse` @ phase 0.03 | Missing progenitor surface, tint/gain regression, preset/camera breakage | 4 / 32 / 1.5% | stable (jitter off) |
+| SN_FLASH | same @ phase 0.24 | Emissivity-evolution + volume-ignition regressions at the hot flash peak | 6 / 40 / 2.5% | stable |
+| SN_EXPANSION | same @ phase 0.55 | Lost volume / broken particle population / gross morphology drift during expansion | 6 / 40 / 3% | stable |
+| SN_HYPERNOVA | `?preset=hypernova` @ phase 0.55 | Hypernova structural-state regressions (must stay distinct from core-collapse) | 6 / 40 / 3% | stable |
+| SN_GRB_ON | `?preset=long-grb-on-axis` @ phase 0.42 | Lost jet, beaming-response regressions on-axis | 8 / 48 / 4% | stable |
+| SN_GRB_OFF | `?preset=long-grb-off-axis` @ phase 0.42 | Off-axis geometric response flattening into a brightness multiplier | 8 / 48 / 4% | stable |
 
 ## Update procedure
 

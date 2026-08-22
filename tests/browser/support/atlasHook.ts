@@ -18,6 +18,8 @@ interface AtlasStateView {
     activePreset: string;
     transition: { active: boolean; phase: string | null; progress: number };
   };
+  /** Per-destination serialized share state keyed by destination id. */
+  destinations: Record<string, { schemaVersion: number; state: Record<string, unknown> }>;
 }
 
 interface InventoryView {
@@ -52,6 +54,18 @@ interface AtlasHook {
       setExposure(exposure: number): void;
       setBloom(enabled: boolean, strength: number): void;
       setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void;
+    };
+    /** Destination timeline transport (deterministic pause/scrub for specs). */
+    time: {
+      pause(): void;
+      play(): void;
+      scrubTo(phase01: number): void;
+      snapshot(): { paused: boolean; simulationPhase: number; physicalTime: number | null };
+    };
+    /** Quality surface used to pin tiers in deterministic spec flows. */
+    governor: {
+      configure(config: { qualityMode?: 'auto' | 'low' | 'medium' | 'high' | 'ultra' }): void;
+      readonly currentTier: 'low' | 'medium' | 'high' | 'ultra';
     };
   };
   navigate(destinationId: string, presetId?: string): unknown;
