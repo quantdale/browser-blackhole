@@ -32,8 +32,23 @@
  * - Work multipliers (`setWorkMultiplier`) express a destination's relative
  *   cost; the effective fps target is `targetFps / multiplier` (clamped to
  *   [0.1, 10]) so a heavier destination tolerates proportionally lower fps
- *   before a downgrade. This interpretation is documented here because
- *   `types.ts` only fixes the map's existence.
+ *   before a downgrade. The multiplier that matters is the ACTIVE
+ *   destination's (`setActiveDestination`, host-called on activation and
+ *   disposal). Until the host signals an activation, the heaviest registered
+ *   multiplier is used as a conservative legacy fallback.
+ * - Raise condition is refresh-aware: on a vsync-locked display, wall-clock
+ *   fps saturates at the compositor cadence, so demanding smoothed fps above
+ *   `target x 1.15` can be unsatisfiable (e.g. 60 fps display, 60 fps target)
+ *   and auto would never climb back after a downgrade. The governor estimates
+ *   the refresh interval from a window of recent frame minima (quantized to
+ *   common refresh intervals) and raises when smoothed fps exceeds
+ *   `min(target x 1.15, refreshFps - margin)`. When no confident estimate
+ *   exists (few samples, unthrottled environment), the raw factor applies.
+ * - Startup grace: for STARTUP_GRACE_MS of wall time after governor creation —
+ *   and again after every forced-tier release / mode change into auto /
+ *   active-destination switch, all of which can trigger pipeline compilation —
+ *   automatic tier changes are suppressed entirely so known warmup spikes do
+ *   not cascade the tier down (docs/PERFORMANCE_BUDGETS.md §6/§17).
  */
 
 import type {
@@ -84,6 +99,37 @@ const STABLE_AFTER_SETTLING_MS = 2000;
 const MULTIPLIER_MIN = 0.1;
 const MULTIPLIER_MAX = 10;
 
+/**
+ * No automatic tier changes within this wall-time window (ms) after governor
+ * creation or after any event that recompiles pipelines (forced-tier release,
+ * mode entry, active-destination switch) — compilation/loading spikes are
+ * noise, not signal (docs/PERFORMANCE_BUDGETS.md §6 "ignore known
+ * compilation/loading spikes", §17 bootstrap).
+ */
+const STARTUP_GRACE_MS = 3000;
+
+/** Frame-duration history length for the refresh estimator (~2 s at 60 Hz). */
+const REFRESH_WINDOW_SAMPLES = 120;
+/** Minimum history samples before the estimate is trusted. */
+const REFRESH_MIN_SAMPLES = 30;
+/**
+ * A window minimum confirms a common refresh interval only when it is close
+ * to it on BOTH sides. One-sided slack would let overload frames (slower than
+ * vsync) masquerade as a low-refresh display and fabricate raise headroom.
+ */
+const REFRESH_MATCH_TOLERANCE = 0.15;
+/** Common display refresh intervals (ms), ascending. */
+const COMMON_REFRESH_INTERVALS_MS: readonly number[] = [
+  1000 / 120,
+  1000 / 90,
+  1000 / 60,
+  1000 / 30
+];
+/** Margin subtracted from the estimated refresh fps in the raise threshold. */
+const RAISE_REFRESH_MARGIN_FPS = 4;
+/** Floor for the raise threshold as a fraction of target (stays above drop band). */
+const RAISE_THRESHOLD_FLOOR_FACTOR = 0.9;
+
 /** Frame-duration guard: a single sample longer than this is clamped (tab switch). */
 const MAX_SAMPLED_FRAME_MS = 500;
 
@@ -116,6 +162,20 @@ export class PerformanceGovernor implements IPerformanceGovernor {
   // Smoothed fps state.
   private fpsEmaValue = 0;
   private hasFpsSample = false;
+
+  // Refresh estimation from recent frame-duration minima (ring buffer).
+  private readonly frameDurationWindow = new Float32Array(REFRESH_WINDOW_SAMPLES);
+  private frameWindowCount = 0;
+  private frameWindowCursor = 0;
+
+  // Startup grace: wall-time anchor; automatic changes are suppressed for
+  // STARTUP_GRACE_MS after creation or the last grace restart.
+  private graceAnchorMs = 0;
+
+  // Active destination (work-multiplier lifecycle).
+  private activeDestinationIdValue: DestinationId | null = null;
+  /** False until the first setActiveDestination call (legacy fallback semantics). */
+  private hasActiveDestinationSignal = false;
 
   // Sustained-threshold accumulators (ms of continuous condition).
   private belowDropThresholdMs = 0;
@@ -186,6 +246,7 @@ export class PerformanceGovernor implements IPerformanceGovernor {
       this.fpsEmaValue += FPS_EMA_ALPHA * (instantaneousFps - this.fpsEmaValue);
     }
 
+    this.recordFrameDuration(durationMs);
     this.advanceActivityClock(durationMs);
     this.evaluateAutoTier(durationMs);
   }
@@ -203,6 +264,25 @@ export class PerformanceGovernor implements IPerformanceGovernor {
       return;
     }
     this.workMultipliers.set(destinationId, multiplier);
+    if (this.activeDestinationIdValue === destinationId) {
+      // Cost expectation for the live workload changed; accumulated evidence
+      // about the old workload does not carry over.
+      this.resetHysteresis();
+    }
+  }
+
+  /**
+   * Host lifecycle hook: which destination is currently rendering. Switching
+   * resets hysteresis accumulators and restarts the startup grace window,
+   * because the arriving destination may compile fresh pipelines.
+   */
+  setActiveDestination(destinationId: DestinationId | null): void {
+    if (this.disposed) return;
+    if (this.hasActiveDestinationSignal && this.activeDestinationIdValue === destinationId) return;
+    this.activeDestinationIdValue = destinationId;
+    this.hasActiveDestinationSignal = true;
+    this.resetHysteresis();
+    this.restartGrace();
   }
 
   get currentTier(): QualityTier {
@@ -234,6 +314,8 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     this.sampling = false;
     this.tierListeners.clear();
     this.workMultipliers.clear();
+    this.activeDestinationIdValue = null;
+    this.hasActiveDestinationSignal = false;
   }
 
   // -------------------------------------------------------------------------
@@ -254,6 +336,11 @@ export class PerformanceGovernor implements IPerformanceGovernor {
       this.tierValue = tier;
       this.emitTierChanged(previous);
     }
+    if (tier === null && this.config.qualityMode === 'auto') {
+      // Releasing a forced tier typically coincides with fresh pipeline
+      // compilation for the arriving destination.
+      this.restartGrace();
+    }
   }
 
   /** Currently forced tier, or `null` when the auto/manual path is live. */
@@ -271,6 +358,11 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     return this.workMultipliers.get(destinationId) ?? 1;
   }
 
+  /** Destination whose work multiplier drives the fps expectation, if signaled. */
+  get activeDestinationId(): DestinationId | null {
+    return this.activeDestinationIdValue;
+  }
+
   /** Snapshot of the mutable config for debug surfaces. */
   getConfig(): Readonly<GovernorConfig> {
     return this.config;
@@ -280,14 +372,22 @@ export class PerformanceGovernor implements IPerformanceGovernor {
   // Internals
   // -------------------------------------------------------------------------
 
-  /** Effective fps expectation given the heaviest registered cost multiplier. */
+  /**
+   * Effective fps expectation. With an active-destination signal, only that
+   * destination's multiplier counts; without one (legacy hosts), the heaviest
+   * registered multiplier sets a conservative expectation.
+   */
   private effectiveTargetFps(): number {
-    // The governor does not track which destination is active; the host
-    // registers multipliers per destination and the most expensive registered
-    // workload sets the expectation (conservative when several are live).
     let multiplier = 1;
-    for (const value of this.workMultipliers.values()) {
-      if (value > multiplier) multiplier = value;
+    if (this.hasActiveDestinationSignal) {
+      if (this.activeDestinationIdValue !== null) {
+        const registered = this.workMultipliers.get(this.activeDestinationIdValue);
+        if (registered !== undefined) multiplier = registered;
+      }
+    } else {
+      for (const value of this.workMultipliers.values()) {
+        if (value > multiplier) multiplier = value;
+      }
     }
     const clamped = clamp(multiplier, MULTIPLIER_MIN, MULTIPLIER_MAX);
     return this.config.targetFps / clamped;
@@ -297,7 +397,9 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     const previous = this.tierValue;
     this.resetHysteresis();
     if (this.config.qualityMode === 'auto') {
-      // Keep walking from wherever the tier currently is.
+      // Keep walking from wherever the tier currently is; re-arm grace since
+      // entering auto often follows a settings change that recompiles.
+      this.restartGrace();
       return;
     }
     this.tierValue = this.config.qualityMode;
@@ -312,34 +414,42 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     const index = TIER_LADDER.indexOf(this.tierValue);
     if (index < 0) return;
 
-    const now = performance.now();
-    if (now - this.lastAutoChangeAtMs < MIN_TIER_CHANGE_INTERVAL_MS) return;
-
-    const previous = this.tierValue;
-
+    // Sustain accumulators advance on every auto-mode frame, including during
+    // the anti-flap cooldown and the startup grace window; only the actual
+    // tier change is gated below.
     if (this.fpsEmaValue < target * DROP_THRESHOLD_FACTOR) {
       this.belowDropThresholdMs += frameDurationMs;
       this.aboveRaiseThresholdMs = 0;
-      if (this.belowDropThresholdMs >= DROP_SUSTAIN_MS && index > 0) {
-        this.tierValue = TIER_LADDER[index - 1] as QualityTier;
-        this.afterAutoChange(now, previous);
-      }
-      return;
-    }
-
-    if (this.fpsEmaValue > target * RAISE_THRESHOLD_FACTOR) {
+    } else if (this.fpsEmaValue > this.raiseThresholdFps(target)) {
       this.aboveRaiseThresholdMs += frameDurationMs;
       this.belowDropThresholdMs = 0;
-      if (this.aboveRaiseThresholdMs >= RAISE_SUSTAIN_MS && index < TIER_LADDER.length - 1) {
-        this.tierValue = TIER_LADDER[index + 1] as QualityTier;
-        this.afterAutoChange(now, previous);
-      }
+    } else {
+      // Inside the comfort band: both accumulators decay to zero.
+      this.belowDropThresholdMs = 0;
+      this.aboveRaiseThresholdMs = 0;
+    }
+
+    const now = performance.now();
+    if (now - this.lastAutoChangeAtMs < MIN_TIER_CHANGE_INTERVAL_MS) return;
+
+    // Known compilation/loading spikes must not move the tier
+    // (docs/PERFORMANCE_BUDGETS.md §6/§17). Evidence collected inside the
+    // grace window is discarded so a post-grace decision starts clean.
+    if (now - this.graceAnchorMs < STARTUP_GRACE_MS) {
+      this.resetHysteresis();
       return;
     }
 
-    // Inside the comfort band: both accumulators decay to zero.
-    this.belowDropThresholdMs = 0;
-    this.aboveRaiseThresholdMs = 0;
+    const previous = this.tierValue;
+    if (this.belowDropThresholdMs >= DROP_SUSTAIN_MS && index > 0) {
+      this.tierValue = TIER_LADDER[index - 1] as QualityTier;
+      this.afterAutoChange(now, previous);
+      return;
+    }
+    if (this.aboveRaiseThresholdMs >= RAISE_SUSTAIN_MS && index < TIER_LADDER.length - 1) {
+      this.tierValue = TIER_LADDER[index + 1] as QualityTier;
+      this.afterAutoChange(now, previous);
+    }
   }
 
   private afterAutoChange(nowMs: number, previous: QualityTier): void {
@@ -347,6 +457,57 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     this.belowDropThresholdMs = 0;
     this.aboveRaiseThresholdMs = 0;
     this.emitTierChanged(previous);
+  }
+
+  /** Sliding window of recent frame durations feeding the refresh estimator. */
+  private recordFrameDuration(durationMs: number): void {
+    this.frameDurationWindow[this.frameWindowCursor] = durationMs;
+    this.frameWindowCursor = (this.frameWindowCursor + 1) % REFRESH_WINDOW_SAMPLES;
+    if (this.frameWindowCount < REFRESH_WINDOW_SAMPLES) this.frameWindowCount += 1;
+  }
+
+  /**
+   * Estimated display refresh fps from the minimum of recent frame durations,
+   * quantized to common refresh intervals. Frames are rAF-driven, so a
+   * healthy pipeline's fastest frames sit at the compositor cadence;
+   * quantization keeps overload frames (slower than vsync) and unthrottled
+   * environments from faking or hiding headroom. Returns null when the
+   * history is too short or matches no common interval.
+   */
+  private estimatedRefreshFps(): number | null {
+    if (this.frameWindowCount < REFRESH_MIN_SAMPLES) return null;
+    let minMs = Infinity;
+    for (let i = 0; i < this.frameWindowCount; i += 1) {
+      const duration = this.frameDurationWindow[i];
+      if (duration !== undefined && duration < minMs) minMs = duration;
+    }
+    for (const intervalMs of COMMON_REFRESH_INTERVALS_MS) {
+      if (Math.abs(minMs - intervalMs) <= intervalMs * REFRESH_MATCH_TOLERANCE) {
+        return 1000 / intervalMs;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * fps level the smoothed sample must exceed before a raise is considered.
+   * Refresh-aware: capped by the estimated compositor cadence minus margin so
+   * a vsync-locked display can still qualify for raises it can actually
+   * sustain; floored above the drop band so the two never overlap.
+   */
+  private raiseThresholdFps(targetFps: number): number {
+    const rawThreshold = targetFps * RAISE_THRESHOLD_FACTOR;
+    const refreshFps = this.estimatedRefreshFps();
+    if (refreshFps === null) return rawThreshold;
+    return Math.max(
+      targetFps * RAISE_THRESHOLD_FLOOR_FACTOR,
+      Math.min(rawThreshold, refreshFps - RAISE_REFRESH_MARGIN_FPS)
+    );
+  }
+
+  /** Re-arm the startup grace window (pipeline recompilation expected). */
+  private restartGrace(): void {
+    this.graceAnchorMs = performance.now();
   }
 
   private advanceActivityClock(frameDurationMs: number): void {

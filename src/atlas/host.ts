@@ -36,7 +36,10 @@ import { LensingService } from '../renderer/shared/LensingService.js';
 import { ParticleService } from '../renderer/shared/ParticleService.js';
 import { RibbonService } from '../renderer/shared/RibbonService.js';
 import { SharedPost } from '../renderer/shared/SharedPost.js';
-import { SharedRendererKernel } from '../renderer/SharedRendererKernel.js';
+import {
+  SharedRendererKernel,
+  type SharedRendererKernelOptions
+} from '../renderer/SharedRendererKernel.js';
 import { TrajectoryService } from '../renderer/shared/TrajectoryService.js';
 import { VolumeService } from '../renderer/shared/VolumeService.js';
 import { NEUTRON_STAR_PRESETS } from '../phenomena/neutron-star/presets.js';
@@ -176,6 +179,12 @@ export interface CosmicAtlasHostOptions {
    * `prefers-reduced-motion` from the media query (browser environments only).
    */
   reducedMotion?: boolean;
+  /**
+   * Dev/test-only backend override forwarded to the shared kernel; the
+   * `?backend=` URL parsing stays in the app shell. Undefined = the documented
+   * WebGPU-preferred-with-WebGL2-fallback policy.
+   */
+  forcedBackend?: 'webgpu' | 'webgl2';
 }
 
 export class CosmicAtlasHost {
@@ -248,7 +257,7 @@ export class CosmicAtlasHost {
 
     this.navigation = new NavigationController(this.registry);
 
-    this.kernel = new SharedRendererKernel({
+    const kernelOptions: SharedRendererKernelOptions = {
       governor: this.governor,
       post: this.post,
       getTimeInfo: () => this.getTimeInfo(),
@@ -256,7 +265,11 @@ export class CosmicAtlasHost {
       getServices: () => this.services,
       getCamera: () => this.camera,
       dprCap: DEFAULT_DPR_CAP
-    });
+    };
+    if (options.forcedBackend !== undefined) {
+      kernelOptions.forcedBackend = options.forcedBackend;
+    }
+    this.kernel = new SharedRendererKernel(kernelOptions);
 
     this.services = this.buildServices();
 
@@ -642,6 +655,9 @@ export class CosmicAtlasHost {
       throw error;
     }
     this.activeSeed = Number(prepared.preset.seed) >>> 0;
+    // The arriving destination's work multiplier now drives the governor's
+    // fps expectation (and re-arms its warmup grace window).
+    this.governor.setActiveDestination(prepared.module.descriptor.id);
     // Transitions ramp the camera themselves; this instant/snap application
     // covers plain activations and reduced motion (animateSeconds 0).
     this.cameraRig.applyArrivalPreset(
@@ -660,6 +676,7 @@ export class CosmicAtlasHost {
     const active = this.activePrepared;
     this.activePrepared = null;
     if (active === null) return;
+    this.governor.setActiveDestination(null);
     // Surface failures to the director (it wraps this call in try/catch), but
     // always attempt both halves of the teardown.
     let firstError: unknown = null;

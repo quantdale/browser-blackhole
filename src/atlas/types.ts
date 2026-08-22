@@ -196,6 +196,11 @@ export interface ParticleSystemHandle {
   setPopulationScale(scale: number): void;
   reset(seed: number): void;
   dispose(): void;
+  /**
+   * Bounded debug metadata (RENDERING_SERVICES.md §16): capacity/drawn count,
+   * buffer bytes, update path, blending. No GPU readback is performed.
+   */
+  getDebugSnapshot(): Record<string, unknown>;
 }
 
 export interface IParticleService {
@@ -377,6 +382,12 @@ export interface IPerformanceGovernor {
   notifyInteraction(): void;
   /** Destinations declare relative cost multipliers per tier. */
   setWorkMultiplier(destinationId: DestinationId, multiplier: number): void;
+  /**
+   * Host lifecycle hook: which destination is currently rendering (null when
+   * none). Governs which work multiplier drives the fps expectation; switching
+   * resets hysteresis and re-arms the startup grace window.
+   */
+  setActiveDestination(destinationId: DestinationId | null): void;
   readonly currentTier: QualityTier;
   readonly renderScale: number;
   readonly activityMode: GovernorActivityMode;
