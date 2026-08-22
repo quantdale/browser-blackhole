@@ -1,167 +1,140 @@
 # Durable project state
 
-Last update: 2026-08-22 — M5 + GATE D + CA4 CAMPAIGN COMPLETE
-
-All three campaign goals landed and validated on `main`:
-M5 productization (canonical product state, experience modes, real control
-panel, production presets), Gate D deterministic visual-regression framework
-(12 twice-stable goldens across BH/NS/hyperspace/diagnostic/Stellar
-Explosion), and the CA4 Stellar Explosion destination (route, timeline,
-shock/volume/particles/jet models, hypernova + long-GRB presets,
-phase-gated resources, governor integration).
+Last update: 2026-08-23 — M8 RECOVERY CAMPAIGN: M8-01..05 COMPLETE ON MAIN;
+M8-06..09 REMAIN. Gates green at commit 5c47d74 (241/241 unit).
 
 ## Current phase
 
-**CAMPAIGN GREEN; READY FOR NEXT FEATURE CAMPAIGN.**
-Full gates: `npm run check` PASS (format/lint/typecheck/169 unit/build);
-Playwright **43/43** PASS (19 pre-existing incl. forced-backend +
-integrator-parity, 12 golden, 12 stellar-explosion). Working tree clean;
-`main` synchronized with `origin/main`.
+**M8 (Optimized Schwarzschild LUT backend) — packets 01–05 landed and
+validated; 06–09 pending.** `main` history this campaign:
 
-## Campaign summary (what landed, in order)
+```
+41ead9e unfinished progress            (interrupted M8-03, 7 failing tests)
+2442d66 fix: recover interrupted m8 lut generator
+51531e6 feat: complete deterministic schwarzschild lut generation   (M8-03)
+37fb785 perf: select measured lut domain and encoding               (M8-04)
+5c47d74 feat: add validated schwarzschild lut runtime sampler       (M8-05)
+```
 
-1. `feat: canonical atlas product state` — CosmicAtlasStateV1 gains
-   `experience.mode` (scientific/cinematic/debug) and `debug.diagnosticsEnabled`;
-   rendering gains `dynamicResolution` + manual `renderScaleOverride`
-   (`host.setRenderScaleOverride`, effectiveRenderScale). PresetDescriptor gains
-   optional `display` + `recommendedQuality` (physics/observer/display/quality
-   defined SEPARATELY). Share links encode `mode=`. Host §13 bloom throttle:
-   cinematic bloom suspended at LOW tier during active camera interaction,
-   restored on settle. Black-hole production presets: face-on-disk,
-   edge-on-lensing, photon-ring, doppler-demo (display-only differences).
-2. `feat: atlas ui component kit` (worker A, own branch merged) — pure-DOM kit
-   under src/ui/atlas/: collapsible sections, slider/select/toggle/button rows,
-   readout list, timeline transport, mode switch + shell CSS with reduced-motion
-   and focus-visible policies; unit tests for pure helpers.
-3. `feat: canonical atlas product state (host)` — setExperienceMode applies
-   documented per-mode DISPLAY defaults (scientific = bloom OFF, never required),
-   setVisual/setQualityMode/setTargetFps/setDiagnostics; preset.display applied
-   on activation.
-4. `feat: atlas product shell` — atlasApp.ts rewritten as the product UI:
-   top bar (brand / destination chips / experience-mode segmented switch /
-   panel toggle), canvas-dominant content row, compact collapsible control
-   panel rebuilt from registry state per active destination+preset (Preset /
-   Timeline / Observer / Visual / Rendering / Diagnostics(debug) / About-
-   Fidelity). Controls write ONLY canonical host state. Diagnostic chip appears
-   only in Debug mode. Hook surface unchanged for specs.
-5. `test: deterministic visual golden framework` (worker B branch, finished by
-   integrator) — tests/browser/support/goldenHarness.ts + visual-goldens.spec.ts
-   - docs/cosmic-atlas/GOLDEN_IMAGES.md. Perceptual tolerances per golden;
-     element screenshots of #viewport (UI-change-immune); determinism contract =
-     pinned tier + explicit resize re-apply + linear display chain +
-     PAUSE-BEFORE-NAVIGATE clock freezing + camera-settle wait.
-6. `feat: stellar explosion physics core` (worker C output adopted after its
-   45-min timeout; validated by integrator) — types/physics/timeline/shockShell/
-   density/emission/jet/ejecta/presets: C1 free-expansion→Sedov shock law with
-   dR/dt>=0 invariant, log-compressed deterministic timeline mapping (1e-9
-   roundtrip), CPU+TSL dual-face density field (shell × asymmetry × seeded
-   value-noise clumping × falloff), kelvin-ramp emissivity evolution, bipolar
-   jet with clamped delta^3 viewing response, tier-scaled ParticleService plans,
-   5 presets. 23 invariant tests.
-7. `feat: stellar explosion destination rendering + registration` —
-   stellarExplosionModule.ts composes VolumeService (half-res path FIRST REAL
-   USER, jitter OFF — see defect notes), ParticleService (tier capacities,
-   phase-scaled population), emissive progenitor surface, jet factor folded
-   into volume emission gain with beaming-inspired viewing response; rendered
-   jet front capped at 3x contemporaneous shell radius (disclosed coherence
-   scaling). Resource phase awareness: volume+particles off through
-   progenitor/collapse, ramped flash→expansion. enter() pauses clock at preset
-   phase for deterministic arrival. Registered at /atlas/stellar-explosion.
-8. `test: SN browser coverage + goldens` — 12 browser tests (deep links x4
-   presets x both backends, mid-timeline ejecta visibility, GRB on/off-axis
-   geometric divergence, scrub/reset tolerance-based determinism, transition
-   integration in/out, extended 32-switch resource stress) + six SN goldens
-   with documented rationale.
-9. `perf: SN benchmark matrix recorded` — scripts/bench-stellar-explosion.mjs;
-   results in docs/cosmic-atlas/BENCHMARK_MATRIX.md §9.
+Push state: 2442d66..37fb785 pushed to origin/main; **5c47d74 local-only at
+last attempt — GitHub returned connection failures twice (100% packet loss,
+transient; same outage self-recovered earlier this session). FIRST ACTION of
+next session: `git push origin main`, then verify `origin/main == 5c47d74`.
 
-## Validation evidence (this campaign)
+## What this campaign did (recovery audit → repair → complete)
 
-| Command                               | Result                                                                                                       |
-| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `npm run check`                       | PASS — prettier/eslint/tsc clean, vitest 169/169 (14 files), vite build OK                                   |
-| `npx playwright test`                 | PASS — 43/43 (6 smoke, 7 navigation, 4 webgl2, 2 integrator-parity, 12 visual-goldens, 12 stellar-explosion) |
-| visual-goldens rerun (x2 stability)   | PASS 12/12 twice consecutively                                                                               |
-| SN live probe (all 4 presets, WebGPU) | zero pageerror/console errors; non-uniform frames default + scrubbed                                         |
-| SN deep links forced WebGL2           | PASS (poll-past-lazy-compilation pattern)                                                                    |
+1. RECOVERY AUDIT of 41ead9e (7 failing tests in lutGenerate.test.ts).
+   Defect classification, all root-caused before any edit:
+   - TEST construction bugs ×3: f16 overflow roundtrip assertion (65520→Inf
+     decodes as Inf BY DESIGN); "tie" built between non-adjacent f16 values
+     (their average IS the representable midpoint 0x3883); rg32f test
+     demanding f64-exact roundtrip through documented Math.fround storage.
+     Implementation was CORRECT in all three — tests repaired, not loosened
+     (RNE tie test now covers BOTH adjacent-pair directions).
+   - SAMPLER bugs ×3 (real): terminal escape direction evaluated at post-
+     step overshoot instead of interpolated crossing radius; captured-class
+     mirror used nearest-strided-sample (~30× error vs interpolated exact
+     crossing); rMin recorded post-step. All fixed; oracle comparisons
+     re-framed onto matched settings + dense stride + shared-crossing
+     frames (the old far-stop comparison mixed tetrad frames ~0.03 rad
+     apart — frame rotation, not physics).
+   - MEASURED winding law recorded: outArc ≈ ~(1/2)ln(1/(x−1)); x=1.001 →
+     4.65 rad. A 16-rad cap NEVER truncates numerically reachable columns;
+     truncation semantics now tested via explicit small psiMax budgets.
+2. M8-03 COMPLETE (51531e6): tools/generate-luts/generate.ts +
+   validate.ts; npm scripts lut:generate / lut:validate / lut:study;
+   deterministic pipeline (byte-identical assets+manifest across runs,
+   proven at CLI level); manifest-hash content-addressed directories
+   (<family>-<hash8>); measured validation block baked into manifests
+   (classification exact rate=0; terminal-direction max 1.2e-4 rad);
+   gFactor field honestly 0-with-note until M8-07 measures it.
+   Windows landmine found live: asset named aux.bin cannot exist on Win32
+   (reserved DOS device AUX) — renamed aux-data.bin BEFORE first push.
+3. M8-04 COMPLETE (37fb785): lut:study sweeps axis mappings × widths ×
+   heights with OFF-GRID oracle-compared columns (on-grid evaluation hides
+   exactly the cross-column filtering error being measured). FROZEN:
+   xKnots [0, 0.70, 1.30, 3] @ 1024×1024 psiMax=16, R16F+RGBA16F.
+   radiusErrMax 3.05e-2 r_g / rms 1.18e-2 / angular ≤5.4e-5 rad @ 2 MiB.
+   Tight critical band WORST (starves 0.85–0.95 where lensed disk hits
+   live); ψ-height not the bottleneck; r16f quantization inside budget at
+   half of r32f memory. ADR §6 rewritten with these numbers.
+4. M8-05 COMPLETE (5c47d74): STORAGE CONTRACT FIX — per-column spans made
+   v-filtering meaningless; generator now resamples every column onto one
+   shared span (4.722 rad shipped), clamp-extending short columns with
+   terminal radius; manifest domain.storedSpanRg validated & REQUIRED by
+   runtime. src/phenomena/black-hole/lut/runtime.ts: loadLutFamily
+   (schema + byteLength + SHA-256 verification, structured rejection
+   taxonomy incl. missing-stored-span for pre-M8-05 families);
+   LutSampler (ANALYTIC classification via b⇔b_c — never interpolated;
+   exact fallback taxonomy x-out-of-domain-low/high + hybrid-band-winding;
+   texel-center bilinear both axes; launch-row solve on folded monotone
+   arc; withinRealData separating boundary values from clamp padding;
+   truthful diagnostics incl. WebGL2 filterability). formatWebGL2Status:
+   half-float core-filterable; 32F gated behind OES_texture_float_linear.
+   13 runtime tests run against the SHIPPED family bytes (checksum tamper,
+   truncation, schema, stored-span rejections; boundary sweep; roundtrip
+   worst <7.6e-2 r_g matching M8-04 budget).
 
-Environment: Windows, Node v22.23.2, Edge headless (channel msedge),
-hardware WebGPU adapter "amd rdna-2"; forced ?backend=webgl2 exercised by the
-webgl2 spec files on every atlas route incl. stellar-explosion.
+## Shipped LUT artifact (committed, provenance-complete)
 
-## Performance baseline (hardware WebGPU)
+public/luts/schwarzschild-v1-4a91cf34/ (dir name = manifest hash):
+trajectory.bin 1024×1024 R16F 2 MiB + aux-data.bin 1024×1 RGBA16F 8 KiB
++ manifest.json (generatorCommit, source-commit generatedAt, SHA-256 per
+asset, validation summary, hybridBandHalfWidthX=0, provenance block).
+Regenerate: npm run lut:generate; verify: npm run lut:validate -- <dir>;
+re-measure domain: npm run lut:study [-- --quick].
 
-Stellar Explosion (BENCHMARK_MATRIX.md §9): most phases ~7 ms median
-submission wall time at Low/Medium/High internal scales; heaviest GRB-jet
-phase: Low 7.0/13.9 ms, Medium 13.9/20.9 ms (768x640), High 20.8/27.8 ms
-(960x800) — comfortably inside the Medium >=30 FPS budget, 60 Hz median at
-Medium. Black-hole true-Low baseline unchanged from previous campaign
-(13.9 ms median / 20.8 p95 @ renderScale 0.6); bloom interaction throttle now
-additionally protects it during cinematic-mode camera motion.
+## Validation evidence (this campaign, cumulative)
 
-## Defects found and fixed this campaign
+| Gate | Result |
+| --- | --- |
+| npm run check | PASS at 5c47d74 — prettier/eslint/tsc clean, vitest **241/241** (18 files), vite build OK |
+| Unit delta | +26 tests this campaign (lutGenerate repairs + lutPipeline 6 + lutRuntime 13) |
+| Determinism | two consecutive lut:generate runs → identical dir/hash/bytes |
+| lut:validate on shipped family | manifest OK; both assets byte-length + sha256 verified |
+| Playwright | NOT RUN this session — DEFERRED_ENVIRONMENT (browser gates untouched by lut modules so far; no src/renderer or destination files modified since last known-green browser campaign except NONE — verifiable via git diff 41ead9e..HEAD --stat: changes confined to tools/, src/phenomena/black-hole/lut/, tests/unit/, docs/, public/luts/) |
 
-1. GOLDEN NS_SURFACE verification failure — destinations integrate their own
-   clocks from frame dt, so pausing AFTER arrival left load-dependent rotation
-   phase. Fix: harness pauses the shared clock BEFORE navigating (destination
-   enters frozen at phase 0) + explicit camera-settle wait (<1e-4 delta).
-2. SN volume flicker — temporalJitter WITHOUT accumulation read as animated
-   grain (measured luminance oscillation 51<->137 between frames). Fix: jitter
-   disabled in the destination (documented in-module); residual banding
-   absorbed by step budget.
-3. Tier-pin without resize — governor.configure({qualityMode}) changes
-   renderScale but nothing re-drives canvas sizing; first Medium benchmark
-   silently measured Low-resolution frames. Fix in bench harness + documented
-   requirement for any deterministic capture flow.
-4. Worker-C timeout adoption — sn-core worker hit its 45-min budget AFTER
-   writing all files but BEFORE committing/validation; integrator adopted the
-   orphaned output into main, ran gates (23/23 invariants, lint, tsc), fixed
-   API mismatches, and committed with provenance noted.
-5. Managed-worktree quirk — the uikit child received the MAIN checkout as its
-   "worktree" (branch campaign/ui-kit checked out in situ). Integrator kept
-   uncommitted work isolated by ownership discipline (child committed only its
-   own paths) and fast-forwarded main afterwards. Watch for this if reusing
-   parallel workers here.
+Environment: Windows, Node v22.23.2 (tsx CLI runner added as devDep, MIT).
 
-## Quality-gate status (cumulative)
+## Remaining M8 packets (exact next actions)
 
-- Gate A repository health: PASS (commands above).
-- Gate B browser health: PASS (43/43; no uncaught errors; backend reported).
-- Gate C physics correctness: PASS for scope — SN model invariants executed
-  (23 tests: monotonic radius, non-negative finite bounded density, seed
-  reproducibility/morphology change, hypernova structural distinction, jet
-  basis/opening-angle/viewing-response, timeline roundtrip/order/reset);
-  black-hole parity corpus unchanged and still green.
-- Gate D visual correctness: PASS — 12 goldens, documented tolerances +
-  why/what-caught per row (GOLDEN_IMAGES.md), never auto-updated to green.
-- Gate E performance/resource health: PASS for scope — SN matrix recorded;
-  32-switch stress bounded (live scopes +1 cap, GPU bytes <1.75x baseline).
-- Gate F compatibility: PASS — hardware WebGPU + forced WebGL2 across all
-  routes including stellar-explosion.
-- Gate H product integrity/accessibility: PASS for scope — keyboard-operable
-  panel (native buttons/radios/ranges), visible focus, labelled controls with
-  units, aria-expanded/pressed/checked semantics, mobile bottom-drawer layout,
-  reduced-motion honored (transitions + CSS), Scientific/Cinematic/Debug
-  visibly separated; debug-only surfaces hidden outside Debug mode.
+- **M8-06 Disk/environment integration**: TSL LUT sampling pass under
+  src/phenomena/black-hole/lut/ (GPU textures from family bytes:
+  RedFormat+HalfFloatType=R16F, RGBAFormat+HalfFloatType=RGBA16F; DataTexture
+  upload; fragment path mirrors numerical integrator EXCEPT trajectory:
+  b analytic → resolveRay branch → launchRow solve → disk-crossing
+  candidates equally spaced in ψ (ADR §7 sinusoid zeros) → terminal
+  direction; fallback pixels route to the EXISTING RK4 loop inline with
+  debug-visible reason). Reuse camera/basis/disk/emission/starfield/HDR/
+  governor verbatim — NO second shading model.
+- **M8-07 Equivalence corpus**: selected-ray + image comparisons
+  numerical-vs-LUT across mission §9 list; goldens only after
+  investigation, never auto-updated.
+- **M8-08 Performance report**: bench harness A/B identical settings;
+  meaningful-win-or-don't-ship rule (SPEC §14).
+- **M8-09 Auto policy**: rendering.backendPreference already exists in
+  AppState schema ('auto'|'numerical'|'lut'); wire selection + truthful
+  fallback reason surfacing in Debug mode.
+- Then Cosmic Atlas regression sweep (mission §13) + full playwright.
 
 ## Deferred / known gaps (honest)
 
-1. Post cost not yet isolated as a standalone number (bloom on/off A/B) —
-   bloom remains threshold-gated display-side and is force-off during LOW-tier
-   interaction; a dedicated post benchmark is nice-to-have.
-2. Governor auto-recovery manual probe on a real vsynced 60 Hz display still
-   outstanding (carried over; headless cadence makes it flaky as an automated
-   gate).
-3. SN physical sliders (energy proxy etc.) are preset-level, not live-bound;
-   module reads validated state at prepare/enter. Live control binding would
-   need destination-side uniform plumbing (follow-up campaign candidate).
-4. Half-res volume composite is linear upsample without depth-awareness
-   (VolumeService documented limitation; haloing acceptable at current scales).
-5. Parity corpus g-factor extension still open (carried over).
+1. Playwright/browser suite not executed this session (DEFERRED_ENVIRONMENT,
+   network outage window also hit pushes — see top). No app-runtime code
+   paths were touched by M8-03..05 commits (diff-scoped to tooling/lut/tests/
+   docs/assets), so prior browser evidence stands for the atlas shell.
+2. Steep outer rim (r>~16): dr/dψ>100 makes pointwise comparisons
+   coordinate-sensitive; disk-hit metrics slope-guard it; visual verdict
+   owned by M8-07 images.
+3. gFactorRelativeErrorMax=0 placeholder in v1 manifests until M8-07
+   measures the renderer-level quantity.
+4. hybridBandHalfWidthX=0 for reachable physics (winding law measured);
+   band machinery stays live-tested via synthetic small-psiMax families.
+5. Parity corpus g-factor extension still open (carried from M5 campaign).
 
 ## Next actions
 
-1. Next feature campaigns in roadmap order: LUT/M8 backend (BH-160..165) or
-   Kerr/M9 — NOT started in this campaign per mission stop condition.
-2. Optional hardening: dedicated SharedPost A/B benchmark; live SN control
-   binding; depth-aware half-res upscale in VolumeService.
+1. git push origin main; verify remote == 5c47d74.
+2. M8-06 TSL integration slice (texture upload + sampling node + fallback
+   routing), keeping numerical path byte-identical as default.
+3. npx playwright test after any file touching destinations/renderer.
