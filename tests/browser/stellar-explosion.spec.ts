@@ -169,9 +169,12 @@ test.describe('Stellar Explosion validation', () => {
     await page.goto('/atlas/stellar-explosion?preset=core-collapse');
     await waitForArrival(page);
     // Pin quality so auto-tier drift cannot change internal resolution.
-    await page.evaluate(() =>
-      window.__ATLAS_APP__!.host.governor.configure({ qualityMode: 'medium' })
-    );
+    const pinMedium = (): void => {
+      void page.evaluate(() => {
+        window.__ATLAS_APP__!.host.governor.configure({ qualityMode: 'medium' });
+      });
+    };
+    pinMedium();
     await freezeAt(page, 0.6);
     await waitForNonUniformFrame(page);
     const first = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());

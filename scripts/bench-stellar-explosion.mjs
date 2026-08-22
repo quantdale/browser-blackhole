@@ -52,14 +52,19 @@ await page.waitForFunction(
 
 // Deterministic measurement conditions: pinned tier (auto allowed explicitly),
 // paused timeline scrubbed to the requested phase so every sample marches the
-// same workload.
-await page.evaluate((q) => {
-  const host = window.__ATLAS_APP__.host;
-  if (q !== 'auto') {
-    host.governor.configure({ qualityMode: q });
-  }
-  host.time.pause();
-}, quality);
+// same workload. Re-applies canvas sizing AFTER the pin (renderScale changes
+// with the tier but nothing else re-drives resize).
+await page.evaluate(
+  ({ q, width, height }) => {
+    const host = window.__ATLAS_APP__.host;
+    if (q !== 'auto') {
+      host.governor.configure({ qualityMode: q });
+    }
+    host.handleResize(width, height);
+    host.time.pause();
+  },
+  { q: quality, width: 1280 - 320, height: 800 }
+);
 await page.waitForTimeout(warmupMs / 2);
 await page.evaluate((p) => {
   window.__ATLAS_APP__.host.time.scrubTo(p);

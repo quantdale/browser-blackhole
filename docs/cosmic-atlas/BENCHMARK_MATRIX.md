@@ -218,3 +218,36 @@ Never compare runs with different:
 - browser backend;
 
 without explicitly normalizing or explaining the difference.
+## 9. Recorded results — Stellar Explosion (CA4, M5+CA4 campaign)
+
+Hardware: amd rdna-2 (hardware WebGPU), Microsoft Edge headless, Windows.
+Viewport 1280x800 (canvas region ~960x800 CSS after product panel), DPR 1,
+warmup 9 s, 600 samples via scripts/bench-stellar-explosion.mjs (timeline
+paused at the listed normalized phase; tier pinned explicitly and canvas
+re-sized after the pin).
+
+| label | preset | phase | tier | internal px | median ms | p95 ms |
+| --- | --- | --- | --- | --- | --- | --- |
+| sn-low-progenitor | core-collapse | 0.03 | low | 583x436 | 7.0 | 7.1 |
+| sn-low-flash | core-collapse | 0.24 | low | 583x436 | 7.0 | 13.8 |
+| sn-low-expansion | core-collapse | 0.55 | low | 583x436 | 7.0 | 7.1 |
+| sn-low-hypernova | hypernova | 0.55 | low | 583x436 | 7.0 | 7.1 |
+| sn-low-grb | long-grb-on-axis | 0.42 | low | 583x436 | 7.0 | 13.9 |
+| sn-med-progenitor | core-collapse | 0.03 | medium | 768x640 | 7.0 | 7.1 |
+| sn-med-flash | core-collapse | 0.24 | medium | 768x640 | 7.0 | 13.8 |
+| sn-med-expansion | core-collapse | 0.55 | medium | 768x640 | 7.0 | 7.1 |
+| sn-med-hypernova | hypernova | 0.55 | medium | 768x640 | 7.0 | 7.1 |
+| sn-med-grb | long-grb-on-axis | 0.42 | medium | 768x640 | 13.9 | 20.9 |
+| sn-high-expansion | core-collapse | 0.55 | high | 960x800 | 7.0 | 7.1 |
+| sn-high-grb | long-grb-on-axis | 0.42 | high | 960x800 | 20.8 | 27.8 |
+
+Reading: most phases are vsync-idle (~7 ms submission wall time); the GRB jet
+phase is the heaviest workload (half-res volume + jet factor + full particle
+population) yet stays far inside the 33.3 ms/30 Hz Medium budget and clears
+16.7 ms/60 Hz median at Medium; High remains above 30 FPS p95.
+
+Methodology note (defect found while measuring): pinning a tier changes
+`governor.renderScale` but nothing re-applies canvas sizing — the first
+medium run silently measured Low-resolution frames (583x436). The harness now
+calls `host.handleResize(...)` immediately after the pin; the same re-apply is
+required by any deterministic capture flow (see GOLDEN_IMAGES.md).
