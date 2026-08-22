@@ -218,6 +218,7 @@ Never compare runs with different:
 - browser backend;
 
 without explicitly normalizing or explaining the difference.
+
 ## 9. Recorded results — Stellar Explosion (CA4, M5+CA4 campaign)
 
 Hardware: amd rdna-2 (hardware WebGPU), Microsoft Edge headless, Windows.

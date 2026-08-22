@@ -254,7 +254,11 @@ export function createStellarExplosionModule(): PhenomenonModule {
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       halfResolution: true,
       earlyAlphaTermination: true,
-      temporalJitter: true
+      // Jitter WITHOUT temporal accumulation reads as animated grain under a
+      // paused camera (measured: sample luminance flickered 51<->137 between
+      // consecutive frames). Off keeps presented frames stable and
+      // deterministic; residual banding is absorbed by the step budget.
+      temporalJitter: false
     });
     volume.setStepScale(TIER_STEP_SCALE[ctx.quality]);
     volume.setVisible(false); // phase-gated: off until the flash
