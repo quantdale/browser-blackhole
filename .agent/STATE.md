@@ -46,10 +46,10 @@ integrator-parity, 12 golden, 12 stellar-explosion). Working tree clean;
    only in Debug mode. Hook surface unchanged for specs.
 5. `test: deterministic visual golden framework` (worker B branch, finished by
    integrator) — tests/browser/support/goldenHarness.ts + visual-goldens.spec.ts
-   + docs/cosmic-atlas/GOLDEN_IMAGES.md. Perceptual tolerances per golden;
-   element screenshots of #viewport (UI-change-immune); determinism contract =
-   pinned tier + explicit resize re-apply + linear display chain +
-   PAUSE-BEFORE-NAVIGATE clock freezing + camera-settle wait.
+   - docs/cosmic-atlas/GOLDEN_IMAGES.md. Perceptual tolerances per golden;
+     element screenshots of #viewport (UI-change-immune); determinism contract =
+     pinned tier + explicit resize re-apply + linear display chain +
+     PAUSE-BEFORE-NAVIGATE clock freezing + camera-settle wait.
 6. `feat: stellar explosion physics core` (worker C output adopted after its
    45-min timeout; validated by integrator) — types/physics/timeline/shockShell/
    density/emission/jet/ejecta/presets: C1 free-expansion→Sedov shock law with
@@ -77,13 +77,13 @@ integrator-parity, 12 golden, 12 stellar-explosion). Working tree clean;
 
 ## Validation evidence (this campaign)
 
-| Command | Result |
-| --- | --- |
-| `npm run check` | PASS — prettier/eslint/tsc clean, vitest 169/169 (14 files), vite build OK |
-| `npx playwright test` | PASS — 43/43 (6 smoke, 7 navigation, 4 webgl2, 2 integrator-parity, 12 visual-goldens, 12 stellar-explosion) |
-| visual-goldens rerun (x2 stability) | PASS 12/12 twice consecutively |
-| SN live probe (all 4 presets, WebGPU) | zero pageerror/console errors; non-uniform frames default + scrubbed |
-| SN deep links forced WebGL2 | PASS (poll-past-lazy-compilation pattern) |
+| Command                               | Result                                                                                                       |
+| ------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `npm run check`                       | PASS — prettier/eslint/tsc clean, vitest 169/169 (14 files), vite build OK                                   |
+| `npx playwright test`                 | PASS — 43/43 (6 smoke, 7 navigation, 4 webgl2, 2 integrator-parity, 12 visual-goldens, 12 stellar-explosion) |
+| visual-goldens rerun (x2 stability)   | PASS 12/12 twice consecutively                                                                               |
+| SN live probe (all 4 presets, WebGPU) | zero pageerror/console errors; non-uniform frames default + scrubbed                                         |
+| SN deep links forced WebGL2           | PASS (poll-past-lazy-compilation pattern)                                                                    |
 
 Environment: Windows, Node v22.23.2, Edge headless (channel msedge),
 hardware WebGPU adapter "amd rdna-2"; forced ?backend=webgl2 exercised by the
@@ -125,20 +125,20 @@ additionally protects it during cinematic-mode camera motion.
 
 ## Quality-gate status (cumulative)
 
-+ Gate A repository health: PASS (commands above).
-+ Gate B browser health: PASS (43/43; no uncaught errors; backend reported).
-+ Gate C physics correctness: PASS for scope — SN model invariants executed
+- Gate A repository health: PASS (commands above).
+- Gate B browser health: PASS (43/43; no uncaught errors; backend reported).
+- Gate C physics correctness: PASS for scope — SN model invariants executed
   (23 tests: monotonic radius, non-negative finite bounded density, seed
   reproducibility/morphology change, hypernova structural distinction, jet
   basis/opening-angle/viewing-response, timeline roundtrip/order/reset);
   black-hole parity corpus unchanged and still green.
-+ Gate D visual correctness: PASS — 12 goldens, documented tolerances +
+- Gate D visual correctness: PASS — 12 goldens, documented tolerances +
   why/what-caught per row (GOLDEN_IMAGES.md), never auto-updated to green.
-+ Gate E performance/resource health: PASS for scope — SN matrix recorded;
+- Gate E performance/resource health: PASS for scope — SN matrix recorded;
   32-switch stress bounded (live scopes +1 cap, GPU bytes <1.75x baseline).
-+ Gate F compatibility: PASS — hardware WebGPU + forced WebGL2 across all
+- Gate F compatibility: PASS — hardware WebGPU + forced WebGL2 across all
   routes including stellar-explosion.
-+ Gate H product integrity/accessibility: PASS for scope — keyboard-operable
+- Gate H product integrity/accessibility: PASS for scope — keyboard-operable
   panel (native buttons/radios/ranges), visible focus, labelled controls with
   units, aria-expanded/pressed/checked semantics, mobile bottom-drawer layout,
   reduced-motion honored (transitions + CSS), Scientific/Cinematic/Debug

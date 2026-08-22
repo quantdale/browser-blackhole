@@ -199,8 +199,8 @@ Manual/device-lab benchmark:
 
 Initial policy after baselines exist:
 
-- >10% median regression: investigate;
-- >15% p95 regression: block unless justified by a measured quality/correctness gain;
+- > 10% median regression: investigate;
+- > 15% p95 regression: block unless justified by a measured quality/correctness gain;
 - substantial memory growth: block until explained;
 - transition p95 > target budget: investigate swap/compile/upload causes.
 
@@ -227,20 +227,20 @@ warmup 9 s, 600 samples via scripts/bench-stellar-explosion.mjs (timeline
 paused at the listed normalized phase; tier pinned explicitly and canvas
 re-sized after the pin).
 
-| label | preset | phase | tier | internal px | median ms | p95 ms |
-| --- | --- | --- | --- | --- | --- | --- |
-| sn-low-progenitor | core-collapse | 0.03 | low | 583x436 | 7.0 | 7.1 |
-| sn-low-flash | core-collapse | 0.24 | low | 583x436 | 7.0 | 13.8 |
-| sn-low-expansion | core-collapse | 0.55 | low | 583x436 | 7.0 | 7.1 |
-| sn-low-hypernova | hypernova | 0.55 | low | 583x436 | 7.0 | 7.1 |
-| sn-low-grb | long-grb-on-axis | 0.42 | low | 583x436 | 7.0 | 13.9 |
-| sn-med-progenitor | core-collapse | 0.03 | medium | 768x640 | 7.0 | 7.1 |
-| sn-med-flash | core-collapse | 0.24 | medium | 768x640 | 7.0 | 13.8 |
-| sn-med-expansion | core-collapse | 0.55 | medium | 768x640 | 7.0 | 7.1 |
-| sn-med-hypernova | hypernova | 0.55 | medium | 768x640 | 7.0 | 7.1 |
-| sn-med-grb | long-grb-on-axis | 0.42 | medium | 768x640 | 13.9 | 20.9 |
-| sn-high-expansion | core-collapse | 0.55 | high | 960x800 | 7.0 | 7.1 |
-| sn-high-grb | long-grb-on-axis | 0.42 | high | 960x800 | 20.8 | 27.8 |
+| label             | preset           | phase | tier   | internal px | median ms | p95 ms |
+| ----------------- | ---------------- | ----- | ------ | ----------- | --------- | ------ |
+| sn-low-progenitor | core-collapse    | 0.03  | low    | 583x436     | 7.0       | 7.1    |
+| sn-low-flash      | core-collapse    | 0.24  | low    | 583x436     | 7.0       | 13.8   |
+| sn-low-expansion  | core-collapse    | 0.55  | low    | 583x436     | 7.0       | 7.1    |
+| sn-low-hypernova  | hypernova        | 0.55  | low    | 583x436     | 7.0       | 7.1    |
+| sn-low-grb        | long-grb-on-axis | 0.42  | low    | 583x436     | 7.0       | 13.9   |
+| sn-med-progenitor | core-collapse    | 0.03  | medium | 768x640     | 7.0       | 7.1    |
+| sn-med-flash      | core-collapse    | 0.24  | medium | 768x640     | 7.0       | 13.8   |
+| sn-med-expansion  | core-collapse    | 0.55  | medium | 768x640     | 7.0       | 7.1    |
+| sn-med-hypernova  | hypernova        | 0.55  | medium | 768x640     | 7.0       | 7.1    |
+| sn-med-grb        | long-grb-on-axis | 0.42  | medium | 768x640     | 13.9      | 20.9   |
+| sn-high-expansion | core-collapse    | 0.55  | high   | 960x800     | 7.0       | 7.1    |
+| sn-high-grb       | long-grb-on-axis | 0.42  | high   | 960x800     | 20.8      | 27.8   |
 
 Reading: most phases are vsync-idle (~7 ms submission wall time); the GRB jet
 phase is the heaviest workload (half-res volume + jet factor + full particle
