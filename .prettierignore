@@ -7,3 +7,4 @@ playwright-report/
 coverage/
 *.md
 docs/assets/*.png
+public/luts/

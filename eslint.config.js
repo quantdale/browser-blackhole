@@ -8,7 +8,8 @@ export default tseslint.config(
       'test-results/**',
       'playwright-report/**',
       'coverage/**',
-      'node_modules/**'
+      'node_modules/**',
+      'public/luts/**'
     ]
   },
   ...tseslint.configs.recommended,
