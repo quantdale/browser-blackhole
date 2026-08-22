@@ -46,6 +46,12 @@ import { NEUTRON_STAR_PRESETS } from '../phenomena/neutron-star/presets.js';
 import { collectInventory } from './debugInventory.js';
 import type { DebugInventoryView } from './debugInventory.js';
 import { PerformanceGovernor } from './governor.js';
+import {
+  BLOOM_STRENGTH_RANGE,
+  EXPOSURE_RANGE,
+  RENDER_SCALE_OVERRIDE_RANGE,
+  TONE_MAPPING_VALUES
+} from './atlasState.js';
 import { InitStatusTracker } from './hostStatus.js';
 import { NavigationController } from './navigation.js';
 import type { NavigationIntent } from './navigation.js';
@@ -56,12 +62,14 @@ import type { TransitionPrepareRequest } from './TransitionDirector.js';
 import type {
   BackendInfo,
   CosmicAtlasStateV1,
+  ExperienceMode,
   FrameContext,
   FramePlan,
   FrameTimeInfo,
   HostServices,
   IParticleService,
   ISharedPost,
+  PresetDisplayState,
   PreparedPhenomenon,
   PhenomenonDescriptor,
   PresetDescriptor,
@@ -87,6 +95,22 @@ const MAX_FRAME_DT_SECONDS = 0.25;
 /** Fallback CSS size when the canvas is not laid out yet. */
 const FALLBACK_CSS_WIDTH = 1280;
 const FALLBACK_CSS_HEIGHT = 720;
+
+/**
+ * Display-domain defaults applied when the user switches experience mode
+ * (campaign §5). These are PRESENTATION values only — they never touch
+ * physics/model state. Scientific deliberately disables bloom so nothing
+ * scientific can require it.
+ */
+const EXPERIENCE_VISUAL_DEFAULTS: Record<
+  ExperienceMode,
+  Required<Omit<PresetDisplayState, never>>
+> = {
+  scientific: { exposure: 1, toneMapping: 'aces-filmic', bloomEnabled: false, bloomStrength: 0 },
+  cinematic: { exposure: 1.1, toneMapping: 'aces-filmic', bloomEnabled: true, bloomStrength: 0.6 },
+  // Debug changes visibility surfaces, not the display chain.
+  debug: { exposure: 1, toneMapping: 'aces-filmic', bloomEnabled: false, bloomStrength: 0 }
+};
 
 // ---------------------------------------------------------------------------
 // Host-local gluons
@@ -227,6 +251,14 @@ export class CosmicAtlasHost {
   private bloomEnabledValue = true;
   private bloomStrengthValue = 0.5;
   private toneMappingValue: ToneMappingMode = 'aces-filmic';
+
+  // M5 canonical product state.
+  private experienceModeValue: ExperienceMode = 'scientific';
+  private diagnosticsEnabledValue = false;
+  /** Manual render-scale override (null = governor-managed dynamic resolution). */
+  private renderScaleOverrideValue: number | null = null;
+  /** True while the §13 interaction throttle has bloom suspended. */
+  private bloomThrottleActive = false;
 
   /** Stable per-frame destination closures (no per-frame allocation). */
   private readonly frameDestination = {
@@ -413,6 +445,7 @@ export class CosmicAtlasHost {
     this.time.update(dt);
     this.cameraRig.update(dt);
     this.director.update(dt);
+    this.applyBloomInteractionThrottle();
 
     const overlay = this.director.getOverlay();
     const plan: FramePlan = {
@@ -437,19 +470,40 @@ export class CosmicAtlasHost {
   handleResize(cssWidth: number, cssHeight: number): void {
     if (this.disposed) return;
     if (!Number.isFinite(cssWidth) || !Number.isFinite(cssHeight)) return;
-    this.kernel.handleResize(cssWidth, cssHeight, this.governor.renderScale);
+    const scale = this.effectiveRenderScale();
+    this.kernel.handleResize(cssWidth, cssHeight, scale);
 
     // Mirror the kernel's pixel-ratio formula for the overlay target size.
     const dpr =
       typeof window !== 'undefined' && Number.isFinite(window.devicePixelRatio)
         ? window.devicePixelRatio
         : 1;
-    const ratio =
-      Math.min(dpr > 0 ? dpr : 1, this.governor.getConfig().dprCap) * this.governor.renderScale;
+    const ratio = Math.min(dpr > 0 ? dpr : 1, this.governor.getConfig().dprCap) * scale;
     this.director.resizeOverlay(
       Math.max(1, Math.round(cssWidth * ratio)),
       Math.max(1, Math.round(cssHeight * ratio))
     );
+  }
+
+  /** Manual override wins over governor-managed dynamic resolution. */
+  private effectiveRenderScale(): number {
+    return this.renderScaleOverrideValue ?? this.governor.renderScale;
+  }
+
+  /**
+   * Campaign §13: protect the black-hole Low-tier budget from post cost.
+   * When bloom is ON and the governor reports the LOW tier during active
+   * interaction, bloom is temporarily suspended and restored once the camera
+   * settles. Purely display-side; never touches destination state.
+   */
+  private applyBloomInteractionThrottle(): void {
+    if (!this.bloomEnabledValue) return;
+    const throttled =
+      this.governor.currentTier === 'low' && this.governor.activityMode === 'interaction';
+    if (throttled !== this.bloomThrottleActive) {
+      this.bloomThrottleActive = throttled;
+      this.post.setBloom(!throttled, throttled ? 0 : this.bloomStrengthValue);
+    }
   }
 
   /** Reduced-motion preference forwarded to director + rig (CA-ADR-005). */
@@ -461,6 +515,109 @@ export class CosmicAtlasHost {
 
   get reducedMotion(): boolean {
     return this.reducedMotionValue;
+  }
+
+  // -----------------------------------------------------------------------
+  // M5 product state surface (experience / visual / rendering / debug)
+  // -----------------------------------------------------------------------
+
+  /**
+   * Switch the product experience mode. Presentation defaults are applied
+   * deterministically per mode (documented table above); physics/model state
+   * is untouched. Entering Debug also enables the diagnostics surface;
+   * leaving Debug leaves the flag as the user last set it.
+   */
+  setExperienceMode(mode: ExperienceMode): void {
+    if (!(mode in EXPERIENCE_VISUAL_DEFAULTS)) return;
+    this.experienceModeValue = mode;
+    const defaults = EXPERIENCE_VISUAL_DEFAULTS[mode];
+    this.setVisual(defaults);
+    if (mode === 'debug') this.diagnosticsEnabledValue = true;
+  }
+
+  get experienceMode(): ExperienceMode {
+    return this.experienceModeValue;
+  }
+
+  get diagnosticsEnabled(): boolean {
+    return this.diagnosticsEnabledValue;
+  }
+
+  setDiagnostics(enabled: boolean): void {
+    this.diagnosticsEnabledValue = enabled === true;
+  }
+
+  /** Apply display-domain values (clamped) through the shared post. */
+  setVisual(partial: PresetDisplayState): void {
+    if (partial.exposure !== undefined) {
+      const exposure = clampRange(
+        Number(partial.exposure),
+        EXPOSURE_RANGE.min,
+        EXPOSURE_RANGE.max,
+        this.exposureValue
+      );
+      this.exposureValue = exposure;
+      this.post.setExposure(exposure);
+    }
+    if (partial.toneMapping !== undefined) {
+      const mode = (TONE_MAPPING_VALUES as readonly string[]).includes(partial.toneMapping)
+        ? partial.toneMapping
+        : this.toneMappingValue;
+      this.toneMappingValue = mode;
+      this.post.setToneMapping(mode);
+    }
+    if (partial.bloomEnabled !== undefined || partial.bloomStrength !== undefined) {
+      const enabled = partial.bloomEnabled ?? this.bloomEnabledValue;
+      const strength =
+        partial.bloomStrength !== undefined
+          ? clampRange(
+              Number(partial.bloomStrength),
+              BLOOM_STRENGTH_RANGE.min,
+              BLOOM_STRENGTH_RANGE.max,
+              this.bloomStrengthValue
+            )
+          : this.bloomStrengthValue;
+      this.bloomEnabledValue = enabled === true;
+      this.bloomStrengthValue = strength;
+      // Reset the §13 throttle latch so the next frame re-evaluates cleanly
+      // against the new user intent instead of keeping a stale suspension.
+      this.bloomThrottleActive = false;
+      this.post.setBloom(this.bloomEnabledValue, strength);
+    }
+  }
+
+  get renderScaleOverride(): number | null {
+    return this.renderScaleOverrideValue;
+  }
+
+  /**
+   * Manual render-scale override (campaign §4 rendering domain). Null
+   * restores governor-managed dynamic resolution. Values outside the
+   * documented range collapse back to null rather than throwing.
+   */
+  setRenderScaleOverride(scale: number | null): void {
+    if (
+      scale === null ||
+      !Number.isFinite(scale) ||
+      scale < RENDER_SCALE_OVERRIDE_RANGE.min ||
+      scale > RENDER_SCALE_OVERRIDE_RANGE.max
+    ) {
+      this.renderScaleOverrideValue = null;
+    } else {
+      this.renderScaleOverrideValue = scale;
+    }
+    this.handleResize(
+      this.canvas.clientWidth || FALLBACK_CSS_WIDTH,
+      this.canvas.clientHeight || FALLBACK_CSS_HEIGHT
+    );
+  }
+
+  setQualityMode(mode: CosmicAtlasStateV1['rendering']['qualityMode']): void {
+    this.governor.configure({ qualityMode: mode });
+  }
+
+  setTargetFps(fps: 30 | 60): void {
+    this.governor.configure({ targetFps: fps });
   }
 
   get isReady(): boolean {
@@ -495,6 +652,9 @@ export class CosmicAtlasHost {
         targetPreset: runtime.targetId !== null ? (selection?.presetId ?? null) : null,
         transition: this.director.getPublicState()
       },
+      experience: {
+        mode: this.experienceModeValue
+      },
       sharedVisual: {
         exposure: this.exposureValue,
         bloomEnabled: this.bloomEnabledValue,
@@ -504,7 +664,11 @@ export class CosmicAtlasHost {
       rendering: {
         qualityMode: config.qualityMode,
         targetFps: config.targetFps,
-        renderScaleOverride: null
+        dynamicResolution: this.renderScaleOverrideValue === null,
+        renderScaleOverride: this.renderScaleOverrideValue
+      },
+      debug: {
+        diagnosticsEnabled: this.diagnosticsEnabledValue
       },
       accessibility: {
         reducedMotion: this.reducedMotionValue,
@@ -655,6 +819,12 @@ export class CosmicAtlasHost {
       throw error;
     }
     this.activeSeed = Number(prepared.preset.seed) >>> 0;
+    // Preset display recommendations ride on top of mode defaults: presets
+    // define physics/observer/display separately (campaign §10), and only the
+    // DISPLAY domain is applied here.
+    if (prepared.preset.display !== undefined) {
+      this.setVisual(prepared.preset.display);
+    }
     // The arriving destination's work multiplier now drives the governor's
     // fps expectation (and re-arms its warmup grace window).
     this.governor.setActiveDestination(prepared.module.descriptor.id);
@@ -780,6 +950,13 @@ function throwIfAborted(signal: AbortSignal, message: string): void {
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
+}
+
+/** Finite-clamp with fallback (host-local mirror of atlasState helpers). */
+function clampRange(value: number, min: number, max: number, fallback: number): number {
+  if (!Number.isFinite(value)) return fallback;
+  if (min > max) return fallback;
+  return Math.min(max, Math.max(min, value));
 }
 
 /** Media-query probe; treated as false outside browser environments. */

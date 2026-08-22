@@ -68,6 +68,19 @@ const TIER_STEP_BUDGETS: Record<FrameContext['quality'], number> = {
 /** Gentle cinematic orbit rate used when a preset enables `state.orbit`. */
 const ORBIT_RATE_DEG_PER_SECOND = 2;
 
+/**
+ * Display recommendations for the production preset set (campaign §10:
+ * physics / observer / display / quality defined SEPARATELY — display values
+ * here never alter the lensing or disk model, which stay identical across
+ * every presentation preset).
+ */
+const DISPLAY_SCIENTIFIC = {
+  exposure: 1,
+  toneMapping: 'aces-filmic',
+  bloomEnabled: false,
+  bloomStrength: 0
+} as const;
+
 export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
   {
     id: 'default',
@@ -102,6 +115,62 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     },
     seed: 11,
     timelineInitialPhase: 0
+  },
+  {
+    id: 'face-on-disk',
+    displayName: 'Face-on Disk',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Same full numerical Schwarzschild ray tracer as the default preset; observer placed near the disk symmetry axis so the face-on reference geometry (no Doppler asymmetry expected) can be inspected directly.',
+    state: { orbit: false },
+    camera: { position: [1.5, 22, 4], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 50 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: DISPLAY_SCIENTIFIC,
+    recommendedQuality: 'medium'
+  },
+  {
+    id: 'edge-on-lensing',
+    displayName: 'Edge-on Lensing',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Identical lensing/disk model viewed from near the disk plane, emphasizing the upper/lower secondary disk images produced by strong-field light bending.',
+    state: { orbit: false },
+    camera: { position: [17, 0.9, 6], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: { exposure: 1.2, toneMapping: 'aces-filmic', bloomEnabled: false, bloomStrength: 0 },
+    recommendedQuality: 'medium'
+  },
+  {
+    id: 'photon-ring',
+    displayName: 'Photon Ring',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Identical lensing/disk model with a closer camera framing the critical impact parameter; display recommendation raises exposure slightly to keep high-order ring structure readable. Physics unchanged.',
+    state: { orbit: false },
+    camera: { position: [0, 1.2, 9.5], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 45 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: { exposure: 1.5, toneMapping: 'aces-filmic', bloomEnabled: true, bloomStrength: 0.35 },
+    recommendedQuality: 'high'
+  },
+  {
+    id: 'doppler-demo',
+    displayName: 'Doppler Demonstration',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Edge-on-ish view of the SAME Shakura-Sunyaev disk with relativistic beaming enabled, making the approaching/receding brightness contrast directly visible. No model change versus other presets.',
+    state: { orbit: false },
+    camera: { position: [14, 3, 8], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: { exposure: 1.15, toneMapping: 'aces-filmic', bloomEnabled: false, bloomStrength: 0 },
+    recommendedQuality: 'medium'
   },
   {
     id: 'debug-parity',

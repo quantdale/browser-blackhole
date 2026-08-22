@@ -35,6 +35,7 @@ export const DEFAULT_ACTIVE_DESTINATION: DestinationId = 'black-hole';
 export const TONE_MAPPING_VALUES = ['aces-filmic', 'agx', 'neutral', 'linear'] as const;
 export const QUALITY_MODE_VALUES = ['auto', 'low', 'medium', 'high', 'ultra'] as const;
 export const TRANSITION_PHASE_VALUES = ['preparing', 'outgoing', 'hyperspace', 'arriving'] as const;
+export const EXPERIENCE_MODE_VALUES = ['scientific', 'cinematic', 'debug'] as const;
 
 /**
  * Host-side control clamps. These bound UI-facing presentation controls only;
@@ -168,7 +169,14 @@ export function createDefaultAtlasState(
     rendering: {
       qualityMode: 'auto',
       targetFps: 60,
+      dynamicResolution: true,
       renderScaleOverride: null
+    },
+    experience: {
+      mode: 'scientific'
+    },
+    debug: {
+      diagnosticsEnabled: false
     },
     accessibility: {
       reducedMotion: false,
@@ -320,10 +328,24 @@ export function validateAtlasState(
     rendering: {
       qualityMode: enumOr(renderingRaw['qualityMode'], QUALITY_MODE_VALUES, 'auto'),
       targetFps: finiteNumberOrNull(renderingRaw['targetFps']) === 30 ? 30 : 60,
+      dynamicResolution: boolOr(renderingRaw['dynamicResolution'], true),
       renderScaleOverride: clampFiniteOrNull(
         renderingRaw['renderScaleOverride'],
         RENDER_SCALE_OVERRIDE_RANGE.min,
         RENDER_SCALE_OVERRIDE_RANGE.max
+      )
+    },
+    experience: {
+      mode: enumOr(
+        (isPlainObject(input['experience']) ? input['experience'] : {})['mode'],
+        EXPERIENCE_MODE_VALUES,
+        'scientific'
+      )
+    },
+    debug: {
+      diagnosticsEnabled: boolOr(
+        (isPlainObject(input['debug']) ? input['debug'] : {})['diagnosticsEnabled'],
+        false
       )
     },
     accessibility: {
@@ -381,6 +403,7 @@ function formatNumberCompact(value: number): string {
  * - `e` sharedVisual.exposure, `b` bloomEnabled, `bs` bloomStrength,
  *   `t` toneMapping (each omitted when equal to its default);
  * - `q` rendering.qualityMode (omitted when `auto`);
+ * - `mode` experience.mode (omitted when `scientific`);
  * - `rm` accessibility.reducedMotion (omitted when false).
  *
  * The input is re-normalized through {@link validateAtlasState} first, so the
@@ -405,6 +428,7 @@ export function serializeForUrl(state: CosmicAtlasStateV1): string {
     parts.push(`t=${s.sharedVisual.toneMapping}`);
   }
   if (s.rendering.qualityMode !== 'auto') parts.push(`q=${s.rendering.qualityMode}`);
+  if (s.experience.mode !== 'scientific') parts.push(`mode=${s.experience.mode}`);
   if (s.accessibility.reducedMotion) parts.push('rm=1');
   return parts.join('&');
 }
@@ -510,7 +534,16 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
     result.rendering = {
       qualityMode: enumOr(qualityMode, QUALITY_MODE_VALUES, 'auto'),
       targetFps: defaults.rendering.targetFps,
+      dynamicResolution: defaults.rendering.dynamicResolution,
       renderScaleOverride: defaults.rendering.renderScaleOverride
+    };
+  }
+
+  // Experience mode rides share links as `mode=` (additive M5 domain).
+  const experienceMode = read('mode');
+  if (experienceMode !== null) {
+    result.experience = {
+      mode: enumOr(experienceMode, EXPERIENCE_MODE_VALUES, defaults.experience.mode)
     };
   }
 

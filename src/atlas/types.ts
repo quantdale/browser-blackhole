@@ -21,6 +21,18 @@ export type FidelityClass = 'DIRECT' | 'DATA_DRIVEN' | 'PROCEDURAL_SCIENTIFIC' |
 export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra';
 export type QualityTier = 'low' | 'medium' | 'high' | 'ultra';
 
+/**
+ * Product experience mode (M5 canonical state, campaign §4/§5).
+ *
+ * - `scientific`: physical readability first — restrained post effects, clear
+ *   labels/units, deterministic display. Must NOT require bloom.
+ * - `cinematic`: SAME underlying physical simulation; may change exposure,
+ *   bloom and presentation only.
+ * - `debug`: exposes technical diagnostics (backend, tier, frame timing,
+ *   inventories) and developer destinations (Diagnostic).
+ */
+export type ExperienceMode = 'scientific' | 'cinematic' | 'debug';
+
 export type DestinationGroup = 'compact' | 'catastrophe' | 'galactic' | 'expansion' | 'lab';
 
 export type DestinationId = string;
@@ -69,6 +81,19 @@ export interface CameraArrivalPreset {
   fovDeg?: number;
 }
 
+/**
+ * Display-only recommendations a preset may carry (campaign §10: presets
+ * define physics/observer/display/quality SEPARATELY). Values live in the
+ * DISPLAY domain: applying them never mutates physical/model state.
+ * All fields optional; absent fields keep the current shared-visual value.
+ */
+export interface PresetDisplayState {
+  exposure?: number;
+  toneMapping?: CosmicAtlasStateV1['sharedVisual']['toneMapping'];
+  bloomEnabled?: boolean;
+  bloomStrength?: number;
+}
+
 export interface PresetDescriptor {
   id: string;
   displayName: string;
@@ -83,6 +108,10 @@ export interface PresetDescriptor {
   seed: number;
   /** Initial normalized timeline phase in [0, 1]. */
   timelineInitialPhase: number;
+  /** Display-domain recommendation applied on activation (optional). */
+  display?: PresetDisplayState;
+  /** Quality tier this preset was tuned against; advisory only. */
+  recommendedQuality?: QualityTier;
 }
 
 // ---------------------------------------------------------------------------
@@ -465,6 +494,10 @@ export interface CosmicAtlasStateV1 {
     targetPreset: string | null;
     transition: TransitionPublicState;
   };
+  /** Product experience mode (Scientific / Cinematic / Debug). */
+  experience: {
+    mode: ExperienceMode;
+  };
   sharedVisual: {
     exposure: number;
     bloomEnabled: boolean;
@@ -474,7 +507,13 @@ export interface CosmicAtlasStateV1 {
   rendering: {
     qualityMode: QualityMode;
     targetFps: 30 | 60;
+    /** Dynamic resolution governed by the global governor when true. */
+    dynamicResolution: boolean;
     renderScaleOverride: number | null;
+  };
+  /** Debug-domain visibility flags (kept out of Scientific/Cinematic UX). */
+  debug: {
+    diagnosticsEnabled: boolean;
   };
   accessibility: {
     reducedMotion: boolean;
