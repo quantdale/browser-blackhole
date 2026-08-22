@@ -52,7 +52,18 @@ const MATERIAL_ESTIMATED_BYTES = 256 * 1024;
 const DISK_INNER_RG = 6;
 const DISK_OUTER_RG = 18;
 /** Escape classification radius (r_g) — far enough that deflection is done. */
-const ESCAPE_RADIUS_RG = 60;
+const ESCAPE_RADIUS_RG = 32;
+
+/**
+ * Per-tier integration step budgets pushed to the integrator's uMaxSteps
+ * uniform each frame. Must stay <= the integrator's compile-time ceiling.
+ */
+const TIER_STEP_BUDGETS: Record<FrameContext['quality'], number> = {
+  low: 256,
+  medium: 512,
+  high: 1024,
+  ultra: 2048
+};
 
 /** Gentle cinematic orbit rate used when a preset enables `state.orbit`. */
 const ORBIT_RATE_DEG_PER_SECOND = 2;
@@ -124,6 +135,7 @@ export class BlackHoleModule implements PhenomenonModule {
   private fallbackPass: DiagnosticPass | null = null;
   private scene: Scene | null = null;
   private orbitEnabled = false;
+  private lastQualityTier: FrameContext['quality'] = 'medium';
   private disposed = false;
 
   async prepare(ctx: PrepareContext): Promise<{
@@ -205,6 +217,9 @@ export class BlackHoleModule implements PhenomenonModule {
    * wall-clock reads, so it stays deterministic under the atlas timeline.
    */
   update(ctx: FrameContext): void {
+    // PERFORMANCE CAMPAIGN: the integrator's step budget is a UNIFORM, so the
+    // governor's live tier reaches the shader without any pipeline rebuild.
+    this.lastQualityTier = ctx.quality;
     if (this.disposed || !this.orbitEnabled) return;
     const rig = ctx.services.cameraRig;
     const orbit = rig.getOrbit();
@@ -215,9 +230,12 @@ export class BlackHoleModule implements PhenomenonModule {
   render(ctx: RenderContext): void {
     if (this.disposed || this.scene === null) return;
     if (this.lensing !== null) {
-      this.lensing.setUniformsFromState(
-        cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG)
-      );
+      // Live tier budget: the governor's current step count rides the
+      // uMaxSteps uniform — no pipeline rebuild on tier changes.
+      this.lensing.setUniformsFromState({
+        ...cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG),
+        maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier]
+      });
     } else if (this.fallbackPass !== null) {
       applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
     }

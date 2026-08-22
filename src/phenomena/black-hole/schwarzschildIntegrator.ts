@@ -138,8 +138,8 @@ const FINITE_MAGNITUDE_BOUND = 1e30;
 /** Fixed bisection count for disk-crossing refinement (NM §10.2). */
 const DISK_BISECTION_ITERATIONS = 24;
 
-/** Fallback compile-time loop bound for an unrecognized quality tier. */
-const DEFAULT_LOOP_BOUND = 1024;
+// (The old DEFAULT_LOOP_BOUND fallback was removed: unrecognized tiers now
+// fall back to the medium budget inline at the factory.)
 
 /**
  * Explicit NUMERICAL_FAILURE debug color — dim magenta, never black
@@ -149,16 +149,24 @@ const DEFAULT_LOOP_BOUND = 1024;
 const NUMERICAL_FAILURE_RGB: readonly [number, number, number] = [0.08, 0.0, 0.08];
 
 /**
- * Compile-time RK4 iteration bounds per quality tier (SHADER_CONTRACTS §13:
- * no slider may request unbounded iterations). The maxSteps uniform provides
- * early exit WITHIN the selected bound.
+ * Step budgets per quality tier. PERFORMANCE CAMPAIGN FINDING: baking the
+ * tier bound as the compile-time loop limit froze whatever tier was current
+ * at prepare time into the pipeline forever (first boot prepared at 'high',
+ * so Low quality silently ran 1024-step rays). The Loop bound is therefore
+ * the MAXIMUM tier budget and the ACTUAL per-frame budget is the uMaxSteps
+ * uniform, which the destination updates when the governor changes tier —
+ * no recompile, live adaptation (SHADER_CONTRACTS §13 still holds: no
+ * unbounded iterations).
  */
-const QUALITY_TIER_LOOP_BOUNDS: Record<QualityTier, number> = {
+const QUALITY_TIER_STEP_BUDGETS: Record<QualityTier, number> = {
   low: 256,
   medium: 512,
   high: 1024,
   ultra: 2048
 };
+
+/** Compile-time hard ceiling of the integration loop (ultra budget). */
+const MAX_COMPILE_LOOP_BOUND = QUALITY_TIER_STEP_BUDGETS.ultra;
 
 // ---------------------------------------------------------------------------
 // Public uniform-block documentation
@@ -285,7 +293,7 @@ function readVec3Components(raw: unknown): [number, number, number] | null {
  * `makeDiskEmissionNode(...)` for disk contributions.
  */
 export function createLensingMaterial(params: LensingPassParams): SchwarzschildLensingMaterial {
-  const maxLoopSteps = QUALITY_TIER_LOOP_BOUNDS[params.qualityTier] ?? DEFAULT_LOOP_BOUND;
+  const stepBudget = QUALITY_TIER_STEP_BUDGETS[params.qualityTier] ?? 512;
   const safeMassRg = Number.isFinite(params.massRg) && params.massRg > 0 ? params.massRg : 1;
 
   // Scalar uniform NODES first, exposed through the block afterwards, so that
@@ -296,8 +304,14 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const uDiskEnabled = uniform(params.diskEnabled ? 1 : 0);
   const uDiskInnerRg = uniform(Number.isFinite(params.diskInnerRg) ? params.diskInnerRg : 6);
   const uDiskOuterRg = uniform(Number.isFinite(params.diskOuterRg) ? params.diskOuterRg : 20);
-  const uMaxSteps = uniform(maxLoopSteps);
-  const uBaseStep = uniform(0.05);
+  const uMaxSteps = uniform(stepBudget);
+  // Base step in units of M. Sized so a ray from a typical observer
+  // distance (~10-20M) reaches the strong-field region within a fraction of
+  // the LOW tier budget: curvature-induced error at r > ~6M scales as (M/r)^2
+  // per unit length, so long STRAIGHTISH approach legs tolerate large h;
+  // resolution where it matters comes from the horizon floor below plus the
+  // bounded photon-sphere refinement.
+  const uBaseStep = uniform(0.3);
   const uMinStep = uniform(0.001);
   const uMaxStep = uniform(100);
   const uEscapeRadiusRg = uniform(1000);
@@ -502,7 +516,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
 
       // Compile-time bound from the quality tier; the uniform budget below
       // exits earlier when configured (SHADER_CONTRACTS §13).
-      Loop(maxLoopSteps, ({ i }) => {
+      Loop(MAX_COMPILE_LOOP_BOUND, ({ i }) => {
         If(float(i).greaterThanEqual(uMaxSteps), () => {
           status.assign(int(RAY_MAX_STEPS));
           Break();
@@ -744,7 +758,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       const steps = readFiniteNumber(state['maxSteps']);
       // Hard-clamped to the compile-time tier bound (SHADER_CONTRACTS §13).
       if (steps !== null) {
-        uMaxSteps.value = Math.min(maxLoopSteps, Math.max(1, Math.round(steps)));
+        uMaxSteps.value = Math.min(MAX_COMPILE_LOOP_BOUND, Math.max(1, Math.round(steps)));
       }
       const base = readFiniteNumber(state['baseStep']);
       if (base !== null && base > 0) uBaseStep.value = base;
