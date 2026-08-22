@@ -25,6 +25,15 @@ Owned by existing black-hole specification.
 
 Atlas must reuse existing control semantics rather than redefining mass/spin/disk parameters here.
 
+### Scenario
+
+- `default`, `cinematic-orbit` — presentation presets over the full numerical
+  Schwarzschild backwards ray tracer;
+- `debug-parity` — DEBUG TOOL: encoded terminal escape direction
+  (`rgb = dir*0.5+0.5`, linear), black captured rays, failure-magenta failures,
+  disk disabled. Not a presentation view; consumed by the integrator parity
+  corpus (docs/cosmic-atlas/VALIDATION_TESTING.md §4).
+
 ## Neutron Star
 
 ### Physical/model

@@ -73,6 +73,28 @@ The host must not alter:
 - backend selection semantics;
 - numerical classification behavior.
 
+### Integrator CPU/GPU parity corpus
+
+`tests/browser/integrator-parity.spec.ts` runs a selected-ray numeric corpus
+against the binary64 oracle (`src/phenomena/black-hole/cpuReference.ts`) on
+BOTH backends (hardware WebGPU and forced WebGL2):
+
+- the destination's `debug-parity` preset (`/atlas/black-hole?preset=debug-parity`)
+  renders `rgb = finalDirection * 0.5 + 0.5` in LINEAR space for ESCAPED rays,
+  pure black for CAPTURED, failure-magenta for numerical failures; disk shading
+  is disabled through the same uniforms;
+- presentation is forced to exposure 1 / bloom off / 'linear' tone mapping, so
+  presented pixels are exactly sRGB(linear) and direction components decode
+  numerically;
+- rays bracket b_c = 3 sqrt(3) M on both sides along two screen axes plus a
+  radial center ray, deliberately away from the step-budget-sensitive critical
+  boundary; CPU integration uses the SAME termination policy as the GPU pass
+  (escape radius 32 r_g, capture epsilon 0.01 M);
+- tolerance: 0.06 per linear direction component (budgets 8-bit output
+  quantization, f32-vs-f64 trajectory drift over <= 32 r_g, half-float HDR
+  intermediate storage). Captured rays must present near-black through any
+  monotonic display chain.
+
 ## 5. Neutron-star validation
 
 Required cases:

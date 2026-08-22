@@ -102,6 +102,23 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     },
     seed: 11,
     timelineInitialPhase: 0
+  },
+  {
+    id: 'debug-parity',
+    displayName: 'Black Hole — Debug Parity View',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'DEBUG TOOL, not a presentation: ESCAPED rays output their terminal tetrad-projected direction encoded rgb = dir*0.5+0.5 (linear); CAPTURED rays pure black; numerical failures failure-magenta. Disk disabled. Consumed by tests/browser/integrator-parity.spec.ts against cpuReference.integratePhoton.',
+    state: { debugParity: true },
+    camera: {
+      position: [0, 2.5, 16],
+      target: [0, 0, 0],
+      up: [0, 1, 0],
+      fovDeg: 55
+    },
+    seed: 7,
+    timelineInitialPhase: 0
   }
 ];
 
@@ -135,6 +152,7 @@ export class BlackHoleModule implements PhenomenonModule {
   private fallbackPass: DiagnosticPass | null = null;
   private scene: Scene | null = null;
   private orbitEnabled = false;
+  private debugParity = false;
   private lastQualityTier: FrameContext['quality'] = 'medium';
   private disposed = false;
 
@@ -209,6 +227,7 @@ export class BlackHoleModule implements PhenomenonModule {
     if (this.disposed) return;
     if (this.fallbackPass !== null) this.fallbackPass.uniforms.viewOff.value = 0;
     this.orbitEnabled = ctx.preset.state['orbit'] === true;
+    this.debugParity = ctx.preset.state['debugParity'] === true;
   }
 
   /**
@@ -231,11 +250,18 @@ export class BlackHoleModule implements PhenomenonModule {
     if (this.disposed || this.scene === null) return;
     if (this.lensing !== null) {
       // Live tier budget: the governor's current step count rides the
-      // uMaxSteps uniform — no pipeline rebuild on tier changes.
-      this.lensing.setUniformsFromState({
+      // uMaxSteps uniform — no pipeline rebuild on tier changes. The parity
+      // preset additionally disables disk shading and selects the encoded
+      // escape-direction debug output (both plain uniforms).
+      const lensingState: Record<string, unknown> = {
         ...cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG),
         maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier]
-      });
+      };
+      if (this.debugParity) {
+        lensingState['diskEnabled'] = false;
+        lensingState['debugMode'] = 1;
+      }
+      this.lensing.setUniformsFromState(lensingState);
     } else if (this.fallbackPass !== null) {
       applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
     }
@@ -254,6 +280,7 @@ export class BlackHoleModule implements PhenomenonModule {
     this.fallbackPass = null;
     this.scene = null;
     this.orbitEnabled = false;
+    this.debugParity = false;
   }
 
   serializeShareState(): Record<string, unknown> {

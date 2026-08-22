@@ -228,6 +228,17 @@ export interface SchwarzschildIntegratorUniforms {
   // --- VisualGpuParams ---
   /** Linear multiplier on sampled environment radiance (escaped rays). */
   backgroundIntensity: { value: number };
+  /**
+   * Debug view selector (0 = physical radiance, >= 0.5 = parity view).
+   * Parity view: ESCAPED rays output the terminal tetrad-projected escape
+   * direction encoded as `dir * 0.5 + 0.5` in LINEAR space — directly
+   * comparable against `cpuReference.integratePhoton().finalDirection` under
+   * a linear display chain (exposure 1, bloom off, 'linear' tone mapping);
+   * CAPTURED stays pure black and failures stay failure-magenta so class
+   * agreement is assertable in the same frame. Debug tooling only — never a
+   * cinematic/scientific presentation.
+   */
+  debugMode: { value: number };
 }
 
 /** Return shape of {@link createLensingMaterial} (consumer-locked additive superset). */
@@ -319,6 +330,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   // capture path and this epsilon stays as the outer band.
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
+  const uDebugMode = uniform(0);
 
   const uniforms: SchwarzschildIntegratorUniforms = {
     cameraPositionRg: { value: new Vector3() },
@@ -338,7 +350,8 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
     maxStep: uMaxStep,
     escapeRadiusRg: uEscapeRadiusRg,
     captureEpsilon: uCaptureEpsilon,
-    backgroundIntensity: uBackgroundIntensity
+    backgroundIntensity: uBackgroundIntensity,
+    debugMode: uDebugMode
   };
 
   // Vector uniforms reference the SAME Vector3 instances stored in the block,
@@ -504,6 +517,10 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
     const status = int(RAY_INVALID_INITIAL_STATE).toVar();
     // Accumulated linear-HDR radiance: disk contributions + escaped sky.
     const radiance = vec3(0).toVar();
+    // Terminal tetrad-projected escape direction (§9): assigned at the end of
+    // a valid integration, consumed by environment shading AND the debug
+    // parity encoding in the output assembly (both need it at Fn scope).
+    const escapedDirection = vec3(0).toVar();
 
     If(initValid, () => {
       status.assign(int(RAY_ACTIVE));
@@ -693,24 +710,37 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
         status.assign(int(RAY_MAX_STEPS));
       });
 
+      // Terminal tetrad-projected escape direction (§9): pure math on the
+      // terminal r/phi/pr, computed for every valid terminal state so both
+      // the environment sampling and the debug-parity encoding below can
+      // consume it without branch-dependent definitions.
+      escapedDirection.assign(escapeDirectionFn(r, phi, pr));
+
       // Escape shading: sample the procedural environment along the terminal
       // tetrad-projected direction, scaled by the visual intensity (§9/§11).
       If(status.equal(int(RAY_ESCAPED)), () => {
-        const escapedDirection = escapeDirectionFn(r, phi, pr);
         const skyRadiance = sampleEnvironment(escapedDirection) as Vec3Node;
         radiance.addAssign(skyRadiance.mul(uBackgroundIntensity));
       });
     });
 
+    // Debug parity encoding (uDebugMode >= 0.5): ESCAPED rays output the
+    // terminal tetrad-projected escape direction mapped to [0,1]^3 instead of
+    // environment radiance. Flat gate mix (WebGL2 safety — no select() on
+    // whole-output branches beyond the mandated class split above).
+    const debugMix = select(uDebugMode.greaterThanEqual(0.5), float(1), float(0));
+    const escapedOutput = mix(radiance, escapedDirection.mul(0.5).add(0.5), debugMix) as Vec3Node;
+
     // Output assembly (linear HDR, §11): captured -> photon-capture BLACK
-    // (the shadow); escaped -> accumulated disk light + environment; every
-    // other terminal code (ACTIVE/MAX_STEPS/NON_FINITE/INVALID) -> explicit
-    // NUMERICAL_FAILURE magenta, never black (AGENTS.md honesty rule).
+    // (the shadow); escaped -> accumulated disk light + environment (or the
+    // parity encoding when uDebugMode is set); every other terminal code
+    // (ACTIVE/MAX_STEPS/NON_FINITE/INVALID) -> explicit NUMERICAL_FAILURE
+    // magenta, never black (AGENTS.md honesty rule).
     return vec4(
       select(
         status.equal(int(RAY_CAPTURED)),
         vec3(0, 0, 0),
-        select(status.equal(int(RAY_ESCAPED)), radiance, vec3(...NUMERICAL_FAILURE_RGB))
+        select(status.equal(int(RAY_ESCAPED)), escapedOutput, vec3(...NUMERICAL_FAILURE_RGB))
       ),
       float(1)
     );
@@ -737,9 +767,9 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
      * Applies the accepted state keys (cameraPositionRg, cameraRight,
      * cameraUp, cameraForward, tanHalfFovY, aspect, massRg, centerRg,
      * diskEnabled, diskInnerRg, diskOuterRg, maxSteps, baseStep, minStep,
-     * maxStep, escapeRadiusRg, captureEpsilon, backgroundIntensity).
-     * Unknown keys are ignored silently; wrong-typed values fail the finite
-     * coercion and are ignored defensively.
+     * maxStep, escapeRadiusRg, captureEpsilon, backgroundIntensity,
+     * debugMode). Unknown keys are ignored silently; wrong-typed values fail
+     * the finite coercion and are ignored defensively.
      */
     setUniformsFromState(state: Record<string, unknown>): void {
       const camPos = readVec3Components(state['cameraPositionRg']);
@@ -790,6 +820,8 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const debugRaw = readFiniteNumber(state['debugMode']);
+      if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
     },
     dispose(): void {
       if (disposed) return;

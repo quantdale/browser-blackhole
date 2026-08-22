@@ -28,11 +28,31 @@ interface InventoryView {
   backend: { api: string; adapterName: string } | null;
 }
 
+/**
+ * Structural mirror of the LIVE perspective camera surface specs consume
+ * in-page (three.js PerspectiveCamera satisfies this structurally).
+ */
+interface AtlasCameraView {
+  updateMatrixWorld(): void;
+  matrixWorld: { elements: number[] };
+  position: { x: number; y: number; z: number };
+  fov: number;
+  aspect: number;
+}
+
 /** Structural mirror of the runtime hook object; consumed via `Window`. */
 interface AtlasHook {
   host: {
     state: AtlasStateView;
     debugInventory(): InventoryView;
+    /** Live perspective camera; callers must read basis through evaluate. */
+    camera: AtlasCameraView;
+    /** SharedPost front-end owning exposure/bloom/tone-mapping presentation. */
+    post: {
+      setExposure(exposure: number): void;
+      setBloom(enabled: boolean, strength: number): void;
+      setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void;
+    };
   };
   navigate(destinationId: string, presetId?: string): unknown;
   /** Renders one deterministic frame in-task and returns a 5x5 RGB grid ("r,g,b"). */
