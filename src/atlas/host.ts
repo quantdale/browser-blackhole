@@ -405,14 +405,19 @@ export class CosmicAtlasHost {
 
   /** Dynamically import destination metadata + factories (lazy heavy paths). */
   private async registerDestinations(): Promise<void> {
-    const [diagnostic, blackHole, neutronStar] = await Promise.all([
+    const [diagnostic, blackHole, neutronStar, stellarExplosion] = await Promise.all([
       import('./destinations/diagnosticDestination.js'),
       import('./destinations/blackHoleDestination.js'),
-      import('../phenomena/neutron-star/neutronStarModule.js')
+      import('../phenomena/neutron-star/neutronStarModule.js'),
+      import('../phenomena/stellar-explosion/presets.js')
     ]);
     this.registry.register(diagnostic.diagnosticDescriptor, diagnostic.DIAGNOSTIC_PRESETS);
     this.registry.register(blackHole.blackHoleDescriptor, blackHole.BLACK_HOLE_PRESETS);
     this.registry.register(neutronStar.NEUTRON_STAR_DESCRIPTOR, NEUTRON_STAR_PRESETS);
+    this.registry.register(
+      stellarExplosion.STELLAR_EXPLOSION_DESCRIPTOR,
+      stellarExplosion.STELLAR_EXPLOSION_PRESETS
+    );
   }
 
   private wireParticles(backend: BackendInfo): void {

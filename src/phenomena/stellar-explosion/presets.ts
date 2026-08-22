@@ -25,6 +25,8 @@
  * `fidelityNote` — the destination claims no hydrodynamics.
  */
 
+import { createStellarExplosionModule as createRenderingModule } from './stellarExplosionModule.js';
+
 import type {
   PhenomenonDescriptor,
   PhenomenonModule,
@@ -46,10 +48,10 @@ const DESTINATION_ID = 'stellar-explosion';
  * metadata is testable before heavy rendering exists.
  */
 export function createStellarExplosionModule(): PhenomenonModule {
-  throw new Error(
-    'stellar-explosion: rendering module lands with CA4 integration ' +
-      '(physics core present under src/phenomena/stellar-explosion/)'
-  );
+  // Rendering composition lives in its own module to keep this file
+  // preset/metadata-only; the cross-import mirrors the neutron-star
+  // co-location discipline (call-time access, no init-order hazard).
+  return createRenderingModule();
 }
 
 /**
