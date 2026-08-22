@@ -1,19 +1,60 @@
 # Durable project state
 
-Last update: 2026-08-22 — GATE-RUN CYCLE: PENDING WORK VALIDATED, ATLAS WEBGL2 DEBT CLOSED
-Shell/process spawn works again in-session. All pending gates ran for the
-first time on the previously unvalidated working tree; every failure they
-surfaced was fixed and re-proven: `npm run check` PASS (124/124 unit tests,
-11 files), `E2E_PORT=… npx playwright test` PASS (17/17 browser tests). The
-authored-but-unrun governor/service/integrator work is now committed-quality,
-and the last deferred Gate F item (atlas under forced WebGL2) is closed.
+Last update: 2026-08-22 — INTEGRATOR PARITY CORPUS (GATE C) LANDED
+Second gate cycle in the working-shell session: implemented the missing CPU/GPU
+numeric corpus for the Schwarzschild integrator and ran all gates green:
+`npm run check` PASS (124/124 unit), Playwright PASS **19/19** (17 prior + 2 new
+integrator-parity tests, one per backend, both on real hardware/adapter).
+Gate C's "GPU selected rays agree within quantity-specific f32 tolerances" is
+now evidenced by an executed numeric corpus on BOTH backends.
 
 ## Current phase
 
-**POST-GATE CONSOLIDATION COMPLETE.** Everything in the working tree is
-validated by executed gates (no more "authored unvalidated" state). Next:
-new-feature campaigns (Stellar Explosion, LUT/M8, Kerr) or the CPU/GPU numeric
-corpus, both listed under Next actions.
+**GATES GREEN; PARITY CORPUS LANDED.** Remaining known gaps are golden-image
+tooling (Gate D), service GPU-compute destinations, and the governor 60 Hz
+manual probe — none blocking. Next: new-feature campaigns (Stellar Explosion,
+LUT/M8, Kerr) per roadmap order.
+
+## Parity corpus cycle (this session, after the gate-run cycle)
+
+1. NEW DEBUG SURFACE (on-roadmap M2 debug tooling / PRODUCT_SPEC Debug mode):
+   - schwarzschildIntegrator.ts: `uDebugMode` uniform (uniforms.debugMode).
+     >= 0.5 selects the parity encoding: ESCAPED rays output the terminal
+     tetrad-projected escape direction as rgb = dir*0.5+0.5 in LINEAR space;
+     CAPTURED stays pure black; failures stay failure-magenta. Terminal escape
+     direction is now computed once per valid integration into a Fn-scope TSL
+     var and consumed by BOTH environment shading and the parity encoding
+     (removed the branch-local duplicate). Accepted via setUniformsFromState
+     key 'debugMode' (finite coercion, like every other key).
+   - blackHoleDestination.ts: new `debug-parity` preset (state.debugParity).
+     render() passes diskEnabled:false + debugMode:1 when active. Camera
+     identical to default ([0, 2.5, 16], fov 55). Documented as a DEBUG TOOL
+     in DESTINATION_CONTROL_CATALOG.md.
+2. NEW SPEC tests/browser/integrator-parity.spec.ts (per backend webgpu/webgl2):
+   - deep-links /atlas/black-hole?preset=debug-parity(+&backend=webgl2);
+   - forces a deterministic display chain through host.post (bloom off,
+     exposure 1, 'linear' tone mapping) so presented pixels are exactly
+     sRGB(linear) — direction components decode NUMERICALLY;
+   - waits for arrival-camera settle (< 1e-4 position delta), reads the live
+     camera basis in-page with the SAME construction as cameraLensingState;
+   - builds the corpus by bisection: impact parameters b/b_c in {0.35, 0.7}
+     (must classify captured) and {1.25, 2.0} (must classify escaped) along
+     two screen axes plus a radial center ray — deliberately away from the
+     step-budget-sensitive critical boundary; off-viewport rays dropped;
+     >= 6 rays and both classes required;
+   - CPU oracle: integratePhoton with the SAME termination policy as the GPU
+     pass (escapeRadius 32 r_g = destination ESCAPE_RADIUS_RG, captureEpsilon
+     0.01 M = integrator default); max-steps results are excluded from
+     assertions by design;
+   - assertions: captured -> near-black (<= 24/255, monotonic-chain robust);
+     escaped -> |srgbDecode(pixel)*2-1 - cpuFinalDirection| < 0.06 PER CHANNEL
+     (budget: 8-bit quantization ~0.004 + f32/f64 drift over <= 32 r_g +
+     half-float HDR storage); zero failure-magenta pixels; error channels
+     clean.
+3. RESULT: 2/2 PASS — the f32 GPU integrator agrees with the binary64 CPU
+   reference numerically on hardware WebGPU AND forced WebGL2.
+4. Docs: docs/cosmic-atlas/VALIDATION_TESTING.md §4 (corpus contract),
+   DESTINATION_CONTROL_CATALOG.md (debug-parity preset).
 
 ## What this cycle did (exact)
 
@@ -27,7 +68,7 @@ corpus, both listed under Next actions.
    - governor.ts refresh estimator: guard `noUncheckedIndexedAccess` on the
      frame-duration ring read.
    - types.ts: added `ParticleSystemHandle.getDebugSnapshot(): Record<string,
-     unknown>` (impl already had it; interface now documents RENDERING_SERVICES
+unknown>` (impl already had it; interface now documents RENDERING_SERVICES
      §16 contract).
    - governor.test.ts: explicit guards for indexed access under strict flags.
    - particleService.test.ts: object3d geometry access via structural cast;
@@ -80,14 +121,14 @@ corpus, both listed under Next actions.
 
 ## Validation evidence
 
-| Command | Result |
-| --- | --- |
-| `npx prettier --check .` | PASS |
-| `npm run lint` | PASS |
-| `npx tsc --noEmit` | PASS |
-| `npx vitest run` | PASS — 11 files, 124/124 tests |
-| `npm run build` | PASS (vite 8, 61 modules; pre-existing INEFFECTIVE_DYNAMIC_IMPORT notice only) |
-| `E2E_PORT=4176 npx playwright test` | PASS — 17/17 (6 M0 smoke incl. forced backends + unsupported UX, 7 atlas-navigation, 4 atlas-webgl2) |
+| Command                             | Result                                                                                               |
+| ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `npx prettier --check .`            | PASS                                                                                                 |
+| `npm run lint`                      | PASS                                                                                                 |
+| `npx tsc --noEmit`                  | PASS                                                                                                 |
+| `npx vitest run`                    | PASS — 11 files, 124/124 tests                                                                       |
+| `npm run build`                     | PASS (vite 8, 61 modules; pre-existing INEFFECTIVE_DYNAMIC_IMPORT notice only)                       |
+| `E2E_PORT=4176 npx playwright test` | PASS — 19/19 (6 M0 smoke incl. forced backends + unsupported UX, 7 atlas-navigation, 4 atlas-webgl2, 2 integrator-parity) |
 
 Physics spot-evidence carried over from prior cycles (unchanged code paths):
 center-of-shadow pure black (CAPTURED, not failure) on WebGPU AND now under
@@ -99,8 +140,11 @@ backends.
 
 - Gate A Repository health: PASS (commands above).
 - Gate B Browser health: PASS (17/17; hardware WebGPU + forced-webgl2 root AND atlas).
-- Gate C Physics correctness: PARTIAL PASS — classifications/orderings validated;
-  full CPU/GPU numeric ray corpus still deferred (Next actions #1).
+- Gate C Physics correctness: SUBSTANTIALLY PASS — numeric selected-ray corpus
+  (classification + terminal-direction parity, 0.06/channel tolerance) executed
+  on BOTH backends; remaining: g-factor/min-radius corpus extension (nice-to-
+  have; disk disabled in parity view so redshift ordering spot-checks from the
+  earlier campaign still cover beaming direction).
 - Gate D Visual correctness: PARTIAL — deterministic screenshots exist
   (artifacts/, uncommitted); no golden framework yet.
 - Gate E Performance: baseline recorded (see Superseded/current rows below);
@@ -144,23 +188,22 @@ cadence makes it flaky as an automated gate.
 
 ## Deferred / known gaps (honest)
 
-1. Full CPU/GPU numeric corpus for the integrator (selected-ray classification/
-   min-radius/redshift parity beyond spot checks). Harness pattern exists
-   (tests/browser/ray-parity.spec.ts).
+1. Golden-image regression framework not started (screenshots are manual).
 2. VolumeService/ParticleService GPU compute path is browser-only by design;
    node harnesses cover documented CPU/validation surfaces. No destination
    exercises them yet (CA2-05 foundation).
-3. Golden-image regression framework not started (screenshots are manual).
-4. Governor auto-recovery probe on real 60 Hz display (above).
-5. Half-res volume render path unused by any destination (plumbing tested).
+3. Governor auto-recovery probe on real 60 Hz display (below).
+4. Half-res volume render path unused by any destination (plumbing tested).
+5. Parity corpus could extend to g-factor/disk-hit quantities once the debug
+   encoding grows those outputs (current disk-disabled view covers class +
+   terminal direction).
 
 ## Next actions
 
-1. CPU/GPU numeric corpus for the integrator using the ray-parity harness
-   pattern (classification/min-radius/g-factor parity on selected rays).
-2. New-feature campaigns in roadmap order: Stellar Explosion destination work,
-   LUT/M8 backend (BH-160..165), Kerr (M9) only after corpus lands.
-3. Optional: golden-image tooling (Gate D partial -> pass).
+1. New-feature campaigns in roadmap order: Stellar Explosion destination work,
+   LUT/M8 backend (BH-160..165), Kerr (M9).
+2. Optional: golden-image tooling (Gate D partial -> pass); g-factor parity
+   extension of the debug view.
 
 ## Session-cycle note (tooling)
 
