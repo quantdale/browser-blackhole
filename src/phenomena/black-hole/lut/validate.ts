@@ -136,6 +136,21 @@ function validateDomain(
         detail: `${textureId}: psiMax must be finite in (0, 16*pi], got ${String(psiMax)}`
       };
     }
+    const span = raw['storedSpanRg'];
+    if (
+      span !== undefined &&
+      (!isFiniteNumber(span) || (span as number) <= 0 || (span as number) > (psiMax as number))
+    ) {
+      return {
+        ok: false,
+        detail: `${textureId}: storedSpanRg must be finite in (0, psiMax], got ${String(span)}`
+      };
+    }
+  } else {
+    const span = raw['storedSpanRg'];
+    if (span !== undefined && (!isFiniteNumber(span) || (span as number) <= 0)) {
+      return { ok: false, detail: `${textureId}: storedSpanRg must be positive finite` };
+    }
   }
   return { ok: true };
 }
@@ -327,10 +342,17 @@ export function validateLutManifest(raw: unknown): LutManifestValidation {
       'textures must contain exactly one trajectory and one aux entry'
     );
   }
-  const tx = (traj.domain as LutTrajectoryDomain).axisX;
-  const ax = (aux.domain as LutAuxDomain).axisX;
-  if (JSON.stringify(tx) !== JSON.stringify(ax)) {
+  const tx = traj.domain as LutTrajectoryDomain;
+  const ax = aux.domain as LutAuxDomain;
+  if (JSON.stringify(tx.axisX) !== JSON.stringify(ax.axisX)) {
     return fail('bad-domain', 'trajectory and aux textures must share identical axisX knots');
+  }
+  if (
+    tx.storedSpanRg !== undefined &&
+    ax.storedSpanRg !== undefined &&
+    tx.storedSpanRg !== ax.storedSpanRg
+  ) {
+    return fail('bad-domain', 'trajectory and aux textures must share the same storedSpanRg');
   }
 
   const hybridBand = raw['hybridBandHalfWidthX'];

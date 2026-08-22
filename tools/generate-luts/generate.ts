@@ -364,6 +364,40 @@ function rmsOf(v: number[]): number {
 // Family assembly
 // ---------------------------------------------------------------------------
 
+/**
+ * Resamples one column's row grid onto the SHARED normalized span
+ * (M8-05 contract): every column in a family must map v=1 to the same psi,
+ * otherwise cross-column bilinear filtering is meaningless. Columns whose
+ * own data end short of the shared span are CLAMP-EXTENDED with their final
+ * valid radius: for escaping columns that is the escape-envelope crossing
+ * (physically exact — the photon leaves the envelope there), for captured
+ * columns the capture-band radius (classification never consults those
+ * rows). Filtering therefore always sees finite, semantically inert values.
+ */
+function resampleToSharedSpan(col: TrajectoryColumn, span: number, height: number): Float64Array {
+  const out = new Float64Array(height);
+  const srcSpan = col.psiStoredSpan;
+  let lastValid = Number.NaN;
+  for (let j = 0; j < height; j += 1) {
+    const psi = ((j + 0.5) / height) * span;
+    if (psi <= col.psiDataEnd && Number.isFinite(lastValid || 0)) {
+      // still inside this column's real data: sample its own grid
+      const x = (psi / srcSpan) * col.rByTexel.length - 0.5;
+      const i0 = Math.min(col.rByTexel.length - 2, Math.max(0, Math.floor(x)));
+      const f = Math.min(1, Math.max(0, x - i0));
+      out[j] = col.rByTexel[i0]! * (1 - f) + col.rByTexel[i0 + 1]! * f;
+      lastValid = out[j]!;
+    } else if (!Number.isFinite(lastValid)) {
+      // before any valid sample can only happen at j=0 with degenerate span
+      out[j] = col.rByTexel[0] ?? Number.NaN;
+      lastValid = out[j]!;
+    } else {
+      out[j] = lastValid;
+    }
+  }
+  return out;
+}
+
 export async function buildFamily(options: GenerateFamilyOptions = {}): Promise<GeneratedFamily> {
   const width = options.width ?? DEFAULT_WIDTH;
   const height = options.height ?? 1024;
@@ -380,12 +414,26 @@ export async function buildFamily(options: GenerateFamilyOptions = {}): Promise<
 
   const sweep = sweepColumns({ width, height, psiMax, rRefRg, escapeRadiusRg, axisX });
 
+  // Shared normalized span (M8-05): every column resampled onto the same
+  // row grid so texture filtering is well-defined. The span is the longest
+  // escaping arc (capped by the winding budget); shorter columns — including
+  // all captured ones — are clamp-extended with their terminal radius.
+  let storedSpan = 0;
+  for (const col of sweep.columns) {
+    if (col.escapingClass) storedSpan = Math.max(storedSpan, col.psiStoredSpan);
+  }
+  if (!(storedSpan > 0)) {
+    // Degenerate sweep (no escaping columns at all — cannot happen across a
+    // full b_c-scaled axis, but never emit a broken family).
+    storedSpan = Math.min(psiMax, 1);
+  }
+  const rowGrids = sweep.columns.map((col) => resampleToSharedSpan(col, storedSpan, height));
+
   // --- trajectory texels: channel layout r[texel = j*width + i] -----------
   const trajChannels = new Float64Array(width * height);
   for (let i = 0; i < width; i += 1) {
-    const col = sweep.columns[i]!;
     for (let j = 0; j < height; j += 1) {
-      trajChannels[j * width + i] = col.rByTexel[j]!;
+      trajChannels[j * width + i] = rowGrids[i]![j]!;
     }
   }
   const traj = encodeTexture({ data: trajChannels, width, height, channelCount: 1 }, trajFormat);
@@ -401,7 +449,9 @@ export async function buildFamily(options: GenerateFamilyOptions = {}): Promise<
     auxChannels[base] = col.terminalDirection[0]!;
     auxChannels[base + 1] = col.terminalDirection[1]!;
     if (col.escapingClass) {
-      auxChannels[base + 2] = col.psiStoredSpan;
+      // Physical (uncapped) outbound arc of THIS column: lets consumers know
+      // where clamped padding begins inside the shared span.
+      auxChannels[base + 2] = col.psiDataEnd;
       auxChannels[base + 3] = col.psiApsis;
     } else {
       auxChannels[base + 2] = -1;
@@ -457,7 +507,7 @@ export async function buildFamily(options: GenerateFamilyOptions = {}): Promise<
         height,
         format: trajFormat,
         interpolation: 'bilinear',
-        domain: { kind: 'trajectory', axisX, psiMax },
+        domain: { kind: 'trajectory', axisX, psiMax, storedSpanRg: storedSpan },
         channels: { r: 0 },
         sha256: trajSha,
         byteLength: traj.bytes.byteLength
@@ -472,7 +522,7 @@ export async function buildFamily(options: GenerateFamilyOptions = {}): Promise<
         height: 1,
         format: auxFormat,
         interpolation: 'nearest',
-        domain: { kind: 'aux', axisX },
+        domain: { kind: 'aux', axisX, storedSpanRg: storedSpan },
         channels: { nR: 0, nT: 1, psiExit: 2, psiApsis: 3 },
         sha256: auxSha,
         byteLength: aux.bytes.byteLength

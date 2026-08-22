@@ -120,18 +120,29 @@ export interface LutAxisMapping {
  * through {@link LutAxisMapping}; rows index accumulated in-plane azimuth
  * `psi` UNIFORMLY over `[0, psiMax]` (uniform psi aligns with the physics:
  * equatorial-plane crossing candidates are equally spaced in psi).
+ *
+ * `storedSpanRg` (M8-05): the NORMALIZED row span every column was resampled
+ * onto at generation time (max over escaping columns of
+ * min(dataEnd, psiMax), clamp-padded beyond shorter columns' data). It is
+ * REQUIRED for texture-filterable sampling — without a shared span the same
+ * v coordinate would mean different psi per column and cross-column
+ * bilinear filtering would be meaningless.
  */
 export interface LutTrajectoryDomain {
   kind: 'trajectory';
   axisX: LutAxisMapping;
-  /** Maximum accumulated azimuth stored per row (radians, > 0). */
+  /** Maximum accumulated azimuth budget per row (radians, > 0). */
   psiMax: number;
+  /** Shared normalized row span the texel grid was resampled onto (radians). */
+  storedSpanRg?: number;
 }
 
 /** Per-row auxiliary texel layout (one texel per column, height 1). */
 export interface LutAuxDomain {
   kind: 'aux';
   axisX: LutAxisMapping;
+  /** Must equal the trajectory domain's storedSpanRg when present. */
+  storedSpanRg?: number;
 }
 
 export type LutTextureDomain = LutTrajectoryDomain | LutAuxDomain;
