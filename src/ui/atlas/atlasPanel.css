@@ -395,3 +395,54 @@
     transition: none;
   }
 }
+
+/* --- app-shell integration (src/app/atlasApp.ts) ---------------------------- */
+/* styles.css binds the legacy skeleton by ID (#app/#viewport/#panel); these
+   ID-qualified rules restore the product-shell geometry on atlas routes only,
+   leaving the bare-root diagnostic app untouched. */
+
+#app.atlas-shell {
+  display: flex;
+  flex-direction: column;
+}
+
+.atlas-content {
+  /* Positioned ancestor so the mobile panel drawer anchors to the content row. */
+  position: relative;
+}
+
+#app.atlas-shell #viewport {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+#app.atlas-shell #panel {
+  flex: 0 0 clamp(260px, 24vw, 320px);
+  max-width: none;
+  max-height: none;
+  padding: 4px 12px 24px;
+  background: var(--panel-bg, rgba(12, 14, 18, 0.92));
+}
+
+#app.atlas-shell .atlas-note {
+  margin: 2px 0 10px;
+  color: var(--text-dim, #9aa3b2);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+@media (max-width: 720px) {
+  #app.atlas-shell #panel {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    flex: 0 0 auto;
+    max-height: 46vh;
+    border-left: none;
+    border-top: 1px solid var(--panel-border, #3a4150);
+  }
+}
