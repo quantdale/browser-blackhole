@@ -107,6 +107,7 @@ Package manager lockfile is the dependency inventory. Before adding a package:
 Do not pull random web images into `public/`. Require clear license/redistribution rights.
 
 Prefer:
+
 - project-generated procedural environment;
 - public-domain/government data with verified terms;
 - permissively licensed assets with attribution file.
