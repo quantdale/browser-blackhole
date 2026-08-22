@@ -19,13 +19,14 @@ LUT/M8, Kerr) per roadmap order.
 
 1. NEW DEBUG SURFACE (on-roadmap M2 debug tooling / PRODUCT_SPEC Debug mode):
    - schwarzschildIntegrator.ts: `uDebugMode` uniform (uniforms.debugMode).
-     >= 0.5 selects the parity encoding: ESCAPED rays output the terminal
-     tetrad-projected escape direction as rgb = dir*0.5+0.5 in LINEAR space;
-     CAPTURED stays pure black; failures stay failure-magenta. Terminal escape
-     direction is now computed once per valid integration into a Fn-scope TSL
-     var and consumed by BOTH environment shading and the parity encoding
-     (removed the branch-local duplicate). Accepted via setUniformsFromState
-     key 'debugMode' (finite coercion, like every other key).
+     Values of 0.5 and above select the parity encoding: ESCAPED rays output
+     the terminal tetrad-projected escape direction as rgb = dir*0.5+0.5 in
+     LINEAR space; CAPTURED stays pure black; failures stay failure-magenta.
+     Terminal escape direction is now computed once per valid integration into
+     a Fn-scope TSL var and consumed by BOTH environment shading and the
+     parity encoding (removed the branch-local duplicate). Accepted via
+     setUniformsFromState key 'debugMode' (finite coercion, like every other
+     key).
    - blackHoleDestination.ts: new `debug-parity` preset (state.debugParity).
      render() passes diskEnabled:false + debugMode:1 when active. Camera
      identical to default ([0, 2.5, 16], fov 55). Documented as a DEBUG TOOL
@@ -41,7 +42,7 @@ LUT/M8, Kerr) per roadmap order.
      (must classify captured) and {1.25, 2.0} (must classify escaped) along
      two screen axes plus a radial center ray — deliberately away from the
      step-budget-sensitive critical boundary; off-viewport rays dropped;
-     >= 6 rays and both classes required;
+     at least 6 rays and both classes required;
    - CPU oracle: integratePhoton with the SAME termination policy as the GPU
      pass (escapeRadius 32 r_g = destination ESCAPE_RADIUS_RG, captureEpsilon
      0.01 M = integrator default); max-steps results are excluded from
@@ -121,13 +122,13 @@ unknown>` (impl already had it; interface now documents RENDERING_SERVICES
 
 ## Validation evidence
 
-| Command                             | Result                                                                                               |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------- |
-| `npx prettier --check .`            | PASS                                                                                                 |
-| `npm run lint`                      | PASS                                                                                                 |
-| `npx tsc --noEmit`                  | PASS                                                                                                 |
-| `npx vitest run`                    | PASS — 11 files, 124/124 tests                                                                       |
-| `npm run build`                     | PASS (vite 8, 61 modules; pre-existing INEFFECTIVE_DYNAMIC_IMPORT notice only)                       |
+| Command                             | Result                                                                                                                    |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `npx prettier --check .`            | PASS                                                                                                                      |
+| `npm run lint`                      | PASS                                                                                                                      |
+| `npx tsc --noEmit`                  | PASS                                                                                                                      |
+| `npx vitest run`                    | PASS — 11 files, 124/124 tests                                                                                            |
+| `npm run build`                     | PASS (vite 8, 61 modules; pre-existing INEFFECTIVE_DYNAMIC_IMPORT notice only)                                            |
 | `E2E_PORT=4176 npx playwright test` | PASS — 19/19 (6 M0 smoke incl. forced backends + unsupported UX, 7 atlas-navigation, 4 atlas-webgl2, 2 integrator-parity) |
 
 Physics spot-evidence carried over from prior cycles (unchanged code paths):
