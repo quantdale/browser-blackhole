@@ -1,0 +1,408 @@
+/**
+ * Golden-image regression harness (Gate D, campaign sections 15-17).
+ *
+ * Design contract (docs/cosmic-atlas/GOLDEN_IMAGES.md):
+ * - Determinism is achieved by FIXING the documented axes rather than by
+ *   trusting the app's defaults: viewport comes from playwright.config.ts
+ *   (1280x800), the quality tier is pinned through
+ *   `governor.setForcedTier()` (canvas sizing is then EXPLICITLY re-applied
+ *   via `host.handleResize()` because nothing else re-fires it after a tier
+ *   pin), the timeline is paused at phase 0, and the display chain is forced
+ *   to exposure 1 / bloom off / linear tone mapping so presented pixels are a
+ *   pure monotonic function of rendered radiance.
+ * - Comparison is perceptual-tolerant, NOT pixel-exact: GPU scheduling,
+ *   antialiasing of UI overlays and sub-frame transition timing make exact
+ *   equality brittle across runs even on one machine. Metrics:
+ *     meanAbsDelta      - mean per-pixel RGB delta magnitude (0..255 scale)
+ *     pctPixelsBeyond   - % of pixels whose max-channel delta exceeds
+ *                         `perChannelThreshold`
+ *     maxChannelDelta   - worst single-channel delta (reported, not gated)
+ * - Goldens are NEVER updated automatically on failure. Regeneration is an
+ *   explicit reviewed act: UPDATE_GOLDENS=1 npx playwright test visual-goldens
+ *
+ * Screenshot target: the #viewport element only (render surface without UI
+ * chrome), so control-panel text rendering cannot pollute physics goldens.
+ */
+
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
+import { expect, type Page } from '@playwright/test';
+
+// Canonical __ATLAS_APP__ window typing (single global augmentation).
+import './atlasHook.js';
+
+/** Root of this checkout; goldens live beside the specs that consume them. */
+const GOLDEN_DIR = fileURLToPath(new URL('../goldens', import.meta.url));
+
+/**
+ * Structural superset of the shared AtlasHook view covering the host members
+ * this harness drives (governor/timeline/navigate/handleResize). Declared
+ * locally so the shared augmentation in atlasHook.ts stays minimal.
+ */
+interface GoldenControlSurface {
+  governor: { setForcedTier(tier: 'low' | 'medium' | 'high' | 'ultra'): void };
+  time: { pause(): void; scrubTo(phase01: number): void };
+  navigate(destinationId: string, presetId?: string): unknown;
+  handleResize(cssWidth: number, cssHeight: number): void;
+}
+
+export interface GoldenTolerance {
+  /** Mean per-pixel RGB delta magnitude allowed (0..255 scale). */
+  meanAbsDelta: number;
+  /** Max percentage of pixels allowed beyond perChannelThreshold. */
+  pctPixelsBeyond: number;
+  /** Per-channel delta above which a pixel counts as "beyond". */
+  perChannelThreshold: number;
+}
+
+export interface GoldenSpec {
+  name: string;
+  url: string;
+  backendOverride?: 'webgpu' | 'webgl2';
+  pinTier?: 'low' | 'medium' | 'high' | 'ultra';
+  /**
+   * When false the timeline is left running (transition capture); otherwise
+   * it is paused and scrubbed to phase 0 for determinism.
+   */
+  pauseTimeline?: boolean;
+  settleMs?: number;
+  special?: 'hyperspace-mid';
+  tolerance: GoldenTolerance;
+  notes: string;
+}
+
+export interface GoldenMetrics {
+  meanAbsDelta: number;
+  pctPixelsBeyond: number;
+  maxChannelDelta: number;
+}
+
+export interface GoldenResult {
+  status: 'pass' | 'fail' | 'updated';
+  metrics?: GoldenMetrics;
+  message?: string;
+}
+
+interface DecodePayload {
+  currentBase64: string;
+  goldenBase64: string;
+  perChannelThreshold: number;
+}
+
+/**
+ * In-page PNG decode + metric computation. Both images are decoded through
+ * createImageBitmap so no Node-side image dependency is required.
+ */
+async function compareInPage(
+  page: Page,
+  payload: DecodePayload
+): Promise<GoldenMetrics & { widthMismatch: boolean }> {
+  return page.evaluate(async ({ currentBase64, goldenBase64, perChannelThreshold }) => {
+    async function decode(base64: string): Promise<ImageData> {
+      const response = await fetch(`data:image/png;base64,${base64}`);
+      const blob = await response.blob();
+      const bitmap = await createImageBitmap(blob);
+      const canvas = document.createElement('canvas');
+      canvas.width = bitmap.width;
+      canvas.height = bitmap.height;
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      if (!ctx) throw new Error('2d context unavailable');
+      ctx.drawImage(bitmap, 0, 0);
+      const data = ctx.getImageData(0, 0, bitmap.width, bitmap.height);
+      bitmap.close();
+      return data;
+    }
+
+    const current = await decode(currentBase64);
+    const golden = await decode(goldenBase64);
+    if (current.width !== golden.width || current.height !== golden.height) {
+      return {
+        meanAbsDelta: Number.POSITIVE_INFINITY,
+        pctPixelsBeyond: 100,
+        maxChannelDelta: 255,
+        widthMismatch: true
+      };
+    }
+
+    let sumDelta = 0;
+    let beyond = 0;
+    let maxChannelDelta = 0;
+    const pixels = current.width * current.height;
+    for (let i = 0; i < pixels; i++) {
+      const o = i * 4;
+      let pixelMax = 0;
+      for (let c = 0; c < 3; c++) {
+        // Bitwise-ish absolute delta over RGB (alpha ignored: opaque canvas).
+        const d = Math.abs((current.data[o + c] ?? 0) - (golden.data[o + c] ?? 0));
+        sumDelta += d;
+        if (d > pixelMax) pixelMax = d;
+        if (d > maxChannelDelta) maxChannelDelta = d;
+      }
+      if (pixelMax > perChannelThreshold) beyond++;
+    }
+    return {
+      meanAbsDelta: sumDelta / (pixels * 3),
+      pctPixelsBeyond: (beyond / pixels) * 100,
+      maxChannelDelta,
+      widthMismatch: false
+    };
+  }, payload);
+}
+
+/** Poll until the atlas app reports arrival at a non-transitioning state. */
+async function waitForArrival(page: Page): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const app = window.__ATLAS_APP__;
+          if (!app) return 'no-app';
+          if (app.host.state.atlas.transition.active) return 'transitioning';
+          return 'arrived';
+        }),
+      { timeout: 30_000, intervals: [250] }
+    )
+    .toBe('arrived');
+}
+
+/**
+ * Poll the live camera until its position stops moving (arrival-ease done).
+ * Without this, screenshot content depends on how far the eased camera
+ * travelled when the capture fired — machine-load-dependent.
+ */
+async function waitForCameraSettle(page: Page, timeoutMs = 10_000): Promise<void> {
+  await page.evaluate(
+    (timeout) =>
+      new Promise<void>((resolve) => {
+        const host = window.__ATLAS_APP__!.host as unknown as {
+          camera: { position: { x: number; y: number; z: number } };
+        };
+        let last = { ...host.camera.position };
+        const startedAt = performance.now();
+        const poll = (): void => {
+          const now = host.camera.position;
+          const delta = Math.hypot(now.x - last.x, now.y - last.y, now.z - last.z);
+          last = { ...now };
+          if (delta < 1e-4 || performance.now() - startedAt > timeout) resolve();
+          else setTimeout(poll, 100);
+        };
+        setTimeout(poll, 150);
+      }),
+    timeoutMs
+  );
+}
+
+/**
+ * Apply every documented determinism forcing inside the page. Returns the
+ * CSS size that was re-applied so callers can assert sanity.
+ */
+async function applyDeterminismForcing(page: Page, spec: GoldenSpec): Promise<void> {
+  await page.evaluate(
+    ({ tier, pauseTimeline }) => {
+      const host = window.__ATLAS_APP__!.host as unknown as {
+        governor: { setForcedTier(tier: 'low' | 'medium' | 'high' | 'ultra'): void };
+        time: { pause(): void; scrubTo(phase01: number): void };
+      };
+      // Pin the tier under auto mode; nothing re-applies canvas sizing after
+      // a tier change, so re-drive resize explicitly below.
+      host.governor.setForcedTier(tier);
+      if (pauseTimeline !== false) {
+        host.time.pause();
+        host.time.scrubTo(0);
+      }
+      // Pure monotonic display chain (mirrors integrator-parity.spec.ts).
+      const post = window.__ATLAS_APP__!.host.post;
+      post.setBloom(false, 0);
+      post.setExposure(1);
+      post.setToneMapping('linear');
+    },
+    { tier: spec.pinTier ?? 'low', pauseTimeline: spec.pauseTimeline ?? true }
+  );
+  // Re-apply sizing AFTER the tier pin (renderScale changes with the tier).
+  const box = await page.locator('#viewport').boundingBox();
+  if (box && box.width > 0 && box.height > 0) {
+    await page.evaluate(
+      ({ width, height }) => {
+        (window.__ATLAS_APP__!.host as unknown as GoldenControlSurface).handleResize(width, height);
+      },
+      { width: box.width, height: box.height }
+    );
+  }
+}
+
+/**
+ * Execute one golden expectation end-to-end: navigate, force determinism,
+ * capture, compare against (or update) the committed baseline.
+ *
+ * DETERMINISM ORDERING (critical for destinations that integrate their own
+ * clocks from frame dt — e.g. neutron-star rotation): boot on the neutral
+ * default route, PAUSE the global clock FIRST, then navigate to the target.
+ * The destination module seeds from preset state at enter() and integrates
+ * dt only while playing, so it enters FROZEN at phase 0 regardless of machine
+ * load. A camera-settle wait then removes arrival-ease timing variance.
+ */
+export async function runGoldenExpectation(page: Page, spec: GoldenSpec): Promise<GoldenResult> {
+  const url =
+    spec.backendOverride === undefined
+      ? spec.url
+      : `${spec.url}${spec.url.includes('?') ? '&' : '?'}backend=${spec.backendOverride}`;
+
+  if (spec.special === 'hyperspace-mid') {
+    await page.goto(url);
+    await waitForArrival(page);
+    // Transition capture: determinism forcing first, then depart and shoot
+    // the moment the hyperspace field dominates. Timeline scrubbing is
+    // skipped by design (pauseTimeline false in the spec row).
+    await applyDeterminismForcing(page, spec);
+    await page.evaluate(() => {
+      (window.__ATLAS_APP__!.host as unknown as GoldenControlSurface).navigate('neutron-star');
+    });
+    await expect
+      .poll(
+        async () => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.transition.phase),
+        { timeout: 15_000, intervals: [50] }
+      )
+      .toBe('hyperspace');
+    return writeOrCompare(page, spec, await page.locator('#viewport').screenshot());
+  }
+
+  // Standard flow: boot default -> pause clock -> navigate frozen -> settle.
+  await page.goto('/atlas/black-hole');
+  await waitForArrival(page);
+  if (spec.pauseTimeline !== false) {
+    await page.evaluate(() => {
+      const host = window.__ATLAS_APP__!.host as unknown as {
+        time: { pause(): void; scrubTo(phase01: number): void };
+      };
+      host.time.pause();
+      host.time.scrubTo(0);
+    });
+  }
+  const target = url.replace(/^.*\/atlas\//, '/atlas/');
+  if (!target.startsWith('/atlas/black-hole')) {
+    await page.evaluate((route) => {
+      const [pathAndQuery] = [route];
+      const withoutPrefix = pathAndQuery.replace(/^\/atlas\//, '');
+      const [dest, query] = withoutPrefix.split('?');
+      const preset = new URLSearchParams(query ?? '').get('preset') ?? undefined;
+      (window.__ATLAS_APP__!.host as unknown as GoldenControlSurface).navigate(dest!, preset);
+    }, target);
+    await waitForArrival(page);
+  }
+
+  await applyDeterminismForcing(page, spec);
+  await waitForCameraSettle(page);
+  await page.waitForTimeout(spec.settleMs ?? 500);
+  return writeOrCompare(page, spec, await page.locator('#viewport').screenshot());
+}
+
+/** Write-or-compare tail shared by both capture paths. */
+async function writeOrCompare(page: Page, spec: GoldenSpec, buffer: Buffer): Promise<GoldenResult> {
+  const goldenPath = join(GOLDEN_DIR, `${spec.name}.png`);
+  if (process.env.UPDATE_GOLDENS === '1') {
+    mkdirSync(GOLDEN_DIR, { recursive: true });
+    writeFileSync(goldenPath, buffer);
+    return { status: 'updated' };
+  }
+  return compareAgainstGolden(page, spec, buffer);
+}
+
+/**
+ * Async comparison half — split from {@link runGoldenExpectation} because
+ * Playwright screenshots are Buffers but the metric computation must run in
+ * the page. The spec file awaits both halves back to back.
+ */
+export async function compareAgainstGolden(
+  page: Page,
+  spec: GoldenSpec,
+  buffer: Buffer
+): Promise<GoldenResult> {
+  const goldenPath = join(GOLDEN_DIR, `${spec.name}.png`);
+  if (!existsSync(goldenPath)) {
+    return {
+      status: 'fail',
+      message: `golden missing: ${goldenPath} (run UPDATE_GOLDENS=1 once to establish)`
+    };
+  }
+  const goldenBuffer = readFileSync(goldenPath);
+  const metrics = await compareInPage(page, {
+    currentBase64: buffer.toString('base64'),
+    goldenBase64: goldenBuffer.toString('base64'),
+    perChannelThreshold: spec.tolerance.perChannelThreshold
+  });
+  if (metrics.widthMismatch) {
+    return {
+      status: 'fail',
+      message: 'dimension mismatch between captured frame and golden'
+    };
+  }
+  const within =
+    metrics.meanAbsDelta <= spec.tolerance.meanAbsDelta &&
+    metrics.pctPixelsBeyond <= spec.tolerance.pctPixelsBeyond;
+  return {
+    status: within ? 'pass' : 'fail',
+    metrics: {
+      meanAbsDelta: +metrics.meanAbsDelta.toFixed(3),
+      pctPixelsBeyond: +metrics.pctPixelsBeyond.toFixed(4),
+      maxChannelDelta: metrics.maxChannelDelta
+    },
+    ...(within ? {} : { message: `tolerance exceeded for ${spec.name}` })
+  };
+}
+
+/**
+ * Initial golden set (campaign §16). Rows for destinations/presets landing
+ * later in this campaign are appended here as they become available, e.g.
+ *
+ *   { name: 'BH_FACE_ON_DISK', url: '/atlas/black-hole?preset=face-on-disk',
+ *     tolerance: BH_TOLERANCE, notes: '...' },
+ *   { name: 'SN_PROGENITOR', url: '/atlas/stellar-explosion?preset=core-collapse',
+ *     ... phase-scrubbed rows once CA4 lands ... }
+ */
+export const GOLDEN_SPECS: GoldenSpec[] = [
+  {
+    name: 'ATLAS_DIAGNOSTIC',
+    url: '/atlas/diagnostic',
+    tolerance: { meanAbsDelta: 2, pctPixelsBeyond: 0.5, perChannelThreshold: 24 },
+    notes:
+      'Deterministic camera-ray gradient pattern; catches boot/compositing regressions of the atlas shell itself. Tight tolerance: fully static scene.'
+  },
+  {
+    name: 'BH_CLASSIC',
+    url: '/atlas/black-hole',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Default Schwarzschild lensing + accretion disk view; catches gross lensing/disk/post regressions (shadow loss, disk disappearance, inverted beaming).'
+  },
+  {
+    name: 'NS_SURFACE',
+    url: '/atlas/neutron-star',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Neutron-star default preset (surface + hot spot + dipole lines); catches surface-emission and field-line regressions.'
+  },
+  {
+    name: 'NS_PULSAR',
+    url: '/atlas/neutron-star?preset=pulsar',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Pulsar preset at phase-0 rotation; catches hot-spot/beam geometry regressions (lighthouse pattern at t=0).'
+  },
+  {
+    name: 'NS_MAGNETAR',
+    url: '/atlas/neutron-star?preset=magnetar',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Magnetar preset with flare envelope active at fixed flarePhase; catches flare-envelope and tint regressions.'
+  },
+  {
+    name: 'ATLAS_HYPERSPACE_BH_NS',
+    url: '/atlas/black-hole',
+    special: 'hyperspace-mid',
+    pauseTimeline: false,
+    tolerance: { meanAbsDelta: 25, pctPixelsBeyond: 48, perChannelThreshold: 35 },
+    notes:
+      'Mid-transition hyperspace field between Black Hole and Neutron Star. Generous tolerance: the exact frame captured depends on transition timing jitter; asserts the transition system renders AT ALL (streak field present, scene handoff not black).'
+  }
+];
