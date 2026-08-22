@@ -43,6 +43,55 @@ Reading a paper and implementing equations independently is different from copyi
 
 If adapting Bruneton's BSD-3-Clause implementation, preserve required copyright/license notices and identify adapted files/ideas as appropriate.
 
+### 3.1 Provenance register (M8 LUT backend)
+
+```text
+Name: Real-time High-Quality Rendering of Non-Rotating Black Holes
+Type: scientific paper (method reference only)
+Source URL: https://arxiv.org/abs/2010.08735
+Author/organization: Eric Bruneton
+Version/date/commit: arXiv preprint, published 2020-10-17 (v1); DOI 10.48550/arXiv.2010.08735
+License: arXiv non-exclusive distribution; paper text remains copyrighted by the author.
+  No paper text is redistributed in this repository — only cited.
+License URL/file: https://arxiv.org/licenses/nonexclusive-distrib/1.0/
+How used: M8-01 review of the precomputed-table method (beam parameterization,
+  constant-time deflection/disc-intersection lookups, critical-region axis
+  remapping, star-filtering motivation). Design decisions recorded in
+  docs/LUT_BACKEND_ADR.md.
+Modified/derived?: N/A (citation only)
+Redistribution allowed?: Not redistributed
+Attribution required?: Cited above and in the ADR
+Verification/checksum: N/A
+Reviewer/date: integrator agent / 2026-08-22
+```
+
+```text
+Name: black_hole_shader (reference implementation)
+Type: source-code reference (concepts only; NO code copied)
+Source URL: https://github.com/ebruneton/black_hole_shader
+Author/organization: Eric Bruneton
+Version/date/commit: master as of 2026-08-22 review
+License: BSD-3-Clause "New" or "Revised" License
+License URL/file: https://github.com/ebruneton/black_hole_shader/blob/master/LICENSE
+How used: structural understanding of the two-texture scheme
+  (512x512 ray-deflection texture, 64x32 ray-inverse-radius texture,
+  u(e^2)=1/(1+6e^2) critical-region remap, mod-pi trajectory symmetry for
+  disc crossings, FilteredPulse disc-edge anti-aliasing). The repository's
+  own generator, tables, manifest schema, and TSL runtime sampler are
+  INDEPENDENT implementations from this repository's CPU reference solver;
+  no GLSL/C++ lines were copied or mechanically translated.
+Modified/derived?: No copied code; concepts adapted with attribution here
+Redistribution allowed?: N/A (nothing redistributed)
+Attribution required?: BSD-3-Clause requires license notice IF code were used;
+  none is used, attribution kept voluntarily above
+Verification/checksum: N/A
+Reviewer/date: integrator agent / 2026-08-22
+```
+
+Generated LUT assets derived from these references inherit this lineage per
+section 7 below; every shipped family records generator commit/version plus
+checksums so the lineage stays auditable.
+
 ## 4. Dependencies
 
 Package manager lockfile is the dependency inventory. Before adding a package:
