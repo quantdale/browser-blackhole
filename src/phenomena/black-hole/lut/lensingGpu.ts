@@ -659,15 +659,17 @@ export function createLutLensingMaterial(
                 });
                 If(done.equal(0), () => {
                   If(
-                    select(pr.lessThan(0), float(1), float(0)).mul(
-                      select(
-                        float(1)
-                          .sub(uMassRg.mul(2).div(max(r, uMassRg)))
-                          .lessThan(float(1e-3)),
-                        float(1),
-                        float(0)
+                    select(pr.lessThan(0), float(1), float(0))
+                      .mul(
+                        select(
+                          float(1)
+                            .sub(uMassRg.mul(2).div(max(r, uMassRg)))
+                            .lessThan(float(1e-3)),
+                          float(1),
+                          float(0)
+                        )
                       )
-                    ).greaterThan(0.5),
+                      .greaterThan(0.5),
                     () => {
                       numStatus.assign(int(RAY_CAPTURED));
                       rayWasCaptured.assign(1);
@@ -719,17 +721,28 @@ export function createLutLensingMaterial(
     //   captured -> ALWAYS pure black (no debug encoding)
     //   escaped  -> parity encoding when debugMode=1, radiance otherwise
     //   other    -> failure magenta
+    // Capture covers BOTH backends through rayWasCaptured (LUT captured class
+    // AND numerical horizon/stall capture): a captured ray must never leak
+    // accumulated disk light or the debug-parity encoding. Escape is
+    // LUT-escaped or numerical RAY_ESCAPED; everything else (init-invalid,
+    // MAX_STEPS, NON_FINITE) is failure magenta, matching the reference.
     const debugMixLegacy = select(uDebugMode.greaterThanEqual(0.5), float(1), float(0));
-    const escapedOutput = mix(radiance, escapedDirection.mul(0.5).add(0.5), debugMixLegacy) as Vec3Node;
+    const escapedOutput = mix(
+      radiance,
+      escapedDirection.mul(0.5).add(0.5),
+      debugMixLegacy
+    ) as Vec3Node;
+
+    const escapedOut = select(
+      statusTag.equal(int(LUT_STATUS_LUT_ESCAPED)),
+      float(1),
+      select(numStatusOut.equal(int(RAY_ESCAPED)), float(1), float(0))
+    ).greaterThan(0.5);
 
     const physicalRgb = select(
-      numStatusOut.equal(int(RAY_CAPTURED)),
+      rayWasCaptured.greaterThan(0.5),
       vec3(0, 0, 0),
-      select(
-        statusTag.equal(int(LUT_STATUS_FAILURE)),
-        vec3(...NUMERICAL_FAILURE_RGB),
-        escapedOutput
-      )
+      select(escapedOut, escapedOutput, vec3(...NUMERICAL_FAILURE_RGB))
     ) as Vec3Node;
 
     const statusColor = select(
