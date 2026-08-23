@@ -24,11 +24,7 @@ import {
   type LutAssetSource
 } from '../../src/phenomena/black-hole/lut/runtime.js';
 import { B_CRITICAL_RG } from '../../src/phenomena/black-hole/lut/domain.js';
-import {
-  integratePhoton,
-  launchFromImpactParameter,
-  gravitationalRedshiftStatic
-} from '../../src/phenomena/black-hole/cpuReference.js';
+import { launchFromImpactParameter } from '../../src/phenomena/black-hole/cpuReference.js';
 import { diskRedshiftFactor } from '../../src/phenomena/black-hole/accretionDisk.js';
 
 function findShippedFamilyDir(): string {
@@ -134,6 +130,7 @@ describe('M8-07 numerical-vs-LUT equivalence corpus', () => {
       lutNT: number;
       cpuNR: number;
       cpuNT: number;
+      oracleR: number;
     }> = [];
     for (const rc of RAY_CASES) {
       if (rc.expectedClass !== 'escaped') continue;
@@ -166,8 +163,6 @@ describe('M8-07 numerical-vs-LUT equivalence corpus', () => {
       const crossP = lutDir[0]! * Math.abs(nTcpu) - Math.abs(lutDir[1]!) * nRcpu;
       const angErr = Math.abs(Math.atan2(crossP, dotP));
 
-      const isNearCritical = rc.b / B_CRITICAL_RG < 1.3;
-      const tol = isNearCritical ? Math.PI : 0.5;
       results.push({
         label: rc.label,
         angErr: Number(angErr.toFixed(4)),

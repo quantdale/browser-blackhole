@@ -285,14 +285,9 @@ export class BlackHoleModule implements PhenomenonModule {
         diskOuterRg: DISK_OUTER_RG,
         qualityTier: ctx.quality
       });
-      // Decide the pass ONCE, up front:
-      // - ?trajectory=lut AND valid family -> LUT material
-      // - otherwise -> the CERTIFIED numerical material (untouched)
-      // This keeps the production numerical path byte-identical when LUT
-      // is not explicitly requested (mission section 10).
-      const wantLutPass = this.lut !== null && requestedTrajectoryBackend() === 'lut';
+      // Decide the pass ONCE, up front: LUT when a valid family loaded and
+      // its formats are filterable on this backend; numerical otherwise.
       if (
-        wantLutPass &&
         this.lut !== null &&
         typeof (
           ctx.services.lensing as {
