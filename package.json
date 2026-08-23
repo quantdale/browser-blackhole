@@ -23,6 +23,9 @@
     "lut:generate": "tsx tools/generate-luts/generate.ts",
     "lut:validate": "tsx tools/generate-luts/validate.ts",
     "lut:study": "tsx tools/generate-luts/study.ts",
+    "bench:black-hole": "node scripts/bench-black-hole.mjs",
+    "bench:black-hole:numerical": "node scripts/bench-black-hole.mjs --backend=numerical --label=numerical",
+    "bench:black-hole:lut": "node scripts/bench-black-hole.mjs --backend=lut --label=lut",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
   },
   "dependencies": {

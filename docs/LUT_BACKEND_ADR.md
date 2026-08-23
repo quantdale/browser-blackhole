@@ -184,10 +184,40 @@ the first LUT backend.
   `docs/VALIDATION_VECTORS.md` additions and enforced by tests.
 
 ## 10. Explicitly out of scope (honest limits)
-
 - Beam-traced star filtering (paper section on beams) — investigated,
   documented, possibly deferred (section 8).
 - Time-of-flight / retarded time (the reference stores propagation time per
   sample; our renderer has no time-delayed shading consumer yet).
 - Kerr/spinning extension (M9 will need its own family; schema reserves the
   `physicsConvention` field).
+
+## 11. Auto-default decision criterion (M8-08) — FIXED BEFORE MEASUREMENT
+
+To prevent post-hoc threshold tuning, the definition of a "meaningful
+performance win" was written down BEFORE the paired numerical-vs-LUT
+measurement campaign ran. The harness is `scripts/bench-black-hole.mjs`
+(matched conditions: same preset, quality tier, viewport, pinned render scale,
+warm-up, sample count; backend set through canonical state, M8-09).
+
+**LUT becomes the `auto` default (`LUT_AUTO_DEFAULT = true`) only if ALL of:**
+
+1. **Headline win:** median frame-time improvement ≥ 10 % on the
+   representative `default` preset at the primary mainstream internal
+   resolution (1280×720-class CSS viewport, render scale 1);
+2. **No scene regression:** no measured scene shows a median regression
+   greater than 5 %;
+3. **Tail safety:** p95 frame time regresses by at most 10 % on every scene;
+4. **Reproducibility:** the sign of the median delta is stable across ≥ 2
+   repeated runs per scene (noise guard; more repeats if noisy);
+5. **Fidelity unchanged:** all equivalence gates stay green
+   (`lutEquivalence` corpus, integrator parity on both backends, goldens).
+
+Otherwise numerical REMAINS the auto default and M8-08 records the honest
+(marginal/negative/hardware-specific) outcome. A technically correct negative
+result is acceptable and explicitly preferred over adoption justified by
+sunk cost. Manual selection (`numerical`/`lut`) and truthful fallback are
+preserved in either branch.
+
+Measured scenes: `default` (typical), `face-on-disk` (easy/escape-heavy),
+`edge-on-lensing` (disk-heavy), `photon-ring` (critical-region). Results are
+recorded under `benchmarks/` and summarized in `.agent/STATE.md`.

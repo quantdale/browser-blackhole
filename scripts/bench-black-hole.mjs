@@ -1,68 +1,172 @@
 /**
- * Repeatable black-hole performance harness (performance campaign §28).
+ * Repeatable black-hole numerical-vs-LUT matched-comparison harness
+ * (M8-08 / campaign §2.1).
  *
- * Measures steady-state frame times of /atlas/black-hole on whatever backend
- * the browser provides (records the ACTUAL adapter/backend from the host),
- * after pipeline warm-up, at fixed viewport and quality settings.
+ * Measures steady-state FRAME times (rAF deltas — NOT GPU timestamps; see the
+ * frameGpuMs note in the record) of /atlas/black-hole after pipeline warm-up
+ * at fully pinned conditions: trajectory backend (set through canonical state,
+ * not URL scraping), preset, quality tier, viewport, and a manual render scale
+ * for deterministic internal resolution. Prints ONE JSON record per run
+ * conforming closely to docs/BENCHMARK_MATRIX.md §1.
  *
  * Usage:
- *   node scripts/bench-black-hole.mjs [--frames=600] [--warmupMs=9000]
- *        [--port=4183] [--quality=low|medium|high] [--label=before]
+ *   node scripts/bench-black-hole.mjs [--backend=numerical|lut|auto]
+ *        [--preset=default] [--quality=medium|low|high|ultra|auto]
+ *        [--width=1280] [--height=800] [--render-scale=1|0]
+ *        [--frames=600] [--warmup-ms=9000] [--channel=msedge|chrome|chromium]
+ *        [--label=run] [--port=4183]
  *
- * Prints one JSON record (stdout) matching the campaign benchmark schema;
- * machine-specific runs are NOT committed by default.
+ * --render-scale=0 keeps governor-managed dynamic resolution; any value in
+ * [0.25, 2] pins a FIXED internal resolution (dynamicResolution off), which is
+ * what matched backend comparisons must use.
+ *
+ * Paired convenience scripts live in package.json
+ * (bench:black-hole:numerical / bench:black-hole:lut). Machine-specific raw
+ * records are NOT committed by default; small durable summaries may live under
+ * benchmarks/ where repository policy allows (BENCHMARK_MATRIX §11).
  */
 
 import { preview } from 'vite';
 import { chromium } from '@playwright/test';
+import os from 'node:os';
+import { execSync } from 'node:child_process';
 
 function arg(name, fallback) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
   return hit === undefined ? fallback : hit.slice(name.length + 3);
 }
 
-const frames = Number(arg('frames', '600'));
-const warmupMs = Number(arg('warmupMs', '9000'));
-const port = Number(arg('port', '4183'));
+const BACKENDS = new Set(['numerical', 'lut', 'auto']);
+const QUALITIES = new Set(['auto', 'low', 'medium', 'high', 'ultra']);
+
+const backend = String(arg('backend', 'auto'));
+const preset = String(arg('preset', 'default'));
+const quality = String(arg('quality', 'medium'));
+const width = Number(arg('width', '1280'));
+const height = Number(arg('height', '800'));
+const renderScale = Number(arg('render-scale', '0')); // 0 = governor-managed
+const frames = Math.max(60, Number(arg('frames', '600')));
+const warmupMs = Number(arg('warmup-ms', '9000'));
+const channel = String(arg('channel', 'msedge'));
 const label = String(arg('label', 'run'));
+const port = Number(arg('port', '4183'));
+
+if (!BACKENDS.has(backend)) {
+  console.error(`[bench] invalid --backend=${backend} (numerical|lut|auto)`);
+  process.exit(2);
+}
+if (!QUALITIES.has(quality)) {
+  console.error(`[bench] invalid --quality=${quality} (auto|low|medium|high|ultra)`);
+  process.exit(2);
+}
+
+function currentCommit() {
+  if (process.env.BENCH_COMMIT) return process.env.BENCH_COMMIT;
+  try {
+    return execSync('git rev-parse HEAD', { encoding: 'utf8' }).trim();
+  } catch {
+    return 'uncommitted';
+  }
+}
 
 const server = await preview({ preview: { port, host: '127.0.0.1' } });
-const browser = await chromium.launch({ channel: 'msedge' });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const launchOptions = channel === 'chromium' ? {} : { channel };
+const browser = await chromium.launch(launchOptions);
+const browserName = channel === 'chromium' ? 'chromium' : channel;
+const page = await browser.newPage({ viewport: { width, height } });
 
+/** Console errors that indicate real trouble (same filter class as e2e). */
 const consoleErrors = [];
+const suppressedConsoleErrors = [];
 page.on('console', (m) => {
-  if (m.type() === 'error' && !/powerPreference|readback|Failed to load resource/.test(m.text())) {
-    consoleErrors.push(m.text().slice(0, 120));
+  if (m.type() !== 'error') return;
+  const text = m.text();
+  if (/powerPreference|readback|Failed to load resource/.test(text)) {
+    suppressedConsoleErrors.push(text.slice(0, 120));
+    return;
   }
+  consoleErrors.push(text.slice(0, 200));
 });
 
-await page.goto(`http://127.0.0.1:${port}/atlas/black-hole`);
+await page.goto(
+  `http://127.0.0.1:${port}/atlas/black-hole?preset=${encodeURIComponent(preset)}`
+);
 await page.waitForFunction(
   () => window.__ATLAS_APP__ && window.__ATLAS_APP__.host.state.atlas.transition.active === false,
   null,
   { timeout: 30000 }
 );
-// Pipeline warm-up: shader compiles, governor settles, texture uploads.
-await page.waitForTimeout(warmupMs);
+
+// Pin ALL measurement conditions through canonical state (never uniforms):
+// trajectory backend preference, quality tier, manual render scale. Resize is
+// driven by the REAL #viewport rect so internal resolution is deterministic
+// regardless of UI layout; the re-applied resize applies tier/scale cleanly.
+await page.evaluate(
+  ({ q, scale }) => {
+    const host = window.__ATLAS_APP__.host;
+    if (q !== 'auto') host.governor.configure({ qualityMode: q });
+    if (scale > 0) host.setRenderScaleOverride(scale);
+    const rect = document.getElementById('viewport').getBoundingClientRect();
+    host.handleResize(rect.width, rect.height);
+    host.time.pause();
+  },
+  { q: quality, scale: renderScale }
+);
+await page.waitForTimeout(warmupMs / 2);
+
+// Trajectory backend rides canonical state (M8-09); 'auto' keeps the default.
+if (backend !== 'auto') {
+  await page.evaluate((pref) => {
+    window.__ATLAS_APP__.host.setTrajectoryBackend(pref);
+  }, backend);
+}
+await page.waitForTimeout(warmupMs / 2);
 
 const info = await page.evaluate(() => {
   const app = window.__ATLAS_APP__;
-  const inv = app.host.debugInventory();
+  const host = app.host;
+  const inv = host.debugInventory();
   const canvas = document.getElementById('scene');
-  const glInfo = navigator.userAgent.match(/Edg\/([\d.]+)/);
+  const snap = host.activeDestinationDebugSnapshot() ?? {};
+  const uaEdge = navigator.userAgent.match(/Edg\/([\d.]+)/);
+  const uaChrome = navigator.userAgent.match(/Chrome\/([\d.]+)/);
+  const scopes = inv.resourceScopes.map((s) => ({
+    name: s.name,
+    textures: s.counters.texture,
+    bytes: s.counters.estimatedGpuBytes
+  }));
   return {
-    activeDestination: app.host.state.atlas.activeDestination,
+    activeDestination: host.state.atlas.activeDestination,
+    activePreset: host.state.atlas.activePreset || '(default)',
+    requestedBackend: snap.trajectoryBackendRequested ?? null,
+    effectiveBackend: snap.trajectoryBackendEffective ?? null,
+    fallbackReason: snap.lutFallbackReason ?? null,
+    lutFamilyLoaded: snap.lutFamilyLoaded ?? false,
+    lutFamilyDir: snap.lutFamilyDir ?? null,
+    lutWebgl2Filterable: snap.lutWebgl2Filterable ?? null,
     tier: inv.governor.tier,
-    renderScale: inv.governor.renderScale,
+    // Effective scale actually driving internal resolution right now.
+    renderScale: host.renderScaleOverride ?? inv.governor.renderScale,
     activityMode: inv.governor.activityMode,
     internal: [canvas.width, canvas.height],
-    browserVersion: glInfo ? glInfo[1] : 'unknown'
+    devicePixelRatio: window.devicePixelRatio,
+    adapterName: inv.backend ? inv.backend.adapterName : null,
+    backendApi: inv.backend ? inv.backend.api : null,
+    timestampQuery: inv.backend ? inv.backend.timestampQuery : false,
+    totalEstimatedGpuBytes: inv.totalEstimatedGpuBytes,
+    totalTextures: inv.totalResourceCounts.texture,
+    resourceScopes: scopes,
+    browserVersion: uaEdge ? uaEdge[1] : uaChrome ? uaChrome[1] : 'unknown',
+    platform: navigator.platform
   };
 });
-void info.browserVersion;
 
-// Steady-state sampling inside the page: rAF deltas over `frames` frames.
+const qualityMismatch =
+  quality !== 'auto' && info.tier !== quality ? `${quality}->${info.tier}` : null;
+
+// Steady-state sampling INSIDE the page: rAF deltas over `frames` frames while
+// PAUSED (rendering continues; simulation time frozen). These are FRAME times
+// measured on the CPU side of the rAF loop — never label them GPU timestamps.
 const samples = await page.evaluate(
   (frameCount) =>
     new Promise((resolve) => {
@@ -84,37 +188,84 @@ const samples = await page.evaluate(
 );
 
 const sorted = [...samples].sort((a, b) => a - b);
-const pick = (q) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))].toFixed(2);
-
-const adapter = await page.evaluate(
-  () => window.__ATLAS_APP__.host.debugInventory().backend.adapterName
-);
-const backendApi = await page.evaluate(
-  () => window.__ATLAS_APP__.host.debugInventory().backend.api
-);
+const pick = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
+const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
+const variance = samples.reduce((a, b) => a + (b - mean) ** 2, 0) / samples.length;
+const round2 = (v) => +v.toFixed(2);
 
 const record = {
+  schemaVersion: 1,
+  kind: 'black-hole-backend-comparison',
+  date: new Date().toISOString(),
   label,
-  commit: process.env.BENCH_COMMIT ?? 'uncommitted',
-  browser: `Edge ${info.browserVersion}`,
-  adapter,
-  backend: backendApi,
-  scene: 'BENCH_BLACK_HOLE_TYPICAL',
-  viewport: [1280, 800],
-  internal: info.internal,
-  quality: info.tier,
+  commit: currentCommit(),
+  destination: info.activeDestination,
+  preset: info.activePreset,
+  trajectoryBackend: {
+    requested: info.requestedBackend,
+    effective: info.effectiveBackend,
+    fallbackReason: info.fallbackReason
+  },
+  lut: {
+    familyLoaded: info.lutFamilyLoaded,
+    familyDir: info.lutFamilyDir,
+    webgl2Filterable: info.lutWebgl2Filterable
+  },
+  browser: { name: browserName, version: info.browserVersion },
+  os: `${os.type()} ${os.release()} (${process.platform})`,
+  platform: info.platform,
+  adapter: { name: info.adapterName },
+  backend: info.backendApi,
+  timestampQueryAvailable: info.timestampQuery,
+  viewportCss: [width, height],
+  devicePixelRatio: info.devicePixelRatio,
+  effectiveRenderSize: info.internal,
+  quality: { requested: quality, effectiveTier: info.tier, mismatch: qualityMismatch },
   renderScale: info.renderScale,
   activityMode: info.activityMode,
-  diskEnabled: true,
-  medianMs: pick(0.5),
-  p90Ms: pick(0.9),
-  p95Ms: pick(0.95),
-  p99Ms: pick(0.99),
-  samples: sorted.length,
-  consoleErrors: consoleErrors.length
+  warmupMs,
+  sampleFrames: sorted.length,
+  frameCpuMs: {
+    // rAF wall deltas around the whole orchestrated frame (update+render+
+    // present). Percentiles over the sorted sample set.
+    min: round2(sorted[0]),
+    median: round2(pick(0.5)),
+    p90: round2(pick(0.9)),
+    p95: round2(pick(0.95)),
+    p99: round2(pick(0.99)),
+    max: round2(sorted[sorted.length - 1]),
+    mean: round2(mean),
+    stdev: round2(Math.sqrt(variance))
+  },
+  // Honest limitation: this harness has no GPU timestamp queries wired; these
+  // are CPU-side frame-time measurements only.
+  frameGpuMs: null,
+  gpuTimingNote:
+    'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps',
+  memory: {
+    estimatedGpuBytesTotal: info.totalEstimatedGpuBytes,
+    textureCount: info.totalTextures,
+    resourceScopes: info.resourceScopes
+  },
+  consoleErrors: consoleErrors.length,
+  suppressedConsoleErrors: suppressedConsoleErrors.length,
+  consoleErrorSamples: consoleErrors.slice(0, 5),
+  notes:
+    renderScale > 0
+      ? `fixed internal resolution via render-scale=${renderScale}`
+      : 'governor-managed dynamic resolution'
 };
 console.log(JSON.stringify(record, null, 1));
 
 await browser.close();
 await server.close();
+
+const backendMismatch =
+  backend !== 'auto' && info.effectiveBackend !== backend
+    ? `[bench] WARNING: requested ${backend}, effective ${info.effectiveBackend} (${info.fallbackReason})`
+    : null;
+if (qualityMismatch !== null) {
+  console.error(`[bench] WARNING: quality tier mismatch ${qualityMismatch}`);
+}
+if (backendMismatch !== null) console.error(backendMismatch);
 process.exit(0);
