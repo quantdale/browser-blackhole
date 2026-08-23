@@ -27,9 +27,8 @@ e321513 fix: lut material ownership gate and pass selection
 237091c unfinished (interrupted WIP: stall capture + captured-black intent)
 ```
 The two follow-up commits after 237091c complete that WIP (see Validation
-evidence): 7ceff4d (fix) + a40de92 (state). LOCAL ONLY — push to origin/main
-PENDING: github.com:443 unreachable at commit time (2 connection attempts
-failed). Push as first action of next session.
+evidence): 7ceff4d (fix) + de9562a (state). BOTH PUSHED to origin/main
+(237091c..de9562a) after earlier transient github.com connectivity failure.
 
 ## M8 packet status
 
