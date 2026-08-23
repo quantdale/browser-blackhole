@@ -356,7 +356,8 @@ export function createLutLensingMaterial(
   const fragmentGraph = Fn((): Vec4Node => {
     const radiance = vec3(0).toVar();
     const escapedDirection = vec3(0).toVar();
-    // 0 LUT-escaped, 1 LUT-captured, 2 numerical-resolved, 3 failure.
+    const rayWasCaptured = float(0).toVar();
+    const numStatusOut = int(-1).toVar();
     const statusTag = int(LUT_STATUS_FAILURE).toVar();
 
     If(initValid, () => {
@@ -514,6 +515,7 @@ export function createLutLensingMaterial(
           lutResolved.assign(1);
           If(isCaptured.greaterThan(0.5), () => {
             statusTag.assign(int(LUT_STATUS_LUT_CAPTURED));
+            rayWasCaptured.assign(1);
           }).Else(() => {
             // Outgoing envelope azimuth + reconstructed world direction from
             // aux terminal components (same tetrad projection as numerical).
@@ -645,11 +647,33 @@ export function createLutLensingMaterial(
                 });
 
                 // Capture (priority) then conservative escape.
+                // Two capture conditions (identical to original integrator):
+                // 1. r <= (2 + captureEpsilon) * M
+                // 2. Coordinate stall: f < 1e-3 while infalling (pr < 0)
                 If(done.equal(0), () => {
                   If(r.lessThanEqual(captureRadius), () => {
                     numStatus.assign(int(RAY_CAPTURED));
+                    rayWasCaptured.assign(1);
                     done.assign(1);
                   });
+                });
+                If(done.equal(0), () => {
+                  If(
+                    select(pr.lessThan(0), float(1), float(0)).mul(
+                      select(
+                        float(1)
+                          .sub(uMassRg.mul(2).div(max(r, uMassRg)))
+                          .lessThan(float(1e-3)),
+                        float(1),
+                        float(0)
+                      )
+                    ).greaterThan(0.5),
+                    () => {
+                      numStatus.assign(int(RAY_CAPTURED));
+                      rayWasCaptured.assign(1);
+                      done.assign(1);
+                    }
+                  );
                 });
                 If(done.equal(0), () => {
                   If(
@@ -685,18 +709,27 @@ export function createLutLensingMaterial(
 
         radiance.assign(numRadiance);
         escapedDirection.assign(numEscapeDir);
+        numStatusOut.assign(numStatus);
         statusTag.assign(int(LUT_STATUS_NUMERICAL_RESOLVED));
       });
     });
 
     // ---- output assembly --------------------------------------------------
-    // Legacy parity encoding (uDebugMode >= 0.5) kept for contract parity;
-    // backend/status debug view (uLutDebugStatus >= 0.5) wins over it.
+    // Status-based selection (identical to original integrator):
+    //   captured -> ALWAYS pure black (no debug encoding)
+    //   escaped  -> parity encoding when debugMode=1, radiance otherwise
+    //   other    -> failure magenta
     const debugMixLegacy = select(uDebugMode.greaterThanEqual(0.5), float(1), float(0));
-    const escapedOutput = mix(
-      radiance,
-      escapedDirection.mul(0.5).add(0.5),
-      debugMixLegacy
+    const escapedOutput = mix(radiance, escapedDirection.mul(0.5).add(0.5), debugMixLegacy) as Vec3Node;
+
+    const physicalRgb = select(
+      numStatusOut.equal(int(RAY_CAPTURED)),
+      vec3(0, 0, 0),
+      select(
+        statusTag.equal(int(LUT_STATUS_FAILURE)),
+        vec3(...NUMERICAL_FAILURE_RGB),
+        escapedOutput
+      )
     ) as Vec3Node;
 
     const statusColor = select(
@@ -713,7 +746,7 @@ export function createLutLensingMaterial(
       )
     ) as Vec3Node;
     const statusMix = select(uLutDebugStatus.greaterThanEqual(0.5), float(1), float(0));
-    const finalRgb = mix(escapedOutput, statusColor, statusMix) as Vec3Node;
+    const finalRgb = mix(physicalRgb, statusColor, statusMix) as Vec3Node;
 
     return vec4(finalRgb, float(1));
   });
