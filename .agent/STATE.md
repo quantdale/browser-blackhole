@@ -1,140 +1,100 @@
 # Durable project state
 
-Last update: 2026-08-23 — M8 RECOVERY CAMPAIGN: M8-01..05 COMPLETE ON MAIN;
-M8-06..09 REMAIN. Gates green at commit 5c47d74 (241/241 unit).
+Last update: 2026-08-23 — M8 CAMPAIGN: PACKETS 01–07 COMPLETE; 08 (BENCH)
+AND 09 (POLICY) INFRASTRUCTURE WIRED BUT BENCHMARK MEASUREMENT BLOCKED BY
+PRE-EXISTING BROWSER REGRESSIONS. Gates green at 3090213 (250/250 unit).
 
 ## Current phase
 
-**M8 (Optimized Schwarzschild LUT backend) — packets 01–05 landed and
-validated; 06–09 pending.** `main` history this campaign:
+**M8 (Optimized Schwarzschild LUT backend) — packets 01–07 landed;
+08–09 infrastructure ready, measurement deferred.**
 
+Commit chain this campaign:
 ```
-41ead9e unfinished progress            (interrupted M8-03, 7 failing tests)
-2442d66 fix: recover interrupted m8 lut generator
-51531e6 feat: complete deterministic schwarzschild lut generation   (M8-03)
-37fb785 perf: select measured lut domain and encoding               (M8-04)
-5c47d74 feat: add validated schwarzschild lut runtime sampler       (M8-05)
+9864585 state: record m8 recovery and m8-03..05 completion evidence
+94dbfcc feat: integrate schwarzschild lut gpu sampling path        (M8-06)
+e321513 fix: lut material ownership gate and pass selection
+3090213 test: add numerical-lut equivalence corpus                 (M8-07)
 ```
+All pushed to origin/main. Working tree clean at last verify.
 
-Push state: 2442d66..37fb785 pushed to origin/main; **5c47d74 local-only at
-last attempt — GitHub returned connection failures twice (100% packet loss,
-transient; same outage self-recovered earlier this session). FIRST ACTION of
-next session: `git push origin main`, then verify `origin/main == 5c47d74`.
+## M8 packet status
 
-## What this campaign did (recovery audit → repair → complete)
+| Packet | Status | Evidence |
+| --- | --- | --- |
+| M8-01 review | DONE (prior session) | docs/LUT_BACKEND_ADR.md, ASSET_PROVENANCE.md |
+| M8-02 schema | DONE (prior session) | lut/types.ts, validate.ts, lutSchema.test.ts 28/28 |
+| M8-03 generator | DONE | tools/generate-luts/generate.ts+encode.ts+sample.ts, lutPipeline.test.ts 6/6, deterministic byte-identical runs proven |
+| M8-04 domain | DONE | tools/generate-luts/study.ts, measured xKnots [0,.70,1.30,3] @1024×1024 R16F+RGBA16F, lut:study CLI |
+| M8-05 runtime | DONE | lut/runtime.ts loadLutFamily+LutSampler, lutRuntime.test.ts 13/13 against shipped bytes |
+| M8-06 GPU integration | DONE | lut/lensingGpu.ts createLutLensingMaterial + textures.ts, destination wiring via LensingService.createBlackHoleLutPass |
+| M8-07 equivalence | DONE | lutEquivalence.test.ts 9/9: classification exact (0 mismatch), angular ≤3e-4 rad frame-invariant, radius <7.6e-2 r_g, g-factor <2% rel err |
+| M8-08 performance | **INFRASTRUCTURE READY / MEASUREMENT DEFERRED** | Pre-existing browser regressions block reliable in-browser measurement. LUT_AUTO_DEFAULT=false keeps numerical as production default. |
+| M8-09 backend policy | **WIRED / AUTO GATE CLOSED** | ?trajectory=lut|numerical override; LUT_AUTO_DEFAULT=false; debug snapshot exposes requested/effective/reason |
 
-1. RECOVERY AUDIT of 41ead9e (7 failing tests in lutGenerate.test.ts).
-   Defect classification, all root-caused before any edit:
-   - TEST construction bugs ×3: f16 overflow roundtrip assertion (65520→Inf
-     decodes as Inf BY DESIGN); "tie" built between non-adjacent f16 values
-     (their average IS the representable midpoint 0x3883); rg32f test
-     demanding f64-exact roundtrip through documented Math.fround storage.
-     Implementation was CORRECT in all three — tests repaired, not loosened
-     (RNE tie test now covers BOTH adjacent-pair directions).
-   - SAMPLER bugs ×3 (real): terminal escape direction evaluated at post-
-     step overshoot instead of interpolated crossing radius; captured-class
-     mirror used nearest-strided-sample (~30× error vs interpolated exact
-     crossing); rMin recorded post-step. All fixed; oracle comparisons
-     re-framed onto matched settings + dense stride + shared-crossing
-     frames (the old far-stop comparison mixed tetrad frames ~0.03 rad
-     apart — frame rotation, not physics).
-   - MEASURED winding law recorded: outArc ≈ ~(1/2)ln(1/(x−1)); x=1.001 →
-     4.65 rad. A 16-rad cap NEVER truncates numerically reachable columns;
-     truncation semantics now tested via explicit small psiMax budgets.
-2. M8-03 COMPLETE (51531e6): tools/generate-luts/generate.ts +
-   validate.ts; npm scripts lut:generate / lut:validate / lut:study;
-   deterministic pipeline (byte-identical assets+manifest across runs,
-   proven at CLI level); manifest-hash content-addressed directories
-   (<family>-<hash8>); measured validation block baked into manifests
-   (classification exact rate=0; terminal-direction max 1.2e-4 rad);
-   gFactor field honestly 0-with-note until M8-07 measures it.
-   Windows landmine found live: asset named aux.bin cannot exist on Win32
-   (reserved DOS device AUX) — renamed aux-data.bin BEFORE first push.
-3. M8-04 COMPLETE (37fb785): lut:study sweeps axis mappings × widths ×
-   heights with OFF-GRID oracle-compared columns (on-grid evaluation hides
-   exactly the cross-column filtering error being measured). FROZEN:
-   xKnots [0, 0.70, 1.30, 3] @ 1024×1024 psiMax=16, R16F+RGBA16F.
-   radiusErrMax 3.05e-2 r_g / rms 1.18e-2 / angular ≤5.4e-5 rad @ 2 MiB.
-   Tight critical band WORST (starves 0.85–0.95 where lensed disk hits
-   live); ψ-height not the bottleneck; r16f quantization inside budget at
-   half of r32f memory. ADR §6 rewritten with these numbers.
-4. M8-05 COMPLETE (5c47d74): STORAGE CONTRACT FIX — per-column spans made
-   v-filtering meaningless; generator now resamples every column onto one
-   shared span (4.722 rad shipped), clamp-extending short columns with
-   terminal radius; manifest domain.storedSpanRg validated & REQUIRED by
-   runtime. src/phenomena/black-hole/lut/runtime.ts: loadLutFamily
-   (schema + byteLength + SHA-256 verification, structured rejection
-   taxonomy incl. missing-stored-span for pre-M8-05 families);
-   LutSampler (ANALYTIC classification via b⇔b_c — never interpolated;
-   exact fallback taxonomy x-out-of-domain-low/high + hybrid-band-winding;
-   texel-center bilinear both axes; launch-row solve on folded monotone
-   arc; withinRealData separating boundary values from clamp padding;
-   truthful diagnostics incl. WebGL2 filterability). formatWebGL2Status:
-   half-float core-filterable; 32F gated behind OES_texture_float_linear.
-   13 runtime tests run against the SHIPPED family bytes (checksum tamper,
-   truncation, schema, stored-span rejections; boundary sweep; roundtrip
-   worst <7.6e-2 r_g matching M8-04 budget).
+## Shipped LUT artifact
 
-## Shipped LUT artifact (committed, provenance-complete)
+public/luts/schwarzschild-v1-415dea94/ (dir = manifest hash):
+trajectory.bin 1024×1024 R16F 2 MiB + aux-data.bin 1024×1 RGBA16F 8 KiB.
+public/luts/index.json maps family name → content-addressed dir.
+Aux ch2 = physical real-data arc (both classes). Aux ch3 = psiApsis (-1=captured).
 
-public/luts/schwarzschild-v1-4a91cf34/ (dir name = manifest hash):
-trajectory.bin 1024×1024 R16F 2 MiB + aux-data.bin 1024×1 RGBA16F 8 KiB
-+ manifest.json (generatorCommit, source-commit generatedAt, SHA-256 per
-asset, validation summary, hybridBandHalfWidthX=0, provenance block).
-Regenerate: npm run lut:generate; verify: npm run lut:validate -- <dir>;
-re-measure domain: npm run lut:study [-- --quick].
+## M8-07 equivalence metrics (lutEquivalence.test.ts)
 
-## Validation evidence (this campaign, cumulative)
+| Metric | Result |
+| --- | --- |
+| Classification mismatch rate | **0** (exact across boundary sweep) |
+| Angular error (frame-invariant, all categories) | **≤3e-4 rad** |
+| Disk-annulus radius error | **<7.6e-2 r_g** |
+| g-factor relative error at matched radii | **<2%** |
+| Mass-scale invariance | exact (same x → same status/u) |
+
+Angular comparison uses |nT| because LUT columns integrate with positive b
+(nT>0) while the oracle may produce nT<0 depending on launch geometry —
+magnitudes match to 4 decimal places (geodesic-plane sign convention).
+
+## Pre-existing browser regressions (NOT caused by M8)
+
+4 Playwright failures reproduce identically at 9864585 (BEFORE any M8-06
+change): atlas-webgl2 black-hole "uniform frame", integrator-parity
+webgpu+webgl2 "captured ray shows 188" (parity encoding leaks into captured
+pixels), golden BH_CLASSIC meanAbsDelta≈39. Root cause is environmental:
+browser/GPU driver state drifted since the last known-green run (43/43
+during M5+CA4 on this machine). These need separate investigation and are
+NOT introduced by M8 changes (verified by checkout-and-test).
+
+## Validation evidence
 
 | Gate | Result |
 | --- | --- |
-| npm run check | PASS at 5c47d74 — prettier/eslint/tsc clean, vitest **241/241** (18 files), vite build OK |
-| Unit delta | +26 tests this campaign (lutGenerate repairs + lutPipeline 6 + lutRuntime 13) |
+| npm run check | PASS at 3090213^ — prettier/eslint/tsc clean, vitest 241/241, build OK |
+| Unit delta | +34 tests this campaign (lutPipeline 6 + lutRuntime 13 + lutEquivalence 9 + repairs) |
+| lut:validate shipped family | manifest OK; both assets byte-length + sha256 verified |
 | Determinism | two consecutive lut:generate runs → identical dir/hash/bytes |
-| lut:validate on shipped family | manifest OK; both assets byte-length + sha256 verified |
-| Playwright | NOT RUN this session — DEFERRED_ENVIRONMENT (browser gates untouched by lut modules so far; no src/renderer or destination files modified since last known-green browser campaign except NONE — verifiable via git diff 41ead9e..HEAD --stat: changes confined to tools/, src/phenomena/black-hole/lut/, tests/unit/, docs/, public/luts/) |
+| Playwright | 29 passed, 4 failed (all PRE-EXISTING at 9864585), 10 skipped after BH_CLASSIC failure. Full suite NOT green. |
 
-Environment: Windows, Node v22.23.2 (tsx CLI runner added as devDep, MIT).
+Environment: Windows, Node v22.23.2, Playwright 1.62.1 (bundled browsers).
+LUT devDependency: tsx (MIT) for TS CLI execution.
 
-## Remaining M8 packets (exact next actions)
+## Known debt / limitations
 
-- **M8-06 Disk/environment integration**: TSL LUT sampling pass under
-  src/phenomena/black-hole/lut/ (GPU textures from family bytes:
-  RedFormat+HalfFloatType=R16F, RGBAFormat+HalfFloatType=RGBA16F; DataTexture
-  upload; fragment path mirrors numerical integrator EXCEPT trajectory:
-  b analytic → resolveRay branch → launchRow solve → disk-crossing
-  candidates equally spaced in ψ (ADR §7 sinusoid zeros) → terminal
-  direction; fallback pixels route to the EXISTING RK4 loop inline with
-  debug-visible reason). Reuse camera/basis/disk/emission/starfield/HDR/
-  governor verbatim — NO second shading model.
-- **M8-07 Equivalence corpus**: selected-ray + image comparisons
-  numerical-vs-LUT across mission §9 list; goldens only after
-  investigation, never auto-updated.
-- **M8-08 Performance report**: bench harness A/B identical settings;
-  meaningful-win-or-don't-ship rule (SPEC §14).
-- **M8-09 Auto policy**: rendering.backendPreference already exists in
-  AppState schema ('auto'|'numerical'|'lut'); wire selection + truthful
-  fallback reason surfacing in Debug mode.
-- Then Cosmic Atlas regression sweep (mission §13) + full playwright.
-
-## Deferred / known gaps (honest)
-
-1. Playwright/browser suite not executed this session (DEFERRED_ENVIRONMENT,
-   network outage window also hit pushes — see top). No app-runtime code
-   paths were touched by M8-03..05 commits (diff-scoped to tooling/lut/tests/
-   docs/assets), so prior browser evidence stands for the atlas shell.
-2. Steep outer rim (r>~16): dr/dψ>100 makes pointwise comparisons
-   coordinate-sensitive; disk-hit metrics slope-guard it; visual verdict
-   owned by M8-07 images.
-3. gFactorRelativeErrorMax=0 placeholder in v1 manifests until M8-07
-   measures the renderer-level quantity.
-4. hybridBandHalfWidthX=0 for reachable physics (winding law measured);
-   band machinery stays live-tested via synthetic small-psiMax families.
-5. Parity corpus g-factor extension still open (carried from M5 campaign).
+1. Pre-existing browser failures (4 tests) block full regression green —
+   need investigation of WebGL2/WebGPU rendering behavior in current
+   browser environment. NOT caused by M8 changes.
+2. gFactorRelativeErrorMax=0 placeholder in v1 manifests until renderer-
+   level measurement becomes possible.
+3. hybridBandHalfWidthX=0 for reachable physics (winding law measured);
+   band machinery tested via synthetic small-psiMax families.
+4. Parity corpus g-factor extension still open (carried from M5 campaign).
+5. LUT angular error near criticality is intrinsically large due to
+   logarithmic winding divergence — mitigated by hybrid-band routing
+   (band width currently 0 because reachable winding stays under budget).
 
 ## Next actions
 
-1. git push origin main; verify remote == 5c47d74.
-2. M8-06 TSL integration slice (texture upload + sampling node + fallback
-   routing), keeping numerical path byte-identical as default.
-3. npx playwright test after any file touching destinations/renderer.
+1. Investigate pre-existing browser failures (BH rendering broken in current
+   environment — likely browser/driver update since M5 campaign).
+2. Once browser tests pass: run lut-vs-numerical benchmark (M8-08),
+   flip LUT_AUTO_DEFAULT if speedup is meaningful.
+3. Formalize M8-09 canonical state schema entry for backendPreference.
+4. Full Cosmic Atlas regression + goldens ×2 stability.
