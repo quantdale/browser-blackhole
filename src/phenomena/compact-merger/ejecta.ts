@@ -154,11 +154,11 @@ export function buildEjectaParticlePlan(
     speedUnitsS: driftSpeedUnitsS,
     polarBias,
     lifetimeSeconds: [6, 14],
-    sizePx: [1.5, 4],
+    sizePx: [1, 2.5],
     colorRamp: [
-      { t: 0, color: [2.2, 1.4, 0.7], alpha: 0.9 },
-      { t: 0.45, color: [1.6, 0.7, 0.35], alpha: 0.65 },
-      { t: 1, color: [0.8, 0.25, 0.15], alpha: 0.25 }
+      { t: 0, color: [1.1, 0.7, 0.4], alpha: 0.1 },
+      { t: 0.45, color: [0.8, 0.36, 0.2], alpha: 0.07 },
+      { t: 1, color: [0.4, 0.14, 0.1], alpha: 0.04 }
     ],
     seed: scenario.seed
   };

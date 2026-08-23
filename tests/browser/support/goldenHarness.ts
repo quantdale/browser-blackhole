@@ -467,5 +467,63 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
     notes:
       'Same GRB engine viewed off-axis — must differ from SN_GRB_ON geometrically; catches flat-multiplier regressions of viewing response.'
+  },
+  // --- Compact Merger goldens (CA5) ------------------------------------------
+  // Timeline positions are deterministic: the destination enters paused and
+  // the harness scrubs to `scrubPhase` before capture; volume jitter is off
+  // and every model quantity is a pure function of the scrub position.
+  {
+    name: 'CM_INSPIRAL',
+    url: '/atlas/compact-merger?preset=equal-mass-nsns',
+    scrubPhase: 0.05,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Binary inspiral mid-window: two compact surfaces + closed-form orbit trails on dark sky. Catches star/trail loss, orbit-phase regressions, sky breakage.'
+  },
+  {
+    name: 'CM_MERGER',
+    url: '/atlas/compact-merger?preset=equal-mass-nsns',
+    scrubPhase: 0.37,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Merger flash + early ejecta ignition. Catches flash-envelope and volume-ignition regressions; bloom-carrying frame needs moderate tolerance.'
+  },
+  {
+    name: 'CM_KILONOVA',
+    url: '/atlas/compact-merger?preset=equal-mass-nsns',
+    scrubPhase: 0.7,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    notes:
+      'Kilonova light-curve peak: warm expanding shell + remnant. Catches emission/temperature-trend and shell-radius regressions.'
+  },
+  {
+    name: 'CM_GRB_ON',
+    url: '/atlas/compact-merger?preset=short-grb-on-axis',
+    scrubPhase: 0.54,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    notes:
+      'Short-GRB bipolar jet viewed on-axis (response saturated). Catches lost-jet and viewing-response regressions on-axis.'
+  },
+  {
+    name: 'CM_GRB_OFF',
+    url: '/atlas/compact-merger?preset=short-grb-off-axis',
+    scrubPhase: 0.54,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    notes:
+      'Identical engine viewed 68 deg off-axis — bipolar diamond geometry must differ from CM_GRB_ON; catches flat-multiplier response regressions.'
+  },
+  {
+    name: 'CM_REMNANT',
+    url: '/atlas/compact-merger?preset=kilonova-focus',
+    scrubPhase: 0.9,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    notes:
+      'Afterglow with prompt-BH remnant scenario (faint accretion glow, fading ejecta). Catches remnant-scenario and late-timeline resource regressions.'
   }
 ];

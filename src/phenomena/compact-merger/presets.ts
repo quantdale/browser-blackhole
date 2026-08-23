@@ -93,6 +93,9 @@ const GRB_ENGINE_STATE: CompactMergerPublicState = {
   ejectaScenario: 'polar-enhanced',
   remnantScenario: 'prompt-bh',
   jetScenario: 'thin',
+  // Coherence contract: the model viewing angle MATCHES the preset camera
+  // polar (8 deg from the +Y jet axis) so the response and the framing agree.
+  viewingAngleDeg: 8,
   seed: 127
 };
 
@@ -171,12 +174,14 @@ const GRB_ON_AXIS_PRESET: PresetDescriptor = {
     '(bounded, disclosed) — on-axis saturates. Kinematic front, NOT ' +
     'relativistic MHD.',
   state: { ...GRB_ENGINE_STATE },
-  // polar 8deg (near jet axis, matches viewingAngleDeg 4-ish framing), az 15:
+  // polar 8deg (near jet axis, matches viewingAngleDeg 8), az 15, d=30 units
+  // (frames the ~5-unit jet front readably at engine-ignition+0.8 s):
   // dir = (0.036, 0.990, 0.135)
-  camera: { position: [2.5, 69.3, 9.5], target: [0, 0, 0], fovDeg: 55 },
+  camera: { position: [1.1, 29.7, 4.0], target: [0, 0, 0], fovDeg: 55 },
   seed: 127,
-  // 0.42 lands inside the jet segment (engine active, front expanding).
-  timelineInitialPhase: 0.42
+  // 0.52 lands inside the jet segment AFTER engine ignition (tau > 0.5 s),
+  // where the front is expanding and the viewing response is active.
+  timelineInitialPhase: 0.52
 };
 
 const GRB_OFF_AXIS_PRESET: PresetDescriptor = {
@@ -189,10 +194,10 @@ const GRB_OFF_AXIS_PRESET: PresetDescriptor = {
     'polar axis so the on/off-axis difference is purely geometric through ' +
     'the disclosed viewing-response factor. No intrinsic state changes.',
   state: { ...GRB_OFF_AXIS_STATE },
-  // polar 68deg, azimuth 30deg, d=70: dir = (0.464, 0.375, 0.803)
-  camera: { position: [32.5, 26.3, 56.2], target: [0, 0, 0], fovDeg: 55 },
+  // polar 68deg, azimuth 30deg, d=30 units: dir = (0.464, 0.375, 0.803)
+  camera: { position: [13.9, 11.2, 24.1], target: [0, 0, 0], fovDeg: 55 },
   seed: 131,
-  timelineInitialPhase: 0.42
+  timelineInitialPhase: 0.52
 };
 
 /** All compact-merger presets, default first. */

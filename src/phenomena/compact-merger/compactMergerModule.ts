@@ -263,6 +263,10 @@ export function createCompactMergerModule(): PhenomenonModule {
     jetGroup.name = 'compact-merger-jet';
     jetGroup.add(jetTop, jetBottom);
     jetGroup.visible = false;
+    // Render AFTER the volume proxy (renderOrder 10): the bipolar lobes live
+    // inside the ejecta shell and would otherwise be occluded by its
+    // normal-blended composite.
+    jetGroup.renderOrder = 20;
     destinationScene.add(jetGroup);
     ctx.scope.track('geometry', jetGeometry, () => jetGeometry.dispose(), 16384);
     ctx.scope.track('material', jetMaterialTop, () => jetMaterialTop.dispose(), 4096);
@@ -278,6 +282,8 @@ export function createCompactMergerModule(): PhenomenonModule {
       // TSL density: shell(r; R, width) x angular two-component weight — the
       // shader twin of ejectaDirectionWeight/ejectaAnisotropyFactor (pure
       // function of the SAMPLE DIRECTION; observer-independent by contract).
+      // All smoothsteps use STRICTLY RISING edges: reversed-argument
+      // smoothstep is undefined in WGSL and lit the entire bounds sphere.
       density: ({ pos }) => {
         const p = vec3(pos as never);
         const r = length(p);
@@ -286,20 +292,18 @@ export function createCompactMergerModule(): PhenomenonModule {
         const equatorial = float(1).sub(polar);
         // Scenario weight folded through uVolumePolar (preset-driven).
         const weight = mix(equatorial, polar, uVolumePolar);
-        const shell = smoothstep(
-          uVolumeWidth.max(0.05),
-          uVolumeWidth.mul(2.2),
-          r.sub(uVolumeRadius).abs().oneMinus()
+        const w = uVolumeWidth.max(0.05);
+        const R = uVolumeRadius.max(0.1);
+        const rise = smoothstep(R.sub(w.mul(2.0)), R.sub(w.mul(0.2)), r);
+        const fall = smoothstep(R.add(w.mul(0.2)), R.add(w.mul(2.2)), r).oneMinus();
+        const outer = smoothstep(R.mul(1.05), R.mul(1.3), r).oneMinus();
+        return max(
+          rise
+            .mul(fall)
+            .mul(outer)
+            .mul(float(0.35).add(weight.mul(0.65))),
+          float(0)
         );
-        void shell;
-        // Band around the shell radius with a soft inner/outer falloff.
-        const band = smoothstep(
-          uVolumeWidth.mul(2.2),
-          uVolumeWidth.max(0.05),
-          r.sub(uVolumeRadius).abs()
-        );
-        const outer = smoothstep(uVolumeRadius.mul(1.6), uVolumeRadius, r);
-        return max(band.mul(outer).mul(float(0.35).add(weight.mul(0.65))), float(0));
       },
       emission: () => vec3(uVolumeTint).mul(uVolumeGain),
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
@@ -347,6 +351,11 @@ export function createCompactMergerModule(): PhenomenonModule {
       system.setPopulationScale(0); // phase-gated
       system.object3d().name = 'compact-merger-ejecta-particles';
       destinationScene.add(system.object3d());
+      // ParticleService contract: update() must run once before the first
+      // render so the shared GPU buffers are created — scrubbing to a paused
+      // post-merger phase would otherwise present uninitialized buffers.
+      // The fixed dt keeps that initialization deterministic.
+      system.update(1 / 60);
       ctx.scope.track('storageBuffer', system, () => system?.dispose(), plan.capacity * 48);
       particleHandle = system;
     }
@@ -410,14 +419,15 @@ export function createCompactMergerModule(): PhenomenonModule {
   function populationFractionFor(phase: MergerPhase): number {
     switch (phase) {
       case 'contact':
-        return 0.25;
+        return 0.2;
       case 'merger':
-        return 0.6;
+        return 0.35;
       case 'jet':
+        return 0.15;
       case 'kilonova':
-        return 1;
+        return 0.3;
       case 'afterglow':
-        return 0.45;
+        return 0.15;
       default:
         return 0; // inspiral keeps expensive systems OFF
     }
@@ -518,11 +528,13 @@ export function createCompactMergerModule(): PhenomenonModule {
     volumeHandle?.setStepScale(TIER_STEP_SCALE[lastTier]);
 
     // --- jet (scenario + phase gated; viewing response = presentation gain) --
+    // Active during the jet phase; fades through kilonova; gone by afterglow.
     const front = jetFrontRadiusUnits(t, res);
     const response = jetViewingResponse(ready.state.viewingAngleDeg, res);
-    const jetVisible = front > 0 && phase !== 'afterglow';
+    const jetPhaseGain = phase === 'jet' ? 1 : phase === 'kilonova' ? 0.35 : 0;
+    const jetVisible = front > 0 && jetPhaseGain > 0;
     // Gain folds the viewing response; the front/ejecta cap bounds geometry.
-    uJetGain.value = jetVisible ? response * 0.9 : 0;
+    uJetGain.value = jetVisible ? response * 1.4 * jetPhaseGain : 0;
     uJetFront.value = front;
     uJetRadius.value = Math.max(front * 0.16, res.r1Units * 0.5);
     if (jetGroup !== null) {
@@ -532,8 +544,15 @@ export function createCompactMergerModule(): PhenomenonModule {
     }
 
     // --- particles (phase-gated population) -----------------------------------
+    // COHERENCE NOTE: particles stay at their spawned shell (the emitter is
+    // fixed at creation by the shared service contract) and act as NEAR-
+    // REMNANT glow accents; the ejecta SHELL morphology is carried by the
+    // volume field, whose radius is a pure function of t. Scaling the
+    // particle object3d was evaluated and REJECTED: sprite sizing is world-
+    // space, so object scaling blows the sprites up with the shell.
     if (particleHandle !== null) {
-      particleHandle.setPopulationScale(populationFractionFor(phase));
+      const pop = populationFractionFor(phase);
+      particleHandle.setPopulationScale(pop);
       if (volumeVisible && !snapshot.paused) {
         particleHandle.update(ctx.time.dt);
       }
@@ -548,6 +567,14 @@ export function createCompactMergerModule(): PhenomenonModule {
     debug['phase'] = phase;
     debug['previousPhase'] = lastPhase;
     debug['timeSeconds'] = t;
+    debug['starGain'] = starGain;
+    debug['flashGain'] = flashGain;
+    debug['remnantGain'] = remnantSample.gain;
+    debug['remnantVisible'] = remnant !== null ? remnant.visible : false;
+    debug['jetVisible'] = jetGroup !== null ? jetGroup.visible : false;
+    debug['volumeGain'] = uVolumeGain.value;
+    debug['volumeRadius'] = uVolumeRadius.value;
+    debug['volumeWidth'] = uVolumeWidth.value;
     debug['separationUnits'] = inspiral.separation;
     debug['orbitalFrequencyRadS'] = inspiral.orbitalFrequency;
     debug['contactSeconds'] = res.contactSeconds;

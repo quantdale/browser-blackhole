@@ -52,9 +52,10 @@ export function remnantSampleAt(
 
   switch (scenario.remnantScenario) {
     case 'massive-ns':
-      // Long-lived hot remnant: bright immediately, slow presentation fade.
+      // Long-lived hot remnant: bright at merger, presentation-fades toward
+      // the kilonova peak (the ejecta light curve takes over the view).
       return {
-        gain: tau <= 0 ? 0 : Math.max(0.55, 1 - tau / 1e6),
+        gain: tau <= 0 ? 0 : Math.max(0.35, 1 - (0.65 * tau) / 86400),
         tint: HOT_TINT,
         radiusUnits: radius * 0.92,
         glowGain: 0

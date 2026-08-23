@@ -274,13 +274,14 @@ describe('ejecta model (CA5-06/07, mission §13)', () => {
 
   it('direction weight is finite, in [0,1], and observer-independent', () => {
     const res = scenarioOf({ ejectaScenario: 'polar-enhanced' });
-    for (const [x, y, z] of [
+    const dirs: ReadonlyArray<readonly [number, number, number]> = [
       [0, 1, 0],
       [0, -1, 0],
       [1, 0, 0],
       [0.3, 0.4, 0.5],
       [0, 0, 0]
-    ]) {
+    ];
+    for (const [x, y, z] of dirs) {
       const w = ejectaDirectionWeight(x, y, z, res);
       expect(Number.isFinite(w)).toBe(true);
       expect(w).toBeGreaterThanOrEqual(0);

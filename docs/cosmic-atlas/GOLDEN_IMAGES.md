@@ -58,6 +58,12 @@ A golden passes iff `meanAbsDelta <= tolerance.meanAbsDelta` AND
 | SN_HYPERNOVA | `?preset=hypernova` @ phase 0.55 | Hypernova structural-state regressions (must stay distinct from core-collapse) | 6 / 40 / 3% | stable |
 | SN_GRB_ON | `?preset=long-grb-on-axis` @ phase 0.42 | Lost jet, beaming-response regressions on-axis | 8 / 48 / 4% | stable |
 | SN_GRB_OFF | `?preset=long-grb-off-axis` @ phase 0.42 | Off-axis geometric response flattening into a brightness multiplier | 8 / 48 / 4% | stable |
+| CM_INSPIRAL | `/atlas/compact-merger?preset=equal-mass-nsns` @ phase 0.05 | Binary inspiral: star/trail loss, orbit-phase regressions, sky breakage | 6 / 2 / 32 | stable (volume/particles dormant) |
+| CM_MERGER | `?preset=equal-mass-nsns` @ phase 0.37 | Merger flash envelope + ejecta volume ignition | 8 / 48 / 4% | stable |
+| CM_KILONOVA | `?preset=equal-mass-nsns` @ phase 0.7 | Kilonova shell radius/temperature trend + remnant | 8 / 48 / 5% | stable |
+| CM_GRB_ON | `?preset=short-grb-on-axis` @ phase 0.54 | Short-GRB jet on-axis (saturated response) lost or dimmed | 8 / 48 / 5% | stable |
+| CM_GRB_OFF | `?preset=short-grb-off-axis` @ phase 0.54 | Off-axis bipolar geometry flattening into a brightness multiplier | 8 / 48 / 5% | stable |
+| CM_REMNANT | `?preset=kilonova-focus` @ phase 0.9 | Afterglow + prompt-BH remnant scenario + late-timeline resources | 8 / 48 / 5% | stable |
 
 ## Update procedure
 

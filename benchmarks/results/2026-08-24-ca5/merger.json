@@ -1,0 +1,57 @@
+{
+  "schemaVersion": 1,
+  "kind": "compact-merger-phase-benchmark",
+  "date": "2026-08-23T23:33:54.995Z",
+  "label": "cm-merger",
+  "commit": "034b21b42cc99acec01eb8683b7ac51759105842",
+  "destination": "compact-merger",
+  "preset": "equal-mass-nsns",
+  "timelinePhase": 0.37,
+  "resolvedPhase": "merger",
+  "resolvedTimeSeconds": 0.7713173459725221,
+  "browser": {
+    "name": "msedge",
+    "version": "151.0.0.0"
+  },
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "platform": "Win32",
+  "adapter": {
+    "name": "amd rdna-2"
+  },
+  "backend": "webgpu",
+  "viewportCss": [1280, 800],
+  "devicePixelRatio": 1,
+  "effectiveRenderSize": [778, 581],
+  "quality": {
+    "requested": "medium",
+    "effectiveTier": "medium"
+  },
+  "renderScale": 0.8,
+  "warmupMs": 9000,
+  "sampleFrames": 480,
+  "frameCpuMs": {
+    "min": 1.7,
+    "median": 7,
+    "p90": 7,
+    "p95": 7.1,
+    "p99": 7.1,
+    "max": 7.2,
+    "mean": 6.94,
+    "stdev": 0.25
+  },
+  "frameGpuMs": null,
+  "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+  "phaseResources": {
+    "volumeVisible": true,
+    "volumeRadiusUnits": 1.4400000000000002,
+    "particlePopulationScale": 0.35,
+    "jetVisible": false,
+    "jetFrontUnits": 0,
+    "ejectaRadiusUnits": 0.595496450823997
+  },
+  "memory": {
+    "estimatedGpuBytesTotal": 7737416
+  },
+  "consoleErrors": 0,
+  "consoleErrorSamples": []
+}
