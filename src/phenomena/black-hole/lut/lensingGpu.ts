@@ -385,6 +385,7 @@ export function createLutLensingMaterial(
         .greaterThan(0.5);
 
       // ---- LUT branch ------------------------------------------------------
+      const lutResolved = float(0).toVar();
       If(lutEligible, () => {
         const lutFailed = float(0).toVar();
         const lutRadiance = vec3(0).toVar();
@@ -510,6 +511,7 @@ export function createLutLensingMaterial(
 
         // Terminal state per class.
         If(lutFailed.equal(0), () => {
+          lutResolved.assign(1);
           If(isCaptured.greaterThan(0.5), () => {
             statusTag.assign(int(LUT_STATUS_LUT_CAPTURED));
           }).Else(() => {
@@ -534,16 +536,10 @@ export function createLutLensingMaterial(
         escapedDirection.assign(lutEscapeDir);
       });
 
-      // ---- numerical path: owns every non-LUT pixel (fallback or gate) -----
-      // Runs when LUT is disabled OR the pixel fell back; its results
-      // OVERWRITE the LUT contribution entirely (no blending of backends).
-      const numericalOwns = select(
-        select(lutEligible, float(1), float(0))
-          .mul(select(statusTag.equal(int(LUT_STATUS_NUMERICAL_RESOLVED)), float(1), float(0)))
-          .greaterThan(0.5),
-        float(1),
-        float(0)
-      ).toVar();
+      // ---- numerical path: owns every pixel the LUT did not fully resolve --
+      // Runs when LUT is disabled, ineligible, OR failed mid-sample; its
+      // results OVERWRITE the LUT contribution entirely (no backend blend).
+      const numericalOwns = select(lutResolved.greaterThan(0.5), float(0), float(1)).toVar();
 
       If(numericalOwns.greaterThan(0.5), () => {
         statusTag.assign(int(LUT_STATUS_NUMERICAL_RESOLVED));
