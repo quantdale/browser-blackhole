@@ -74,7 +74,8 @@ interface AtlasAppWindowHook {
 const PRODUCTION_DESTINATIONS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'black-hole', label: 'Black Hole' },
   { id: 'neutron-star', label: 'Neutron Star' },
-  { id: 'stellar-explosion', label: 'Stellar Explosion' }
+  { id: 'stellar-explosion', label: 'Stellar Explosion' },
+  { id: 'compact-merger', label: 'Compact Merger' }
 ];
 
 /** Developer destination — surfaced ONLY while Debug mode is active. */
@@ -181,9 +182,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   const refreshNav = (): void => {
     const activeId = host.state.atlas.activeDestination;
     nav.replaceChildren();
-    const entries = host.registry.has('stellar-explosion')
-      ? [...PRODUCTION_DESTINATIONS]
-      : PRODUCTION_DESTINATIONS.filter((d) => d.id !== 'stellar-explosion');
+    const entries = [...PRODUCTION_DESTINATIONS];
     if (host.experienceMode === 'debug') entries.push(DEBUG_DESTINATION);
     for (const destination of entries) {
       if (!host.registry.has(destination.id)) continue;
@@ -383,6 +382,59 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }
       }).root
     );
+
+    // -- Destination controls (only semantics that actually exist) ------------
+    // Compact Merger exposes scenario/observer controls backed by its
+    // canonical applyControlState normalizer (CA5); other destinations keep
+    // preset-bound state only (documented control-scoping decision).
+    if (destId === 'compact-merger') {
+      const mergerSection = createCollapsibleSection({ title: 'Merger', open: false });
+      const share = (host.state.destinations['compact-merger']?.state ?? {}) as Record<
+        string,
+        unknown
+      >;
+      mergerSection.body.append(
+        createSliderRow({
+          label: 'Viewing angle',
+          min: 0,
+          max: 90,
+          step: 1,
+          value: typeof share['viewingAngleDeg'] === 'number' ? share['viewingAngleDeg'] : 75,
+          unit: '°',
+          onInput: (value) => {
+            host.setDestinationControl('compact-merger', { viewingAngleDeg: value });
+          }
+        }).root,
+        createSelectRow({
+          label: 'Remnant',
+          options: [
+            { value: 'massive-ns', label: 'Massive NS' },
+            { value: 'prompt-bh', label: 'Prompt BH' },
+            { value: 'delayed-collapse', label: 'Delayed collapse' }
+          ],
+          value:
+            typeof share['remnantScenario'] === 'string' ? share['remnantScenario'] : 'massive-ns',
+          onChange: (value) => {
+            host.setDestinationControl('compact-merger', { remnantScenario: value });
+            markPanelDirty();
+          }
+        }).root,
+        createSelectRow({
+          label: 'Jet',
+          options: [
+            { value: 'none', label: 'None' },
+            { value: 'thin', label: 'Thin (8°)' },
+            { value: 'wide', label: 'Wide (20°)' }
+          ],
+          value: typeof share['jetScenario'] === 'string' ? share['jetScenario'] : 'none',
+          onChange: (value) => {
+            host.setDestinationControl('compact-merger', { jetScenario: value });
+            markPanelDirty();
+          }
+        }).root
+      );
+      panelElement.append(mergerSection.root);
+    }
 
     // -- Diagnostics (Debug domain; opt-in) ------------------------------------
     if (host.diagnosticsEnabled) {

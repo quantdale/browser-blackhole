@@ -643,6 +643,13 @@ export interface PhenomenonModule {
 
   serializeShareState?(): Record<string, unknown>;
   getDebugSnapshot?(): Record<string, unknown>;
+  /**
+   * Live canonical control channel (CA5): UI controls call the HOST, the
+   * host forwards here; the module normalizes/merges through its ONE
+   * normalizer. Never a UI-to-uniform bypass. Absent = destination has no
+   * live controls.
+   */
+  applyControlState?(partial: Record<string, unknown>): void;
 }
 
 // ---------------------------------------------------------------------------

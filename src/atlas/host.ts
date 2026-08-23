@@ -409,18 +409,25 @@ export class CosmicAtlasHost {
 
   /** Dynamically import destination metadata + factories (lazy heavy paths). */
   private async registerDestinations(): Promise<void> {
-    const [diagnostic, blackHole, neutronStar, stellarExplosion] = await Promise.all([
-      import('./destinations/diagnosticDestination.js'),
-      import('./destinations/blackHoleDestination.js'),
-      import('../phenomena/neutron-star/neutronStarModule.js'),
-      import('../phenomena/stellar-explosion/presets.js')
-    ]);
+    const [diagnostic, blackHole, neutronStar, stellarExplosion, compactMerger] = await Promise.all(
+      [
+        import('./destinations/diagnosticDestination.js'),
+        import('./destinations/blackHoleDestination.js'),
+        import('../phenomena/neutron-star/neutronStarModule.js'),
+        import('../phenomena/stellar-explosion/presets.js'),
+        import('../phenomena/compact-merger/presets.js')
+      ]
+    );
     this.registry.register(diagnostic.diagnosticDescriptor, diagnostic.DIAGNOSTIC_PRESETS);
     this.registry.register(blackHole.blackHoleDescriptor, blackHole.BLACK_HOLE_PRESETS);
     this.registry.register(neutronStar.NEUTRON_STAR_DESCRIPTOR, NEUTRON_STAR_PRESETS);
     this.registry.register(
       stellarExplosion.STELLAR_EXPLOSION_DESCRIPTOR,
       stellarExplosion.STELLAR_EXPLOSION_PRESETS
+    );
+    this.registry.register(
+      compactMerger.COMPACT_MERGER_DESCRIPTOR,
+      compactMerger.COMPACT_MERGER_PRESETS
     );
   }
 
@@ -655,6 +662,20 @@ export class CosmicAtlasHost {
     const module = this.activePrepared?.module;
     if (module === undefined || typeof module.getDebugSnapshot !== 'function') return null;
     return module.getDebugSnapshot();
+  }
+
+  /**
+   * Canonical destination-control channel (CA5): forwards a partial control
+   * payload to the ACTIVE destination's applyControlState (which normalizes
+   * through its own single normalizer). Unknown ids / absent handlers are
+   * ignored; never throws; never touches uniforms directly.
+   */
+  setDestinationControl(destinationId: string, partial: Record<string, unknown>): void {
+    const active = this.activePrepared?.module;
+    if (active === undefined) return;
+    if (active.descriptor.id !== destinationId) return;
+    if (typeof active.applyControlState !== 'function') return;
+    active.applyControlState(partial);
   }
 
   get isReady(): boolean {
