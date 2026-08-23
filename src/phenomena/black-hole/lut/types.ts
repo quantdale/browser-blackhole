@@ -167,7 +167,10 @@ export interface LutTextureEntry {
    * texture id (see docs/LUT_BACKEND_ADR.md §4):
    * - trajectory: 0 = r(psi; x) in r_g.
    * - aux:        0 = nR, 1 = nT (terminal tetrad direction components),
-   *               2 = psiExit (rad), 3 = psiApsis (rad).
+   *               2 = realDataArc (rad): physical arc where the column's
+   *               real data ends inside the shared span (escape crossing
+   *               for escaping rays, capture azimuth for captured rays),
+   *               3 = psiApsis (rad; -1 marks a captured column).
    */
   channels: Record<string, number>;
   /** SHA-256 of the raw asset bytes, lowercase hex (64 chars). */

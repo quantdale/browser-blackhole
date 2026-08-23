@@ -2,11 +2,11 @@
   "schemaVersion": 1,
   "family": "schwarzschild-v1",
   "generatorVersion": "1.0.0",
-  "generatorCommit": "37fb785d282f218accb964cf1c46f24b3cebe1ac",
+  "generatorCommit": "9864585aa0ab5916cf096c6946d8a7411d672067",
   "physicsConvention": "schwarzschild-M1-static-observer, geometric units G=c=M=1",
   "coordinateConvention": "planar state (r, phi, p_r), E-normalized L=b; pos=r*(cos(phi)e0+sin(phi)e1); backwards ray tracing; terminal direction is the static-observer tetrad projection",
-  "referenceSolverVersion": "cpuReference.ts@37fb785d282f218accb964cf1c46f24b3cebe1ac#stepSize=0.002,maxStep=40",
-  "generatedAt": "2026-08-23T03:04:01+08:00",
+  "referenceSolverVersion": "cpuReference.ts@9864585aa0ab5916cf096c6946d8a7411d672067#stepSize=0.002,maxStep=40",
+  "generatedAt": "2026-08-23T03:35:16+08:00",
   "provenance": {
     "paper": "Eric Bruneton, Real-time High-Quality Rendering of Non-Rotating Black Holes, arXiv:2010.08735 (2020)",
     "implementation": "github.com/ebruneton/black_hole_shader (BSD-3-Clause)",
@@ -83,7 +83,7 @@
         "psiExit": 2,
         "psiApsis": 3
       },
-      "sha256": "f3f91fdc3810b5d24d125e4bd7d29b304e654e0fe4c47b9cd3117364b5827cd4",
+      "sha256": "94481f83f89b387b6228d49ab80fea402d538a1925ebf8b79741c2ab6cfacf87",
       "byteLength": 8192
     }
   ],

@@ -28,6 +28,11 @@ import type { Node } from 'three/webgpu';
 import { add, cos, div, dot, length, max, min, mul, normalize, sin, sub, vec3 } from 'three/tsl';
 import type { ILensingService, LensingPassParams, TslDensityFn } from '../../atlas/types';
 import { createLensingMaterial } from '../../phenomena/black-hole/schwarzschildIntegrator';
+import {
+  createLutLensingMaterial,
+  type LutLensingMaterial
+} from '../../phenomena/black-hole/lut/lensingGpu.js';
+import type { LutGpuResources } from '../../phenomena/black-hole/lut/textures.js';
 
 /** Handle shape returned by createBlackHoleLensingPass (mirrors ILensingService). */
 interface BlackHoleLensingPassHandle {
@@ -90,13 +95,55 @@ export class LensingService implements ILensingService {
     dispose(): void;
   } {
     const delegate = createLensingMaterial(params);
+    return this.wrapLensingHandle(delegate.material, delegate, params);
+  }
+
+  /**
+   * LUT-accelerated variant of the black-hole pass (M8-06). Same uniform
+   * contract; trajectory queries resolve from validated GPU textures with
+   * inline numerical fallback for out-of-domain rays.
+   */
+  createBlackHoleLutPass(
+    params: LensingPassParams,
+    lut: {
+      resources: LutGpuResources;
+      storedSpanRad: number;
+      bCriticalRg: number;
+      hybridBandHalfWidthX: number;
+    }
+  ): {
+    object3d(): THREE.Mesh;
+    setUniformsFromState(state: Record<string, unknown>): void;
+    dispose(): void;
+    lutMaterial(): LutLensingMaterial;
+  } {
+    const delegate = createLutLensingMaterial({
+      ...params,
+      trajectoryTexture: lut.resources.trajectoryTexture,
+      auxTexture: lut.resources.auxTexture,
+      storedSpanRad: lut.storedSpanRad,
+      bCriticalRg: lut.bCriticalRg,
+      hybridBandHalfWidthX: lut.hybridBandHalfWidthX
+    });
+    const wrapped = this.wrapLensingHandle(delegate.material, delegate, params);
+    return {
+      ...wrapped,
+      lutMaterial: () => delegate
+    };
+  }
+
+  private wrapLensingHandle(
+    material: THREE.Material,
+    delegate: { setUniformsFromState(state: Record<string, unknown>): void; dispose(): void },
+    _params: LensingPassParams
+  ) {
     const geometry = createFullscreenTriangleGeometry();
-    const mesh: THREE.Mesh = new THREE.Mesh(geometry, delegate.material);
+    const mesh: THREE.Mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
     mesh.name = 'black-hole-lensing-pass';
 
     let disposed = false;
-    const handle: BlackHoleLensingPassHandle = {
+    const handle = {
       object3d: () => mesh,
       setUniformsFromState: (state: Record<string, unknown>) => {
         delegate.setUniformsFromState(state);
@@ -104,13 +151,13 @@ export class LensingService implements ILensingService {
       dispose: () => {
         if (disposed) return;
         disposed = true;
-        const index = this.passes.indexOf(handle);
+        const index = this.passes.indexOf(handle as BlackHoleLensingPassHandle);
         if (index >= 0) this.passes.splice(index, 1);
         geometry.dispose();
         delegate.dispose();
       }
     };
-    this.passes.push(handle);
+    this.passes.push(handle as BlackHoleLensingPassHandle);
     return handle;
   }
 

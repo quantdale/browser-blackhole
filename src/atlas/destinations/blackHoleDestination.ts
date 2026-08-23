@@ -26,6 +26,11 @@ import type { PerspectiveCamera } from 'three';
 
 import { createDiagnosticPass } from '../../shaders/diagnostic.js';
 import type { DiagnosticPass, DiagnosticUniformBlock } from '../../shaders/diagnostic.js';
+import {
+  buildLutGpuResources,
+  type LutGpuResources
+} from '../../phenomena/black-hole/lut/textures.js';
+import { loadLutFamily, formatWebGL2Status } from '../../phenomena/black-hole/lut/runtime.js';
 import type { ILensingService } from '../types.js';
 import type {
   EnterContext,
@@ -225,6 +230,19 @@ export class BlackHoleModule implements PhenomenonModule {
   private lastQualityTier: FrameContext['quality'] = 'medium';
   private disposed = false;
 
+  /** LUT backend state (M8-06). Null until a valid family loads. */
+  private lut: {
+    resources: LutGpuResources;
+    storedSpanRad: number;
+    bCriticalRg: number;
+    hybridBandHalfWidthX: number;
+    familyDir: string;
+    webgl2Filterable: boolean;
+  } | null = null;
+  /** Requested trajectory backend; effective resolution in render(). */
+  private lastEffectiveBackend: 'numerical' | 'lut' = 'numerical';
+  private lastFallbackReason: string | null = null;
+
   async prepare(ctx: PrepareContext): Promise<{
     module: PhenomenonModule;
     scope: PrepareContext['scope'];
@@ -236,6 +254,26 @@ export class BlackHoleModule implements PhenomenonModule {
     ctx.reportProgress(0.15, 'Creating Schwarzschild lensing pass');
     throwIfAborted(ctx.signal);
     const scene = new Scene();
+
+    // --- LUT family load (M8-06): best-effort, never blocks the numerical
+    // path. Any failure records a truthful reason and continues numerical.
+    ctx.reportProgress(0.2, 'Loading Schwarzschild LUT family');
+    try {
+      const lut = await loadShippedLutFamily();
+      if (lut !== null) {
+        this.lut = lut;
+        ctx.scope.track(
+          'texture',
+          lut.resources,
+          () => lut.resources.dispose(),
+          lut.resources.byteEstimate
+        );
+      }
+    } catch (error) {
+      console.warn('[BlackHoleModule] LUT family load failed:', error);
+      this.lut = null;
+    }
+
     try {
       // Primary path: full backwards ray tracing through the shared
       // LensingService (physics owned by schwarzschildIntegrator.ts).
@@ -247,20 +285,77 @@ export class BlackHoleModule implements PhenomenonModule {
         diskOuterRg: DISK_OUTER_RG,
         qualityTier: ctx.quality
       });
-      ctx.scope.track(
-        'geometry',
-        handle.object3d().geometry,
-        () => handle.object3d().geometry.dispose(),
-        GEOMETRY_ESTIMATED_BYTES
-      );
-      ctx.scope.track(
-        'material',
-        handle.object3d().material,
-        () => handle.dispose(),
-        MATERIAL_ESTIMATED_BYTES
-      );
-      this.lensing = handle;
-      scene.add(handle.object3d());
+      // Decide the pass ONCE, up front: LUT when a valid family loaded and
+      // its formats are filterable on this backend; numerical otherwise.
+      if (
+        this.lut !== null &&
+        typeof (
+          ctx.services.lensing as {
+            createBlackHoleLutPass?: unknown;
+          }
+        ).createBlackHoleLutPass === 'function'
+      ) {
+        const lutSvc = ctx.services.lensing as ILensingService & {
+          createBlackHoleLutPass: (
+            p: Parameters<ILensingService['createBlackHoleLensingPass']>[0],
+            l: {
+              resources: LutGpuResources;
+              storedSpanRad: number;
+              bCriticalRg: number;
+              hybridBandHalfWidthX: number;
+            }
+          ) => LensingHandle & { lutMaterial?: () => unknown };
+        };
+        const lutHandle = lutSvc.createBlackHoleLutPass(
+          {
+            massRg: 1,
+            backgroundEquirect: null,
+            diskEnabled: true,
+            diskInnerRg: DISK_INNER_RG,
+            diskOuterRg: DISK_OUTER_RG,
+            qualityTier: ctx.quality
+          },
+          {
+            resources: this.lut.resources,
+            storedSpanRad: this.lut.storedSpanRad,
+            bCriticalRg: this.lut.bCriticalRg,
+            hybridBandHalfWidthX: this.lut.hybridBandHalfWidthX
+          }
+        );
+        ctx.scope.track(
+          'geometry',
+          lutHandle.object3d().geometry,
+          () => lutHandle.object3d().geometry.dispose(),
+          GEOMETRY_ESTIMATED_BYTES
+        );
+        ctx.scope.track(
+          'material',
+          lutHandle.object3d().material,
+          () => lutHandle.dispose(),
+          MATERIAL_ESTIMATED_BYTES
+        );
+        this.lensing = lutHandle as LensingHandle;
+        scene.add(lutHandle.object3d());
+        ctx.reportProgress(0.5, 'Schwarzschild LUT pass ready');
+      } else {
+        if (this.lut === null && this.lastFallbackReason === null) {
+          this.lastFallbackReason = 'lut-assets-unavailable';
+        }
+        ctx.scope.track(
+          'geometry',
+          handle.object3d().geometry,
+          () => handle.object3d().geometry.dispose(),
+          GEOMETRY_ESTIMATED_BYTES
+        );
+        ctx.scope.track(
+          'material',
+          handle.object3d().material,
+          () => handle.dispose(),
+          MATERIAL_ESTIMATED_BYTES
+        );
+        this.lensing = handle;
+        scene.add(handle.object3d());
+      }
     } catch {
       // Honest degraded path: deterministic fullscreen pattern, flagged in the
       // debug snapshot. Never presented as geodesic lensing.
@@ -330,6 +425,19 @@ export class BlackHoleModule implements PhenomenonModule {
         lensingState['diskEnabled'] = false;
         lensingState['debugMode'] = 1;
       }
+      // Trajectory backend gate: LUT only when a valid family is loaded AND
+      // its formats are filterable here; otherwise truthful numerical.
+      const lutUsable = this.lut !== null && this.lut.webgl2Filterable && lutFamilyRequested();
+      lensingState['lutEnabled'] = lutUsable ? 1 : 0;
+      if (lutUsable) {
+        this.lastEffectiveBackend = 'lut';
+        this.lastFallbackReason = null;
+      } else {
+        this.lastEffectiveBackend = 'numerical';
+        if (this.lut === null && this.lastFallbackReason === null) {
+          this.lastFallbackReason = 'lut-assets-unavailable';
+        }
+      }
       this.lensing.setUniformsFromState(lensingState);
     } else if (this.fallbackPass !== null) {
       applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
@@ -360,13 +468,22 @@ export class BlackHoleModule implements PhenomenonModule {
     return {
       pattern:
         this.lensing !== null
-          ? 'schwarzschild geodesic lensing + accretion disk'
+          ? this.lut !== null
+            ? 'schwarzschild geodesic lensing + accretion disk (LUT-capable)'
+            : 'schwarzschild geodesic lensing + accretion disk'
           : 'fullscreen pass fallback (lensing construction failed)',
       lensingWired: this.lensing !== null,
       diskInnerRg: DISK_INNER_RG,
       diskOuterRg: DISK_OUTER_RG,
       orbitEnabled: this.orbitEnabled,
       disposed: this.disposed,
+      // M8-06 backend/fallback truth (mission §9/§17):
+      trajectoryBackendRequested: requestedTrajectoryBackend(),
+      trajectoryBackendEffective: this.lastEffectiveBackend,
+      lutFamilyLoaded: this.lut !== null,
+      lutFamilyDir: this.lut?.familyDir ?? null,
+      lutWebgl2Filterable: this.lut?.webgl2Filterable ?? null,
+      lutFallbackReason: this.lastFallbackReason,
       estimatedGpuMemoryMBIsEstimate: true
     };
   }
@@ -380,6 +497,85 @@ function throwIfAborted(signal: AbortSignal): void {
   if (signal.aborted) {
     throw new DOMException('BlackHoleModule prepare aborted', 'AbortError');
   }
+}
+
+/**
+ * Dev/test-only trajectory-backend override (?trajectory=lut|numerical),
+ * same policy class as ?backend=. Default 'auto' resolves to numerical
+ * until M8-08 evidence justifies lut-by-default (LUT_BACKEND_SPEC §14/§15).
+ */
+function requestedTrajectoryBackend(): 'auto' | 'numerical' | 'lut' {
+  if (typeof window === 'undefined') return 'auto';
+  const value = new URLSearchParams(window.location.search).get('trajectory');
+  if (value === 'lut' || value === 'numerical') return value;
+  return 'auto';
+}
+
+function lutFamilyRequested(): boolean {
+  const mode = requestedTrajectoryBackend();
+  // 'numerical' forces the oracle path; 'lut' opts in; 'auto' stays numerical
+  // until M8-08 measures a meaningful win and M8-09 flips the default.
+  if (mode === 'numerical') return false;
+  if (mode === 'lut') return true;
+  return LUT_AUTO_DEFAULT;
+}
+
+/**
+ * auto-policy gate: flipped to true only by measured M8-08 evidence.
+ * See docs/BENCHMARK_MATRIX.md for the recorded numbers.
+ */
+export const LUT_AUTO_DEFAULT = false;
+
+async function loadShippedLutFamily(): Promise<{
+  resources: import('../../phenomena/black-hole/lut/textures.js').LutGpuResources;
+  storedSpanRad: number;
+  bCriticalRg: number;
+  hybridBandHalfWidthX: number;
+  familyDir: string;
+  webgl2Filterable: boolean;
+} | null> {
+  const indexResponse = await fetch('/luts/index.json');
+  if (!indexResponse.ok) return null;
+  const index = (await indexResponse.json()) as Record<string, string>;
+  const familyDir = index['schwarzschild-v1'];
+  if (familyDir === undefined) return null;
+  const manifestResponse = await fetch(`/luts/${familyDir}/manifest.json`);
+  if (!manifestResponse.ok) return null;
+  const manifestJson = await manifestResponse.json();
+  const manifest = manifestJson as {
+    textures: Array<{ id: string; file: string; format: string }>;
+    physics: { bCriticalRg: number };
+    hybridBandHalfWidthX: number;
+    textures0domain?: unknown;
+  };
+  const trajEntry = manifest.textures.find((t) => t.id === 'trajectory');
+  const auxEntry = manifest.textures.find((t) => t.id === 'aux');
+  if (trajEntry === undefined || auxEntry === undefined) return null;
+  const assets = new Map<string, Uint8Array>();
+  for (const entry of [trajEntry, auxEntry]) {
+    const assetResponse = await fetch(`/luts/${familyDir}/${entry.file}`);
+    if (!assetResponse.ok) return null;
+    assets.set(entry.file, new Uint8Array(await assetResponse.arrayBuffer()));
+  }
+  const result = await loadLutFamily(manifestJson, assets);
+  if (!result.ok) return null;
+  const domainSpan = (
+    result.family.manifest.textures.find((t) => t.id === 'trajectory')?.domain as {
+      storedSpanRg?: number;
+    }
+  )?.storedSpanRg;
+  if (domainSpan === undefined) return null;
+  const filterable =
+    formatWebGL2Status(trajEntry.format as Parameters<typeof formatWebGL2Status>[0]).filterable &&
+    formatWebGL2Status(auxEntry.format as Parameters<typeof formatWebGL2Status>[0]).filterable;
+  return {
+    resources: buildLutGpuResources(result.family.manifest, assets),
+    storedSpanRad: domainSpan,
+    bCriticalRg: result.family.manifest.physics.bCriticalRg,
+    hybridBandHalfWidthX: result.family.manifest.hybridBandHalfWidthX,
+    familyDir,
+    webgl2Filterable: filterable
+  };
 }
 
 /**

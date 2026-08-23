@@ -39,7 +39,7 @@ import type {
   LutTextureEntry,
   LutTrajectoryDomain
 } from './types.js';
-import { verifyAssetChecksum } from './validate.js';
+import { verifyAssetChecksum, validateLutManifest } from './validate.js';
 
 // ---------------------------------------------------------------------------
 // Loading
@@ -109,8 +109,7 @@ export async function loadLutFamily(
   manifestJson: unknown,
   assets: LutAssetSource
 ): Promise<LutLoadResult> {
-  const validated = await Promise.resolve().then(() => import('./validate.js'));
-  const result = validated.validateLutManifest(manifestJson);
+  const result = validateLutManifest(manifestJson);
   if (!result.ok) return failLoad(result.reason, result.detail);
 
   const textures = resolveTextures(result.manifest);

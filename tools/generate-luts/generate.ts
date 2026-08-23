@@ -41,7 +41,7 @@
  * manifests there. Recording a fake offline bound would be dishonest.
  */
 
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import path from 'node:path';
@@ -441,20 +441,22 @@ export async function buildFamily(options: GenerateFamilyOptions = {}): Promise<
   // --- aux texels: [nR, nT, psiExit, psiApsis] per column ------------------
   // psiExit stores the ROW-COORDINATE span of valid escaping data (= the
   // stored span), matching how the runtime walks outward from the launch
-  // solve; captured rows carry the -1 sentinel.
+  // solve; captured rows carry the -1 sentinel in channel 3.
   const auxChannels = new Float64Array(width * 4);
   for (let i = 0; i < width; i += 1) {
     const col = sweep.columns[i]!;
     const base = i * 4;
     auxChannels[base] = col.terminalDirection[0]!;
     auxChannels[base + 1] = col.terminalDirection[1]!;
+    // Channel 2 = physical real-data arc of THIS column (outbound escape
+    // crossing for escaping rays; capture azimuth for captured rays). Both
+    // classes need it: disk-crossing enumeration must stop at the arc end.
+    auxChannels[base + 2] = col.psiDataEnd;
+    // Channel 3 = apsis azimuth in launch frame; -1 marks a CAPTURED column
+    // (informational hint — analytic classification lives in resolveRay).
     if (col.escapingClass) {
-      // Physical (uncapped) outbound arc of THIS column: lets consumers know
-      // where clamped padding begins inside the shared span.
-      auxChannels[base + 2] = col.psiDataEnd;
       auxChannels[base + 3] = col.psiApsis;
     } else {
-      auxChannels[base + 2] = -1;
       auxChannels[base + 3] = -1;
     }
   }
@@ -557,6 +559,18 @@ export async function writeFamily(family: GeneratedFamily, outRoot: string): Pro
     await writeFile(path.join(dir, name), bytes);
   }
   await writeFile(path.join(dir, 'manifest.json'), `${JSON.stringify(family.manifest, null, 2)}\n`);
+  // Family index: stable URL for runtimes (public/luts/index.json maps
+  // family name -> current content-addressed directory). Written AFTER the
+  // family directory so a crash never publishes a dangling pointer.
+  const indexPath = path.join(outRoot, 'index.json');
+  let index: Record<string, string> = {};
+  try {
+    index = JSON.parse(await readFile(indexPath, 'utf8')) as Record<string, string>;
+  } catch {
+    index = {};
+  }
+  index[family.manifest.family] = family.directoryName;
+  await writeFile(indexPath, `${JSON.stringify(index, null, 2)}\n`);
   return dir;
 }
 
