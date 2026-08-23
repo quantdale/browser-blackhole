@@ -67,8 +67,12 @@ interface AtlasHook {
     /** Quality surface used to pin tiers in deterministic spec flows. */
     governor: {
       configure(config: { qualityMode?: 'auto' | 'low' | 'medium' | 'high' | 'ultra' }): void;
+      /** Hard tier pin used by the golden harness (overrides auto mode). */
+      setForcedTier(tier: 'low' | 'medium' | 'high' | 'ultra'): void;
       readonly currentTier: 'low' | 'medium' | 'high' | 'ultra';
     };
+    /** Re-applies canvas sizing from the given CSS viewport size. */
+    handleResize(cssWidth: number, cssHeight: number): void;
     /** M8-09 canonical trajectory-backend preference setter. */
     setTrajectoryBackend(preference: 'auto' | 'numerical' | 'lut'): void;
     /** Debug snapshot of the active destination module (null when none). */

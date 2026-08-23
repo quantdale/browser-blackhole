@@ -35,12 +35,17 @@ export const TRAJECTORY_BACKEND_VALUES: readonly TrajectoryBackendPreference[] =
 
 /**
  * Auto-policy gate (M8-08/M8-09): what `auto` resolves to when a validated
- * LUT family is loaded and usable on the active backend. Stays `false` unless
- * the paired numerical-vs-LUT benchmark campaign demonstrates a meaningful,
- * reproducible performance win within documented quality limits
- * (docs/BENCHMARK_MATRIX.md §10, docs/LUT_BACKEND_ADR.md §11).
+ * LUT family is loaded and usable on the active backend.
+ *
+ * FLIPPED TO TRUE by the M8-08 paired benchmark campaign (2026-08-23, Edge
+ * 151 / WebGPU / AMD RDNA-2, Windows): median frame-time improvement 49-83 %
+ * across default/face-on/edge-on scenes at pinned internal resolutions,
+ * photon-ring scene tied, p95 never regressed, sign-stable across repeats,
+ * and the full equivalence suite green after the M8 LUT GPU-path fixes
+ * (frame-origin, crossing selection, phi-star ratio — see git history and
+ * docs/LUT_BACKEND_ADR.md §11/§12). Criterion and numbers: ADR §11.
  */
-export const LUT_AUTO_DEFAULT: boolean = false;
+export const LUT_AUTO_DEFAULT: boolean = true;
 
 /** Everything the resolver needs to make the backend decision. */
 export interface TrajectoryBackendRequest {

@@ -260,6 +260,13 @@ export class BlackHoleModule implements PhenomenonModule {
    */
   private readonly urlTrajectoryOverride: TrajectoryBackendPreference | null =
     readTrajectoryUrlOverride();
+  /**
+   * Dev-only LUT status view (?lutdebug=1): renders the per-pixel resolution
+   * status map (LUT-escaped cyan / LUT-captured black / numerical-resolved
+   * orange / failure magenta) for M8 validation diagnostics.
+   */
+  private readonly lutDebugView: boolean =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lutdebug');
   private lastFallbackReason: string | null = null;
 
   async prepare(ctx: PrepareContext): Promise<{
@@ -445,6 +452,9 @@ export class BlackHoleModule implements PhenomenonModule {
       if (this.debugParity) {
         lensingState['diskEnabled'] = false;
         lensingState['debugMode'] = 1;
+      }
+      if (this.lutDebugView) {
+        lensingState['lutDebugStatus'] = 1;
       }
       // M8-09 canonical backend gate: precedence is dev/test URL override
       // (?trajectory=) > canonical rendering.trajectoryBackend preference >

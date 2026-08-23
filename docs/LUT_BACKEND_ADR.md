@@ -221,3 +221,58 @@ preserved in either branch.
 Measured scenes: `default` (typical), `face-on-disk` (easy/escape-heavy),
 `edge-on-lensing` (disk-heavy), `photon-ring` (critical-region). Results are
 recorded under `benchmarks/` and summarized in `.agent/STATE.md`.
+
+## 12. M8-08 measured outcome (2026-08-23) — AUTO DEFAULT FLIPPED TO LUT
+
+Environment: Windows 11, Microsoft Edge 151 (WebGPU, hardware), adapter
+"amd rdna-2", pinned medium tier, 600 sampled frames after 9 s warm-up,
+render scale 1 (internal ≈972×647) and 0.75 (≈729×485). rAF frame deltas are
+CPU-side measurements quantized to the ~6.94 ms display vsync interval.
+Raw records: `benchmarks/results/2026-08-23-m8/`.
+
+| Scene (scale 1.0) | numerical median/p95 | LUT median/p95 | median delta |
+| --- | --- | --- | --- |
+| default | 41.7 / 48.8 ms | 13.8 / 14.0 ms | **−67 %** (repeat −60 %) |
+| face-on-disk | 41.8 / 48.8 ms | 7.0 / 13.9 ms | **−83 %** |
+| edge-on-lensing | 27.9 / 34.9 ms | 7.0 / 14.0 ms | **−75 %** |
+| photon-ring | 20.9 / 27.9 ms | 20.9 / 27.9 ms | **0 % (tie)** |
+| default (scale 0.75) | 13.9 / 14.0 ms | 7.0 / 7.1 ms | **−50 %** |
+| edge-on (scale 0.75) | 13.8 / 14.0 ms | 7.0 / 7.1 ms | **−49 %** |
+
+Criterion verdict (§11): (1) headline ≥10 % — PASS; (2) no scene median
+regression >5 % — PASS (worst = photon-ring 0 %); (3) p95 regression ≤10 % —
+PASS (photon-ring identical, all others improve); (4) sign-stable across
+repeats on every scene — PASS; (5) equivalence green — PASS after the M8
+GPU-path fixes below. **`LUT_AUTO_DEFAULT = true`.** Numerical remains
+explicitly selectable (canonical preference + `?trajectory=` override) and
+all fallback paths stay truthful.
+
+Memory: the LUT family costs ~2.1 MiB GPU textures (R16F 1024² + RGBA16F
+1024×1) inside the destination scope whenever the black hole prepares —
+independent of the selected backend today (assets load eagerly); making the
+load backend-conditional is future optimization, not required by the gate.
+
+### M8 validation-debt closure — GPU-path defects found and FIXED
+
+Extending the browser parity corpus to the LUT execution path exposed three
+real defects in `lut/lensingGpu.ts` that the CPU-level M8-07 corpus could not
+see (its terminal-direction tolerance had been DEFERRED, not asserted). All
+three are fixed at the root cause; the browser corpora now enforce:
+
+1. **FRAME-ORIGIN FIX** — table rows/aux live in launch coordinates (φ=0 at
+   the r_ref=64 inbound crossing); the pass embeds φ=0 at the OBSERVER. The
+   code had used `psiApsis` directly, rotating every LUT-resolved ray by the
+   camera-dependent angle `psiApsis − launchRow`. Correct mapping: folded row
+   `|φ_obs − launchRow|`, exit azimuth `launchRow + arcEnd`.
+2. **CROSSING SELECTION** — the ascending-arc selection loop re-selected the
+   same crossing on every pass (window test `>=` with a per-pass reset best),
+   multiplying disk emission up to 4×. Exclusion is now by candidate azimuth.
+3. **PHI-STAR RATIO** — the plane-height zero used `atan(e1.y/−e0.y)` (the
+   PERPENDICULAR angle) instead of `atan(−e0.y/e1.y)`, transplanting the
+   entire disk image by ≈90° per pixel plane.
+
+Post-fix evidence: numerical-vs-LUT whole-frame mean delta 0.09/255
+(doppler-demo view, forced linear chain); terminal-direction agreement
+≤ ~1° across the sky on both renderer APIs; integrator parity corpus green
+on all four (api × trajectory) rows; cross-backend disk luminance agreement
+at matched probes ≤ 8/255.

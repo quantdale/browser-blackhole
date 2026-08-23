@@ -33,10 +33,11 @@ describe('trajectory backend vocabulary', () => {
     expect(TRAJECTORY_BACKEND_VALUES).toEqual(['auto', 'numerical', 'lut']);
   });
 
-  it('keeps numerical as the shipped auto default until measured evidence flips it', () => {
-    // Regression guard for the M8-08 decision: flipping this constant without
-    // recorded benchmark evidence must fail this test.
-    expect(LUT_AUTO_DEFAULT).toBe(false);
+  it('keeps the shipped auto default aligned with the recorded M8-08 decision', () => {
+    // Evidence trail: docs/LUT_BACKEND_ADR.md §11 (criterion, fixed before
+    // measurement) and §12 (measured outcome). Reverting this flag requires
+    // a documented reason in the same commit.
+    expect(LUT_AUTO_DEFAULT).toBe(true);
   });
 });
 
@@ -46,13 +47,17 @@ describe('resolveTrajectoryBackend precedence', () => {
     expect(r).toEqual({ requested: 'auto', effective: 'numerical', fallbackReason: null });
   });
 
-  it('auto resolves to lut only when the gate AND readiness both hold', () => {
+  it('auto resolves to lut when the gate AND readiness both hold (M8-08 flipped)', () => {
+    // Regression guard for the M8-08 decision: the gate is TRUE with recorded
+    // benchmark evidence (docs/LUT_BACKEND_ADR.md §11/§12); readiness is
+    // still required — auto with unavailable assets stays numerical.
+    expect(LUT_AUTO_DEFAULT).toBe(true);
     const notReady = resolveTrajectoryBackend(
-      base({ autoDefaultLut: true, lutAssetsReady: false })
+      base({ autoDefaultLut: LUT_AUTO_DEFAULT, lutAssetsReady: false })
     );
     expect(notReady.effective).toBe('numerical');
     expect(notReady.fallbackReason).toBeNull();
-    const open = resolveTrajectoryBackend(base({ autoDefaultLut: true, lutAssetsReady: true }));
+    const open = resolveTrajectoryBackend(base({ autoDefaultLut: LUT_AUTO_DEFAULT }));
     expect(open).toEqual({ requested: 'auto', effective: 'lut', fallbackReason: null });
   });
 

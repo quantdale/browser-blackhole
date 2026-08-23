@@ -392,18 +392,21 @@ export function createLutLensingMaterial(
         const lutRadiance = vec3(0).toVar();
         const lutEscapeDir = vec3(0).toVar();
 
+        // Captured-class columns are anchored at r_ref (=64) INBOUND and this
+        // family carries no apsis azimuth for them, so the launch-frame ->
+        // observer-frame shift needed below is undefined; those pixels are
+        // routed to the numerical oracle EXPLICITLY (never a silent mixup).
         const uCol = clamp(xToUNode(xNorm), float(0), float(1)).toVar();
         const aux4 = auxAt(uCol).toVar();
         const arcEnd = aux4.z.toVar();
-        const psiApsisTex = aux4.w.toVar();
         const isCaptured = select(aux4.w.lessThan(0), float(1), float(0)).toVar();
-        // Escaping columns anchor rows AT APSIS (row = |phi - psiApsis|);
-        // captured columns anchor rows AT LAUNCH (row = phi).
-        const frameO = mix(psiApsisTex, float(0), isCaptured).toVar();
+        If(isCaptured.greaterThan(0.5), () => {
+          lutFailed.assign(1);
+        });
 
         // Launch solve: bounded binary search for v where traj(u,v) crosses
-        // the observer radius. The stored curve is monotone non-decreasing
-        // from periapsis to the envelope crossing / clamp plateau.
+        // the observer radius. Escaping rows are ANCHORED AT APSIS and rise
+        // monotonically to the escape-radius crossing / clamp plateau.
         const target = r0.toVar();
         const loV = float(0).toVar();
         const hiV = float(1).toVar();
@@ -417,6 +420,21 @@ export function createLutLensingMaterial(
           });
         });
         const launchRow = loV.add(hiV).mul(0.5).mul(spanLit).toVar();
+
+        // FRAME MAPPING (M8 root-cause fix): table rows and aux channels live
+        // in LAUNCH coordinates (phi = 0 at the r_ref inbound crossing, apsis
+        // at psiApsis), while THIS pass embeds the geodesic plane with
+        // phi = 0 AT THE OBSERVER. The inbound observer-sphere crossing sits
+        // at launch azimuth (psiApsis - launchRow), so
+        //   phiLaunch = phiOurs + (psiApsis - launchRow)
+        // and therefore the folded row for an our-frame azimuth is
+        //   row = |phiOurs - launchRow|
+        // and the outgoing escape crossing happens at our-frame azimuth
+        //   phiExit = launchRow + arcEnd.
+        // Using psiApsis directly here rotated every LUT-resolved ray by the
+        // camera-dependent angle (psiApsis - launchRow), corrupting disk-hit
+        // geometry and terminal sky directions for r0 != r_ref cameras.
+        const frameO = launchRow.toVar();
 
         // Solve validity: observer radius must lie inside this ray's tabulated
         // radial range AND inside real data; non-finite reads fail explicitly.
@@ -441,13 +459,24 @@ export function createLutLensingMaterial(
         });
 
         // Disk-plane crossings at the exact zeros of the plane-height
-        // sinusoid u_y(phi) = cos(phi)*e0.y + sin(phi)*e1.y: phi* =
-        // atan2(-e0.y, e1.y), candidates phi* + k*pi (ADR section 7).
-        const phiStar = e1.y.div(e0.y.mul(-1)).atan().toVar();
+        // sinusoid u_y(phi) = cos(phi)*e0.y + sin(phi)*e1.y (observer frame):
+        // phi* = atan2(-e0.y, e1.y), candidates phi* + k*pi (ADR section 7);
+        // rows fold through the OBSERVER-frame origin (see FRAME MAPPING).
+        // The +k*pi sweep makes the atan2 quadrant irrelevant, but the RATIO
+        // itself must be -e0.y/e1.y: an earlier e1.y/(-e0.y) version computed
+        // the PERPENDICULAR angle (tan psi = -b/a vs tan phi* = -a/b) and
+        // transplanted the entire disk image by ~90 degrees per pixel plane.
+        const phiStar = e0.y.mul(-1).div(e1.y).atan().toVar();
 
         // Emission in ascending-arc order: MAX_CROSSINGS selection passes,
         // each scanning all candidates for the smallest row > previous min.
+        // EXCLUSION IS BY CANDIDATE AZIMUTH (phiCand), not by row alone: the
+        // folded row maps the inbound AND outbound branches to the same value,
+        // so a row-only window would (a) re-emit the same crossing on every
+        // pass (4x brightness blowup) and (b) drop the legitimate branch
+        // partner that shares its row.
         const prevBest = float(-1).toVar();
+        const prevBestPhi = float(1e30).toVar();
         Loop(MAX_CROSSINGS, () => {
           const bestS = float(1e30).toVar();
           const bestR = float(0).toVar();
@@ -461,9 +490,11 @@ export function createLutLensingMaterial(
               phiCand,
               phiCand.sub(frameO).abs()
             ).toVar();
-            const inWindow = select(rowCand.greaterThanEqual(prevBest), float(1), float(0)).mul(
-              select(rowCand.lessThanEqual(arcEnd), float(1), float(0))
-            );
+            const inWindow = select(rowCand.greaterThanEqual(prevBest), float(1), float(0))
+              .mul(select(rowCand.lessThanEqual(arcEnd), float(1), float(0)))
+              .mul(
+                select(phiCand.sub(prevBestPhi).abs().greaterThan(float(1e-4)), float(1), float(0))
+              );
             If(inWindow.greaterThan(0.5), () => {
               const rHit = trajAt(uCol, rowCand.div(spanLit)).toVar();
               const finite = select(
@@ -507,6 +538,7 @@ export function createLutLensingMaterial(
             }) as Vec3Node;
             lutRadiance.addAssign(emitted);
             prevBest.assign(bestS);
+            prevBestPhi.assign(bestPhi);
           });
         });
 
@@ -518,8 +550,9 @@ export function createLutLensingMaterial(
             rayWasCaptured.assign(1);
           }).Else(() => {
             // Outgoing envelope azimuth + reconstructed world direction from
-            // aux terminal components (same tetrad projection as numerical).
-            const phiExit = psiApsisTex.add(arcEnd).toVar();
+            // aux terminal components (same tetrad projection as numerical),
+            // expressed in the OBSERVER frame per FRAME MAPPING above.
+            const phiExit = launchRow.add(arcEnd).toVar();
             const cE = cos(phiExit);
             const sE = sin(phiExit);
             const dirWorld = normalize(

@@ -63,12 +63,27 @@ function collectErrors(page: Page): string[] {
 }
 
 test.describe('trajectory backend selection (M8-09)', () => {
-  test('auto keeps numerical as the production default', async ({ page }) => {
+  test('auto resolves through the measured gate: lut when assets are usable', async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto('/atlas/black-hole');
     await waitForArrival(page, 'black-hole');
 
     // One deterministic frame so render() has resolved the policy at least once.
+    expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
+
+    const snap = await trajectorySnapshot(page);
+    expect(snap.trajectoryBackendRequested).toBe('auto');
+    // M8-08 flipped the auto gate WITH recorded evidence (ADR §11/§12): auto
+    // resolves to the LUT path when the validated family is loaded/usable.
+    expect(snap.trajectoryBackendEffective).toBe('lut');
+    expect(errors).toEqual([]);
+  });
+
+  test('auto falls back to numerical when LUT assets are unavailable', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.route(/\/luts\//, (route) => route.abort());
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page, 'black-hole');
     expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
 
     const snap = await trajectorySnapshot(page);
@@ -147,7 +162,8 @@ test.describe('trajectory backend selection (M8-09)', () => {
 
     const snap = await trajectorySnapshot(page);
     expect(snap.trajectoryBackendRequested).toBe('auto');
-    expect(snap.trajectoryBackendEffective).toBe('numerical');
+    // Invalid values collapse to auto, which now resolves through the gate.
+    expect(snap.trajectoryBackendEffective).toBe('lut');
     expect(errors).toEqual([]);
   });
 

@@ -88,9 +88,7 @@ page.on('console', (m) => {
   consoleErrors.push(text.slice(0, 200));
 });
 
-await page.goto(
-  `http://127.0.0.1:${port}/atlas/black-hole?preset=${encodeURIComponent(preset)}`
-);
+await page.goto(`http://127.0.0.1:${port}/atlas/black-hole?preset=${encodeURIComponent(preset)}`);
 await page.waitForFunction(
   () => window.__ATLAS_APP__ && window.__ATLAS_APP__.host.state.atlas.transition.active === false,
   null,
@@ -240,8 +238,7 @@ const record = {
   // Honest limitation: this harness has no GPU timestamp queries wired; these
   // are CPU-side frame-time measurements only.
   frameGpuMs: null,
-  gpuTimingNote:
-    'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps',
+  gpuTimingNote: 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps',
   memory: {
     estimatedGpuBytesTotal: info.totalEstimatedGpuBytes,
     textureCount: info.totalTextures,

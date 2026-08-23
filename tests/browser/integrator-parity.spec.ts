@@ -25,6 +25,12 @@ import { collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHa
  * f64 trajectory drift over <= 32 r_g, and half-float HDR intermediate
  * storage; they would catch a wrong sign, swapped basis vector, inverted
  * falloff, or classification flip away from the critical boundary.
+ *
+ * M8 validation-debt closure: the corpus runs against BOTH trajectory
+ * execution paths on BOTH renderer APIs. The ?trajectory= dev override pins
+ * the execution path (precedence-1 policy, docs/LUT_BACKEND_SPEC §15); the
+ * module debug snapshot is asserted so an ignored override can never make a
+ * row vacuously pass.
  */
 
 /** GPU escape radius driven by the destination (blackHoleDestination.ts). */
@@ -156,155 +162,177 @@ async function waitForCameraSettled(page: Page): Promise<void> {
     .toBeLessThan(1e-4);
 }
 
-test.describe('Schwarzschild integrator CPU/GPU parity corpus', () => {
-  for (const backend of ['webgpu', 'webgl2'] as const) {
-    test(`selected rays agree with the binary64 reference (${backend})`, async ({ page }) => {
-      const errors = collectErrors(page);
-      test.setTimeout(120_000);
+/** One full corpus execution against one (api backend, trajectory path) pair. */
+async function runParityCorpus(page: Page, backend: string, trajectory: string): Promise<void> {
+  const errors = collectErrors(page);
 
-      await page.goto(`/atlas/black-hole?preset=debug-parity&backend=${backend}`);
-      await expect
-        .poll(
-          async () =>
-            page.evaluate(() => {
-              const app = window.__ATLAS_APP__;
-              if (!app) return 'no-app';
-              if (app.host.state.atlas.transition.active) return 'transitioning';
-              return app.host.state.atlas.activeDestination === 'black-hole' &&
-                app.host.state.atlas.activePreset === 'debug-parity'
-                ? 'arrived'
-                : 'waiting';
-            }),
-          { timeout: 30_000, intervals: [250] }
-        )
-        .toBe('arrived');
+  await page.goto(
+    `/atlas/black-hole?preset=debug-parity&backend=${backend}&trajectory=${trajectory}`
+  );
+  await expect
+    .poll(
+      async () =>
+        page.evaluate(() => {
+          const app = window.__ATLAS_APP__;
+          if (!app) return 'no-app';
+          if (app.host.state.atlas.transition.active) return 'transitioning';
+          return app.host.state.atlas.activeDestination === 'black-hole' &&
+            app.host.state.atlas.activePreset === 'debug-parity'
+            ? 'arrived'
+            : 'waiting';
+        }),
+      { timeout: 30_000, intervals: [250] }
+    )
+    .toBe('arrived');
 
-      // Deterministic display chain: identity-ish post so presented pixels are
-      // sRGB(linear) and direction components decode numerically.
-      await page.evaluate(() => {
-        const post = window.__ATLAS_APP__!.host.post;
-        post.setBloom(false, 0);
-        post.setExposure(1);
-        post.setToneMapping('linear');
-      });
-      await waitForCameraSettled(page);
-      const basis = await readCameraBasis(page);
+  // Guard against a silently ignored trajectory override: the debug snapshot
+  // must report exactly the requested execution path after a rendered frame.
+  expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
+  const snap = await page.evaluate(() =>
+    window.__ATLAS_APP__!.host.activeDestinationDebugSnapshot()
+  );
+  expect(snap?.['trajectoryBackendRequested'], 'requested path recorded').toBe(trajectory);
+  expect(snap?.['trajectoryBackendEffective'], 'requested path actually executed').toBe(
+    trajectory === 'lut' ? 'lut' : 'numerical'
+  );
 
-      // --- corpus selection -------------------------------------------------
-      // Impact parameters bracketing b_c on both sides along two screen axes,
-      // deliberately AWAY from the critical boundary (classification there is
-      // step-budget sensitive by design); radial-in via the exact center ray.
-      const ratios = [0.35, 0.7, 1.25, 2.0];
-      const axes: Array<{ axis: Vec3; name: string }> = [
-        { axis: basis.right, name: 'screen-x' },
-        { axis: basis.up, name: 'screen-y' }
-      ];
-      interface CorpusRay {
-        label: string;
-        ndc: NdcPoint;
-        cpuClass: string;
-        cpuDir: Vec3;
-      }
-      const rays: CorpusRay[] = [];
-      const centerDir: Vec3 = scale(basis.forward, -1); // camera looks at origin
-      const centerNdc = ndcForDir(basis, centerDir);
-      const centerCpu = integratePhoton(basis.position, centerDir, {
+  // Deterministic display chain: identity-ish post so presented pixels are
+  // sRGB(linear) and direction components decode numerically.
+  await page.evaluate(() => {
+    const post = window.__ATLAS_APP__!.host.post;
+    post.setBloom(false, 0);
+    post.setExposure(1);
+    post.setToneMapping('linear');
+  });
+  await waitForCameraSettled(page);
+  const basis = await readCameraBasis(page);
+
+  // --- corpus selection ---------------------------------------------------
+  // Impact parameters bracketing b_c on both sides along two screen axes,
+  // deliberately AWAY from the critical boundary (classification there is
+  // step-budget sensitive by design); radial-in via the exact center ray.
+  const ratios = [0.35, 0.7, 1.25, 2.0];
+  const axes: Array<{ axis: Vec3; name: string }> = [
+    { axis: basis.right, name: 'screen-x' },
+    { axis: basis.up, name: 'screen-y' }
+  ];
+  interface CorpusRay {
+    label: string;
+    ndc: NdcPoint;
+    cpuClass: string;
+    cpuDir: Vec3;
+  }
+  const rays: CorpusRay[] = [];
+  const centerDir: Vec3 = scale(basis.forward, -1); // camera looks at origin
+  const centerNdc = ndcForDir(basis, centerDir);
+  const centerCpu = integratePhoton(basis.position, centerDir, {
+    escapeRadius: ESCAPE_RADIUS_RG,
+    captureEpsilon: CAPTURE_EPSILON_M
+  });
+  if (
+    Math.abs(centerNdc.x) < 0.9 &&
+    Math.abs(centerNdc.y) < 0.9 &&
+    centerCpu.status === 'captured'
+  ) {
+    rays.push({
+      label: 'radial-center',
+      ndc: centerNdc,
+      cpuClass: 'captured',
+      cpuDir: [0, 0, 0]
+    });
+  }
+  for (const { axis, name } of axes) {
+    for (const ratio of ratios) {
+      const alpha = angleForImpact(basis.position, basis.forward, axis, ratio * B_CRITICAL);
+      const d = add(scale(basis.forward, Math.cos(alpha)), scale(axis, Math.sin(alpha)));
+      const dn = norm(d);
+      const dir: Vec3 = [d[0] / dn, d[1] / dn, d[2] / dn];
+      const ndc = ndcForDir(basis, dir);
+      if (Math.abs(ndc.x) > 0.9 || Math.abs(ndc.y) > 0.9) continue; // off-viewport
+      const result = integratePhoton(basis.position, dir, {
         escapeRadius: ESCAPE_RADIUS_RG,
         captureEpsilon: CAPTURE_EPSILON_M
       });
-      if (
-        Math.abs(centerNdc.x) < 0.9 &&
-        Math.abs(centerNdc.y) < 0.9 &&
-        centerCpu.status === 'captured'
-      ) {
-        rays.push({
-          label: 'radial-center',
-          ndc: centerNdc,
-          cpuClass: 'captured',
-          cpuDir: [0, 0, 0]
-        });
+      if (result.status === 'max-steps') continue; // never assert budget artifacts
+      const expected = ratio < 1 ? 'captured' : 'escaped';
+      expect(
+        result.status,
+        `${name} b/b_c=${ratio}: CPU class must match analytic expectation`
+      ).toBe(expected);
+      rays.push({
+        label: `${name}-b${ratio}`,
+        ndc,
+        cpuClass: result.status,
+        cpuDir: result.finalDirection
+      });
+    }
+  }
+  expect(rays.length, 'corpus must retain enough in-viewport rays').toBeGreaterThanOrEqual(6);
+  expect(rays.some((r) => r.cpuClass === 'captured')).toBe(true);
+  expect(rays.some((r) => r.cpuClass === 'escaped')).toBe(true);
+
+  // --- presented-frame evidence --------------------------------------------
+  const samples = await sampleColorsAtNdc(
+    page,
+    rays.map((r) => r.ndc)
+  );
+  expect(samples.length).toBe(rays.length);
+
+  let magentaish = 0;
+  for (let i = 0; i < rays.length; i += 1) {
+    const ray = rays[i]!;
+    const px = samples[i]!;
+    const channels = [px.r, px.g, px.b];
+
+    if (ray.cpuClass === 'captured') {
+      for (const c of channels) {
+        expect(c, `${ray.label}: captured ray must present near-black`).toBeLessThanOrEqual(
+          BLACK_CHANNEL_MAX
+        );
       }
-      for (const { axis, name } of axes) {
-        for (const ratio of ratios) {
-          const alpha = angleForImpact(basis.position, basis.forward, axis, ratio * B_CRITICAL);
-          const d = add(scale(basis.forward, Math.cos(alpha)), scale(axis, Math.sin(alpha)));
-          const dn = norm(d);
-          const dir: Vec3 = [d[0] / dn, d[1] / dn, d[2] / dn];
-          const ndc = ndcForDir(basis, dir);
-          if (Math.abs(ndc.x) > 0.9 || Math.abs(ndc.y) > 0.9) continue; // off-viewport
-          const result = integratePhoton(basis.position, dir, {
-            escapeRadius: ESCAPE_RADIUS_RG,
-            captureEpsilon: CAPTURE_EPSILON_M
-          });
-          if (result.status === 'max-steps') continue; // never assert budget artifacts
-          const expected = ratio < 1 ? 'captured' : 'escaped';
-          expect(
-            result.status,
-            `${name} b/b_c=${ratio}: CPU class must match analytic expectation`
-          ).toBe(expected);
-          rays.push({
-            label: `${name}-b${ratio}`,
-            ndc,
-            cpuClass: result.status,
-            cpuDir: result.finalDirection
-          });
-        }
-      }
-      expect(rays.length, 'corpus must retain enough in-viewport rays').toBeGreaterThanOrEqual(6);
-      expect(rays.some((r) => r.cpuClass === 'captured')).toBe(true);
-      expect(rays.some((r) => r.cpuClass === 'escaped')).toBe(true);
+      continue;
+    }
 
-      // --- presented-frame evidence ----------------------------------------
-      const samples = await sampleColorsAtNdc(
-        page,
-        rays.map((r) => r.ndc)
-      );
-      expect(samples.length).toBe(rays.length);
+    // Escaped: decode to linear and compare against the CPU terminal
+    // direction component-by-component.
+    if (px.r > 40 && px.g < px.r - 15 && Math.abs(px.b - px.r) < 25) {
+      magentaish += 1;
+    }
+    const recovered: Vec3 = [
+      decodeSrgbChannel(px.r) * 2 - 1,
+      decodeSrgbChannel(px.g) * 2 - 1,
+      decodeSrgbChannel(px.b) * 2 - 1
+    ];
+    for (let c = 0; c < 3; c += 1) {
+      const delta = Math.abs(recovered[c]! - ray.cpuDir[c]!);
+      expect(
+        delta,
+        `${ray.label}: direction[${'xyz'[c]}] gpu=${recovered[c]!.toFixed(4)} ` +
+          `cpu=${ray.cpuDir[c]!.toFixed(4)}`
+      ).toBeLessThan(DIRECTION_TOLERANCE);
+    }
+  }
+  expect(magentaish, 'no failure-colored pixels expected in the corpus').toBe(0);
+  // Known benign noise (context-creation preference hints, readback
+  // warnings, resource 404s) is filtered exactly like the other suites.
+  const realErrors = [
+    ...errors.consoleErrors.filter(
+      (t) => !/powerPreference|readback|Failed to load resource/.test(t)
+    ),
+    ...errors.pageErrors
+  ];
+  expect(realErrors, `${backend}/${trajectory}: console/page errors must stay clean`).toEqual([]);
+}
 
-      let magentaish = 0;
-      for (let i = 0; i < rays.length; i += 1) {
-        const ray = rays[i]!;
-        const px = samples[i]!;
-        const channels = [px.r, px.g, px.b];
-
-        if (ray.cpuClass === 'captured') {
-          for (const c of channels) {
-            expect(c, `${ray.label}: captured ray must present near-black`).toBeLessThanOrEqual(
-              BLACK_CHANNEL_MAX
-            );
-          }
-          continue;
-        }
-
-        // Escaped: decode to linear and compare against the CPU terminal
-        // direction component-by-component.
-        if (px.r > 40 && px.g < px.r - 15 && Math.abs(px.b - px.r) < 25) {
-          magentaish += 1;
-        }
-        const recovered: Vec3 = [
-          decodeSrgbChannel(px.r) * 2 - 1,
-          decodeSrgbChannel(px.g) * 2 - 1,
-          decodeSrgbChannel(px.b) * 2 - 1
-        ];
-        for (let c = 0; c < 3; c += 1) {
-          const delta = Math.abs(recovered[c]! - ray.cpuDir[c]!);
-          expect(
-            delta,
-            `${ray.label}: direction[${'xyz'[c]}] gpu=${recovered[c]!.toFixed(4)} ` +
-              `cpu=${ray.cpuDir[c]!.toFixed(4)}`
-          ).toBeLessThan(DIRECTION_TOLERANCE);
-        }
-      }
-      expect(magentaish, 'no failure-colored pixels expected in the corpus').toBe(0);
-      // Known benign noise (context-creation preference hints, readback
-      // warnings, resource 404s) is filtered exactly like the other suites.
-      const realErrors = [
-        ...errors.consoleErrors.filter(
-          (t) => !/powerPreference|readback|Failed to load resource/.test(t)
-        ),
-        ...errors.pageErrors
-      ];
-      expect(realErrors, `${backend}: console/page error channels must stay clean`).toEqual([]);
-    });
+test.describe('Schwarzschild integrator CPU/GPU parity corpus', () => {
+  for (const backend of ['webgpu', 'webgl2'] as const) {
+    for (const trajectory of ['numerical', 'lut'] as const) {
+      test(`selected rays agree with the binary64 reference (${backend}, ${trajectory})`, async ({
+        page
+      }) => {
+        test.setTimeout(120_000);
+        await runParityCorpus(page, backend, trajectory);
+      });
+    }
   }
 });
