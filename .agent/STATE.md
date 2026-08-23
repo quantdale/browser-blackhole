@@ -17,10 +17,8 @@ Commit chain this campaign (after the M8 closure commits 82c4dfa/e9c53ac/
 a20a7a9/b4c41b5):
 ```
 034b21b feat: add compact merger reduced physics core and destination module
-<pending> feat: register compact merger atlas product experience
-<pending> test: add compact merger validation browser coverage and goldens
-<pending> perf: characterize compact merger phase workloads
-<pending> docs/state: ca5 completion evidence
+b388ea5 feat: register compact merger atlas product experience with validation and goldens
+<pending> chore: remove stray temp asset; finalize ca5 state
 ```
 
 ## CA5 packet status
