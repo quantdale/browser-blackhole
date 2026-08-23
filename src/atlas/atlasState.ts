@@ -24,6 +24,7 @@ import type {
   TransitionPublicState,
   VersionedDestinationState
 } from './types';
+import { TRAJECTORY_BACKEND_VALUES } from './trajectoryPolicy';
 
 // ---------------------------------------------------------------------------
 // Defaults and documented control ranges (STATE_AND_ROUTES §6)
@@ -170,7 +171,8 @@ export function createDefaultAtlasState(
       qualityMode: 'auto',
       targetFps: 60,
       dynamicResolution: true,
-      renderScaleOverride: null
+      renderScaleOverride: null,
+      trajectoryBackend: 'auto'
     },
     experience: {
       mode: 'scientific'
@@ -333,6 +335,11 @@ export function validateAtlasState(
         renderingRaw['renderScaleOverride'],
         RENDER_SCALE_OVERRIDE_RANGE.min,
         RENDER_SCALE_OVERRIDE_RANGE.max
+      ),
+      trajectoryBackend: enumOr(
+        renderingRaw['trajectoryBackend'],
+        TRAJECTORY_BACKEND_VALUES,
+        'auto'
       )
     },
     experience: {
@@ -403,6 +410,7 @@ function formatNumberCompact(value: number): string {
  * - `e` sharedVisual.exposure, `b` bloomEnabled, `bs` bloomStrength,
  *   `t` toneMapping (each omitted when equal to its default);
  * - `q` rendering.qualityMode (omitted when `auto`);
+ * - `tb` rendering.trajectoryBackend (omitted when `auto`);
  * - `mode` experience.mode (omitted when `scientific`);
  * - `rm` accessibility.reducedMotion (omitted when false).
  *
@@ -428,6 +436,9 @@ export function serializeForUrl(state: CosmicAtlasStateV1): string {
     parts.push(`t=${s.sharedVisual.toneMapping}`);
   }
   if (s.rendering.qualityMode !== 'auto') parts.push(`q=${s.rendering.qualityMode}`);
+  if (s.rendering.trajectoryBackend !== 'auto') {
+    parts.push(`tb=${s.rendering.trajectoryBackend}`);
+  }
   if (s.experience.mode !== 'scientific') parts.push(`mode=${s.experience.mode}`);
   if (s.accessibility.reducedMotion) parts.push('rm=1');
   return parts.join('&');
@@ -530,12 +541,20 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
   }
 
   const qualityMode = read('q');
-  if (qualityMode !== null) {
+  const trajectoryBackend = read('tb');
+  if (qualityMode !== null || trajectoryBackend !== null) {
     result.rendering = {
-      qualityMode: enumOr(qualityMode, QUALITY_MODE_VALUES, 'auto'),
+      qualityMode:
+        qualityMode !== null
+          ? enumOr(qualityMode, QUALITY_MODE_VALUES, 'auto')
+          : defaults.rendering.qualityMode,
       targetFps: defaults.rendering.targetFps,
       dynamicResolution: defaults.rendering.dynamicResolution,
-      renderScaleOverride: defaults.rendering.renderScaleOverride
+      renderScaleOverride: defaults.rendering.renderScaleOverride,
+      trajectoryBackend:
+        trajectoryBackend !== null
+          ? enumOr(trajectoryBackend, TRAJECTORY_BACKEND_VALUES, 'auto')
+          : defaults.rendering.trajectoryBackend
     };
   }
 

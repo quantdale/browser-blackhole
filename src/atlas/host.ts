@@ -59,6 +59,7 @@ import { ResourceManager } from './ResourceManager.js';
 import { TimeController } from './TimeController.js';
 import { TransitionDirector } from './TransitionDirector.js';
 import type { TransitionPrepareRequest } from './TransitionDirector.js';
+import { TRAJECTORY_BACKEND_VALUES, type TrajectoryBackendPreference } from './trajectoryPolicy.js';
 import type {
   BackendInfo,
   CosmicAtlasStateV1,
@@ -257,6 +258,8 @@ export class CosmicAtlasHost {
   private diagnosticsEnabledValue = false;
   /** Manual render-scale override (null = governor-managed dynamic resolution). */
   private renderScaleOverrideValue: number | null = null;
+  /** M8-09 canonical trajectory-backend preference (rendering domain). */
+  private trajectoryBackendValue: TrajectoryBackendPreference = 'auto';
   /** True while the §13 interaction throttle has bloom suspended. */
   private bloomThrottleActive = false;
 
@@ -296,6 +299,7 @@ export class CosmicAtlasHost {
       getQuality: () => this.governor.currentTier,
       getServices: () => this.services,
       getCamera: () => this.camera,
+      getTrajectoryBackend: () => this.trajectoryBackendValue,
       dprCap: DEFAULT_DPR_CAP
     };
     if (options.forcedBackend !== undefined) {
@@ -625,6 +629,34 @@ export class CosmicAtlasHost {
     this.governor.configure({ targetFps: fps });
   }
 
+  /**
+   * Canonical trajectory-backend preference (M8-09). Invalid values collapse
+   * to `auto` instead of throwing; takes effect on the next rendered frame —
+   * no pipeline rebuild (the destination pass selector re-evaluates per frame).
+   */
+  setTrajectoryBackend(preference: TrajectoryBackendPreference): void {
+    this.trajectoryBackendValue = (TRAJECTORY_BACKEND_VALUES as readonly string[]).includes(
+      preference
+    )
+      ? preference
+      : 'auto';
+  }
+
+  get trajectoryBackend(): TrajectoryBackendPreference {
+    return this.trajectoryBackendValue;
+  }
+
+  /**
+   * Debug snapshot of the active destination module (getDebugSnapshot when
+   * implemented), or null. Read-only introspection for diagnostics, tests and
+   * benchmark harnesses — never a control path.
+   */
+  activeDestinationDebugSnapshot(): Record<string, unknown> | null {
+    const module = this.activePrepared?.module;
+    if (module === undefined || typeof module.getDebugSnapshot !== 'function') return null;
+    return module.getDebugSnapshot();
+  }
+
   get isReady(): boolean {
     return this.status.ready;
   }
@@ -670,7 +702,8 @@ export class CosmicAtlasHost {
         qualityMode: config.qualityMode,
         targetFps: config.targetFps,
         dynamicResolution: this.renderScaleOverrideValue === null,
-        renderScaleOverride: this.renderScaleOverrideValue
+        renderScaleOverride: this.renderScaleOverrideValue,
+        trajectoryBackend: this.trajectoryBackendValue
       },
       debug: {
         diagnosticsEnabled: this.diagnosticsEnabledValue

@@ -141,6 +141,12 @@ export interface SharedRendererKernelOptions {
    * Same fail-loud policy as `getServices`.
    */
   getCamera?: () => THREE.PerspectiveCamera;
+  /**
+   * Canonical trajectory-backend preference surfaced through FrameContext
+   * (M8-09). Defaults to 'auto' when absent so synthetic/test kernels stay
+   * valid without wiring.
+   */
+  getTrajectoryBackend?: () => 'auto' | 'numerical' | 'lut';
   /** Device pixel ratio cap applied before render scaling (default 2). */
   dprCap?: number;
   /**
@@ -470,7 +476,8 @@ export class SharedRendererKernel implements IRendererKernel {
       services: getServices(),
       time: this.options.getTimeInfo(),
       quality: this.options.getQuality(),
-      renderScale: this.options.governor.renderScale
+      renderScale: this.options.governor.renderScale,
+      trajectoryBackend: this.options.getTrajectoryBackend?.() ?? 'auto'
     };
   }
 

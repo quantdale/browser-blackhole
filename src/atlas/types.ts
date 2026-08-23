@@ -11,6 +11,8 @@
 import type * as THREE from 'three';
 import type { WebGPURenderer } from 'three/webgpu';
 
+import type { TrajectoryBackendPreference } from './trajectoryPolicy';
+
 // ---------------------------------------------------------------------------
 // Enums and primitive aliases
 // ---------------------------------------------------------------------------
@@ -510,6 +512,12 @@ export interface CosmicAtlasStateV1 {
     /** Dynamic resolution governed by the global governor when true. */
     dynamicResolution: boolean;
     renderScaleOverride: number | null;
+    /**
+     * M8-09 canonical trajectory-backend preference for the black-hole
+     * lensing path (docs/LUT_BACKEND_SPEC.md §15). Resolution precedence:
+     * dev/test URL override > this preference > auto policy + capability.
+     */
+    trajectoryBackend: TrajectoryBackendPreference;
   };
   /** Debug-domain visibility flags (kept out of Scientific/Cinematic UX). */
   debug: {
@@ -594,6 +602,8 @@ export interface FrameContext {
   time: FrameTimeInfo;
   quality: QualityTier;
   renderScale: number;
+  /** Canonical trajectory-backend preference (M8-09, atlas rendering domain). */
+  trajectoryBackend: TrajectoryBackendPreference;
 }
 
 export interface RenderContext {

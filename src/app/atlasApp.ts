@@ -39,7 +39,8 @@ import {
   EXPOSURE_RANGE,
   RENDER_SCALE_OVERRIDE_RANGE,
   TONE_MAPPING_VALUES,
-  QUALITY_MODE_VALUES
+  QUALITY_MODE_VALUES,
+  parseFromUrl
 } from '../atlas/atlasState.js';
 import type { ExperienceMode } from '../atlas/types.js';
 import { CosmicAtlasHost, type CosmicAtlasHostOptions } from '../atlas/host.js';
@@ -90,6 +91,11 @@ const EXPERIENCE_MODES: ReadonlyArray<{ id: ExperienceMode; label: string }> = [
 
 const QUALITY_OPTIONS = QUALITY_MODE_VALUES.map((value) => ({ value, label: value }));
 const TONE_MAPPING_OPTIONS = TONE_MAPPING_VALUES.map((value) => ({ value, label: value }));
+const TRAJECTORY_BACKEND_OPTIONS = [
+  { value: 'auto', label: 'Auto' },
+  { value: 'numerical', label: 'Numerical' },
+  { value: 'lut', label: 'LUT' }
+];
 const TARGET_FPS_OPTIONS = [
   { value: '30', label: '30 FPS' },
   { value: '60', label: '60 FPS' }
@@ -364,6 +370,17 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         onInput: (value) => {
           host.setRenderScaleOverride(value);
         }
+      }).root,
+      createSelectRow({
+        label: 'Trajectory backend',
+        options: TRAJECTORY_BACKEND_OPTIONS,
+        value: host.state.rendering.trajectoryBackend,
+        onChange: (value) => {
+          if (value === 'auto' || value === 'numerical' || value === 'lut') {
+            host.setTrajectoryBackend(value);
+            markPanelDirty();
+          }
+        }
       }).root
     );
 
@@ -413,6 +430,17 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     );
   }
 
+  /** One-line trajectory-backend truth for the diagnostics readout. */
+  function formatTrajectoryReadout(snapshot: Record<string, unknown> | null): string {
+    if (snapshot === null || snapshot['trajectoryBackendEffective'] === undefined) return '—';
+    const requested = String(snapshot['trajectoryBackendRequested']);
+    const effective = String(snapshot['trajectoryBackendEffective']);
+    const reason = snapshot['lutFallbackReason'];
+    return typeof reason === 'string' && reason.length > 0
+      ? `${effective} (requested ${requested}; ${reason})`
+      : `${effective} (requested ${requested})`;
+  }
+
   /** Debug telemetry readouts (bounded, no GPU readback). */
   function updateReadouts(): void {
     if (readouts === null) return;
@@ -430,6 +458,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         label: 'Transition',
         value: host.state.atlas.transition.phase ?? 'idle'
       },
+      {
+        label: 'Trajectory',
+        value: formatTrajectoryReadout(host.activeDestinationDebugSnapshot())
+      },
       { label: 'Live scopes', value: String(inv.liveScopeCount) },
       { label: 'GPU bytes (est.)', value: String(inv.totalEstimatedGpuBytes) },
       { label: 'Pending prepares', value: String(inv.pendingPrepares) }
@@ -444,6 +476,27 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     throw err;
   }
   status.textContent = 'Atlas ready';
+
+  // Share-link subset application (STATE_AND_ROUTES §9): the compact query
+  // keys ride the SAME normalizer as runtime state. Applied once after init
+  // so presentation surfaces exist; route identity stays authoritative via
+  // parseRoute (unknown keys here are ignored by the parser).
+  const share = parseFromUrl(window.location.search);
+  if (share.rendering !== undefined) {
+    host.setQualityMode(share.rendering.qualityMode);
+    host.setTrajectoryBackend(share.rendering.trajectoryBackend);
+  }
+  if (share.sharedVisual !== undefined) {
+    host.setVisual({
+      exposure: share.sharedVisual.exposure,
+      bloomEnabled: share.sharedVisual.bloomEnabled,
+      bloomStrength: share.sharedVisual.bloomStrength,
+      toneMapping: share.sharedVisual.toneMapping
+    });
+  }
+  if (share.experience !== undefined && share.experience.mode !== host.experienceMode) {
+    host.setExperienceMode(share.experience.mode);
+  }
 
   refreshNav();
   buildPanel();

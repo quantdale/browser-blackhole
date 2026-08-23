@@ -18,6 +18,8 @@ interface AtlasStateView {
     activePreset: string;
     transition: { active: boolean; phase: string | null; progress: number };
   };
+  /** Atlas rendering domain (quality/trajectory-backend preferences). */
+  rendering: { trajectoryBackend?: 'auto' | 'numerical' | 'lut' } & Record<string, unknown>;
   /** Per-destination serialized share state keyed by destination id. */
   destinations: Record<string, { schemaVersion: number; state: Record<string, unknown> }>;
 }
@@ -67,6 +69,10 @@ interface AtlasHook {
       configure(config: { qualityMode?: 'auto' | 'low' | 'medium' | 'high' | 'ultra' }): void;
       readonly currentTier: 'low' | 'medium' | 'high' | 'ultra';
     };
+    /** M8-09 canonical trajectory-backend preference setter. */
+    setTrajectoryBackend(preference: 'auto' | 'numerical' | 'lut'): void;
+    /** Debug snapshot of the active destination module (null when none). */
+    activeDestinationDebugSnapshot(): Record<string, unknown> | null;
   };
   navigate(destinationId: string, presetId?: string): unknown;
   /** Renders one deterministic frame in-task and returns a 5x5 RGB grid ("r,g,b"). */

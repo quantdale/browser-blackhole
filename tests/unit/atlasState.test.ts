@@ -116,6 +116,34 @@ describe('M5 experience/debug state domains', () => {
     expect(bad.experience?.mode).toBe('scientific');
   });
 
+  it('round-trips the trajectory backend through the share-link serializer', () => {
+    // Non-default preference must appear in share links as tb=.
+    const lutState = createDefaultAtlasState();
+    lutState.rendering.trajectoryBackend = 'lut';
+    const serialized = serializeForUrl(lutState);
+    expect(serialized).toContain('tb=lut');
+    const parsed = parseFromUrl(serialized);
+    expect(parsed.rendering?.trajectoryBackend).toBe('lut');
+
+    // Auto is the default and must be omitted from share links.
+    const auto = serializeForUrl(createDefaultAtlasState());
+    expect(auto).not.toContain('tb=');
+
+    // Invalid values in a share link collapse back to auto.
+    const bad = parseFromUrl('v=1&tb=warp');
+    expect(bad.rendering?.trajectoryBackend).toBe('auto');
+  });
+
+  it('keeps quality and trajectory share keys independent (complete sections)', () => {
+    const parsed = parseFromUrl('v=1&tb=numerical');
+    expect(parsed.rendering?.qualityMode).toBe('auto');
+    expect(parsed.rendering?.trajectoryBackend).toBe('numerical');
+
+    const qOnly = parseFromUrl('v=1&q=high');
+    expect(qOnly.rendering?.qualityMode).toBe('high');
+    expect(qOnly.rendering?.trajectoryBackend).toBe('auto');
+  });
+
   it('rejects non-v1 schemas entirely (no silent migration)', () => {
     const defaults = createDefaultAtlasState();
     const rejected = validateAtlasState({

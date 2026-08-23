@@ -25,7 +25,9 @@ const OPTIONS = {
 } as const;
 
 describe('deterministic LUT generation pipeline', () => {
-  it('produces byte-identical assets and manifest across runs', async () => {
+  // Two full CPU-reference builds are legitimately slow (>5 s under parallel
+  // vitest workers); the timeout budgets that cost without touching asserts.
+  it('produces byte-identical assets and manifest across runs', { timeout: 60_000 }, async () => {
     const a = await buildFamily(OPTIONS);
     const b = await buildFamily(OPTIONS);
     expect(a.directoryName).toBe(b.directoryName);

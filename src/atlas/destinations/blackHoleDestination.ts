@@ -31,6 +31,13 @@ import {
   type LutGpuResources
 } from '../../phenomena/black-hole/lut/textures.js';
 import { loadLutFamily, formatWebGL2Status } from '../../phenomena/black-hole/lut/runtime.js';
+import {
+  LUT_AUTO_DEFAULT,
+  parseTrajectoryUrlOverride,
+  resolveTrajectoryBackend,
+  type TrajectoryBackend,
+  type TrajectoryBackendPreference
+} from '../../atlas/trajectoryPolicy.js';
 import type { ILensingService } from '../types.js';
 import type {
   EnterContext,
@@ -239,8 +246,20 @@ export class BlackHoleModule implements PhenomenonModule {
     familyDir: string;
     webgl2Filterable: boolean;
   } | null = null;
-  /** Requested trajectory backend; effective resolution in render(). */
-  private lastEffectiveBackend: 'numerical' | 'lut' = 'numerical';
+  /** Requested/effective trajectory backend; resolved per frame in render(). */
+  private lastEffectiveBackend: TrajectoryBackend = 'numerical';
+  private lastRequestedBackend: TrajectoryBackendPreference = 'auto';
+  /** Canonical preference for the current frame (copied in update()). */
+  private frameTrajectoryBackend: TrajectoryBackendPreference = 'auto';
+  /**
+   * Dev/test URL override captured ONCE at construction: the navigation layer
+   * canonicalizes the address bar after route commit (history.replaceState),
+   * so render-time URL scraping would silently lose the override and flip the
+   * backend mid-session. Boot-time capture is the documented precedence-1
+   * semantics (deep link pins the backend for the whole page load).
+   */
+  private readonly urlTrajectoryOverride: TrajectoryBackendPreference | null =
+    readTrajectoryUrlOverride();
   private lastFallbackReason: string | null = null;
 
   async prepare(ctx: PrepareContext): Promise<{
@@ -403,6 +422,8 @@ export class BlackHoleModule implements PhenomenonModule {
     // PERFORMANCE CAMPAIGN: the integrator's step budget is a UNIFORM, so the
     // governor's live tier reaches the shader without any pipeline rebuild.
     this.lastQualityTier = ctx.quality;
+    // M8-09: canonical preference rides FrameContext each frame.
+    this.frameTrajectoryBackend = ctx.trajectoryBackend;
     if (this.disposed || !this.orbitEnabled) return;
     const rig = ctx.services.cameraRig;
     const orbit = rig.getOrbit();
@@ -425,19 +446,27 @@ export class BlackHoleModule implements PhenomenonModule {
         lensingState['diskEnabled'] = false;
         lensingState['debugMode'] = 1;
       }
-      // Trajectory backend gate: LUT only when a valid family is loaded AND
-      // its formats are filterable here; otherwise truthful numerical.
-      const lutUsable = this.lut !== null && this.lut.webgl2Filterable && lutFamilyRequested();
-      lensingState['lutEnabled'] = lutUsable ? 1 : 0;
-      if (lutUsable) {
-        this.lastEffectiveBackend = 'lut';
-        this.lastFallbackReason = null;
-      } else {
-        this.lastEffectiveBackend = 'numerical';
-        if (this.lut === null && this.lastFallbackReason === null) {
-          this.lastFallbackReason = 'lut-assets-unavailable';
-        }
-      }
+      // M8-09 canonical backend gate: precedence is dev/test URL override
+      // (?trajectory=) > canonical rendering.trajectoryBackend preference >
+      // auto policy (LUT_AUTO_DEFAULT) + asset/capability readiness. A
+      // requested-but-unavailable LUT path falls back to numerical with an
+      // explicit reason surfaced in the debug snapshot — never silently.
+      const resolution = resolveTrajectoryBackend({
+        preference: this.frameTrajectoryBackend,
+        urlOverride: this.urlTrajectoryOverride,
+        lutAssetsReady: this.lut !== null && this.lut.webgl2Filterable,
+        lutUnavailableReason:
+          this.lut === null
+            ? 'lut-assets-unavailable'
+            : this.lut.webgl2Filterable
+              ? null
+              : 'lut-format-not-filterable-on-backend',
+        autoDefaultLut: LUT_AUTO_DEFAULT
+      });
+      lensingState['lutEnabled'] = resolution.effective === 'lut' ? 1 : 0;
+      this.lastRequestedBackend = resolution.requested;
+      this.lastEffectiveBackend = resolution.effective;
+      this.lastFallbackReason = resolution.fallbackReason;
       this.lensing.setUniformsFromState(lensingState);
     } else if (this.fallbackPass !== null) {
       applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
@@ -477,8 +506,8 @@ export class BlackHoleModule implements PhenomenonModule {
       diskOuterRg: DISK_OUTER_RG,
       orbitEnabled: this.orbitEnabled,
       disposed: this.disposed,
-      // M8-06 backend/fallback truth (mission §9/§17):
-      trajectoryBackendRequested: requestedTrajectoryBackend(),
+      // M8-06/M8-09 backend/fallback truth (mission §9/§17):
+      trajectoryBackendRequested: this.lastRequestedBackend,
       trajectoryBackendEffective: this.lastEffectiveBackend,
       lutFamilyLoaded: this.lut !== null,
       lutFamilyDir: this.lut?.familyDir ?? null,
@@ -500,31 +529,15 @@ function throwIfAborted(signal: AbortSignal): void {
 }
 
 /**
- * Dev/test-only trajectory-backend override (?trajectory=lut|numerical),
- * same policy class as ?backend=. Default 'auto' resolves to numerical
- * until M8-08 evidence justifies lut-by-default (LUT_BACKEND_SPEC §14/§15).
+ * Dev/test-only trajectory-backend URL override (?trajectory=lut|numerical|auto).
+ * Precedence 1 of the documented M8-09 policy: an EXPLICIT override wins over
+ * the canonical preference so CI/dev can pin both backends regardless of UI
+ * state. Absent or invalid values return null and never poison state.
  */
-function requestedTrajectoryBackend(): 'auto' | 'numerical' | 'lut' {
-  if (typeof window === 'undefined') return 'auto';
-  const value = new URLSearchParams(window.location.search).get('trajectory');
-  if (value === 'lut' || value === 'numerical') return value;
-  return 'auto';
+function readTrajectoryUrlOverride(): TrajectoryBackendPreference | null {
+  if (typeof window === 'undefined') return null;
+  return parseTrajectoryUrlOverride(new URLSearchParams(window.location.search).get('trajectory'));
 }
-
-function lutFamilyRequested(): boolean {
-  const mode = requestedTrajectoryBackend();
-  // 'numerical' forces the oracle path; 'lut' opts in; 'auto' stays numerical
-  // until M8-08 measures a meaningful win and M8-09 flips the default.
-  if (mode === 'numerical') return false;
-  if (mode === 'lut') return true;
-  return LUT_AUTO_DEFAULT;
-}
-
-/**
- * auto-policy gate: flipped to true only by measured M8-08 evidence.
- * See docs/BENCHMARK_MATRIX.md for the recorded numbers.
- */
-export const LUT_AUTO_DEFAULT = false;
 
 async function loadShippedLutFamily(): Promise<{
   resources: import('../../phenomena/black-hole/lut/textures.js').LutGpuResources;
