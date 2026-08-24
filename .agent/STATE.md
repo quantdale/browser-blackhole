@@ -38,8 +38,10 @@ modes (Kerr-Schild migration decision recorded in KERR_BACKEND_ADR §1.10).
 3ec1c1c test: spin-zero convergence gate, prograde/retrograde suites, Kerr CPU/GPU parity + lifecycle; coordinate-pole stiffness fix w/ mirrored honesty gate (M9-08/09)
 5942fa6 test: establish Kerr visual golden set; existing goldens unchanged
 f8baa59 perf: characterize numerical Kerr backend (M9-10/BH-206 baseline)
-<pending final docs/state commit>
+0599136 docs: close M9 — ADR-018, cross-doc updates, durable STATE closure
 ```
+
+Head at closure: **0599136** + this state fixup (final validation re-run: npm run check green incl. 405/405 vitest + build; full Playwright 109/109).
 
 ## Validation evidence (cumulative, this campaign's final state)
 
