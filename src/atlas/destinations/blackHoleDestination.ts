@@ -1,24 +1,31 @@
 /**
- * Black-hole destination ADAPTER — lifecycle seam around the Schwarzschild
- * backwards-ray-tracing pass (CA0-05 + M2/M3 renderer integration).
+ * Black-hole destination ADAPTER — lifecycle seam around the strong-field
+ * lensing passes (CA0-05 + M2/M3 renderer integration + M9 Kerr backends).
  *
  * Spec sources:
- * - docs/cosmic-atlas/DECISIONS.md CA-ADR-013 — the black-hole renderer stays
- *   scientifically independent; shared abstractions adapt to it, never the
- *   reverse. This module owns NO physics math: geodesics live in
- *   src/phenomena/black-hole/schwarzschildIntegrator.ts behind
- *   LensingService.createBlackHoleLensingPass; this module only feeds camera
- *   state and lifecycle.
+ * - docs/cosmic-atlas/DECISIONS.md CA-ADR-013 — this module owns NO physics:
+ *   Schwarzschild geodesics live in
+ *   src/phenomena/black-hole/schwarzschildIntegrator.ts, Kerr geodesics in
+ *   src/phenomena/black-hole/kerr/ (docs/KERR_BACKEND_ADR.md is the
+ *   convention authority), all reached through LensingService.
  * - docs/cosmic-atlas/ARCHITECTURE.md §4 (lifecycle), §5 (scopes).
- * - docs/cosmic-atlas/WORK_PACKETS.md CA0-05; docs/ROADMAP.md M2-09/M3-05.
+ * - docs/cosmic-atlas/STATE_AND_ROUTES.md §6 + CA6 persistence contract:
+ *   normalizeBlackHoleControls is the ONE validation authority for public
+ *   control values; presets/share links/live controls all flow through it.
  *
- * Honesty notes:
- * - fidelity 'DIRECT': the primary path is the full numerical Schwarzschild
- *   geodesic integrator (GPU f32; CPU binary64 reference stays the oracle).
+ * Backend routing truth (docs/KERR_BACKEND_ADR.md §1.21):
+ * - metric 'kerr' ALWAYS executes the numerical Kerr pass. The Schwarzschild
+ *   LUT is a Schwarzschild optimization and is never presented as a Kerr
+ *   path; while Kerr is active the LUT choice is truthfully inapplicable
+ *   (debug snapshot reports effectiveBackend 'kerr').
+ * - metric 'schwarzschild' restores the existing numerical/LUT policy with
+ *   its documented precedence (URL override > preference > auto+capability).
  * - If lensing-pass construction fails, prepare() falls back to the
  *   deterministic fullscreen pass and reports that truthfully in its debug
  *   snapshot (`lensingWired: false`) — never silently.
- * - `estimatedGpuMemoryMB` values remain documented GUESSES/estimates.
+ * - Spin NEVER affects Schwarzschild output (effectiveSpin forces 0).
+ *
+ * Honesty notes: `estimatedGpuMemoryMB` values remain documented GUESSES.
  */
 
 import { Scene, Vector3 } from 'three/webgpu';
@@ -38,7 +45,14 @@ import {
   type TrajectoryBackend,
   type TrajectoryBackendPreference
 } from '../../atlas/trajectoryPolicy.js';
-import type { ILensingService } from '../types.js';
+import {
+  DEFAULT_BLACK_HOLE_CONTROLS,
+  normalizeBlackHoleControls,
+  effectiveSpin,
+  type BlackHoleControlState
+} from '../../phenomena/black-hole/controlState.js';
+import { kerrIscoRadius } from '../../phenomena/black-hole/kerr/characteristics.js';
+import type { ILensingService, KerrLensingParams } from '../types.js';
 import type {
   EnterContext,
   ExitContext,
@@ -60,16 +74,20 @@ type LensingHandle = ReturnType<ILensingService['createBlackHoleLensingPass']>;
 const GEOMETRY_ESTIMATED_BYTES = 1024;
 const MATERIAL_ESTIMATED_BYTES = 256 * 1024;
 
-/** Disk geometry defaults: ISCO inner edge, 3x outer span (r_g units). */
+/** Disk geometry defaults (Schwarzschild): ISCO inner edge, 3x outer span. */
 const DISK_INNER_RG = 6;
 const DISK_OUTER_RG = 18;
 /** Escape classification radius (r_g) — far enough that deflection is done. */
 const ESCAPE_RADIUS_RG = 32;
 
 /**
- * Per-tier integration step budgets pushed to the integrator's uMaxSteps
- * uniform each frame. Must stay <= the integrator's compile-time ceiling.
+ * Emission-graph floor for the Kerr inner edge (see kerrIntegrator header):
+ * high prograde ISCO reaches ~1.237 r_g; keep a small positive margin above
+ * the photon orbit so the Shakura-Sunyaev profile stays well-defined.
  */
+const KERR_DISK_INNER_FLOOR_RG = 1.05;
+
+/** Per-tier integration step budgets pushed to whichever pass renders. */
 const TIER_STEP_BUDGETS: Record<FrameContext['quality'], number> = {
   low: 256,
   medium: 512,
@@ -77,15 +95,10 @@ const TIER_STEP_BUDGETS: Record<FrameContext['quality'], number> = {
   ultra: 2048
 };
 
-/** Gentle cinematic orbit rate used when a preset enables `state.orbit`. */
+/** Gentle cinematic orbit rate used when a preset enables `orbit`. */
 const ORBIT_RATE_DEG_PER_SECOND = 2;
 
-/**
- * Display recommendations for the production preset set (campaign §10:
- * physics / observer / display / quality defined SEPARATELY — display values
- * here never alter the lensing or disk model, which stay identical across
- * every presentation preset).
- */
+/** Display recommendations for scientific presentation presets. */
 const DISPLAY_SCIENTIFIC = {
   exposure: 1,
   toneMapping: 'aces-filmic',
@@ -184,13 +197,73 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     display: { exposure: 1.15, toneMapping: 'aces-filmic', bloomEnabled: false, bloomStrength: 0 },
     recommendedQuality: 'medium'
   },
+  // -------------------------------------------------------------------------
+  // M9 Kerr preset family (scientifically purposeful; conventions per
+  // docs/KERR_BACKEND_ADR.md). Disk inner edges follow kerrIscoRadius(spin).
+  // -------------------------------------------------------------------------
+  {
+    id: 'kerr-zero-spin',
+    displayName: 'Kerr — Zero Spin (Validation)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Numerical Kerr backend at a* = 0: the primary spin->0 convergence reference. Must be visually and physically indistinguishable from the Schwarzschild path within documented tolerances.',
+    state: { metric: 'kerr', spin: 0, orbit: false },
+    camera: { position: [0, 2.5, 16], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: DISPLAY_SCIENTIFIC,
+    recommendedQuality: 'high'
+  },
+  {
+    id: 'kerr-moderate-prograde',
+    displayName: 'Kerr — Moderate Prograde (a*=0.6)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Numerical Kerr backend, prograde thin disk corotating with a*= +0.6. Disk inner edge at the Bardeen-Press-Teukolsky ISCO (~4.38 r_g); frame dragging shifts the photon ring asymmetrically.',
+    state: { metric: 'kerr', spin: 0.6, orbit: false },
+    camera: { position: [13.5, 3.2, 7], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: DISPLAY_SCIENTIFIC,
+    recommendedQuality: 'high'
+  },
+  {
+    id: 'kerr-high-prograde',
+    displayName: 'Kerr — High Prograde (a*=0.9)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Numerical Kerr backend near the supported spin ceiling: a*= +0.9, disk down to ISCO ~2.32 r_g. Strong frame dragging and pronounced shadow asymmetry; numerical failures stay explicitly classified.',
+    state: { metric: 'kerr', spin: 0.9, orbit: false },
+    camera: { position: [12, 1.6, 6], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: DISPLAY_SCIENTIFIC,
+    recommendedQuality: 'ultra'
+  },
+  {
+    id: 'kerr-retrograde',
+    displayName: 'Kerr — Retrograde Disk (a*=-0.7)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 1,
+    fidelityNote:
+      'Numerical Kerr backend with the disk still corotating with world +Y while the hole spins a*= -0.7 (retrograde relative to the disk): ISCO pushed to ~8.05 r_g, counter-rotating frame dragging.',
+    state: { metric: 'kerr', spin: -0.7, orbit: false },
+    camera: { position: [13.5, 3.2, -7], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: DISPLAY_SCIENTIFIC,
+    recommendedQuality: 'high'
+  },
   {
     id: 'debug-parity',
     displayName: 'Black Hole — Debug Parity View',
     destinationId: 'black-hole',
     stateSchemaVersion: 1,
     fidelityNote:
-      'DEBUG TOOL, not a presentation: ESCAPED rays output their terminal tetrad-projected direction encoded rgb = dir*0.5+0.5 (linear); CAPTURED rays pure black; numerical failures failure-magenta. Disk disabled. Consumed by tests/browser/integrator-parity.spec.ts against cpuReference.integratePhoton.',
+      'DEBUG TOOL, not a presentation: ESCAPED rays output their terminal tetrad-projected direction encoded rgb = dir*0.5+0.5 (linear); CAPTURED rays pure black; numerical failures failure-magenta. Disk disabled. Consumed by tests/browser/integrator-parity.spec.ts against cpuReference.integratePhoton and by the M9 Kerr parity spec against the binary64 kerr reference.',
     state: { debugParity: true },
     camera: {
       position: [0, 2.5, 16],
@@ -211,8 +284,7 @@ export const blackHoleDescriptor: PhenomenonDescriptor = {
   route: 'black-hole',
   defaultPreset: 'default',
   requiredCapabilities: [],
-  // ESTIMATES, not measurements: projected budget once the full backwards
-  // ray-tracing pass replaces the placeholder (HDR intermediates dominate).
+  // ESTIMATES, not measurements.
   estimatedGpuMemoryMB: { low: 64, medium: 128, high: 256, ultra: 512 },
   load: async () => createBlackHoleModule
 };
@@ -226,16 +298,25 @@ export function createBlackHoleModule(): PhenomenonModule {
 // Module
 // ---------------------------------------------------------------------------
 
+type PassKind = 'numerical' | 'lut' | 'kerr';
+
+interface PreparedPasses {
+  numerical: LensingHandle;
+  lut: LensingHandle | null;
+  kerr: LensingHandle;
+}
+
 export class BlackHoleModule implements PhenomenonModule {
   readonly descriptor = blackHoleDescriptor;
 
-  private lensing: LensingHandle | null = null;
+  private passes: PreparedPasses | null = null;
   private fallbackPass: DiagnosticPass | null = null;
   private scene: Scene | null = null;
-  private orbitEnabled = false;
-  private debugParity = false;
+  /** Canonical control record (the ONLY authority is the normalizer). */
+  private controls: BlackHoleControlState = { ...DEFAULT_BLACK_HOLE_CONTROLS };
   private lastQualityTier: FrameContext['quality'] = 'medium';
   private disposed = false;
+  private activePassKind: PassKind | null = null;
 
   /** LUT backend state (M8-06). Null until a valid family loads. */
   private lut: {
@@ -246,28 +327,20 @@ export class BlackHoleModule implements PhenomenonModule {
     familyDir: string;
     webgl2Filterable: boolean;
   } | null = null;
-  /** Requested/effective trajectory backend; resolved per frame in render(). */
-  private lastEffectiveBackend: TrajectoryBackend = 'numerical';
   private lastRequestedBackend: TrajectoryBackendPreference = 'auto';
-  /** Canonical preference for the current frame (copied in update()). */
+  private lastEffectiveTrajectoryBackend: TrajectoryBackend = 'numerical';
+  /** Canonical Schwarzschild trajectory preference copied in update(). */
   private frameTrajectoryBackend: TrajectoryBackendPreference = 'auto';
+  private lastFallbackReason: string | null = null;
   /**
-   * Dev/test URL override captured ONCE at construction: the navigation layer
-   * canonicalizes the address bar after route commit (history.replaceState),
-   * so render-time URL scraping would silently lose the override and flip the
-   * backend mid-session. Boot-time capture is the documented precedence-1
-   * semantics (deep link pins the backend for the whole page load).
+   * Dev/test URL override captured ONCE at construction (M8-09 semantics):
+   * pins the SCHWARZSCHILD trajectory backend for the page load. Never
+   * applies to the Kerr backend (metric=kerr ignores ?trajectory= truthfully).
    */
   private readonly urlTrajectoryOverride: TrajectoryBackendPreference | null =
     readTrajectoryUrlOverride();
-  /**
-   * Dev-only LUT status view (?lutdebug=1): renders the per-pixel resolution
-   * status map (LUT-escaped cyan / LUT-captured black / numerical-resolved
-   * orange / failure magenta) for M8 validation diagnostics.
-   */
   private readonly lutDebugView: boolean =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lutdebug');
-  private lastFallbackReason: string | null = null;
 
   async prepare(ctx: PrepareContext): Promise<{
     module: PhenomenonModule;
@@ -277,12 +350,16 @@ export class BlackHoleModule implements PhenomenonModule {
   }> {
     if (this.disposed) throw new Error('[BlackHoleModule] prepare() called after dispose().');
 
-    ctx.reportProgress(0.15, 'Creating Schwarzschild lensing pass');
+    ctx.reportProgress(0.15, 'Creating strong-field lensing passes');
     throwIfAborted(ctx.signal);
     const scene = new Scene();
 
+    // Preset state flows through the ONE normalizer before anything consumes it.
+    this.controls = normalizeBlackHoleControls(ctx.preset.state);
+    const presetSpin = effectiveSpin(this.controls);
+
     // --- LUT family load (M8-06): best-effort, never blocks the numerical
-    // path. Any failure records a truthful reason and continues numerical.
+    // paths. Any failure records a truthful reason and continues numerical.
     ctx.reportProgress(0.2, 'Loading Schwarzschild LUT family');
     try {
       const lut = await loadShippedLutFamily();
@@ -301,18 +378,24 @@ export class BlackHoleModule implements PhenomenonModule {
     }
 
     try {
-      // Primary path: full backwards ray tracing through the shared
-      // LensingService (physics owned by schwarzschildIntegrator.ts).
-      const handle = ctx.services.lensing.createBlackHoleLensingPass({
+      const baseParams = {
         massRg: 1,
         backgroundEquirect: null,
         diskEnabled: true,
-        diskInnerRg: DISK_INNER_RG,
-        diskOuterRg: DISK_OUTER_RG,
         qualityTier: ctx.quality
+      };
+
+      // --- Pass 1: numerical Schwarzschild (always available) ---
+      const numerical = ctx.services.lensing.createBlackHoleLensingPass({
+        ...baseParams,
+        diskInnerRg: DISK_INNER_RG,
+        diskOuterRg: DISK_OUTER_RG
       });
-      // Decide the pass ONCE, up front: LUT when a valid family loaded and
-      // its formats are filterable on this backend; numerical otherwise.
+      trackLensingHandle(ctx, numerical);
+      scene.add(numerical.object3d());
+
+      // --- Pass 2: LUT Schwarzschild (only when assets are usable) ---
+      let lut: LensingHandle | null = null;
       if (
         this.lut !== null &&
         typeof (
@@ -332,15 +415,8 @@ export class BlackHoleModule implements PhenomenonModule {
             }
           ) => LensingHandle & { lutMaterial?: () => unknown };
         };
-        const lutHandle = lutSvc.createBlackHoleLutPass(
-          {
-            massRg: 1,
-            backgroundEquirect: null,
-            diskEnabled: true,
-            diskInnerRg: DISK_INNER_RG,
-            diskOuterRg: DISK_OUTER_RG,
-            qualityTier: ctx.quality
-          },
+        lut = lutSvc.createBlackHoleLutPass(
+          { ...baseParams, diskInnerRg: DISK_INNER_RG, diskOuterRg: DISK_OUTER_RG },
           {
             resources: this.lut.resources,
             storedSpanRad: this.lut.storedSpanRad,
@@ -348,43 +424,28 @@ export class BlackHoleModule implements PhenomenonModule {
             hybridBandHalfWidthX: this.lut.hybridBandHalfWidthX
           }
         );
-        ctx.scope.track(
-          'geometry',
-          lutHandle.object3d().geometry,
-          () => lutHandle.object3d().geometry.dispose(),
-          GEOMETRY_ESTIMATED_BYTES
-        );
-        ctx.scope.track(
-          'material',
-          lutHandle.object3d().material,
-          () => lutHandle.dispose(),
-          MATERIAL_ESTIMATED_BYTES
-        );
-        this.lensing = lutHandle as LensingHandle;
-        scene.add(lutHandle.object3d());
-        ctx.reportProgress(0.5, 'Schwarzschild LUT pass ready');
-      } else {
-        if (this.lut === null && this.lastFallbackReason === null) {
-          this.lastFallbackReason = 'lut-assets-unavailable';
-        }
-        ctx.scope.track(
-          'geometry',
-          handle.object3d().geometry,
-          () => handle.object3d().geometry.dispose(),
-          GEOMETRY_ESTIMATED_BYTES
-        );
-        ctx.scope.track(
-          'material',
-          handle.object3d().material,
-          () => handle.dispose(),
-          MATERIAL_ESTIMATED_BYTES
-        );
-        this.lensing = handle;
-        scene.add(handle.object3d());
+        trackLensingHandle(ctx, lut);
+        scene.add(lut.object3d());
       }
+
+      // --- Pass 3: numerical Kerr (M9; distinct strong-field backend) ---
+      const kerrSpin = Math.min(0.998, Math.max(-0.998, presetSpin));
+      const kerrInner = Math.max(kerrIscoRadius(kerrSpin), KERR_DISK_INNER_FLOOR_RG);
+      const kerrParams: KerrLensingParams = {
+        ...baseParams,
+        diskInnerRg: kerrInner,
+        diskOuterRg: DISK_OUTER_RG,
+        spinDimensionless: kerrSpin
+      };
+      const kerr = ctx.services.lensing.createKerrLensingPass(kerrParams);
+      trackLensingHandle(ctx, kerr);
+      scene.add(kerr.object3d());
+
+      this.passes = { numerical, lut, kerr };
+      ctx.reportProgress(0.5, 'Strong-field passes ready');
     } catch {
-      // Honest degraded path: deterministic fullscreen pattern, flagged in the
-      // debug snapshot. Never presented as geodesic lensing.
+      // Honest degraded path: deterministic fullscreen pattern, flagged in
+      // the debug snapshot. Never presented as geodesic lensing.
       ctx.reportProgress(0.4, 'Lensing pass unavailable — deterministic fallback');
       throwIfAborted(ctx.signal);
       const pass = createDiagnosticPass();
@@ -416,22 +477,20 @@ export class BlackHoleModule implements PhenomenonModule {
   enter(ctx: EnterContext): void {
     if (this.disposed) return;
     if (this.fallbackPass !== null) this.fallbackPass.uniforms.viewOff.value = 0;
-    this.orbitEnabled = ctx.preset.state['orbit'] === true;
-    this.debugParity = ctx.preset.state['debugParity'] === true;
+    // Preset state re-normalized here so preset switches reset controls.
+    this.controls = normalizeBlackHoleControls(ctx.preset.state);
   }
 
   /**
-   * Advances the gentle orbit ONLY when the active preset asks for it
-   * (`state.orbit === true`); otherwise a no-op. Driven by frame dt, never by
-   * wall-clock reads, so it stays deterministic under the atlas timeline.
+   * Advances the gentle orbit ONLY when the active control state asks for it;
+   * otherwise a no-op. Driven by frame dt for determinism under the atlas
+   * timeline.
    */
   update(ctx: FrameContext): void {
-    // PERFORMANCE CAMPAIGN: the integrator's step budget is a UNIFORM, so the
-    // governor's live tier reaches the shader without any pipeline rebuild.
     this.lastQualityTier = ctx.quality;
-    // M8-09: canonical preference rides FrameContext each frame.
+    // M8-09: canonical Schwarzschild trajectory preference rides FrameContext.
     this.frameTrajectoryBackend = ctx.trajectoryBackend;
-    if (this.disposed || !this.orbitEnabled) return;
+    if (this.disposed || !this.controls.orbit) return;
     const rig = ctx.services.cameraRig;
     const orbit = rig.getOrbit();
     const azimuthDeg = (orbit.azimuthDeg + ORBIT_RATE_DEG_PER_SECOND * ctx.time.dt) % 360;
@@ -440,44 +499,71 @@ export class BlackHoleModule implements PhenomenonModule {
 
   render(ctx: RenderContext): void {
     if (this.disposed || this.scene === null) return;
-    if (this.lensing !== null) {
-      // Live tier budget: the governor's current step count rides the
-      // uMaxSteps uniform — no pipeline rebuild on tier changes. The parity
-      // preset additionally disables disk shading and selects the encoded
-      // escape-direction debug output (both plain uniforms).
-      const lensingState: Record<string, unknown> = {
-        ...cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG),
-        maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier]
-      };
-      if (this.debugParity) {
+    if (this.passes !== null) {
+      const { numerical, lut, kerr } = this.passes;
+      const useKerr = this.controls.metric === 'kerr';
+      let selected: LensingHandle;
+      let kind: PassKind;
+
+      if (useKerr) {
+        selected = kerr;
+        kind = 'kerr';
+        // Backend policy truth (ADR §1.21): Kerr runs numerical Kerr; the
+        // Schwarzschild trajectory preference/LUT policy is INAPPLICABLE.
+        this.lastRequestedBackend = 'auto';
+        this.lastEffectiveTrajectoryBackend = 'numerical';
+        this.lastFallbackReason = this.lut === null ? null : 'lut-inapplicable-while-kerr-active';
+      } else {
+        const resolution = resolveTrajectoryBackend({
+          preference: this.frameTrajectoryBackend,
+          urlOverride: this.urlTrajectoryOverride,
+          lutAssetsReady: lut !== null && this.lut !== null && this.lut.webgl2Filterable,
+          lutUnavailableReason:
+            this.lut === null || lut === null
+              ? 'lut-assets-unavailable'
+              : this.lut.webgl2Filterable
+                ? null
+                : 'lut-format-not-filterable-on-backend',
+          autoDefaultLut: LUT_AUTO_DEFAULT
+        });
+        selected = resolution.effective === 'lut' && lut !== null ? lut : numerical;
+        kind = resolution.effective === 'lut' && lut !== null ? 'lut' : 'numerical';
+        this.lastRequestedBackend = resolution.requested;
+        this.lastEffectiveTrajectoryBackend = resolution.effective;
+        this.lastFallbackReason = resolution.fallbackReason;
+      }
+      this.activePassKind = kind;
+
+      // Visibility gate: exactly one strong-field pass renders per frame.
+      numerical.object3d().visible = kind === 'numerical';
+      if (lut !== null) lut.object3d().visible = kind === 'lut';
+      kerr.object3d().visible = kind === 'kerr';
+
+      const spin = effectiveSpin(this.controls);
+      const lensingState: Record<string, unknown> = useKerr
+        ? {
+            ...cameraLensingState(
+              ctx.camera,
+              Math.max(kerrIscoRadius(spin), KERR_DISK_INNER_FLOOR_RG),
+              DISK_OUTER_RG
+            ),
+            maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
+            spinDimensionless: spin
+          }
+        : {
+            ...cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG),
+            maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
+            lutEnabled: kind === 'lut' ? 1 : 0
+          };
+
+      if (this.controls.debugParity) {
         lensingState['diskEnabled'] = false;
         lensingState['debugMode'] = 1;
       }
-      if (this.lutDebugView) {
+      if (!useKerr && this.lutDebugView) {
         lensingState['lutDebugStatus'] = 1;
       }
-      // M8-09 canonical backend gate: precedence is dev/test URL override
-      // (?trajectory=) > canonical rendering.trajectoryBackend preference >
-      // auto policy (LUT_AUTO_DEFAULT) + asset/capability readiness. A
-      // requested-but-unavailable LUT path falls back to numerical with an
-      // explicit reason surfaced in the debug snapshot — never silently.
-      const resolution = resolveTrajectoryBackend({
-        preference: this.frameTrajectoryBackend,
-        urlOverride: this.urlTrajectoryOverride,
-        lutAssetsReady: this.lut !== null && this.lut.webgl2Filterable,
-        lutUnavailableReason:
-          this.lut === null
-            ? 'lut-assets-unavailable'
-            : this.lut.webgl2Filterable
-              ? null
-              : 'lut-format-not-filterable-on-backend',
-        autoDefaultLut: LUT_AUTO_DEFAULT
-      });
-      lensingState['lutEnabled'] = resolution.effective === 'lut' ? 1 : 0;
-      this.lastRequestedBackend = resolution.requested;
-      this.lastEffectiveBackend = resolution.effective;
-      this.lastFallbackReason = resolution.fallbackReason;
-      this.lensing.setUniformsFromState(lensingState);
+      selected.setUniformsFromState(lensingState);
     } else if (this.fallbackPass !== null) {
       applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
     }
@@ -492,33 +578,60 @@ export class BlackHoleModule implements PhenomenonModule {
     if (this.disposed) return;
     this.disposed = true;
     // GPU objects are owned by the prepare scope; drop references only.
-    this.lensing = null;
+    this.passes = null;
     this.fallbackPass = null;
     this.scene = null;
-    this.orbitEnabled = false;
-    this.debugParity = false;
+    this.controls = { ...DEFAULT_BLACK_HOLE_CONTROLS };
+    this.activePassKind = null;
+  }
+
+  /**
+   * Canonical live control channel (CA5/CA6): merges the partial payload over
+   * the current record and re-normalizes through the ONE normalizer. The host
+   * caches the serialized result afterwards (persistence/back-forward).
+   */
+  applyControlState(partial: Record<string, unknown>): void {
+    if (this.disposed) return;
+    this.controls = normalizeBlackHoleControls({ ...this.controls, ...partial });
   }
 
   serializeShareState(): Record<string, unknown> {
-    return { orbit: this.orbitEnabled };
+    return {
+      metric: this.controls.metric,
+      spin: this.controls.spin,
+      orbit: this.controls.orbit,
+      debugParity: this.controls.debugParity
+    };
   }
 
   getDebugSnapshot(): Record<string, unknown> {
+    const wired = this.passes !== null;
+    const pattern = wired
+      ? this.activePassKind === 'kerr'
+        ? 'kerr geodesic lensing + accretion disk (numerical)'
+        : this.activePassKind === 'lut'
+          ? 'schwarzschild geodesic lensing + accretion disk (LUT-capable)'
+          : 'schwarzschild geodesic lensing + accretion disk'
+      : 'fullscreen pass fallback (lensing construction failed)';
+    const spin = effectiveSpin(this.controls);
     return {
-      pattern:
-        this.lensing !== null
-          ? this.lut !== null
-            ? 'schwarzschild geodesic lensing + accretion disk (LUT-capable)'
-            : 'schwarzschild geodesic lensing + accretion disk'
-          : 'fullscreen pass fallback (lensing construction failed)',
-      lensingWired: this.lensing !== null,
-      diskInnerRg: DISK_INNER_RG,
-      diskOuterRg: DISK_OUTER_RG,
-      orbitEnabled: this.orbitEnabled,
-      disposed: this.disposed,
-      // M8-06/M8-09 backend/fallback truth (mission §9/§17):
+      pattern,
+      lensingWired: wired,
+      // Metric/control truth (M9):
+      metric: this.controls.metric,
+      spin: this.controls.spin,
+      effectiveSpin: spin,
+      spinConvention: 'signed dimensionless a* = Jc/(GM^2); +Y axis; disk always +Y-corotating',
+      kerrDiskInnerRg:
+        this.controls.metric === 'kerr'
+          ? Math.max(kerrIscoRadius(spin), KERR_DISK_INNER_FLOOR_RG)
+          : null,
+      schwarzschildDiskInnerRg: DISK_INNER_RG,
+      activePassKind: this.activePassKind,
+      // M8-06/M8-09 backend/fallback truth, extended by ADR §1.21:
       trajectoryBackendRequested: this.lastRequestedBackend,
-      trajectoryBackendEffective: this.lastEffectiveBackend,
+      trajectoryBackendEffective:
+        this.controls.metric === 'kerr' ? 'numerical-kerr' : this.lastEffectiveTrajectoryBackend,
       lutFamilyLoaded: this.lut !== null,
       lutFamilyDir: this.lut?.familyDir ?? null,
       lutWebgl2Filterable: this.lut?.webgl2Filterable ?? null,
@@ -538,11 +651,24 @@ function throwIfAborted(signal: AbortSignal): void {
   }
 }
 
+function trackLensingHandle(ctx: PrepareContext, handle: LensingHandle): void {
+  ctx.scope.track(
+    'geometry',
+    handle.object3d().geometry,
+    () => handle.object3d().geometry.dispose(),
+    GEOMETRY_ESTIMATED_BYTES
+  );
+  ctx.scope.track(
+    'material',
+    handle.object3d().material,
+    () => handle.dispose(),
+    MATERIAL_ESTIMATED_BYTES
+  );
+}
+
 /**
  * Dev/test-only trajectory-backend URL override (?trajectory=lut|numerical|auto).
- * Precedence 1 of the documented M8-09 policy: an EXPLICIT override wins over
- * the canonical preference so CI/dev can pin both backends regardless of UI
- * state. Absent or invalid values return null and never poison state.
+ * Precedence 1 of the documented M8-09 policy (Schwarzschild paths only).
  */
 function readTrajectoryUrlOverride(): TrajectoryBackendPreference | null {
   if (typeof window === 'undefined') return null;
@@ -624,10 +750,9 @@ const scratchUp = new Vector3();
 const scratchForward = new Vector3();
 
 /**
- * Builds the flat state record consumed by
- * `LensingService.createBlackHoleLensingPass().setUniformsFromState`
- * (accepted keys documented in schwarzschildIntegrator.ts). Scene units are
- * r_g with M = 1; disk normal is world +Y per docs/WORLD_FRAME.md §1.
+ * Builds the flat state record consumed by the lensing passes'
+ * `setUniformsFromState`. Scene units are r_g with M = 1; disk normal is
+ * world +Y (= the Kerr spin axis) per docs/WORLD_FRAME.md §1.
  */
 function cameraLensingState(
   camera: PerspectiveCamera,

@@ -365,12 +365,33 @@ export interface LensingPassParams {
   qualityTier: QualityTier;
 }
 
+/**
+ * Kerr numerical pass parameters (M9; docs/KERR_BACKEND_ADR.md is the
+ * convention authority for every field consumed downstream).
+ */
+export interface KerrLensingParams extends LensingPassParams {
+  /** SIGNED dimensionless spin a* = Jc/(GM^2) in [-0.998, +0.998]. */
+  spinDimensionless: number;
+}
+
 export interface ILensingService {
   /**
    * Full Schwarzschild backwards-ray-tracing pass (black-hole destination).
    * Implementation must follow docs/NUMERICAL_METHODS.md exactly.
    */
   createBlackHoleLensingPass(params: LensingPassParams): {
+    object3d(): THREE.Mesh;
+    setUniformsFromState(state: Record<string, unknown>): void;
+    dispose(): void;
+  };
+  /**
+   * Full KERR numerical backwards-ray-tracing pass (M9-03..05). A DISTINCT
+   * strong-field backend — never a branch of the Schwarzschild integrator.
+   * Conventions: docs/KERR_BACKEND_ADR.md; numerics:
+   * src/phenomena/black-hole/kerr/. The LUT backend is Schwarzschild-only
+   * and must never be presented as a Kerr path.
+   */
+  createKerrLensingPass(params: KerrLensingParams): {
     object3d(): THREE.Mesh;
     setUniformsFromState(state: Record<string, unknown>): void;
     dispose(): void;

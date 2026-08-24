@@ -26,8 +26,14 @@
 import * as THREE from 'three';
 import type { Node } from 'three/webgpu';
 import { add, cos, div, dot, length, max, min, mul, normalize, sin, sub, vec3 } from 'three/tsl';
-import type { ILensingService, LensingPassParams, TslDensityFn } from '../../atlas/types';
+import type {
+  ILensingService,
+  KerrLensingParams,
+  LensingPassParams,
+  TslDensityFn
+} from '../../atlas/types';
 import { createLensingMaterial } from '../../phenomena/black-hole/schwarzschildIntegrator';
+import { createKerrLensingMaterial } from '../../phenomena/black-hole/kerr/kerrIntegrator.js';
 import {
   createLutLensingMaterial,
   type LutLensingMaterial
@@ -95,6 +101,22 @@ export class LensingService implements ILensingService {
     dispose(): void;
   } {
     const delegate = createLensingMaterial(params);
+    return this.wrapLensingHandle(delegate.material, delegate, params);
+  }
+
+  /**
+   * Full KERR numerical backwards-ray-tracing pass (M9-03..05). Delegates
+   * the geodesic integrator to the kerr module's TSL material factory
+   * (docs/KERR_BACKEND_ADR.md governs its conventions), wraps the returned
+   * NodeMaterial on a fullscreen triangle Mesh, and forwards uniform-state
+   * updates and disposal. Created passes are tracked like the others.
+   */
+  createKerrLensingPass(params: KerrLensingParams): {
+    object3d(): THREE.Mesh;
+    setUniformsFromState(state: Record<string, unknown>): void;
+    dispose(): void;
+  } {
+    const delegate = createKerrLensingMaterial(params);
     return this.wrapLensingHandle(delegate.material, delegate, params);
   }
 

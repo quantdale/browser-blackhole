@@ -68,6 +68,7 @@ import {
   step,
   sub,
   uint,
+  uniform,
   vec3
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
@@ -449,6 +450,14 @@ type UintNode = Node<'uint'>;
  * Builds the disk emission graph ONCE from baked parameters (params become
  * WGSL literals, not uniforms — rebuild the node when params change).
  *
+ * M9 addition: `opts.innerRadiusRgLive` binds the inner edge to a LIVE
+ * `{ value }` holder instead of a baked literal. Both the annulus edge
+ * windows AND the Shakura-Sunyaev temperature/emissivity profiles then
+ * follow that value every frame (the Kerr backend drives it with its live
+ * ISCO(spin) uniform — no pipeline recompile on spin change, mirroring the
+ * tier-budget lesson). When omitted, behavior and generated constants are
+ * IDENTICAL to the pre-M9 graph (all Schwarzschild callers unchanged).
+ *
  * `emit({ r, gFactor, phi })` evaluates per sample entirely with loop-free
  * node math:
  *
@@ -479,7 +488,16 @@ type UintNode = Node<'uint'>;
  * the dimensionless g of {@link diskRedshiftFactor}. Returns a linear-HDR
  * vec3 node.
  */
-export function makeDiskEmissionNode(p: DiskModelParams): {
+export function makeDiskEmissionNode(
+  p: DiskModelParams,
+  opts?: {
+    /**
+     * LIVE inner edge (M9 Kerr): the whole graph reads this value each
+     * frame. Must stay > 1 r_g; callers clamp before writing.
+     */
+    innerRadiusRgLive?: { value: number };
+  }
+): {
   emit: (inputs: { r: unknown; gFactor: unknown; phi: unknown }) => unknown;
 } {
   validateDiskModelParams(p);
@@ -492,6 +510,12 @@ export function makeDiskEmissionNode(p: DiskModelParams): {
   const dScale = p.densityScale;
   const turbAmp = p.turbulence;
   const seed = p.seed >>> 0;
+  const rInLive = opts?.innerRadiusRgLive;
+  const rEdgeNode: FloatNode =
+    rInLive !== undefined ? (uniform(rInLive.value) as unknown as FloatNode) : float(rIn);
+  const rOutNode = float(rOut);
+  const spanNode = rOutNode.sub(rEdgeNode);
+  const rKNode = float(NOISE_R_CELLS).div(spanNode);
   const rK = NOISE_R_CELLS / (rOut - rIn);
 
   /**
@@ -525,7 +549,7 @@ export function makeDiskEmissionNode(p: DiskModelParams): {
     // land on the correct periodic cell instead of a seam.
     const uNorm = fract(div(phiN, 2 * Math.PI));
     const u = mul(uNorm, NOISE_PHI_CELLS);
-    const v = mul(clampNode(rN, 0, 1e6), rK);
+    const v = mul(clampNode(rN, 0, 1e6), rInLive !== undefined ? rKNode : float(rK));
     const iu = floor(u);
     const iv = floor(v);
     const fu = fract(u);
@@ -612,18 +636,17 @@ export function makeDiskEmissionNode(p: DiskModelParams): {
     const phi = float(phiInNode as Node<'float'>);
 
     // --- Edge windows (mirror diskEmissivity) -----------------------------
-    const span = rOut - rIn;
-    const fade = span * 0.05;
-    const innerWindow = smoothstep(float(rIn), float(rIn + fade), r);
-    const outerWindow = oneMinus(smoothstep(float(rOut - fade), float(rOut), r));
+    const fade = spanNode.mul(0.05);
+    const innerWindow = smoothstep(rEdgeNode, rEdgeNode.add(fade), r);
+    const outerWindow = oneMinus(smoothstep(rOutNode.sub(fade), rOutNode, r));
 
     // --- Emissivity core: (r/rIn)^(-emIdx), domain-clamped ----------------
-    const x = div(max(r, float(rIn)), float(rIn));
+    const x = div(max(r, rEdgeNode), rEdgeNode);
     const core = pow(x, float(-emIdx));
     const eps = mul(mul(core, innerWindow), outerWindow);
 
     // --- Shakura-Sunyaev temperature (mirror diskTemperature) -------------
-    const active = select(r.greaterThan(float(rIn)), float(1), float(0));
+    const active = select(r.greaterThan(rEdgeNode), float(1), float(0));
     const boundaryTerm = pow(max(oneMinus(pow(x, float(-0.5))), float(0)), float(0.25));
     const temperature = mul(active, mul(pow(x, float(-0.75)), boundaryTerm).mul(tScale));
 
