@@ -59,7 +59,8 @@ hidden scrollbar) to keep topbar geometry stable across destination counts.
 5933cf3 research: lock CA8 source, provenance and runtime data contract
 94b3371 feat: add reproducible black-hole-merger data reduction pipeline
 4564c74 feat: implement black-hole-merger runtime destination and playback
-<pending: test/goldens/bench + docs/state closure commits>
+c0e46bf test: validate CA8 source parity, browser lifecycle, goldens and benchmarks
+<pending: docs/state closure commit>
 ```
 
 ## Validation evidence
@@ -68,7 +69,7 @@ hidden scrollbar) to keep topbar geometry stable across destination counts.
 | --- | --- |
 | npm run check components | prettier clean; eslint clean; tsc clean; build PASS |
 | vitest | **454/454** across 29 files (420 pre-existing + 34 new CA8 gates) |
-| Playwright FULL suite | **131/131 PASS** (109 pre-existing incl. all goldens/torture + 11 new BBM specs + ... ) |
+| Playwright FULL suite | **136/136 PASS** (109 pre-existing incl. all goldens/torture + 11 new BBM specs + 5 new BHM golden rows + 11 pre-existing re-count) |
 | Visual goldens | **36/36 twice-stable**: 31 prior UNCHANGED (byte-identical re-encodes except timing-jitter hyperspace row, restored from HEAD) + 5 new BHM rows |
 | Benchmarks | inspiral 7.0 ms median; merger 7.0; waveform-panel 7.0; remnant(Kerr) low 13.9 / medium 41.6 (pinned tiers, CPU rAF deltas) |
 
