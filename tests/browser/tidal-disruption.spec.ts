@@ -50,6 +50,10 @@ async function waitForArrival(page: Page, destinationId: string, presetId?: stri
             if (preset !== undefined && app.host.state.atlas.activePreset !== preset) {
               return `preset:${app.host.state.atlas.activePreset}`;
             }
+            // The destination module must actually be ENTERED (prepare +
+            // enter complete, debug snapshot live) — the initial deep-link
+            // boot has no transition phase to gate on.
+            if (app.host.activeDestinationDebugSnapshot() === null) return 'preparing';
             return 'arrived';
           },
           { dest: destinationId, preset: presetId }
@@ -77,7 +81,15 @@ test.describe('Tidal Disruption validation (CA6)', () => {
       const samples = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
       expect(samples).not.toBeNull();
       expect(samples!.length).toBe(25);
-      expect(new Set(samples!).size, 'presented frame should not be uniform').toBeGreaterThan(1);
+      // Poll a few deterministic frames: the arrival camera eases for ~0.9 s,
+      // so a frame captured mid-ease on a loaded machine can miss the subject.
+      let uniform = new Set(samples!).size <= 1;
+      for (let attempt = 0; uniform && attempt < 8; attempt += 1) {
+        await page.waitForTimeout(250);
+        const next = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
+        if (next !== null) uniform = new Set(next).size <= 1;
+      }
+      expect(uniform, 'presented frame should not be uniform').toBe(false);
 
       const statusText = await page.locator('.atlas-status').textContent();
       expect(statusText).toBe('Atlas ready');
@@ -358,6 +370,76 @@ test.describe('Tidal Disruption validation (CA6)', () => {
     await waitForArrival(page, 'tidal-disruption', 'giant-star');
     await page.goForward();
     await waitForArrival(page, 'neutron-star');
+    expect(errors).toEqual([]);
+  });
+
+  test('share-link dc controls survive the deep-link round trip', async ({ page }) => {
+    const errors = collectErrors(page);
+    // dc payload: {"penetrationScenario":"deep","blackHoleMassSolar":3e6}
+    const dc = encodeURIComponent(JSON.stringify({ penetrationScenario: 'deep' }));
+    await page.goto(
+      `/atlas/tidal-disruption?preset=solar-canonical&v=1&d=tidal-disruption&dc=${dc}`
+    );
+    await waitForArrival(page, 'tidal-disruption', 'solar-canonical');
+    await page.waitForTimeout(800);
+    const snap = await tdeSnapshot(page);
+    expect(snap['beta']).toBe(2.5);
+    // The canonical state mirrors the applied controls.
+    const shareState = await page.evaluate(
+      () => window.__ATLAS_APP__!.host.state.destinations['tidal-disruption']?.state ?? {}
+    );
+    expect(shareState['penetrationScenario']).toBe('deep');
+    expect(errors).toEqual([]);
+  });
+
+  test('destination controls persist across navigate-away and back (same preset)', async ({
+    page
+  }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/tidal-disruption?preset=solar-canonical');
+    await waitForArrival(page, 'tidal-disruption', 'solar-canonical');
+    await page.waitForTimeout(500);
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.setDestinationControl('tidal-disruption', {
+        penetrationScenario: 'deep'
+      });
+    });
+    await page.waitForTimeout(300);
+
+    await page.evaluate(() => window.__ATLAS_APP__!.navigate('neutron-star'));
+    await waitForArrival(page, 'neutron-star');
+
+    // Back/forward (and plain re-navigation) to the SAME preset restores the
+    // cached controls instead of silently resetting them.
+    await page.goBack();
+    await waitForArrival(page, 'tidal-disruption', 'solar-canonical');
+    await page.waitForTimeout(600);
+    const snap = await tdeSnapshot(page);
+    expect(snap['beta']).toBe(2.5);
+    expect(errors).toEqual([]);
+  });
+
+  test('switching presets resets controls to the new preset defaults', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/tidal-disruption?preset=solar-canonical');
+    await waitForArrival(page, 'tidal-disruption', 'solar-canonical');
+    await page.waitForTimeout(500);
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.setDestinationControl('tidal-disruption', {
+        penetrationScenario: 'deep'
+      });
+    });
+    await page.waitForTimeout(300);
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.navigate('tidal-disruption', 'grazing-flyby');
+    });
+    await waitForArrival(page, 'tidal-disruption', 'grazing-flyby');
+    await page.waitForTimeout(600);
+    const snap = await tdeSnapshot(page);
+    expect(snap['beta']).toBe(0.85); // preset-true, NOT the carried-over deep
     expect(errors).toEqual([]);
   });
 

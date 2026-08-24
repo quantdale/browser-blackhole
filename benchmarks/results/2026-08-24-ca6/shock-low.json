@@ -1,0 +1,66 @@
+{
+ "schemaVersion": 1,
+ "kind": "tidal-disruption-phase-benchmark",
+ "date": "2026-08-24T04:51:41.836Z",
+ "label": "tde-shock-low",
+ "commit": "9dc18de4c23b6ca8657244eac20a7f6c78776bde",
+ "destination": "tidal-disruption",
+ "preset": "solar-canonical",
+ "timelinePhase": 0.78,
+ "resolvedPhase": "shock",
+ "resolvedTimeSeconds": 13491891.95246509,
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "amd rdna-2"
+ },
+ "backend": "webgpu",
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  583,
+  436
+ ],
+ "quality": {
+  "requested": "low",
+  "effectiveTier": "low"
+ },
+ "renderScale": 0.6,
+ "warmupMs": 9000,
+ "sampleFrames": 240,
+ "frameCpuMs": {
+  "min": 1.9,
+  "median": 7,
+  "p90": 7,
+  "p95": 7.1,
+  "p99": 7.1,
+  "max": 7.2,
+  "mean": 6.93,
+  "stdev": 0.33
+ },
+ "frameGpuMs": null,
+ "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+ "phaseResources": {
+  "streamBoundVisible": true,
+  "spineBoundPoints": 0,
+  "volumeVisible": true,
+  "volumeRadiusUnits": 199.99999999999994,
+  "diskVisible": false,
+  "particlePopulationScale": 0.3,
+  "accentAngularGate": 1,
+  "starDistanceUnits": 68507.69343948088,
+  "beta": 1
+ },
+ "memory": {
+  "estimatedGpuBytesTotal": 5375592
+ },
+ "consoleErrors": 0,
+ "consoleErrorSamples": []
+}

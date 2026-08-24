@@ -102,11 +102,10 @@ const SOLAR_CANONICAL_PRESET: PresetDescriptor = {
     ' Sun-like star around a 10^6 M_sun black hole at beta=1 (periapsis at ' +
     'the tidal radius): full disruption, ~116 day first fallback.',
   state: { ...SOLAR_CANONICAL_STATE },
-  // Arrival frames the MIDPOINT between the boot-phase star (all presets
-  // boot at Barker D=-1.088: star at azimuth -4.8 deg, r=2.184 q) and the
-  // black hole: star ~18 percent of frame height at boot, BH/streams/shock
-  // region near frame center so every later phase stays composed.
-  camera: { position: [-29.3, 28.2, 346.6], target: [-8.3, 0, 97.9], fovDeg: 55 },
+  // Arrival centers the BOOT-PHASE star (all presets boot at Barker D=-1.088:
+  // star at azimuth -4.8 deg, r=2.184 q) with the black hole ~9.5 deg
+  // off-axis above it — subject-centered and stable across presets.
+  camera: { position: [-29.3, 28.2, 346.6], target: [-18.4, 0, 217.6], fovDeg: 55 },
   seed: 211,
   // secondsToUiPhase(-1.517 * barkerCoef) — boots at Barker D=-1.088.
   timelineInitialPhase: 0.160087
@@ -123,8 +122,8 @@ const DEEP_PENETRATION_PRESET: PresetDescriptor = {
     'inside the tidal radius, 6.25x wider energy spread -> faster fallback, ' +
     'more compact and rapidly winding debris.',
   state: { ...DEEP_PENETRATION_STATE },
-  // Same midpoint framing at polar 55 (observer-coherent), q=40 geometry.
-  camera: { position: [-14.1, 34.4, 166.5], target: [-3.3, 0, 39.2], fovDeg: 55 },
+  // Same star-centered discipline at polar 55 (observer-coherent), q=40.
+  camera: { position: [-14.1, 34.4, 166.5], target: [-7.4, 0, 87], fovDeg: 55 },
   seed: 223,
   // Boots at the shared Barker D=-1.088 for this encounter's coefficients.
   timelineInitialPhase: 0.250088
@@ -142,8 +141,8 @@ const GRAZING_FLYBY_PRESET: PresetDescriptor = {
     'intentionally present nothing — the reduced model produces no full ' +
     'disruption for this scenario.',
   state: { ...GRAZING_FLYBY_STATE },
-  // Same midpoint framing at polar 70 (observer-coherent), q=117.7.
-  camera: { position: [-34.1, 20.5, 401.8], target: [-9.8, 0, 115.2], fovDeg: 55 },
+  // Same star-centered discipline at polar 70 (observer-coherent), q=117.7.
+  camera: { position: [-34.1, 20.5, 401.8], target: [-21.7, 0, 256], fovDeg: 55 },
   seed: 227,
   // Boots at the shared Barker D=-1.088 for this encounter's coefficients.
   timelineInitialPhase: 0.136741
@@ -160,8 +159,8 @@ const MASSIVE_BLACK_HOLE_PRESET: PresetDescriptor = {
     'M^(1/3), the horizon as M — the encounter moves relatively deeper into ' +
     'the strong-field zone while every length/time scale grows.',
   state: { ...MASSIVE_BH_STATE },
-  // rt=215 stretches the corridor: same midpoint discipline, q=215.4.
-  camera: { position: [-57.4, 40.1, 677.1], target: [-17.9, 0, 210.9], fovDeg: 55 },
+  // rt=215 stretches the corridor: same star-centered discipline, q=215.4.
+  camera: { position: [-57.4, 40.1, 677.1], target: [-39.7, 0, 468.7], fovDeg: 55 },
   seed: 229,
   timelineInitialPhase: 0.160087
 };
@@ -177,8 +176,8 @@ const GIANT_STAR_PRESET: PresetDescriptor = {
     'hole at beta=1: tripled stellar radius stretches the tidal radius and ' +
     'lengthens the fallback chain relative to the canonical event.',
   state: { ...GIANT_STAR_STATE },
-  // rt=378: same midpoint discipline, q=378.
-  camera: { position: [-98.6, 24.4, 1164.7], target: [-31.3, 0, 370], fovDeg: 55 },
+  // rt=378: same star-centered discipline, q=378.
+  camera: { position: [-98.6, 24.4, 1164.7], target: [-69.6, 0, 822.3], fovDeg: 55 },
   seed: 233,
   timelineInitialPhase: 0.160087
 };

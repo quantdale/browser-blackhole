@@ -236,6 +236,20 @@ export class CosmicAtlasHost {
   private readonly lensingService = new LensingService();
 
   private activePrepared: PreparedPhenomenon | null = null;
+
+  /**
+   * Last-known normalized destination state per destination id (CA6 control-
+   * persistence generalization). Written through whenever a module serializes
+   * share state or accepts canonical controls; merged back over the registry
+   * preset at resolveTarget so revisits (back/forward, re-navigation) restore
+   * supported controls instead of silently resetting them. Scoped to the
+   * preset the state came from: switching presets resets to that preset's
+   * documented defaults.
+   */
+  private readonly destinationStateCache = new Map<
+    string,
+    { presetId: string; schemaVersion: number; state: Record<string, unknown> }
+  >();
   private activeSeed = 1;
   private pendingPrepares = 0;
   private rendererGeneration = 0;
@@ -680,6 +694,23 @@ export class CosmicAtlasHost {
     if (active.descriptor.id !== destinationId) return;
     if (typeof active.applyControlState !== 'function') return;
     active.applyControlState(partial);
+    this.cacheDestinationState(active);
+  }
+
+  /**
+   * Write-through the active module's normalized share state into the
+   * destination-state cache (control persistence generalization, CA6).
+   * The cache is stamped with the PREPARED module's preset id — never the
+   * current navigation selection, which may already point elsewhere.
+   */
+  private cacheDestinationState(active: NonNullable<PreparedPhenomenon['module']>): void {
+    if (typeof active.serializeShareState !== 'function') return;
+    const state = active.serializeShareState();
+    this.destinationStateCache.set(active.descriptor.id, {
+      presetId: this.activePrepared?.preset.id ?? '',
+      schemaVersion: this.activePrepared?.preset.stateSchemaVersion ?? 1,
+      state
+    });
   }
 
   get isReady(): boolean {
@@ -698,10 +729,19 @@ export class CosmicAtlasHost {
     const destinations: Record<string, VersionedDestinationState> = {};
     const active = this.activePrepared;
     if (active !== null && typeof active.module.serializeShareState === 'function') {
-      destinations[active.module.descriptor.id] = {
+      // Write-through: the live serialization refreshes the cache so every
+      // visited destination's last-known controls persist in `state`. Stamped
+      // with the prepared preset id (the selection may already point elsewhere
+      // during a transition).
+      const state = active.module.serializeShareState();
+      this.destinationStateCache.set(active.module.descriptor.id, {
+        presetId: active.preset.id,
         schemaVersion: active.preset.stateSchemaVersion,
-        state: active.module.serializeShareState()
-      };
+        state
+      });
+    }
+    for (const [id, cached] of this.destinationStateCache) {
+      destinations[id] = { schemaVersion: cached.schemaVersion, state: cached.state };
     }
 
     const config = this.governor.getConfig();
@@ -831,7 +871,19 @@ export class CosmicAtlasHost {
         `[CosmicAtlasHost] resolved '${selection.destinationId}/${selection.presetId}' is missing from the registry.`
       );
     }
-    return { descriptor: entry.descriptor, preset };
+    // Control persistence (CA6): restore cached controls when revisiting the
+    // SAME preset; a different preset resets to its documented defaults. The
+    // destination module re-normalizes the merged state in prepare(), so the
+    // module remains the normalization authority.
+    const cached = this.destinationStateCache.get(selection.destinationId);
+    if (cached === undefined || cached.presetId !== selection.presetId) {
+      return { descriptor: entry.descriptor, preset };
+    }
+    const restored: PresetDescriptor = {
+      ...preset,
+      state: { ...preset.state, ...cached.state }
+    };
+    return { descriptor: entry.descriptor, preset: restored };
   }
 
   private async prepareTarget(request: TransitionPrepareRequest): Promise<PreparedPhenomenon> {

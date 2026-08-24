@@ -412,11 +412,16 @@ function formatNumberCompact(value: number): string {
  * - `q` rendering.qualityMode (omitted when `auto`);
  * - `tb` rendering.trajectoryBackend (omitted when `auto`);
  * - `mode` experience.mode (omitted when `scientific`);
- * - `rm` accessibility.reducedMotion (omitted when false).
+ * - `rm` accessibility.reducedMotion (omitted when false);
+ * - `dc` destination controls: the FIRST destinations payload (the active
+ *   destination's normalized control state) JSON-encoded. Omitted when the
+ *   payload is empty. The destination module remains the normalization
+ *   authority — parse-side values re-enter through the module's ONE
+ *   normalizer (STATE_AND_ROUTES §6), never straight to uniforms.
  *
  * The input is re-normalized through {@link validateAtlasState} first, so the
  * output is canonical for equivalent states. Runtime-only fields (transition,
- * targets, camera, destination payloads) are intentionally excluded (§9).
+ * targets, camera) are intentionally excluded (§9).
  */
 export function serializeForUrl(state: CosmicAtlasStateV1): string {
   const s = validateAtlasState(state);
@@ -441,6 +446,13 @@ export function serializeForUrl(state: CosmicAtlasStateV1): string {
   }
   if (s.experience.mode !== 'scientific') parts.push(`mode=${s.experience.mode}`);
   if (s.accessibility.reducedMotion) parts.push('rm=1');
+  const firstDestination = Object.entries(s.destinations)[0];
+  if (firstDestination !== undefined) {
+    const [, payload] = firstDestination;
+    if (payload.state !== undefined && Object.keys(payload.state).length > 0) {
+      parts.push(`dc=${encodeURIComponent(JSON.stringify(payload.state))}`);
+    }
+  }
   return parts.join('&');
 }
 
@@ -572,6 +584,27 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
       reducedMotion: reducedMotion !== '0' && reducedMotion !== '',
       highContrastUi: defaults.accessibility.highContrastUi
     };
+  }
+
+  // Destination controls (dc): JSON-encoded normalized state for one
+  // destination. Structurally sanitized here; the destination module's ONE
+  // normalizer remains the validation authority on application. Invalid JSON
+  // or a non-object payload is ignored (never throws).
+  const dc = read('dc');
+  if (dc !== null) {
+    try {
+      const parsed: unknown = JSON.parse(dc);
+      if (isPlainObject(parsed)) {
+        result.destinations = {
+          [destination ?? defaults.atlas.activeDestination]: {
+            schemaVersion: 1,
+            state: parsed
+          }
+        };
+      }
+    } catch {
+      // Malformed dc: ignore the payload entirely.
+    }
   }
 
   return result;

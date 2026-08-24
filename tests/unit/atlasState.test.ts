@@ -134,6 +134,41 @@ describe('M5 experience/debug state domains', () => {
     expect(bad.rendering?.trajectoryBackend).toBe('auto');
   });
 
+  it('round-trips destination controls through the dc= share key (CA6)', () => {
+    const state = createDefaultAtlasState('tidal-disruption');
+    state.atlas.activePreset = 'solar-canonical';
+    state.destinations['tidal-disruption'] = {
+      schemaVersion: 1,
+      state: { penetrationScenario: 'deep', observerInclinationDeg: 41 }
+    };
+    const serialized = serializeForUrl(state);
+    expect(serialized).toContain('d=tidal-disruption');
+    expect(serialized).toContain('dc=');
+
+    const parsed = parseFromUrl(serialized);
+    const payload = parsed.destinations?.['tidal-disruption'];
+    expect(payload?.schemaVersion).toBe(1);
+    expect(payload?.state['penetrationScenario']).toBe('deep');
+    expect(payload?.state['observerInclinationDeg']).toBe(41);
+  });
+
+  it('omits dc= when no destination payload exists and ignores malformed dc', () => {
+    const plain = serializeForUrl(createDefaultAtlasState());
+    expect(plain).not.toContain('dc=');
+
+    // Malformed JSON: the whole payload is ignored, never thrown.
+    const bad = parseFromUrl('v=1&d=tidal-disruption&dc=%7Bbroken');
+    expect(bad.destinations).toBeUndefined();
+
+    // Non-object JSON payload: ignored.
+    const array = parseFromUrl('v=1&d=tidal-disruption&dc=%5B1%2C2%5D');
+    expect(array.destinations).toBeUndefined();
+
+    // Unsupported share version rejects the whole payload (§10).
+    const wrongVersion = parseFromUrl('v=99&d=tidal-disruption&dc=%7B%7D');
+    expect(wrongVersion.destinations).toBeUndefined();
+  });
+
   it('keeps quality and trajectory share keys independent (complete sections)', () => {
     const parsed = parseFromUrl('v=1&tb=numerical');
     expect(parsed.rendering?.qualityMode).toBe('auto');

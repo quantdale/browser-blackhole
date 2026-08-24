@@ -620,6 +620,51 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     host.setExperienceMode(share.experience.mode);
   }
 
+  // Destination-control deep links (CA6 persistence generalization): dc=
+  // payloads parse into share.destinations and are applied through the
+  // canonical setDestinationControl channel once each target destination is
+  // ACTIVE AND PREPARED. Application is verified against the serialized
+  // canonical state (the call is a silent no-op before prepare completes),
+  // with bounded 200 ms polling cleared on dispose.
+  const pendingControlTargets = new Map(Object.entries(share.destinations ?? {}));
+  const appliedControlTargets = new Set<string>();
+  const controlPayloadMatches = (id: string, payload: Record<string, unknown>): boolean => {
+    const state = host.state.destinations[id]?.state ?? {};
+    return Object.entries(payload).every(([k, v]) => {
+      const actual = state[k];
+      if (typeof v === 'number' && typeof actual === 'number') {
+        return Math.abs(actual - v) <= 1e-6;
+      }
+      return actual === v;
+    });
+  };
+  let controlPollTimer: ReturnType<typeof setInterval> | null = null;
+  if (pendingControlTargets.size > 0) {
+    controlPollTimer = setInterval(() => {
+      for (const [id, entry] of pendingControlTargets) {
+        if (appliedControlTargets.has(id)) continue;
+        if (host.state.atlas.activeDestination !== id) continue;
+        if (!controlPayloadMatches(id, entry.state)) {
+          host.setDestinationControl(id, entry.state);
+          if (controlPayloadMatches(id, entry.state)) appliedControlTargets.add(id);
+          continue;
+        }
+        appliedControlTargets.add(id);
+      }
+      if (appliedControlTargets.size >= pendingControlTargets.size && controlPollTimer !== null) {
+        clearInterval(controlPollTimer);
+        controlPollTimer = null;
+      }
+    }, 200);
+    // Hard budget: stop polling after ~30 s regardless.
+    setTimeout(() => {
+      if (controlPollTimer !== null) {
+        clearInterval(controlPollTimer);
+        controlPollTimer = null;
+      }
+    }, 30_000);
+  }
+
   refreshNav();
   buildPanel();
 
@@ -713,6 +758,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
 
   return {
     dispose(): void {
+      if (controlPollTimer !== null) {
+        clearInterval(controlPollTimer);
+        controlPollTimer = null;
+      }
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       unsubscribeStatus();
