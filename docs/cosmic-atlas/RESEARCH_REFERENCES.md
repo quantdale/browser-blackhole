@@ -142,8 +142,21 @@ Important evidence that research-grade binary-BH evolution belongs to HPC/offlin
 
 - https://www.black-holes.org/2025/05/19/catalog-update
 - https://data.black-holes.org/
+- Third catalog paper: arXiv:2505.13378 (v3.0.0 metadata release 2025-05-12;
+  Appendix C documents the RPDMB waveform format)
+- Second catalog paper: arXiv:1904.04831 (file-format reference)
 
-Candidate source for public numerical-relativity products. Verify dataset licenses/terms and exact extraction interfaces before implementation.
+CA8 implemented-model sources (conventions encoded in
+`tools/cosmic-data/` and `src/phenomena/black-hole-merger/`):
+
+- pinned dataset: SXS:BBH:0001 Lev5, Zenodo record 13166927 (DOI
+  10.5281/zenodo.13166927), license CC-BY-4.0, retrieved 2026-08-25 —
+  full provenance block in docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md;
+- first publication of the simulation: Mroué et al. 2013 (Mroue:2013xna);
+- RPDMB decoding: official MIT-licensed `sxs` Python package (offline
+  tooling only, never bundled);
+- gauge-dependence boundary for horizon coordinate trajectories: §4 of
+  DATA_SOURCES_BBH_MERGER.md (consumed as labeled coordinate paths).
 
 ## Stellar merger / luminous red nova context
 

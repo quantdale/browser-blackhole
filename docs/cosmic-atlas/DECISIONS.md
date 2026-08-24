@@ -146,3 +146,28 @@ Do not casually introduce giant dense 3D textures. Prefer analytic shells, spars
 ## CA-ADR-020 — Transition visuals are not scientific
 
 Hyperspace/interstellar travel is explicitly a cinematic navigation effect and must never be described as a relativistically correct faster-than-light model.
+
+## CA-ADR-021 — Black-Hole Merger pins SXS:BBH:0001 Zenodo record 13166927 (CC-BY-4.0)
+
+The CA8 data-driven destination reduces the pinned Zenodo record of
+SXS:BBH:0001 (Lev5; explicit record-level CC-BY-4.0 license; per-file MD5
+checksums published by the record API). Full provenance, survey and the
+gauge-dependence boundary live in docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md.
+
+Reasons:
+
+- redistribution of derived reduced artifacts requires an explicit grant;
+  the pinned record is the variant that provides one (CC-BY-4.0), while the
+  v3.0 CaltechDATA records expose no machine-readable license field;
+- per-file checksums make offline acquisition reproducible (Gate G /
+  DATA_PIPELINE §14);
+- equal-mass non-spinning is the canonical first production contract.
+
+Consequences:
+
+- attribution obligations (Mroue:2013xna et al.) ride in the manifest, this
+  doc set and the destination About panel;
+- RPDMB decoding uses the official MIT `sxs` package as OFFLINE tooling
+  only — no SXS/sxs code or dependency enters the runtime bundle;
+- NR coordinate trajectories are consumed as gauge-dependent coordinate
+  paths and must be labeled as such (never invariant observables).
