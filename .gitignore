@@ -29,3 +29,8 @@ npm-debug.log*
 *.swp
 .DS_Store
 Thumbs.db
+
+# Offline scientific-data cache (tools/cosmic-data)
+tools/cosmic-data/scratch/
+__pycache__/
+*.pyc

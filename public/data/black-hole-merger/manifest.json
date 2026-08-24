@@ -1,0 +1,58 @@
+{
+  "channels": [
+    "timeM",
+    "bhA.xyz",
+    "bhB.xyz",
+    "h22Re",
+    "h22Im"
+  ],
+  "id": "sxs-bbh-0001-lev5",
+  "phenomenon": "black-hole-merger",
+  "physics": {
+    "coordinateFrame": "source-inertial horizon centers recentered on the fitted midpoint",
+    "scalars": {
+      "chi1z": 1.20930921804e-07,
+      "chi2z": 1.22196915414e-07,
+      "h22PeakAmplitude": 0.3947552107972195,
+      "m1OverM": 0.500000161328,
+      "m2OverM": 0.500000166356,
+      "remnantChiMag": 0.6864817488889335,
+      "remnantChiZ": 0.6864817488889335,
+      "remnantMassOverM": 0.9515962632179453,
+      "separationStartM": 12.224960398882496
+    },
+    "timeOrigin": "h22 amplitude peak (merger anchor)",
+    "units": "geometric NR units (total mass M=1); runtime times relative to h22 peak",
+    "waveformMode": "l2m2-strain-real-imag"
+  },
+  "reduction": {
+    "errorReport": "./reduction-report.json",
+    "method": "phase-uniform inspiral + time-uniform ringdown, linear interp",
+    "toolVersion": "reduce_bbh_merger.py@1"
+  },
+  "runtime": {
+    "bytes": 73888,
+    "checksumSha256": "91f1f9c0aa1a2da6ac22398cd2e95fc74c667727c0f65b23d56a926bc36ee6cd",
+    "encoding": "bbm1",
+    "filename": "sxs-bbh-0001-lev5-bbm1-v1.bin",
+    "samples": 2048,
+    "schemaVersion": 1
+  },
+  "schemaVersion": 1,
+  "source": {
+    "attribution": "Waveform and trajectory data from the SXS Collaboration numerical-relativity catalog (SXS:BBH:0001), licensed CC-BY-4.0.",
+    "datasetId": "SXS:BBH:0001",
+    "doi": "10.5281/zenodo.13166927",
+    "level": "Lev5",
+    "license": "CC-BY-4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
+    "organization": "SXS Collaboration",
+    "publications": [
+      "Mroue:2013xna",
+      "Boyle:2019kee",
+      "SXSCatalogWebsite"
+    ],
+    "retrievedAt": "2026-08-25",
+    "url": "https://zenodo.org/records/13166927"
+  }
+}
