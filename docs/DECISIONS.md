@@ -97,3 +97,24 @@ This file records planning decisions that implementation agents should treat as 
 ## ADR-017 — Milestone integration order is authoritative
 
 **Decision:** Research can run ahead in parallel, but production integration follows `docs/ROADMAP.md` unless this ADR set is deliberately revised.
+
+## ADR-018 — Kerr backend: Boyer-Lindquist Hamiltonian for M9 (Kerr-Schild designated for M10 plunge)
+
+**Decision:** The M9 Kerr renderer is a DISTINCT numerical backend — first-order
+Boyer-Lindquist null-Hamiltonian RK4 over (r, theta, phi, p_r, p_theta) with
+fixed conserved E and L_z, static-observer tetrad initialization, signed
+dimensionless spin, and the locked disk-corotating spin convention. Full
+convention/provenance authority: `docs/KERR_BACKEND_ADR.md`. CPU oracle:
+`src/phenomena/black-hole/kerr/`; GPU: `kerrIntegrator.ts` beside it.
+
+**Why:** exact smooth a->0 correspondence with the validated Schwarzschild
+system in identical coordinates (the M9-08 release gate), smallest viable
+state, no turning-point sign bookkeeping, and capture termination that never
+exercises the BL horizon singularity. Kerr-Schild ingoing coordinates remain
+the DESIGNATED migration path if M10 plunge observers require integrating
+through the horizon; the tradeoff record lives in KERR_BACKEND_ADR §1.10.
+
+**Consequences:** the LUT backend stays Schwarzschild-only and is truthfully
+inapplicable while metric=kerr; coordinate-pole passages carry an explicit f32
+limitation with a mirrored CPU/GPU honesty gate (ADR §1.19); the UI exposes
+signed spin through the canonical destination-control channel only.

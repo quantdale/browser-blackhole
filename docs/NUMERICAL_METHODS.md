@@ -2,6 +2,13 @@
 
 This document fixes the numerical strategy for the Schwarzschild correctness renderer and reference solver. It is deliberately explicit so multiple agents do not implement incompatible geodesic conventions.
 
+> **Kerr note (M9):** the Kerr numerical strategy (BL Hamiltonian RK4,
+> pole-aware stepping, mirrored pole-passage honesty gate, event policy) is
+> specified in `docs/KERR_BACKEND_ADR.md` and implemented in
+> `src/phenomena/black-hole/kerr/`. This document remains authoritative for
+> the Schwarzschild core; where Kerr reuses a mechanism defined here (step
+> policy shape, event ordering, convergence protocol) it does so verbatim.
+
 ## 1. Coordinate and unit conventions
 
 Core geometry uses geometric units `G = c = 1` and measures length in `r_g = GM/c^2`. Therefore the Schwarzschild mass parameter is `M = 1`, the horizon is at `r = 2`, photon sphere at `r = 3`, and Schwarzschild ISCO at `r = 6`.

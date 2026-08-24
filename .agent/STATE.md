@@ -1,134 +1,141 @@
 # Durable project state
 
-Last update: 2026-08-24 (CA6 CAMPAIGN) — **CA6 TIDAL DISRUPTION IMPLEMENTED
-END-TO-END.** Tidal Disruption is the fifth production Cosmic Atlas
-destination: registered, deep-linkable at `/atlas/tidal-disruption`, five
-production presets, deterministic nonlinear timeline, canonical controls,
-generalized destination-control persistence (also fixes the CA5 share-state
-debt), 48-test unit/reference corpus, 19-spec browser suite, six visual
-goldens (twice-stable), and a phase/tier-aware benchmark. Full Playwright
-suite 96/96. All cumulative gates green.
+Last update: 2026-08-24 (M9 KERR CAMPAIGN) — **M9 KERR SPACETIME IMPLEMENTED
+AND VALIDATED END-TO-END.** Kerr is the sixth production black-hole
+experience state: a distinct numerical Boyer-Lindquist null-Hamiltonian
+backend (CPU binary64 oracle + f32 TSL/WebGPU pass), signed dimensionless
+spin through the canonical control channel, spin-dependent ISCO disk,
+Schwarzschild-limit convergence gate, prograde/retrograde validation, Kerr
+presets/goldens/benchmarks. Full Playwright suite 106/106; vitest 405/405;
+all cumulative gates green; existing goldens and Schwarzschild/LUT behavior
+unchanged.
 
 ## Current phase
 
-**CA6 COMPLETE. Next: M9 Kerr (dedicated campaign) or CA7 Quasar/AGN per
-`docs/cosmic-atlas/ROADMAP.md` — do not start casually; M9 requires its own
-research/ADR gate first.**
+**M9 COMPLETE (all packets M9-01..M9-10 / BH-200..BH-206).**
+Next: CA7 Quasar/AGN per `docs/cosmic-atlas/ROADMAP.md`, or M10 observer
+modes (Kerr-Schild migration decision recorded in KERR_BACKEND_ADR §1.10).
 
-Commit chain this campaign (after the CA5 closure commit 70eaddf):
-```
-221d441 feat: add tidal disruption encounter and disruption physics (CA6-01..08 core)
-0c9fa36 test: add tidal disruption browser validation and arrival framing (CA6-13)
-9dc18de feat: add tidal debris stream shock ring and visual goldens (CA6-06..10, CA6-13)
-0a38a7e feat: generalize destination control persistence and add tde benchmark (CA6-14)
-45396ef state: close ca6 with cumulative validation evidence
-7b4fbcc perf: stretch - CM jet readability, tier benchmarks, browser harness hardening
-```
-
-## CA6 packet status
+## M9 packet status
 
 | Packet | Status | Evidence |
 | --- | --- | --- |
-| CA6-01 scope/presets | DONE | `src/phenomena/tidal-disruption/types.ts` (fidelity disclosure; 1 unit = 1 R_sun; BH mass capped ~2x below the Hills regime; stellar/penetration scenario enums; 5 presets in `presets.ts`) |
-| CA6-02 encounter | DONE | `trajectory.ts`: closed-form parabolic Kepler via Barker + Cardano inverse; frame convention documented; invariants tested (round trip, periapsis speed sqrt(2mu/q), monotone radius, finite over extreme sweeps) |
-| CA6-03 deformation | DONE | `deformation.ts`: xi=(rt/r)^3, bounded stretch (cap 2.6), EXACT volume preservation, axis = star->BH; ordering/bounds/NaN tests |
-| CA6-04 disruption | DONE | `disruption.ts`: beta bands (full >=1, partial >=0.75, fly-by) + explicit direct-capture verdict (never silent); reason strings; parameter-ordering tests |
-| CA6-05 debris spawn | DONE | `debris.ts`: deterministic spherical-Fibonacci plan (no RNG for positions), seeded lattice rotation, velocities derived from energy offsets; bounded tier populations; accents via ParticleService |
-| CA6-06 stream | DONE | `stream.ts` + RibbonService: Kepler-family spines (bisect+Newton elliptic, Newton hyperbolic), clustered energy sampling, disclosed crops (f>=1/30, r<=12 rp); continuity/speed-bound tests |
-| CA6-07 bound/unbound | DONE | energy-sign classification; deterministic fractions (1024-element reference plan) in debug snapshot; ~0.5/0.5 near-parabolic symmetry tested |
-| CA6-08 winding/intersection | DONE | differential Kepler winding (no GR precession — disclosed); deterministic shock trigger = first periapsis return of most-bound element (= fallbackSeconds) |
-| CA6-09 shock volume | DONE | VolumeService equatorial TORUS at Rc=2rp (WGSL smoothstep edge contract documented in-graph); phase-gated; gain separated from geometry; half-res path |
-| CA6-10 nascent disk | DONE | procedural annulus, radial falloff, gain ramp after several fallback times; streams/accents retired; disclosed as NOT a disk simulation |
-| CA6-11 LOD | DONE | phase-gated resources (approach/deformation pay zero debris cost; volume only in shock; accents retire at disk); angular-size accent gate; debug exposes volumeVisible/populationScale/accentAngularGate; single global governor (no local controller) |
-| CA6-12 timeline | DONE | `timeline.ts`: 7 phases anchored on Barker timing + model fallback; exact forward/inverse round trips tested; scrub/reset determinism verified in browser (rewind/play identical state) |
-| CA6-13 validation/goldens | DONE | `tests/unit/tidalDisruptionPhysics.test.ts` (48 tests) + `tests/browser/tidal-disruption.spec.ts` (19 specs incl. 25-switch torture BH->TDE->CM->SN->NS x5); 6 TDE goldens twice-stable |
-| CA6-14 benchmark/disposal | DONE | `scripts/bench-tidal-disruption.mjs` (+`bench:tidal-disruption`); per-phase + low/high/ultra/1080p records in `benchmarks/results/2026-08-24-ca6/`; all resources tracked in the prepare scope (geometry/materials/RT/storage buffers), disposal exercised by the torture suite |
-| CA6-15 checkpoint | DONE | this state file + README/GOLDEN_IMAGES/PHENOMENA/STATE_AND_ROUTES/RESEARCH_REFERENCES updates |
+| M9-01/BH-200 convention ADR | DONE | `docs/KERR_BACKEND_ADR.md` (all locked fields incl. formulation tradeoff BL vs KS vs separated; literature: BPT72/Chandrasekhar/MTW + Fujita Table 1 vectors; research CORRECTION found & recorded: static-tetrad phi-leg needs t-phi Gram-Schmidt — ADR §1.8) |
+| M9-02/BH-201 CPU reference | DONE | `kerr/reference.ts`: binary64 RK4 BL-Hamiltonian over 5 vars w/ fixed E,L_z; full failure taxonomy (non-finite/null-constraint/carter-drift/max-steps/invalid-initial-state), Carter diagnostic, turn counts, disk-hit contract, path samples, signed azimuthal travel |
+| BH-203 characteristic helpers | DONE | `kerr/characteristics.ts`: horizons, ergosurface(theta), BPT ISCO(signed-a*), photon orbit, emitter Omega/u^t/g — single authority, no duplication |
+| M9-03..05/BH-202 GPU backend | DONE | `kerr/kerrIntegrator.ts`: fullscreen-triangle TSL material, compile-bound Loop(2048)+live uMaxSteps, flat-gate WebGL2-safe conditionals, bounded-magnitude NaN proxies, mirrored event policy, parity debug encoding, explicit magenta failures |
+| M9-06 spin-aware disk | DONE | ISCO(spin) inner edge via centralized helper; `makeDiskEmissionNode` gained OPTIONAL live-inner binding (`innerRadiusRgLive`) so the Shakura-Sunyaev profile follows ISCO live without recompiles; Schwarzschild callers unchanged (goldens prove it); Kerr g=1/(u^t(1−Omega b_z)) raw into the shared g^3 node |
+| M9-07 controls/persistence | DONE | `controlState.ts` normalizer (ONE authority); destination routes numerical/LUT/KERR passes per metric with truthful debug snapshot (`numerical-kerr`); 4 Kerr presets; dc/share/revisit/history persistence browser-proven |
+| M9-08/BH-204 convergence | DONE | `tests/unit/kerrConvergence.test.ts`: a*=0 exact-limit agreement vs cpuReference (classification/minR/direction/hit-existence) + documented bounded LINEAR-in-\|a*\| departure bounds across ±{0.05..0.2} sweep |
+| M9-09/BH-205 prograde/retrograde | DONE | BPT ISCO ordering vs published vectors; extremal limits; monotone ISCO; photon-orbit boundary; drag sign via signed phi travel; capture-basin ordering b_pro<b_0<b_retro matching known shadow edges (~2.7/5.1/6.7 measured); spin-sign+azimuth mirror symmetry; browser CPU/GPU parity corpus w/ non-vacuous backend proof |
+| M9-10/BH-206 characterization | DONE | `benchmarks/results/2026-08-24-m9-kerr/` (5 records + SUMMARY) via honesty-gated `scripts/bench-kerr.mjs` (`npm run bench:kerr`); NO optimization performed (baseline-only, per plan §15) |
 
-## Cross-cutting: destination control persistence (generalized, CA5 debt closed)
+## Commit chain this campaign
 
-- host keeps a per-destination, preset-scoped state cache written through
-  from `serializeShareState`/`setDestinationControl` and merged back over
-  the registry preset at `resolveTarget` — revisits and back/forward
-  restore supported controls; preset switches reset to preset defaults.
-- share links gain `dc=` (JSON of the active destination's normalized
-  state) — `serializeForUrl`/`parseFromUrl` codec unit-tested; the app
-  applies dc at boot through the canonical `setDestinationControl` channel
-  with application verified against serialized state (bounded polling).
-- Module normalizers remain the ONLY validation authority; no UI-to-uniform
-  bypass. Works for Compact Merger AND Tidal Disruption (browser-tested).
+```
+58d2f0c feat: lock Kerr conventions (ADR) and validate binary64 reference physics (M9-01/M9-02)
+34cfa7c feat: GPU Kerr numerical backend, live ISCO disk emission, metric/spin controls (M9-03..07)
+3ec1c1c test: spin-zero convergence gate, prograde/retrograde suites, Kerr CPU/GPU parity + lifecycle; coordinate-pole stiffness fix w/ mirrored honesty gate (M9-08/09)
+5942fa6 test: establish Kerr visual golden set; existing goldens unchanged
+f8baa59 perf: characterize numerical Kerr backend (M9-10/BH-206 baseline)
+<pending final docs/state commit>
+```
 
-## CA6 scientific fidelity (disclosed)
-
-- encounter trajectory: DIRECT reduced Newtonian model (parabolic Kepler,
-  Barker closed form). NOT a relativistic geodesic; no pericenter
-  precession; supported presets keep rp >= ~40 rg.
-- deformation/disruption/debris/streams: PROCEDURAL_SCIENTIFIC reduced
-  proxies with disclosed constants (tidal-tensor energy spread with
-  coefficient 1, partial-stripping fraction 0.35, deformation gain/cap).
-- fallback/shock trigger derived from the model's own bound-orbit family
-  (canonical ~116 d first fallback for the solar/1e6 MSUN preset —
-  physically plausible, not fitted).
-- display exaggeration: stellar disc radius = max(R*, min(0.12 rt, 20
-  units)) — pure presentation, stated in presets and module disclosure.
-- NOT claimed: SPH, GRMHD, numerical relativity, radiative transfer,
-  stream self-gravity, predictive disk evolution. Sources recorded in
-  `docs/cosmic-atlas/RESEARCH_REFERENCES.md` (TDE section).
-
-## Validation evidence (this campaign, final state)
+## Validation evidence (cumulative, this campaign's final state)
 
 | Gate | Result |
 | --- | --- |
-| npm run check | PASS — prettier/eslint/tsc clean, vitest **351/351**, build OK |
-| Playwright FULL suite | **97/97 PASS** (19 TDE specs + CM dc proof + 3 CM/TDE persistence specs; includes 25-switch torture BH->TDE->CM->SN->NS x5) |
-| Goldens | 24/24, established then verified twice-stable; 18 pre-existing goldens unchanged except ATLAS_HYPERSPACE_BH_NS (documented transition-timing jitter re-baseline, GOLDEN_IMAGES.md) |
-| TDE benchmark | per-phase + low/high/ultra/1080p records committed under `benchmarks/results/2026-08-24-ca6/` |
+| npm run check components | prettier clean; eslint clean; tsc clean |
+| vitest | **405/405** across 25 files (351 pre-existing + 54 new Kerr tests) |
+| npm run build | PASS (vite production build) |
+| Playwright FULL suite | **106/106 PASS** (97 pre-existing incl. all goldens/lifecycle/torture + 9 new Kerr specs: 2 parity backends + 7 integration) |
+| Visual goldens | **27/27 twice-stable**: 24 pre-existing UNCHANGED + 3 new Kerr (KERR_ZERO_SPIN, KERR_HIGH_PROGRADE, KERR_RETROGRADE) established then verified stable on repeat runs |
 
-Environment: Windows 11, Node v22.23.2, Edge 151 (msedge), hardware WebGPU
-(amd rdna-2). Tier records: low 583x436 (scale 0.6), medium 778x581, high/ultra
-972x727 (scale 1.0), ultra-1080p 1600x1007. All frame numbers are rAF CPU-side
-deltas.
+Environment exercised: Windows 11 (10.0.26200), Node v22.23.2, Edge 151
+(msedge channel), **hardware WebGPU (amd rdna-2)** for all browser suites AND
+WebGL2 fallback for the parity matrix rows; deterministic unit/reference
+suites run portable (CI-representative).
 
-## Benchmark findings (CA6-14)
+Environment note: this machine had `core.autocrlf=true`, which made
+`format:check` fail repo-wide against the LF-enforcing `.prettierrc.json`;
+fixed LOCALLY by setting `core.autocrlf=false` + re-smudge. Fresh checkouts
+on Windows should verify this before Gate A (recorded as environment debt).
 
-All TDE phases measure ~7 ms median / ~7.1 ms p95 — the 144 Hz vsync
-interval — at medium tier (778x581 internal) AND at low/high/ultra tiers
-and 1600x1007 internal. The destination renders comfortably inside one
-frame everywhere on this hardware, so per-phase cost differences sit below
-the vsync floor (same honest conclusion as CA5). The PHASE-AWARE evidence
-lives in each record's `phaseResources`: volume visible ONLY at shock,
-disk ONLY at nascent-disk, populationScale 0 at deformation, accents
-retired at nascent-disk. GPU timestamping remains unavailable/unclaimed.
+## Key architectural decisions (see ADRs for full records)
+
+1. BL Hamiltonian (not separated-potentials, not Kerr-Schild) for M9:
+   turning-point-free momenta, smallest state, EXACT a→0 coordinate identity
+   with the validated Schwarzschild system; KS = designated M10 plunge path
+   (KERR_BACKEND_ADR §1.10).
+2. Static-tetrad research correction: orthogonalized phi-leg; init is
+   machine-null by construction (test-falsifiable).
+3. Disk-corotating SIGNED-spin resolution of all BPT +- branches (disk sense
+   fixed to +Y; spin sign transforms physics) — preserves every legacy
+   preset/URL byte-for-byte.
+4. Live ISCO emission binding: optional uniform-driven inner edge in the
+   shared disk-emission graph; default path bit-compatible.
+5. Coordinate-pole honesty gate (parity finding): pole-aware step factor +
+   escaped-rays-with min|sinθ|<0.04 reclassified as explicit failure,
+   mirrored CPU/GPU so corpora skip identical rows.
+6. Backend routing truth: kerr ⇒ numerical-kerr always; LUT inapplicable;
+   effectiveSpin forced 0 under Schwarzschild.
+
+## Benchmark findings (M9-10 baseline)
+
+Hardware WebGPU, rAF CPU-side deltas only (frameGpuMs null — no timestamps):
+a*=0 / −0.7 / +0.9 at low tier (583×436): median ~13.9–14 ms (real cost —
+NOT vsync-masked like Schwarzschild's ~7 ms); prograde high-spin tail p95
+27.7/p99 34.8 ms (winding rays); medium native 778×581: median 34.8 ms;
+ultra 1600×1007: median 180.8 ms. Per-spin medians equal; tails differ.
+NO optimization performed in M9 (correctness-first per plan §15); the
+baseline above is the BH-206 gate input for any future optimization.
 
 ## Known debt / limitations (updated)
 
-1. (Carried) M8 items: gFactorRelativeErrorMax placeholder; captured-class
-   LUT columns routed to the numerical oracle; no disk Doppler asymmetry
-   (golden-pinned baseline); eager LUT loading.
-2. CA6: stream ribbons render only the near-BH portion (r <= 12 rp) — the
-   distant stream is cropped by construction (disclosed); at late phases
-   most of the family is legitimately beyond the crop, so streams fade
-   from view before the shock stage.
-3. CA6: per-phase/tier frame cost is vsync-bound on this hardware; a
-   slower machine or higher resolution would be needed for meaningful
-   per-phase differentiation.
-4. CA6: the nascent disk is a procedural presentation (no viscous
-   evolution); inner radius is presentational (>= 2 ISCO).
-5. Stretch completed this campaign (CA6-campaign stretch A-C): CM
-    viewing-angle/remnant/jet dc round-trip proven via the generalized
-    persistence channel; CM jet lobes now additive + cooler/brighter +
-    narrower for contrast against the merger core (goldens CM_GRB_ON/OFF
-    re-established, physics untouched); CM tier records
-    (low/high/ultra/1080p) added alongside TDE records; browser harness
-    arrival gate hardened (debugSnapshot != null).
-6. Remaining CA5 stretch D (low-tier kilonova shell sampling): investigated
-    — vsync-bound evidence shows no measurable regression at this tier/resolution;
-    smarter bounded sampling is a future optimization, not a current defect.
+1. (Carried from M8) LUT items: gFactorRelativeErrorMax placeholder;
+   captured-class LUT columns routed to numerical oracle; no disk Doppler
+   asymmetry baseline; eager LUT loading. Untouched by M9 by scope policy.
+2. Kerr performance headroom: medium/native ~35 ms median on rdna-2 — below
+   60 fps at default tiers on THIS hardware; optimization (separated-form,
+   tile classification, adaptive stepping) deliberately deferred until needed
+   (BH-206 baseline now exists).
+3. Coordinate-pole passage limitation: escaped rays grazing within
+   sin(theta)<0.04 of the axis classify as explicit numerical failure
+   (magenta) rather than presenting untrusted directions; polar-orbit views
+   will show failure pixels until an axis-regularized formulation lands.
+4. Numerical-failure pixel COUNTS are not yet aggregated into benchmark
+   records (visible via debug classification views only).
+5. Spin-axis tilt unsupported (+Y only), truthfully reported; M10 item.
+6. Kerr WebGL2 fallback: parity corpus PASSES on webgl2 project rows
+   (executed evidence), but broad hardware coverage is NOT certified here
+   (single-machine campaign) — treat wide-GPU certification as open.
+7. Atlas navigation uses replaceState (single history entry); "back/forward"
+   persistence means revisit-cache restoration (browser-tested), not
+   multi-entry popstate timelines — matches the existing architecture.
+
+## Deferred environment gates
+
+None NEW. (Wide-hardware WebGPU certification remains a general release-gate
+item per QUALITY_GATES Gate F, unchanged from before M9.) All M9 gates ran
+for real on hardware WebGPU + WebGL2 fallback on this machine.
+
+## Critical/High defects remaining
+
+**Zero known Critical or High defects.** The two High-class candidates found
+during the campaign were fixed at root cause and regression-pinned:
+(a) static-tetrad orthogonality error (would have broken ALL Kerr physics —
+caught by machine-null init test before any GPU work shipped);
+(b) coordinate-pole RK4 stiffness (wrong directions presented as valid —
+caught by the parity corpus, fixed with mirrored step/honesty policy).
 
 ## Next actions
 
-1. M9 Kerr: dedicated campaign (research/ADR gate first — do not start
-   casually). See `docs/KERR_RESEARCH_PLAN.md`.
-2. CA7 Quasar/AGN per ROADMAP (scale-zone architecture).
-3. Opportunistic CA5 polish (jet readability; CM tier benchmarks using the
-   TDE harness pattern; low-tier kilonova shell sampling).
+1. CA7 Quasar/AGN per `docs/cosmic-atlas/ROADMAP.md` (scale-zone
+   architecture; LensingService.createThinLensDisplacement stays the AGN
+   reduced model — never a substitute for the strong-field passes).
+2. OR M10 observer modes: first decision = Kerr-Schild migration per
+   KERR_BACKEND_ADR §1.10 if plunge worldlines are in scope; tetrad init is
+   already isolated behind one function for additive observer families.
+3. Opportunistic Kerr follow-ups (Medium/Low debt list above): failure-count
+   telemetry into bench records; Kerr LUT exploration ONLY after a validated
+   mapping study; axis-tilt support (rotate init data into spin frame).

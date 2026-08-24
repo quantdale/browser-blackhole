@@ -21,7 +21,12 @@ Changing mode should apply a known preset of visual/debug settings while preserv
 
 `Schwarzschild | Kerr`
 
-Kerr disabled/marked unavailable until M9 exists. Do not present a nonfunctional spin slider as if implemented.
+IMPLEMENTED (M9): the selection travels through the canonical destination-
+control channel (`normalizeBlackHoleControls`) and routes truthfully —
+Kerr always executes the numerical Kerr backend; the Schwarzschild LUT
+choice is inapplicable while Kerr is active and the debug snapshot reports
+the effective backend (`numerical-kerr`). Switching back restores the
+Schwarzschild numerical/LUT policy.
 
 ### Mass
 
@@ -39,7 +44,13 @@ Explain exactly what changes.
 
 ### Spin
 
-Kerr only. Signed dimensionless `a*`. Show prograde/retrograde relationship to disk orientation.
+IMPLEMENTED (M9). Signed dimensionless `a*`, clamped to [-0.998, +0.998].
+Convention shown to the user: positive spin = angular momentum along +Y; the
+disk always orbits +Y-corotating, so positive a* is a prograde disk (ISCO
+shrinks below 6 r_g) and negative a* a retrograde disk (ISCO grows above
+6 r_g). The disk inner edge follows `kerrIscoRadius(spin)` automatically;
+spin has NO effect while metric = Schwarzschild. Axis tilt is NOT exposed:
+M9 supports only the canonical +Y axis (docs/KERR_BACKEND_ADR.md §1.4).
 
 ### Spin/disk axis
 

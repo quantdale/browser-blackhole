@@ -40,6 +40,15 @@ Validation:
 - Kerr spin presets remain inside safe non-extremal range initially, e.g. `|a*| <= 0.998` unless the numerical backend later validates a broader range;
 - spin axis normalized and non-zero.
 
+M9 implementation status: `metric` and signed `spin` are LIVE for the Cosmic
+Atlas black-hole destination through the per-module control record
+(`normalizeBlackHoleControls`, clamp ±0.998; see
+`src/phenomena/black-hole/controlState.ts`). `spinAxis` remains metadata:
+M9 supports only the canonical +Y axis (docs/KERR_BACKEND_ADR.md §1.4); a
+tilted axis is an explicitly unsupported/degraded configuration, not a
+silently rotated approximation. Backend routing truth and the effective-spin
+rule live in KERR_BACKEND_ADR §1.21.
+
 ## 3. ObserverState
 
 ```ts

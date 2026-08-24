@@ -40,6 +40,31 @@ Required fixtures:
 
 Record numerical tolerances in tests; do not use vague "looks close" assertions.
 
+## 3a. Kerr physics tests (M9)
+
+Implemented in `tests/unit/kerrCharacteristics.test.ts`, `kerrReference.test.ts`,
+`kerrConvergence.test.ts` and browser specs `kerr-parity.spec.ts` /
+`kerr-integration.spec.ts`. Coverage per docs/KERR_BACKEND_ADR.md:
+
+- characteristic helpers vs published vectors: ISCO(±0.5/±0.9/0.998/±1),
+  photon-orbit boundary, horizons/ergosurface limits, emitter u^t/Omega
+  normalization against the RAW metric, a*=0 equality with the validated
+  Schwarzschild formulas;
+- reference-solver invariants: finite-difference Hamiltonian-gradient
+  agreement, machine-null initialization through the tetrad, Carter/null
+  residual conservation, exact spin-sign + azimuth-reversal symmetry,
+  frame-dragging sign, monotone capture/escape transition with prograde
+  critical-offset ordering (b_pro < b_0 < b_retro, matching known Kerr
+  shadow-edge values), high-spin stress without hidden failures, distinct
+  failure taxonomy, disk-hit contract, step-halving convergence;
+- spin->0 convergence gate (PRIMARY RELEASE GATE): a*=0 agreement with
+  cpuReference on classification/min-radius/direction/hit-existence plus
+  bounded LINEAR-in-|a*| departure bounds across a signed sweep;
+- browser: selected-ray CPU/GPU parity through the canonical control channel
+  with non-vacuous backend proof (`activePassKind === 'kerr'`), lifecycle/
+  persistence/deep-link/dc round trip/tier+resize/torture suites, and the
+  Kerr golden set (zero-spin/high-prograde/retrograde).
+
 ## 4. CPU/reference solver
 
 Create a readable CPU reference solver before heavily optimizing the GPU geodesic implementation. It may be slower and use higher precision. It returns trajectory/termination diagnostics for a small set of rays.

@@ -57,15 +57,27 @@ Use these for qualitative expectations around lensing, apparent disk warping, Do
 
 ## Kerr research direction
 
-Before M9, perform a new focused literature review. Topics:
+The M9 focused literature review is COMPLETE; its locked output lives in
+`docs/KERR_BACKEND_ADR.md` (conventions, formulation tradeoff, validation
+contract). Primary/standard sources verified during M9-01:
 
-- Kerr metric and constants of motion for null geodesics;
-- Boyer-Lindquist vs Kerr-Schild numerical behavior;
-- robust horizon crossing;
-- spin-dependent ISCO;
-- local tetrads/camera initialization;
-- redshift/radiative-transfer invariant formulation;
-- GPU-friendly integrators and numerical error near critical curves.
+- **Bardeen, Press & Teukolsky 1972**, "Rotating Black Holes: Locally
+  Nonrotating Frames, Energy Extraction, and Scalar Synchrotron Radiation",
+  ApJ 178, 347 — circular equatorial geodesics (Omega eq. 2.16, existence
+  boundary eq. 2.17), photon orbits (eq. 2.18), marginally bound orbit
+  (eq. 2.19), ISCO Z1/Z2 form (eq. 2.20), prograde/retrograde sign
+  convention. Implemented in `src/phenomena/black-hole/kerr/characteristics.ts`.
+- **S. Chandrasekhar**, "The Mathematical Theory of Black Holes" (1983),
+  Ch. III — Boyer-Lindquist metric/inverse metric, separated null geodesic
+  potentials, Carter constant.
+- **Misner, Thorne & Wheeler**, "Gravitation" (1973), §33 — BL coordinates,
+  horizons, ergosurface, frame dragging.
+- **Fujita, Sago & Nakano**, arXiv:1707.09309, Table 1 — independent numeric
+  ISCO vectors (chi = 0.5/0.9/1.0 pro/retro) used as test fixtures.
+- Static-observer tetrad orthogonalization in the t-phi plane (the naive
+  `d/dphi/sqrt(g_phiphi)` leg is NOT orthogonal to the timelike leg when
+  g_tphi != 0): derived and recorded in KERR_BACKEND_ADR §1.8 with the
+  machine-null init test as the falsifier.
 
 Do not lock a Kerr equation implementation solely from a blog or visualization repository.
 

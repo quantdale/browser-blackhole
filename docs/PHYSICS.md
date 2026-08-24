@@ -117,8 +117,26 @@ This behavior needs a documentation test because a naive "mass = lens strength" 
 
 ## 11. Kerr extension
 
-Do not begin Kerr until Schwarzschild milestone gates pass.
+IMPLEMENTED as of M9 (was previously deferred). The convention authority is
+`docs/KERR_BACKEND_ADR.md`; the executable physics lives in
+`src/phenomena/black-hole/kerr/` (binary64 reference) and
+`src/phenomena/black-hole/kerr/kerrIntegrator.ts` (f32 GPU production).
+Summary of locked conventions:
 
-Use dimensionless spin `a* = Jc/(GM^2)` or an equivalent documented convention, with production presets kept away from exact extremality. Kerr introduces axial rather than spherical symmetry, frame dragging, and spin-dependent ISCO.
-
-Kerr-Schild coordinates are the preferred research direction for a robust numerical renderer around/through the horizon. The Kerr backend must satisfy `spin -> 0` convergence tests against the Schwarzschild renderer/reference.
+- Signed dimensionless spin `a* = Jc/(GM^2)`, production domain |a*| <= 0.998;
+  positive spin = angular momentum along world +Y; the thin disk ALWAYS
+  orbits +Y-corotating, so negative a* means a retrograde disk relative to the
+  hole (flipping spin transforms the physics and never reorients the disk).
+- Boyer-Lindquist coordinates with the WORLD_FRAME mapping (+Y symmetry axis);
+  first-order null-Hamiltonian RK4 with fixed conserved E and L_z.
+- Static-observer tetrad initialization (orthogonalized phi-leg — ADR §1.8);
+  cameras inside the ergosphere are explicit invalid states.
+- Spin-dependent disk: inner edge = Bardeen-Press-Teukolsky ISCO(spin) from
+  the centralized helper (`kerr/characteristics.ts`), emitter four-velocity
+  and frequency ratio g = 1/(u^t(1 - Omega b_z)) per ADR §1.16; at a* = 0 all
+  formulas reduce exactly to the Schwarzschild pipeline values.
+- Backend routing truth: metric=kerr always executes the numerical Kerr pass;
+  the LUT is Schwarzschild-only. Spin never affects Schwarzschild output.
+- Known f32 limitations are DECLARED in ADR §1.19: near-critical winding and
+  coordinate-pole passages carry an explicit CPU/GPU-mirrored honesty gate
+  (pole-grazing escaped rays classify as numerical failure, never silently).

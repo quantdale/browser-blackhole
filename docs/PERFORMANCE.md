@@ -128,6 +128,27 @@ Suggested dimensions of quality:
 - temporal sampling;
 - bloom/post-process quality;
 - background detail;
-- Kerr integrator quality later.
+- Kerr integrator quality (live tier budget through uMaxSteps, same mechanism as the Schwarzschild pass).
 
 Do not hardcode device names. Capability detection plus a short representative benchmark should pick the initial tier.
+
+## 13. Kerr numerical backend characterization (M9-10 baseline)
+
+First Kerr implementation is correctness-first; measured standing on the M9
+campaign machine (hardware WebGPU, amd rdna-2, Edge 151 — full records under
+`benchmarks/results/2026-08-24-m9-kerr/`, harness `scripts/bench-kerr.mjs`
+with an active-backend honesty gate):
+
+| Condition | Internal size | median | p95 |
+| --- | --- | --- | --- |
+| a*=0 / −0.7 / +0.9, low tier | 583×436 | ~13.9–14 ms | 14–27.7 ms |
+| a*=+0.9, medium native | 778×581 | 34.8 ms | 41.7 ms |
+| a*=+0.9, ultra 1920×1080 css | 1600×1007 | 180.8 ms | 354.7 ms |
+
+Honest readings: median cost is spin-insensitive but the prograde high-spin
+TAIL fattens sharply (frame-dragged winding rays traverse many more steps);
+the Schwarzschild numerical/LUT paths remain vsync-bound (~7 ms) on the same
+machine, so the Kerr path's extra cost is real and visible at default tiers.
+All numbers are CPU-side rAF deltas (`frameGpuMs: null` — no GPU timestamps).
+No optimization was performed in M9 beyond establishing this telemetry
+(BH-206 gate: optimize only against trustworthy failure/error telemetry).
