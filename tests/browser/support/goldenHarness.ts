@@ -585,5 +585,34 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
     notes:
       'Nascent-disk stage: procedural annulus gain ramp, streams retired, volume off. Catches late-phase resource-retirement and disk-gain regressions.'
+  },
+  // --- Kerr goldens (M9) -------------------------------------------------------
+  // Numerical Kerr backend frames; same determinism axes as the Schwarzschild
+  // rows (paused timeline, pinned tier, monotonic display chain). Spinning
+  // rows carry slightly looser tolerances than BH_CLASSIC because frame
+  // dragging increases per-pixel trajectory winding (f32 sensitivity).
+  {
+    name: 'KERR_ZERO_SPIN',
+    url: '/atlas/black-hole?preset=kerr-zero-spin',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Numerical Kerr backend at a*=0 — the spin->0 convergence reference view. Must remain visually indistinguishable from the Schwarzschild path within documented tolerances; catches silent backend/fallback flips.'
+  },
+  {
+    name: 'KERR_HIGH_PROGRADE',
+    url: '/atlas/black-hole?preset=kerr-high-prograde',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'a*=+0.9 prograde thin disk down to the BPT ISCO; frame-dragged asymmetric photon ring. Catches lost spin dependence, ISCO-edge and dragging-direction regressions.'
+  },
+  {
+    name: 'KERR_RETROGRADE',
+    url: '/atlas/black-hole?preset=kerr-retrograde',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'a*=-0.7 with the disk still +Y-corotating (retrograde relative to spin): ISCO pushed to ~8 r_g, counter-dragging. Must differ geometrically from KERR_HIGH_PROGRADE.'
   }
 ];
