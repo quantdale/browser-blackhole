@@ -423,15 +423,23 @@ export class CosmicAtlasHost {
 
   /** Dynamically import destination metadata + factories (lazy heavy paths). */
   private async registerDestinations(): Promise<void> {
-    const [diagnostic, blackHole, neutronStar, stellarExplosion, compactMerger, tidalDisruption] =
-      await Promise.all([
-        import('./destinations/diagnosticDestination.js'),
-        import('./destinations/blackHoleDestination.js'),
-        import('../phenomena/neutron-star/neutronStarModule.js'),
-        import('../phenomena/stellar-explosion/presets.js'),
-        import('../phenomena/compact-merger/presets.js'),
-        import('../phenomena/tidal-disruption/presets.js')
-      ]);
+    const [
+      diagnostic,
+      blackHole,
+      neutronStar,
+      stellarExplosion,
+      compactMerger,
+      tidalDisruption,
+      quasarAgn
+    ] = await Promise.all([
+      import('./destinations/diagnosticDestination.js'),
+      import('./destinations/blackHoleDestination.js'),
+      import('../phenomena/neutron-star/neutronStarModule.js'),
+      import('../phenomena/stellar-explosion/presets.js'),
+      import('../phenomena/compact-merger/presets.js'),
+      import('../phenomena/tidal-disruption/presets.js'),
+      import('../phenomena/quasar-agn/presets.js')
+    ]);
     this.registry.register(diagnostic.diagnosticDescriptor, diagnostic.DIAGNOSTIC_PRESETS);
     this.registry.register(blackHole.blackHoleDescriptor, blackHole.BLACK_HOLE_PRESETS);
     this.registry.register(neutronStar.NEUTRON_STAR_DESCRIPTOR, NEUTRON_STAR_PRESETS);
@@ -447,6 +455,7 @@ export class CosmicAtlasHost {
       tidalDisruption.TIDAL_DISRUPTION_DESCRIPTOR,
       tidalDisruption.TIDAL_DISRUPTION_PRESETS
     );
+    this.registry.register(quasarAgn.QUASAR_AGN_DESCRIPTOR, quasarAgn.QUASAR_AGN_PRESETS);
   }
 
   private wireParticles(backend: BackendInfo): void {
