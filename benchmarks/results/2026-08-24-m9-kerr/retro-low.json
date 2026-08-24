@@ -1,0 +1,83 @@
+{
+ "schemaVersion": 1,
+ "kind": "kerr-numerical-characterization",
+ "date": "2026-08-24T14:02:47.136Z",
+ "label": "kerr-retro-low",
+ "commit": "5942fa6a1dc6e085ed11cac5b2b4fea4db53ac2c",
+ "destination": "black-hole",
+ "preset": "kerr-retrograde",
+ "metric": "kerr",
+ "spin": {
+  "value": -0.7,
+  "convention": "signed dimensionless a*; +Y axis; disk +Y-corotating"
+ },
+ "kerrDiskInnerRg": 8.142965464834315,
+ "trajectoryBackend": {
+  "requested": "kerr",
+  "effective": "numerical-kerr"
+ },
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "amd rdna-2"
+ },
+ "backend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  583,
+  436
+ ],
+ "quality": {
+  "requested": "low",
+  "effectiveTier": "low"
+ },
+ "renderScale": 0.6,
+ "activityMode": "stable",
+ "warmupMs": 9000,
+ "sampleFrames": 300,
+ "frameCpuMs": {
+  "min": 5.8,
+  "median": 13.9,
+  "p90": 14,
+  "p95": 14,
+  "p99": 21,
+  "max": 27.9,
+  "mean": 11.98,
+  "stdev": 3.59
+ },
+ "frameGpuMs": null,
+ "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+ "memory": {
+  "estimatedGpuBytesTotal": 4912648,
+  "textureCount": 1,
+  "resourceScopes": [
+   {
+    "name": "shared-post",
+    "textures": 0,
+    "bytes": 1096200
+   },
+   {
+    "name": "transition-director",
+    "textures": 0,
+    "bytes": 921600
+   },
+   {
+    "name": "destination:black-hole",
+    "textures": 1,
+    "bytes": 2894848
+   }
+  ]
+ },
+ "consoleErrors": 0,
+ "consoleErrorSamples": [],
+ "notes": "fixed internal resolution via render-scale=0.6"
+}

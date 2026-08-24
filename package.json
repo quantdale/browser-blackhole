@@ -26,6 +26,7 @@
     "bench:black-hole": "node scripts/bench-black-hole.mjs",
     "bench:black-hole:numerical": "node scripts/bench-black-hole.mjs --backend=numerical --label=numerical",
     "bench:black-hole:lut": "node scripts/bench-black-hole.mjs --backend=lut --label=lut",
+    "bench:kerr": "node scripts/bench-kerr.mjs",
     "bench:compact-merger": "node scripts/bench-compact-merger.mjs",
     "bench:tidal-disruption": "node scripts/bench-tidal-disruption.mjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
