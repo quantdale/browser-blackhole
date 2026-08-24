@@ -73,6 +73,10 @@ export interface KerrPhotonOptions {
   diskInnerRg: number | null;
   /** Disk annulus outer radius in r_g; ignored when diskInnerRg is null. */
   diskOuterRg: number | null;
+  /** Pole-passage honesty threshold (ADR §1.19): escaped rays whose closest
+   * axis approach drops |sin(theta)| below this are reclassified as explicit
+   * numerical failures — f32 production cannot resolve them. Mirrors GPU. */
+  poleFailureSin: number;
   /** Record every Nth step into pathSamples; 0 selects an automatic stride. */
   pathStride: number;
 }
@@ -90,6 +94,7 @@ export const DEFAULT_KERR_PHOTON_OPTIONS: Readonly<KerrPhotonOptions> = {
   stallBandDelta: 1e-3,
   constraintThreshold: 1e-4,
   carterThreshold: 1e-5,
+  poleFailureSin: 0.04,
   diskInnerRg: null,
   diskOuterRg: null,
   pathStride: 0
@@ -155,6 +160,8 @@ export interface KerrPhotonResult {
   signedPhiTravelRad: number;
   /** Total unsigned azimuthal travel |phi(end) - phi(start)|, radians. */
   windingRadians: number;
+  /** Minimum |sin(theta)| reached along the trace (pole-passage metric). */
+  minSinTheta: number;
   pathSamples: Vec3[];
 }
 
@@ -470,13 +477,17 @@ function requireFinite(value: number, label: string): number {
 // ---------------------------------------------------------------------------
 
 /** Step-size heuristic: base resolution in the strong field, r^1.5 far out, */
-/** shrink towards the OUTER HORIZON, clamped to [minStep, maxStep] * massRg. */
-export function kerrStepSizeAt(r: number, o: KerrPhotonOptions): number {
+/** shrink towards the OUTER HORIZON and towards the COORDINATE POLE (the */
+/** sin(theta) factor tames the 1/sin^3 stiffness of dH/dtheta there), */
+/** clamped to [minStep, maxStep] * massRg. Mirrors the GPU policy. */
+export function kerrStepSizeAt(r: number, thetaRad: number, o: KerrPhotonOptions): number {
   const m = o.massRg;
   const rPlus = kerrHorizonRadii(o.aStar).outerRg * m;
   const farScale = Math.max(1, Math.pow(r / (10 * m), 1.5));
   const nearScale = Math.min(1, Math.max(0.02, (r - rPlus) / m));
-  const h = o.stepSize * m * farScale * nearScale;
+  // Pole stiffness guard (see kerrStepSizeAt docblock above the header).
+  const poleFactor = Math.max(Math.min(Math.abs(Math.sin(thetaRad)), 1), 0.02);
+  const h = o.stepSize * m * farScale * nearScale * poleFactor;
   const minH = o.minStep * m;
   const maxH = o.maxStep * m;
   return Math.min(maxH, Math.max(minH, h));
@@ -641,6 +652,7 @@ export function integrateKerrPhoton(
     turnCounts: { radial: 0, angular: 0 },
     windingRadians: 0,
     signedPhiTravelRad: 0,
+    minSinTheta: Number.NaN,
     pathSamples: []
   });
 
@@ -701,10 +713,23 @@ export function integrateKerrPhoton(
     detail: 'step budget exhausted before any terminal event'
   };
   let sampledLastStep = false;
+  let minSinTheta = Math.abs(Math.sin(cur.theta));
 
   while (steps < o.maxSteps) {
-    const h = kerrStepSizeAt(cur.r, o);
+    const h = kerrStepSizeAt(cur.r, cur.theta, o);
+    // Theta-domain guard: a resolved trajectory can never leave [0, pi];
+    // numerical wrap-through past the pole is an explicit failure, never a
+    // silently mirrored path.
+    if (cur.theta < 0 || cur.theta > Math.PI) {
+      outcome = {
+        kind: 'numerical-failure',
+        reason: 'non-finite',
+        detail: `step ${steps}: theta left [0, pi] (${cur.theta.toFixed(6)})`
+      };
+      break;
+    }
     prev = { ...cur };
+    minSinTheta = Math.min(minSinTheta, Math.abs(Math.sin(cur.theta)));
     const next = rk4KerrStep(cur, h, energy, lZ, o.aStar, m);
     cur = { ...next };
     lambda += h;
@@ -813,7 +838,16 @@ export function integrateKerrPhoton(
 
     // --- Conservative escape (ADR §1.12): beyond the radius AND outward.
     if (cur.r > o.escapeRadiusRg && cur.pr > 0) {
-      outcome = { kind: 'escaped' };
+      // Pole-passage honesty gate: reclassify (ADR §1.19, mirrors GPU).
+      if (minSinTheta < o.poleFailureSin) {
+        outcome = {
+          kind: 'numerical-failure',
+          reason: 'non-finite',
+          detail: `escaped through pole passage: min|sin(theta)|=${minSinTheta.toExponential(2)}`
+        };
+      } else {
+        outcome = { kind: 'escaped' };
+      }
       break;
     }
   }
@@ -848,6 +882,7 @@ export function integrateKerrPhoton(
     turnCounts: { radial: radialTurns, angular: angularTurns },
     windingRadians: Math.abs(cur.phi - init.phiWorld0),
     signedPhiTravelRad: cur.phi - init.phiWorld0,
+    minSinTheta,
     pathSamples
   };
 }

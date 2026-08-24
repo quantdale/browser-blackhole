@@ -368,11 +368,13 @@ export function createKerrLensingMaterial(
   const sinTheta0 = clamp(rho0.div(max(r0, denomFloor)), float(0), float(1));
   const cosTheta0 = clamp(relPos.y.div(max(r0, denomFloor)), float(-1), float(1));
   const theta0 = acos(clamp(cosTheta0, float(-1), float(1)));
-  // Azimuth from guarded atan + flat-gate quadrant shifts (atan2 equivalent).
+  // Azimuth from guarded atan + flat-gate quadrant shifts (atan2 equivalent):
+  // u = z/|x| (NOT z/rho -- the |x| denominator carries the quadrant info),
+  // base = sign(x)*atan(u), shifted by +-pi when x < 0.
   const azQ = relPos.z
-    .div(max(rho0, denomFloor))
+    .div(max(relPos.x.abs(), denomFloor))
     .mul(select(relPos.x.greaterThanEqual(0), float(1), float(-1)));
-  const azAtan = atan(azQ.mul(select(rho0.greaterThan(denomFloor), float(1), float(0))));
+  const azAtan = atan(azQ);
   const phiW0 = azAtan.add(
     select(
       relPos.x.greaterThanEqual(0),
@@ -448,7 +450,7 @@ export function createKerrLensingMaterial(
 
       const energySq = energy.mul(energy);
       const w = bigA
-        .mul(-energySq)
+        .mul(energySq.mul(-1))
         .add(uMassRg.mul(4).mul(uSpin).mul(r).mul(energy).mul(lZ))
         .add(delta.sub(aSq.mul(s2)).mul(lZ).mul(lZ).div(s2));
 
@@ -463,7 +465,7 @@ export function createKerrLensingMaterial(
       const deltaR = r.sub(uMassRg).mul(2);
       const bigAR = r.mul(4).mul(r2.add(aSq)).sub(aSq.mul(deltaR).mul(s2));
       const wR = bigAR
-        .mul(-energySq)
+        .mul(energySq.mul(-1))
         .add(uMassRg.mul(4).mul(uSpin).mul(energy).mul(lZ))
         .add(deltaR.mul(lZ).mul(lZ).div(s2));
       const dhdr = float(0.5)
@@ -488,7 +490,7 @@ export function createKerrLensingMaterial(
       const bigATh = aSq.mul(delta).mul(sinTwo).mul(-1);
       const sin3 = max(st.mul(s2), float(SIN2_FLOOR));
       const wTh = bigATh
-        .mul(-energySq)
+        .mul(energySq.mul(-1))
         .sub(uMassRg.mul(2).mul(delta).mul(lZ).mul(lZ).mul(ct).div(sin3));
       const dhdtheta = float(0.5)
         .mul(wTh.div(sigmaDelta).sub(w.mul(sigmaTh).mul(delta).div(sigmaDelta.mul(sigmaDelta))))
@@ -534,6 +536,9 @@ export function createKerrLensingMaterial(
     const status = statusStart.toVar();
     const radiance = vec3(0).toVar();
     const escapedDirection = vec3(0).toVar();
+    // Minimum |sin(theta)| along the trace: pole-grazing rays are f32-
+    // limited and get reclassified to explicit failure below (ADR §1.19).
+    const minSinTheta = float(1).toVar();
 
     If(initValid, () => {
       status.assign(int(RAY_ACTIVE));
@@ -555,11 +560,13 @@ export function createKerrLensingMaterial(
 
         // --- Step-size policy (NM §9 QUALITY heuristic; ADR §1.19):
         // far field grows like r^1.5 beyond 10M, shrink towards r+(a*) with
-        // a 0.02 floor, clamped to [minStep, maxStep] scaled by M.
+        // a 0.02 floor, AND shrink with sin(theta) near the coordinate pole
+        // (dH/dtheta ~ L_z^2/sin^3 stiffness), clamped to [minStep, maxStep].
         const farScale = pow(max(rVar.div(uMassRg.mul(10)), float(1)), float(1.5));
         const nearScale = min(float(1), max(rVar.sub(rPlus).div(uMassRg), float(0.02)));
+        const poleFactor = clamp(sin(thVar).abs(), float(0.02), float(1));
         const hStep = clamp(
-          uBaseStep.mul(uMassRg).mul(farScale).mul(nearScale),
+          uBaseStep.mul(uMassRg).mul(farScale).mul(nearScale).mul(poleFactor),
           uMinStep.mul(uMassRg),
           uMaxStep.mul(uMassRg)
         );
@@ -567,6 +574,7 @@ export function createKerrLensingMaterial(
         prevR.assign(rVar);
         prevTh.assign(thVar);
         prevPh.assign(phVar);
+        minSinTheta.assign(min(minSinTheta, sin(thVar).abs()));
 
         // --- Inline classical RK4 (NM §8.1) over the five-var state.
         const d1 = coreDerivsFn(rVar, thVar, prVar, pthVar);
@@ -609,6 +617,19 @@ export function createKerrLensingMaterial(
             .mul(select(prVar.abs().lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
             .mul(select(pthVar.abs().lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
             .lessThan(0.5),
+          () => {
+            status.assign(int(RAY_NON_FINITE));
+            Break();
+          }
+        );
+
+        // --- Theta-domain guard: resolved trajectories never leave [0, pi];
+        // numerical wrap-through past the pole is an explicit NON_FINITE
+        // failure (never a silently mirrored path) — mirrors the reference.
+        If(
+          select(thVar.lessThan(0), float(1), float(0))
+            .add(select(thVar.greaterThan(Math.PI), float(1), float(0)))
+            .greaterThan(0.5),
           () => {
             status.assign(int(RAY_NON_FINITE));
             Break();
@@ -743,6 +764,20 @@ export function createKerrLensingMaterial(
       If(status.equal(int(RAY_ACTIVE)), () => {
         status.assign(int(RAY_MAX_STEPS));
       });
+
+      // Pole-passage honesty gate (ADR §1.19): an ESCAPED ray that grazed
+      // the symmetry axis closer than sin(theta)=0.04 cannot meet the f32
+      // accuracy budget; classify it as an explicit numerical failure
+      // instead of presenting a possibly wrong direction. Captured rays
+      // keep capture (monotone infall is robust). Mirrored by the CPU oracle.
+      If(
+        select(status.equal(int(RAY_ESCAPED)), float(1), float(0))
+          .mul(select(minSinTheta.lessThan(0.04), float(1), float(0)))
+          .greaterThan(0.5),
+        () => {
+          status.assign(int(RAY_NON_FINITE));
+        }
+      );
 
       // --- Terminal tetrad-projected direction (inverse static tetrad,
       // mirroring reference.terminalLocalDirection; defined for every valid

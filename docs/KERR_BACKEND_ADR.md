@@ -400,6 +400,14 @@ debug parity encoding identical in shape to the Schwarzschild one
   logarithmically (winding growth) exactly as in Schwarzschild; classification
   sensitivity there is handled by corpus design (rays deliberately away from
   the boundary; tolerances conditioned on winding), not hidden.
+- **Coordinate-pole passages (M9 parity finding):** full-3D BL trajectories
+  that graze the symmetry axis enter the 1/sin^3(theta) stiffness region of
+  dH/dtheta. Both solvers shrink steps with |sin(theta)| (floor 0.02), and an
+  ESCAPED ray whose closest approach drops |sin(theta)| below 0.04 is
+  RECLASSIFIED as an explicit numerical failure rather than presented with a
+  possibly-wrong direction (f32 cannot meet the accuracy budget there;
+  captured infall stays robust and unaffected). CPU oracle and GPU implement
+  the identical rule so parity corpora skip exactly the same rows.
 - Static observers do not exist inside the ergosphere; cameras there are
   INVALID_INITIAL_STATE until M10 introduces physically valid observer families.
 - High-|a*| prograde disks put the inner edge close to r_ph where `u^t` grows
