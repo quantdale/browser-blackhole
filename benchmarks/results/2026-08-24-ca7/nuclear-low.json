@@ -1,0 +1,59 @@
+{
+ "schemaVersion": 1,
+ "kind": "quasar-agn-zone-characterization",
+ "date": "2026-08-24T15:32:11.452Z",
+ "label": "agn-nuclear-low",
+ "commit": "329aef06efb2836379083aedeb22c7b2cdd32555",
+ "destination": "quasar-agn",
+ "preset": "quasar-reference",
+ "zone": {
+  "requested": "nuclear",
+  "active": "nuclear"
+ },
+ "grPassActive": false,
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "amd rdna-2"
+ },
+ "backend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  583,
+  436
+ ],
+ "quality": {
+  "requested": "low",
+  "effectiveTier": "low"
+ },
+ "renderScale": 0.6,
+ "warmupMs": 9000,
+ "sampleFrames": 300,
+ "frameCpuMs": {
+  "min": 4.8,
+  "median": 7,
+  "p90": 7,
+  "p95": 7.1,
+  "p99": 7.1,
+  "max": 13.9,
+  "mean": 6.99,
+  "stdev": 0.58
+ },
+ "frameGpuMs": null,
+ "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+ "memory": {
+  "estimatedGpuBytesTotal": 11294992,
+  "textureCount": 0
+ },
+ "consoleErrors": 0,
+ "notes": "fixed internal resolution via render-scale=0.6"
+}

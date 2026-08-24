@@ -6,11 +6,11 @@
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": ">=22.12.0"
+    "node": "\u003e=22.12.0"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
+    "build": "tsc --noEmit \u0026\u0026 vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
@@ -29,7 +29,8 @@
     "bench:kerr": "node scripts/bench-kerr.mjs",
     "bench:compact-merger": "node scripts/bench-compact-merger.mjs",
     "bench:tidal-disruption": "node scripts/bench-tidal-disruption.mjs",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build"
+    "check": "npm run format:check \u0026\u0026 npm run lint \u0026\u0026 npm run typecheck \u0026\u0026 npm run test \u0026\u0026 npm run build",
+    "bench:quasar-agn": "node scripts/bench-quasar-agn.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

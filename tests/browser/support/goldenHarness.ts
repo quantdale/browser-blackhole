@@ -614,5 +614,41 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
     notes:
       'a*=-0.7 with the disk still +Y-corotating (retrograde relative to spin): ISCO pushed to ~8 r_g, counter-dragging. Must differ geometrically from KERR_HIGH_PROGRADE.'
+  },
+  // --- Quasar / AGN goldens (CA7) ----------------------------------------------
+  // One row per scale zone plus the blazar orientation: pins the zone
+  // machine's boot state, the double-render guard, and the DIRECT-pass
+  // exclusivity rule visually.
+  {
+    name: 'AGN_INNER_ENGINE',
+    url: '/atlas/quasar-agn?preset=inner-engine',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'INNER zone: DIRECT lensing pass + corona proxy. Catches silent backend loss or corona disappearance in the close-range zone.'
+  },
+  {
+    name: 'AGN_NUCLEAR',
+    url: '/atlas/quasar-agn?preset=quasar-reference',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'NUCLEAR zone: outer disk + dusty torus + bipolar jet base at 45 deg from the axis; GR pass culled. Catches torus/jet loss and zone-boot regressions.'
+  },
+  {
+    name: 'AGN_RADIO_GALAXY',
+    url: '/atlas/quasar-agn?preset=radio-galaxy',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'GALACTIC zone: kpc-scale extended jets with knots over the procedural host. Catches host/jet-extension and cull-guard regressions.'
+  },
+  {
+    name: 'AGN_BLAZAR_VIEW',
+    url: '/atlas/quasar-agn?preset=blazar-view',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'Blazar orientation (~3 deg from the jet axis): approaching lobe dominates via the disclosed constant-sum beaming gains. Catches lobe-asymmetry regressions.'
   }
 ];
