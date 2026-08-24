@@ -75,7 +75,8 @@ const PRODUCTION_DESTINATIONS: ReadonlyArray<{ id: string; label: string }> = [
   { id: 'black-hole', label: 'Black Hole' },
   { id: 'neutron-star', label: 'Neutron Star' },
   { id: 'stellar-explosion', label: 'Stellar Explosion' },
-  { id: 'compact-merger', label: 'Compact Merger' }
+  { id: 'compact-merger', label: 'Compact Merger' },
+  { id: 'tidal-disruption', label: 'Tidal Disruption' }
 ];
 
 /** Developer destination — surfaced ONLY while Debug mode is active. */
@@ -434,6 +435,75 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root
       );
       panelElement.append(mergerSection.root);
+    }
+
+    // -- Tidal Disruption controls (canonical applyControlState channel) ------
+    if (destId === 'tidal-disruption') {
+      const tdeSection = createCollapsibleSection({ title: 'Encounter', open: false });
+      const share = (host.state.destinations['tidal-disruption']?.state ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const bhLog10 =
+        typeof share['blackHoleMassSolar'] === 'number'
+          ? Math.log10(share['blackHoleMassSolar'])
+          : 6;
+      tdeSection.body.append(
+        createSliderRow({
+          label: 'BH mass (log10 solar)',
+          min: 5,
+          max: 7.7,
+          step: 0.01,
+          value: bhLog10,
+          onInput: (value) => {
+            host.setDestinationControl('tidal-disruption', {
+              blackHoleMassSolar: Number((10 ** value).toPrecision(4))
+            });
+          }
+        }).root,
+        createSelectRow({
+          label: 'Star',
+          options: [
+            { value: 'solar-type', label: 'Solar type' },
+            { value: 'low-mass-k', label: 'Low-mass K dwarf' },
+            { value: 'evolved-subgiant', label: 'Evolved subgiant' }
+          ],
+          value: typeof share['stellarPreset'] === 'string' ? share['stellarPreset'] : 'solar-type',
+          onChange: (value) => {
+            host.setDestinationControl('tidal-disruption', { stellarPreset: value });
+          }
+        }).root,
+        createSelectRow({
+          label: 'Penetration',
+          options: [
+            { value: 'grazing', label: 'Grazing (β 0.85)' },
+            { value: 'canonical', label: 'Canonical (β 1.0)' },
+            { value: 'deep', label: 'Deep (β 2.5)' }
+          ],
+          value:
+            typeof share['penetrationScenario'] === 'string'
+              ? share['penetrationScenario']
+              : 'canonical',
+          onChange: (value) => {
+            host.setDestinationControl('tidal-disruption', { penetrationScenario: value });
+          }
+        }).root,
+        createSliderRow({
+          label: 'Observer orientation',
+          min: 0,
+          max: 90,
+          step: 1,
+          value:
+            typeof share['observerInclinationDeg'] === 'number'
+              ? share['observerInclinationDeg']
+              : 62,
+          unit: '°',
+          onInput: (value) => {
+            host.setDestinationControl('tidal-disruption', { observerInclinationDeg: value });
+          }
+        }).root
+      );
+      panelElement.append(tdeSection.root);
     }
 
     // -- Diagnostics (Debug domain; opt-in) ------------------------------------
