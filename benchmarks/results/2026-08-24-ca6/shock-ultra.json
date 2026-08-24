@@ -1,66 +1,60 @@
 {
- "schemaVersion": 1,
- "kind": "tidal-disruption-phase-benchmark",
- "date": "2026-08-24T04:52:17.843Z",
- "label": "tde-shock-ultra",
- "commit": "9dc18de4c23b6ca8657244eac20a7f6c78776bde",
- "destination": "tidal-disruption",
- "preset": "solar-canonical",
- "timelinePhase": 0.78,
- "resolvedPhase": "shock",
- "resolvedTimeSeconds": 13491891.95246509,
- "browser": {
-  "name": "msedge",
-  "version": "151.0.0.0"
- },
- "os": "Windows_NT 10.0.26200 (win32)",
- "platform": "Win32",
- "adapter": {
-  "name": "amd rdna-2"
- },
- "backend": "webgpu",
- "viewportCss": [
-  1280,
-  800
- ],
- "devicePixelRatio": 1,
- "effectiveRenderSize": [
-  972,
-  727
- ],
- "quality": {
-  "requested": "ultra",
-  "effectiveTier": "ultra"
- },
- "renderScale": 1,
- "warmupMs": 9000,
- "sampleFrames": 240,
- "frameCpuMs": {
-  "min": 3.4,
-  "median": 7,
-  "p90": 7,
-  "p95": 7.1,
-  "p99": 7.1,
-  "max": 7.6,
-  "mean": 6.94,
-  "stdev": 0.24
- },
- "frameGpuMs": null,
- "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
- "phaseResources": {
-  "streamBoundVisible": true,
-  "spineBoundPoints": 1,
-  "volumeVisible": true,
-  "volumeRadiusUnits": 199.99999999999994,
-  "diskVisible": false,
-  "particlePopulationScale": 0.3,
-  "accentAngularGate": 1,
-  "starDistanceUnits": 68507.69343948088,
-  "beta": 1
- },
- "memory": {
-  "estimatedGpuBytesTotal": 12767844
- },
- "consoleErrors": 0,
- "consoleErrorSamples": []
+  "schemaVersion": 1,
+  "kind": "tidal-disruption-phase-benchmark",
+  "date": "2026-08-24T04:52:17.843Z",
+  "label": "tde-shock-ultra",
+  "commit": "9dc18de4c23b6ca8657244eac20a7f6c78776bde",
+  "destination": "tidal-disruption",
+  "preset": "solar-canonical",
+  "timelinePhase": 0.78,
+  "resolvedPhase": "shock",
+  "resolvedTimeSeconds": 13491891.95246509,
+  "browser": {
+    "name": "msedge",
+    "version": "151.0.0.0"
+  },
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "platform": "Win32",
+  "adapter": {
+    "name": "amd rdna-2"
+  },
+  "backend": "webgpu",
+  "viewportCss": [1280, 800],
+  "devicePixelRatio": 1,
+  "effectiveRenderSize": [972, 727],
+  "quality": {
+    "requested": "ultra",
+    "effectiveTier": "ultra"
+  },
+  "renderScale": 1,
+  "warmupMs": 9000,
+  "sampleFrames": 240,
+  "frameCpuMs": {
+    "min": 3.4,
+    "median": 7,
+    "p90": 7,
+    "p95": 7.1,
+    "p99": 7.1,
+    "max": 7.6,
+    "mean": 6.94,
+    "stdev": 0.24
+  },
+  "frameGpuMs": null,
+  "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+  "phaseResources": {
+    "streamBoundVisible": true,
+    "spineBoundPoints": 1,
+    "volumeVisible": true,
+    "volumeRadiusUnits": 199.99999999999994,
+    "diskVisible": false,
+    "particlePopulationScale": 0.3,
+    "accentAngularGate": 1,
+    "starDistanceUnits": 68507.69343948088,
+    "beta": 1
+  },
+  "memory": {
+    "estimatedGpuBytesTotal": 12767844
+  },
+  "consoleErrors": 0,
+  "consoleErrorSamples": []
 }

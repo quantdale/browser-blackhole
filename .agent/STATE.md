@@ -21,7 +21,8 @@ Commit chain this campaign (after the CA5 closure commit 70eaddf):
 0c9fa36 test: add tidal disruption browser validation and arrival framing (CA6-13)
 9dc18de feat: add tidal debris stream shock ring and visual goldens (CA6-06..10, CA6-13)
 0a38a7e feat: generalize destination control persistence and add tde benchmark (CA6-14)
-<pending> docs/state: close ca6 with cumulative validation evidence
+45396ef state: close ca6 with cumulative validation evidence
+7b4fbcc perf: stretch - CM jet readability, tier benchmarks, browser harness hardening
 ```
 
 ## CA6 packet status
@@ -79,12 +80,14 @@ Commit chain this campaign (after the CA5 closure commit 70eaddf):
 | Gate | Result |
 | --- | --- |
 | npm run check | PASS — prettier/eslint/tsc clean, vitest **351/351**, build OK |
-| Playwright FULL suite | **96/96 PASS** (19 TDE specs + 2 new CM/TDE persistence specs included) |
+| Playwright FULL suite | **97/97 PASS** (19 TDE specs + CM dc proof + 3 CM/TDE persistence specs; includes 25-switch torture BH->TDE->CM->SN->NS x5) |
 | Goldens | 24/24, established then verified twice-stable; 18 pre-existing goldens unchanged except ATLAS_HYPERSPACE_BH_NS (documented transition-timing jitter re-baseline, GOLDEN_IMAGES.md) |
 | TDE benchmark | per-phase + low/high/ultra/1080p records committed under `benchmarks/results/2026-08-24-ca6/` |
 
 Environment: Windows 11, Node v22.23.2, Edge 151 (msedge), hardware WebGPU
-(amd rdna-2). All frame numbers are rAF CPU-side deltas.
+(amd rdna-2). Tier records: low 583x436 (scale 0.6), medium 778x581, high/ultra
+972x727 (scale 1.0), ultra-1080p 1600x1007. All frame numbers are rAF CPU-side
+deltas.
 
 ## Benchmark findings (CA6-14)
 
@@ -111,10 +114,16 @@ retired at nascent-disk. GPU timestamping remains unavailable/unclaimed.
    per-phase differentiation.
 4. CA6: the nascent disk is a procedural presentation (no viscous
    evolution); inner radius is presentational (>= 2 ISCO).
-5. CA5 stretch items NOT done in this campaign (capacity went to CA6
-   completion): jet readability polish, low/high/ultra CM benchmarks
-   (TDE's harness now demonstrates the pattern), low-tier kilonova shell
-   sampling.
+5. Stretch completed this campaign (CA6-campaign stretch A-C): CM
+    viewing-angle/remnant/jet dc round-trip proven via the generalized
+    persistence channel; CM jet lobes now additive + cooler/brighter +
+    narrower for contrast against the merger core (goldens CM_GRB_ON/OFF
+    re-established, physics untouched); CM tier records
+    (low/high/ultra/1080p) added alongside TDE records; browser harness
+    arrival gate hardened (debugSnapshot != null).
+6. Remaining CA5 stretch D (low-tier kilonova shell sampling): investigated
+    — vsync-bound evidence shows no measurable regression at this tier/resolution;
+    smarter bounded sampling is a future optimization, not a current defect.
 
 ## Next actions
 

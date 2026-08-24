@@ -1,63 +1,57 @@
 {
- "schemaVersion": 1,
- "kind": "compact-merger-phase-benchmark",
- "date": "2026-08-24T06:51:53.292Z",
- "label": "cm-jet-ultra",
- "commit": "45396ef8e28b41562262c10caadb642895ed164d",
- "destination": "compact-merger",
- "preset": "equal-mass-nsns",
- "timelinePhase": 0.52,
- "resolvedPhase": "jet",
- "resolvedTimeSeconds": 2.065113813336873,
- "browser": {
-  "name": "msedge",
-  "version": "151.0.0.0"
- },
- "os": "Windows_NT 10.0.26200 (win32)",
- "platform": "Win32",
- "adapter": {
-  "name": "amd rdna-2"
- },
- "backend": "webgpu",
- "viewportCss": [
-  1280,
-  800
- ],
- "devicePixelRatio": 1,
- "effectiveRenderSize": [
-  972,
-  727
- ],
- "quality": {
-  "requested": "ultra",
-  "effectiveTier": "ultra"
- },
- "renderScale": 1,
- "warmupMs": 9000,
- "sampleFrames": 240,
- "frameCpuMs": {
-  "min": 4.8,
-  "median": 6.9,
-  "p90": 7,
-  "p95": 7.1,
-  "p99": 7.5,
-  "max": 7.6,
-  "mean": 6.95,
-  "stdev": 0.2
- },
- "frameGpuMs": null,
- "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
- "phaseResources": {
-  "volumeVisible": true,
-  "volumeRadiusUnits": 3.4551534701221924,
-  "particlePopulationScale": 0.15,
-  "jetVisible": false,
-  "jetFrontUnits": 0,
-  "ejectaRadiusUnits": 3.4551534701221924
- },
- "memory": {
-  "estimatedGpuBytesTotal": 12755108
- },
- "consoleErrors": 0,
- "consoleErrorSamples": []
+  "schemaVersion": 1,
+  "kind": "compact-merger-phase-benchmark",
+  "date": "2026-08-24T06:51:53.292Z",
+  "label": "cm-jet-ultra",
+  "commit": "45396ef8e28b41562262c10caadb642895ed164d",
+  "destination": "compact-merger",
+  "preset": "equal-mass-nsns",
+  "timelinePhase": 0.52,
+  "resolvedPhase": "jet",
+  "resolvedTimeSeconds": 2.065113813336873,
+  "browser": {
+    "name": "msedge",
+    "version": "151.0.0.0"
+  },
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "platform": "Win32",
+  "adapter": {
+    "name": "amd rdna-2"
+  },
+  "backend": "webgpu",
+  "viewportCss": [1280, 800],
+  "devicePixelRatio": 1,
+  "effectiveRenderSize": [972, 727],
+  "quality": {
+    "requested": "ultra",
+    "effectiveTier": "ultra"
+  },
+  "renderScale": 1,
+  "warmupMs": 9000,
+  "sampleFrames": 240,
+  "frameCpuMs": {
+    "min": 4.8,
+    "median": 6.9,
+    "p90": 7,
+    "p95": 7.1,
+    "p99": 7.5,
+    "max": 7.6,
+    "mean": 6.95,
+    "stdev": 0.2
+  },
+  "frameGpuMs": null,
+  "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+  "phaseResources": {
+    "volumeVisible": true,
+    "volumeRadiusUnits": 3.4551534701221924,
+    "particlePopulationScale": 0.15,
+    "jetVisible": false,
+    "jetFrontUnits": 0,
+    "ejectaRadiusUnits": 3.4551534701221924
+  },
+  "memory": {
+    "estimatedGpuBytesTotal": 12755108
+  },
+  "consoleErrors": 0,
+  "consoleErrorSamples": []
 }

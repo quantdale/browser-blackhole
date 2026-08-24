@@ -190,7 +190,8 @@ const record = {
   consoleErrors: consoleErrors.length,
   consoleErrorSamples: consoleErrors.slice(0, 5)
 };
-console.log(JSON.stringify(record, null, 1));
+// 2-space indent so committed records are prettier-clean without reformatting.
+console.log(JSON.stringify(record, null, 2));
 
 await browser.close();
 await server.close();

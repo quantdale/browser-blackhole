@@ -254,9 +254,7 @@ test.describe('Compact Merger validation (CA5)', () => {
     const dc = encodeURIComponent(
       JSON.stringify({ viewingAngleDeg: 12, jetScenario: 'thin', remnantScenario: 'prompt-bh' })
     );
-    await page.goto(
-      `/atlas/compact-merger?preset=equal-mass-nsns&v=1&d=compact-merger&dc=${dc}`
-    );
+    await page.goto(`/atlas/compact-merger?preset=equal-mass-nsns&v=1&d=compact-merger&dc=${dc}`);
     await waitForArrival(page, 'compact-merger', 'equal-mass-nsns');
     await page.waitForTimeout(800);
     const share = await page.evaluate(
