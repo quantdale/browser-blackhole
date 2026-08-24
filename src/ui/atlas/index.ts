@@ -34,3 +34,5 @@ export type {
   ToggleRowOptions
 } from './components.js';
 export { clamp01, decimalsFromStep, finiteClamp, finiteOrNull, formatSliderValue } from './util.js';
+export { createWaveformPanel } from './waveformPanel.js';
+export type { WaveformPanelHandle, WaveformSeries } from './waveformPanel.js';

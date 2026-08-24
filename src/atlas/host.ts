@@ -430,7 +430,8 @@ export class CosmicAtlasHost {
       stellarExplosion,
       compactMerger,
       tidalDisruption,
-      quasarAgn
+      quasarAgn,
+      blackHoleMerger
     ] = await Promise.all([
       import('./destinations/diagnosticDestination.js'),
       import('./destinations/blackHoleDestination.js'),
@@ -438,7 +439,8 @@ export class CosmicAtlasHost {
       import('../phenomena/stellar-explosion/presets.js'),
       import('../phenomena/compact-merger/presets.js'),
       import('../phenomena/tidal-disruption/presets.js'),
-      import('../phenomena/quasar-agn/presets.js')
+      import('../phenomena/quasar-agn/presets.js'),
+      import('../phenomena/black-hole-merger/presets.js')
     ]);
     this.registry.register(diagnostic.diagnosticDescriptor, diagnostic.DIAGNOSTIC_PRESETS);
     this.registry.register(blackHole.blackHoleDescriptor, blackHole.BLACK_HOLE_PRESETS);
@@ -456,6 +458,10 @@ export class CosmicAtlasHost {
       tidalDisruption.TIDAL_DISRUPTION_PRESETS
     );
     this.registry.register(quasarAgn.QUASAR_AGN_DESCRIPTOR, quasarAgn.QUASAR_AGN_PRESETS);
+    this.registry.register(
+      blackHoleMerger.BLACK_HOLE_MERGER_DESCRIPTOR,
+      blackHoleMerger.BLACK_HOLE_MERGER_PRESETS
+    );
   }
 
   private wireParticles(backend: BackendInfo): void {

@@ -1,6 +1,6 @@
 {
   "assetId": "sxs-bbh-0001-lev5",
-  "runtimeSha256": "91f1f9c0aa1a2da6ac22398cd2e95fc74c667727c0f65b23d56a926bc36ee6cd",
+  "runtimeSha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
   "mergerIndex": 1433,
   "note": "Exact float32 rows emitted into the runtime binary (source parity anchors)",
   "rows": [
@@ -391,49 +391,49 @@
   ],
   "sourceKeyframes": [
     {
-      "sourceTimeM": 7590.740764240086,
+      "sourceTimeM": -1939.8144409057304,
       "h22Re": 0.028480755363991025,
       "h22Im": -0.11084853715396009,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 8539.786444716607,
+      "sourceTimeM": -990.7687604292096,
       "h22Re": -0.08222214297669368,
       "h22Im": -0.10459071704000479,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 9430.555205145816,
+      "sourceTimeM": -100.0,
       "h22Re": -0.1614136382508524,
       "h22Im": -0.15903735477342357,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 9520.555205145816,
+      "sourceTimeM": -10.0,
       "h22Re": -0.09336892686215743,
       "h22Im": 0.35631005169663166,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 9530.555205145816,
+      "sourceTimeM": 0.0,
       "h22Re": 0.09680875305823389,
       "h22Im": -0.3827005902567529,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 9540.555205145816,
+      "sourceTimeM": 10.0,
       "h22Re": 0.24447234865374196,
       "h22Im": 0.20662832025801686,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 9590.555205145816,
+      "sourceTimeM": 60.0,
       "h22Re": 0.0006855470170338046,
       "h22Im": -0.009433767376723886,
       "toleranceFractionOfPeak": 0.02
     },
     {
-      "sourceTimeM": 9780.555205145816,
+      "sourceTimeM": 250.0,
       "h22Re": -0.00037068167722113235,
       "h22Im": -0.002913236051616128,
       "toleranceFractionOfPeak": 0.02

@@ -44,7 +44,9 @@ import {
 } from '../atlas/atlasState.js';
 import type { ExperienceMode } from '../atlas/types.js';
 import { CosmicAtlasHost, type CosmicAtlasHostOptions } from '../atlas/host.js';
+import { DEBUG_DESTINATION_ID, productionDestinationIds } from '../atlas/launchCatalog.js';
 import type { NavigationIntent } from '../atlas/navigation.js';
+import { getCachedDataset } from '../phenomena/black-hole-merger/dataset.js';
 import {
   createButtonRow,
   createCollapsibleSection,
@@ -52,10 +54,12 @@ import {
   createReadoutList,
   createSelectRow,
   createSliderRow,
-  createToggleRow,
   createTimelineTransport,
+  createToggleRow,
+  createWaveformPanel,
   type ReadoutListHandle,
-  type TimelineTransportHandle
+  type TimelineTransportHandle,
+  type WaveformPanelHandle
 } from '../ui/atlas/index.js';
 import { readForcedBackend } from './testHooks.js';
 
@@ -70,21 +74,11 @@ interface AtlasAppWindowHook {
   captureFrame(): string[] | null;
 }
 
-/** Top-bar production destinations, in taxonomy order (campaign §7). */
-const PRODUCTION_DESTINATIONS: ReadonlyArray<{ id: string; label: string }> = [
-  { id: 'black-hole', label: 'Black Hole' },
-  { id: 'neutron-star', label: 'Neutron Star' },
-  { id: 'stellar-explosion', label: 'Stellar Explosion' },
-  { id: 'compact-merger', label: 'Compact Merger' },
-  { id: 'tidal-disruption', label: 'Tidal Disruption' }
-];
-
-/** Developer destination — surfaced ONLY while Debug mode is active. */
-const DEBUG_DESTINATION: { id: string; label: string } = {
-  id: 'diagnostic',
-  label: 'Diagnostic'
-};
-
+/**
+ * Top-bar destination chips are derived from the LAUNCH CATALOG + the live
+ * registry (CA8 integration-debt fix). Labels come from registry descriptors;
+ * the debug-only Diagnostic chip is appended under Debug mode only.
+ */
 const EXPERIENCE_MODES: ReadonlyArray<{ id: ExperienceMode; label: string }> = [
   { id: 'scientific', label: 'Scientific' },
   { id: 'cinematic', label: 'Cinematic' },
@@ -179,22 +173,34 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   const host = new CosmicAtlasHost(canvas, hostOptions);
 
   // --- destination chips -----------------------------------------------------
-  /** Rebuild chips from registry state; Diagnostic only under Debug mode. */
+  /** Rebuild chips from launch catalog + registry state; Diagnostic only under Debug mode. */
   const refreshNav = (): void => {
     const activeId = host.state.atlas.activeDestination;
     nav.replaceChildren();
-    const entries = [...PRODUCTION_DESTINATIONS];
-    if (host.experienceMode === 'debug') entries.push(DEBUG_DESTINATION);
-    for (const destination of entries) {
-      if (!host.registry.has(destination.id)) continue;
+    for (const destination of productionDestinationIds()) {
+      if (!host.registry.has(destination)) continue;
+      const descriptor = host.registry.get(destination)?.descriptor;
       const chip = document.createElement('button');
       chip.type = 'button';
       chip.className = 'atlas-nav-chip';
-      chip.textContent = destination.label;
-      chip.setAttribute('aria-pressed', activeId === destination.id ? 'true' : 'false');
-      if (activeId === destination.id) chip.classList.add('is-active');
+      chip.textContent = descriptor?.title ?? destination;
+      chip.setAttribute('aria-pressed', activeId === destination ? 'true' : 'false');
+      if (activeId === destination) chip.classList.add('is-active');
       chip.addEventListener('click', () => {
-        host.navigate(destination.id);
+        host.navigate(destination);
+      });
+      nav.append(chip);
+    }
+    if (host.experienceMode === 'debug' && host.registry.has(DEBUG_DESTINATION_ID)) {
+      const descriptor = host.registry.get(DEBUG_DESTINATION_ID)?.descriptor;
+      const chip = document.createElement('button');
+      chip.type = 'button';
+      chip.className = 'atlas-nav-chip';
+      chip.textContent = descriptor?.title ?? DEBUG_DESTINATION_ID;
+      chip.setAttribute('aria-pressed', activeId === DEBUG_DESTINATION_ID ? 'true' : 'false');
+      if (activeId === DEBUG_DESTINATION_ID) chip.classList.add('is-active');
+      chip.addEventListener('click', () => {
+        host.navigate(DEBUG_DESTINATION_ID);
       });
       nav.append(chip);
     }
@@ -219,6 +225,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // refresh survive rebuilds through the closures below.
   let transport: TimelineTransportHandle | null = null;
   let readouts: ReadoutListHandle | null = null;
+  /** CA8-13 waveform panel (Black-Hole Merger only); rebuilt with the panel. */
+  let waveformPanel: WaveformPanelHandle | null = null;
   /** Empty signature forces a rebuild on the next UI sync tick. */
   let panelSignature = '';
   const markPanelDirty = (): void => {
@@ -233,6 +241,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   function buildPanel(): void {
     transport = null;
     readouts = null;
+    waveformPanel?.dispose();
+    waveformPanel = null;
     panelElement.replaceChildren(status);
 
     const { destId, presetId } = activeSelection();
@@ -506,6 +516,60 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       panelElement.append(tdeSection.root);
     }
 
+    // -- Black-Hole Merger controls + synchronized waveform (CA8-13/16) ------
+    if (destId === 'black-hole-merger') {
+      const share = (host.state.destinations['black-hole-merger']?.state ?? {}) as Record<
+        string,
+        unknown
+      >;
+      const mergerSection = createCollapsibleSection({ title: 'Merger', open: false });
+      mergerSection.body.append(
+        createToggleRow({
+          label: 'Orbit trails',
+          checked: share['showOrbitTrails'] !== false,
+          onChange: (checked) => {
+            host.setDestinationControl('black-hole-merger', { showOrbitTrails: checked });
+          }
+        }).root,
+        createToggleRow({
+          label: 'Illustrative lens accents',
+          checked: share['illustrativeLensing'] !== false,
+          onChange: (checked) => {
+            host.setDestinationControl('black-hole-merger', { illustrativeLensing: checked });
+          }
+        }).root
+      );
+      const note = document.createElement('p');
+      note.className = 'atlas-note';
+      note.textContent =
+        'Reference-event view: orbital paths and timing come from the pinned ' +
+        'numerical-relativity dataset; the lens accents are illustrative.';
+      mergerSection.body.append(note);
+      panelElement.append(mergerSection.root);
+
+      const waveSection = createCollapsibleSection({ title: 'Waveform (h22)', open: true });
+      waveformPanel = createWaveformPanel();
+      const assetId = host.activeDestinationDebugSnapshot()?.['datasetId'];
+      const ds = typeof assetId === 'string' ? getCachedDataset(assetId) : null;
+      waveformPanel.setSeries(
+        ds === null
+          ? null
+          : {
+              assetId: ds.assetId,
+              timesM: ds.timesM,
+              h22Re: ds.h22Re,
+              h22Im: ds.h22Im,
+              tStartM: ds.tStartM,
+              tEndM: ds.tEndM,
+              h22PeakAmplitude: ds.h22PeakAmplitude,
+              mergerEndM: ds.mergerEndM,
+              ringdownEndM: ds.ringdownEndM
+            }
+      );
+      waveSection.body.append(waveformPanel.root);
+      panelElement.append(waveSection.root);
+    }
+
     // -- Diagnostics (Debug domain; opt-in) ------------------------------------
     if (host.diagnosticsEnabled) {
       const diagSection = createCollapsibleSection({ title: 'Diagnostics', open: true });
@@ -705,6 +769,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         transport.setPlaying(!host.time.snapshot().paused);
         transport.setPhase01(host.time.simulationPhase);
       }
+      if (waveformPanel !== null) {
+        const physicalTime = host.time.snapshot().physicalTime;
+        waveformPanel.update(typeof physicalTime === 'number' ? physicalTime : 0);
+      }
       updateReadouts();
     }
     rafId = requestAnimationFrame(tick);
@@ -766,6 +834,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       resizeObserver.disconnect();
       unsubscribeStatus();
       delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];
+      waveformPanel?.dispose();
+      waveformPanel = null;
       host.dispose();
       panelElement.replaceChildren();
     }

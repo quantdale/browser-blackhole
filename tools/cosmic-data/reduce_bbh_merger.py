@@ -70,6 +70,8 @@ SAMPLE_COUNT = 2048
 INSPIRAL_SAMPLE_FRACTION = 0.7
 CHECKPOINTS = 8192  # dense points for error quantification
 PARITY_KEYFRAMES = 24  # fixture entries for source-vs-runtime tests
+MERGER_END_FRACTION = 0.35  # |h22| fraction of peak defining the merger end
+RINGDOWN_END_FRACTION = 0.08  # further decay defining the ringdown end
 
 # BBM1 channel layout: one f32 time + 6 f32 positions + 2 f32 strain per row.
 FLOAT32_BYTES = 4
@@ -178,8 +180,14 @@ def build_reduced_times(
     # The h22 phase may carry either sign convention (this source decreases);
     # normalize so it increases with time. One ORBIT spans 4*pi of h22 phase
     # (m=2), verified against metadata number_of_orbits for this source.
-    phi = phase if phase[-1] >= phase[0] else -phase
-    phi = phi - phi[peak_index]
+    # np.unwrap can leave tiny DESCENTS where |h| (and thus the angle) is
+    # noisy; np.interp needs an increasing abscissa, so build the sampling
+    # coordinate as the cumulative |phase increment| (monotonic by
+    # construction and equal to the net phase over a clean sweep).
+    oriented = phase if phase[-1] >= phase[0] else -phase
+    increments = np.abs(np.diff(oriented))
+    phi = np.concatenate([[0.0], np.cumsum(increments)])
+    phi -= phi[peak_index]
     earliest_by_orbits = None
     target_span = INSPIRAL_PHASE_SPAN_ORBITS * 4.0 * math.pi
     for i in range(peak_index, -1, -1):
@@ -277,10 +285,13 @@ def reconstruction_error(
 #   88  f64  remnantChiZ
 #   96  f64  separationStartM
 #   104 f64  h22PeakAmplitude
-#   112 32s  ascii assetId (NUL padded)
-#   144 16x  zero padding to headerBytes=160
-HEADER_STRUCT = "!4sIIIII11d"
-HEADER_STRUCT_SIZE = 4 + 5 * 4 + 11 * 8  # 112 bytes through h22PeakAmplitude
+#   112 f64  mergerEndM    (first post-peak time where |h22| <= 0.35*peak)
+#   120 f64  ringdownEndM  (first later time where |h22| <= 0.08*peak)
+#   128 32s  ascii assetId (NUL padded)
+#   ... zero padding to headerBytes=160
+# Little-endian, no implicit padding (matches the TS decoder DataView calls).
+HEADER_STRUCT = "<4sIIIII13d"
+HEADER_STRUCT_SIZE = 4 + 5 * 4 + 13 * 8  # 128 bytes through ringdownEndM
 
 
 def emit_binary(
@@ -314,6 +325,8 @@ def emit_binary(
         scalars["remnantChiZ"],
         scalars["separationStartM"],
         scalars["h22PeakAmplitude"],
+        scalars["mergerEndM"],
+        scalars["ringdownEndM"],
     )
     asset_id_field = ASSET_ID.encode("ascii")
     header += asset_id_field + b"\x00" * (160 - HEADER_STRUCT_SIZE - len(asset_id_field))
@@ -390,6 +403,16 @@ def main() -> int:
     separation_start = float(np.linalg.norm(red_a[0] - red_b[0]))
     h_peak_amp = float(amplitude[peak_index])
 
+    # Data-derived phase anchors (post-peak amplitude thresholds).
+    post_amp = amplitude[peak_index:]
+    merger_end_idx_rel = int(np.argmax(post_amp <= MERGER_END_FRACTION * h_peak_amp))
+    after_merger = post_amp[merger_end_idx_rel:]
+    ringdown_end_idx_rel = merger_end_idx_rel + int(
+        np.argmax(after_merger <= RINGDOWN_END_FRACTION * h_peak_amp)
+    )
+    merger_end_m = float(times[peak_index + merger_end_idx_rel] - peak_time)
+    ringdown_end_m = float(times[peak_index + ringdown_end_idx_rel] - peak_time)
+
     # Remnant metadata: late-time AhC Christodoulou mass + spin magnitude.
     c_mass = horizons["C"]
     late = slice(-100, None)
@@ -413,6 +436,8 @@ def main() -> int:
         "remnantChiZ": remnant_chi_z,
         "separationStartM": separation_start,
         "h22PeakAmplitude": h_peak_amp,
+        "mergerEndM": merger_end_m,
+        "ringdownEndM": ringdown_end_m,
     }
 
     payload = emit_binary(
@@ -580,7 +605,8 @@ def main() -> int:
         ],
         "sourceKeyframes": [
             {
-                "sourceTimeM": float(t),
+                # Relative to the merger anchor (the runtime convention).
+                "sourceTimeM": float(t - peak_time),
                 "h22Re": float(np.interp(t, times, h22.real)),
                 "h22Im": float(np.interp(t, times, h22.imag)),
                 "toleranceFractionOfPeak": 0.02,
