@@ -75,6 +75,11 @@ interface AtlasHook {
     handleResize(cssWidth: number, cssHeight: number): void;
     /** M8-09 canonical trajectory-backend preference setter. */
     setTrajectoryBackend(preference: 'auto' | 'numerical' | 'lut'): void;
+    /**
+     * Canonical destination-control channel (CA5/CA6): forwards a partial
+     * control payload to the ACTIVE destination's normalizer.
+     */
+    setDestinationControl(destinationId: string, partial: Record<string, unknown>): void;
     /** Debug snapshot of the active destination module (null when none). */
     activeDestinationDebugSnapshot(): Record<string, unknown> | null;
   };

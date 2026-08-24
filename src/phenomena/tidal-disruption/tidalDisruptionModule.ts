@@ -72,6 +72,7 @@ import {
   TIER_STEP_SCALE,
   TIER_STREAM_SAMPLES,
   TIER_VOLUME_STEPS,
+  visualStarRadius,
   type ResolvedTdeEncounter,
   type TdePhase,
   type TidalDisruptionPublicState
@@ -112,7 +113,7 @@ const HANDOFF_FADE_SECONDS = 0.35;
 const ACCENT_ANGULAR_GATE_START = 0.015;
 const ACCENT_ANGULAR_GATE_FULL = 0.06;
 /** BH marker ring gain (cinematic site marker, NOT a lensing render). */
-const BH_MARKER_GAIN = 0.22;
+const BH_MARKER_GAIN = 0.5;
 
 /** Phases during which the stream ribbons carry the morphology. */
 const STREAM_PHASES: ReadonlySet<string> = new Set(['disruption', 'debris', 'winding', 'shock']);
@@ -207,7 +208,9 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     starMaterial.colorNode = vec4(vec3(...STAR_TINT_LINEAR).mul(uStarGain), 1);
     star = new THREE.Mesh(starGeometry, starMaterial);
     star.name = 'tde-star';
-    star.scale.setScalar(res.rStarUnits);
+    // DISCLOSED display exaggeration (see types.visualStarRadius): the
+    // rendered disc, not the model radius.
+    star.scale.setScalar(visualStarRadius(res));
     destinationScene.add(star);
     const starBytes =
       (segments.width + 1) * (segments.height + 1) * 32 + segments.width * segments.height * 6 * 4;
@@ -289,7 +292,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
           {
             kind: 'sphere-shell',
             origin: [res.rpUnits, 0, 0],
-            radius: res.rStarUnits,
+            radius: visualStarRadius(res),
             speed: encounterSpeedAtPeriapsis(res),
             directionBias: [0, 0, -1]
           }
@@ -323,8 +326,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     unboundScratch = createSpineScratch(samples + 2);
     boundRibbon = ctx.services.ribbons.createRibbon({
       segments: samples,
-      widthStart: Math.max(res.rStarUnits * 0.35, 0.8),
-      widthEnd: Math.max(res.rStarUnits * 0.08, 0.2),
+      widthStart: Math.max(visualStarRadius(res) * 0.35, 0.8),
+      widthEnd: Math.max(visualStarRadius(res) * 0.08, 0.2),
       colorStart: [1.0, 0.78, 0.52],
       colorEnd: [0.85, 0.42, 0.28],
       additive: true,
@@ -332,8 +335,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     });
     unboundRibbon = ctx.services.ribbons.createRibbon({
       segments: samples,
-      widthStart: Math.max(res.rStarUnits * 0.28, 0.6),
-      widthEnd: Math.max(res.rStarUnits * 0.05, 0.15),
+      widthStart: Math.max(visualStarRadius(res) * 0.28, 0.6),
+      widthEnd: Math.max(visualStarRadius(res) * 0.05, 0.15),
       colorStart: [0.75, 0.82, 1.0],
       colorEnd: [0.35, 0.42, 0.7],
       additive: true,
@@ -494,7 +497,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     const def = deformationAt(res, enc.x, enc.y, enc.z);
     if (star !== null) {
       star.position.set(enc.x, enc.y, enc.z);
-      star.scale.setScalar(res.rStarUnits);
+      star.scale.setScalar(visualStarRadius(res));
     }
     uStarAxis.value.set(def.axisX, def.axisY, def.axisZ);
     uStarStretch.value = def.stretch;

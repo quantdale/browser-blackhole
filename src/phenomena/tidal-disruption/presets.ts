@@ -88,7 +88,9 @@ const FIDELITY_BASE =
   'closed-form parabolic Kepler encounter (Barker timing), tidal-tensor ' +
   'deformation proxy, energy-spread debris family on Newtonian Kepler ' +
   'orbits. Not hydrodynamics/SPH, not GRMHD, not numerical relativity, no ' +
-  'GR apsidal precession, no radiative transfer.';
+  'GR apsidal precession, no radiative transfer. Display note: the stellar ' +
+  'disc is rendered at an exaggerated radius for visibility; every model ' +
+  'quantity uses the true radius.';
 
 const SOLAR_CANONICAL_PRESET: PresetDescriptor = {
   id: 'solar-canonical',
@@ -100,11 +102,13 @@ const SOLAR_CANONICAL_PRESET: PresetDescriptor = {
     ' Sun-like star around a 10^6 M_sun black hole at beta=1 (periapsis at ' +
     'the tidal radius): full disruption, ~116 day first fallback.',
   state: { ...SOLAR_CANONICAL_STATE },
-  // polar 62deg (matches observerInclinationDeg), azimuth 35, d=520 units:
-  // dir = (0.507, 0.469, 0.723)
-  camera: { position: [264, 244, 376], target: [0, 0, 0], fovDeg: 55 },
+  // Arrival frames the BOOT-PHASE star (all presets boot at Barker D=-1.088:
+  // star at azimuth -4.8 deg, r=2.184 q) with standoff 4x the rendered
+  // stellar radius; the black-hole marker stays ~22 deg off-axis, in frame.
+  camera: { position: [-22, 22.5, 259.8], target: [-18.4, 0, 217.6], fovDeg: 55 },
   seed: 211,
-  timelineInitialPhase: 0
+  // secondsToUiPhase(-1.517 * barkerCoef) — boots at Barker D=-1.088.
+  timelineInitialPhase: 0.160087
 };
 
 const DEEP_PENETRATION_PRESET: PresetDescriptor = {
@@ -118,11 +122,11 @@ const DEEP_PENETRATION_PRESET: PresetDescriptor = {
     'inside the tidal radius, 6.25x wider energy spread -> faster fallback, ' +
     'more compact and rapidly winding debris.',
   state: { ...DEEP_PENETRATION_STATE },
-  // polar 55deg, azimuth -40, d=300 units (frames the tighter geometry):
-  // dir = (-0.464, 0.574, 0.553)
-  camera: { position: [-139, 172, 166], target: [0, 0, 0], fovDeg: 55 },
+  // Same star-anchored discipline at polar 55 (observer-coherent).
+  camera: { position: [-10.7, 27.5, 126.2], target: [-7.4, 0, 87], fovDeg: 55 },
   seed: 223,
-  timelineInitialPhase: 0
+  // Boots at the shared Barker D=-1.088 for this encounter's coefficients.
+  timelineInitialPhase: 0.250088
 };
 
 const GRAZING_FLYBY_PRESET: PresetDescriptor = {
@@ -137,10 +141,11 @@ const GRAZING_FLYBY_PRESET: PresetDescriptor = {
     'intentionally present nothing — the reduced model produces no full ' +
     'disruption for this scenario.',
   state: { ...GRAZING_FLYBY_STATE },
-  // polar 70deg, azimuth 150, d=430 units: dir = (0.457, 0.342, -0.791)
-  camera: { position: [197, 147, -340], target: [0, 0, 0], fovDeg: 55 },
+  // Star-anchored arrival at polar 70 (observer-coherent).
+  camera: { position: [-25.5, 16.4, 300.9], target: [-21.7, 0, 256], fovDeg: 55 },
   seed: 227,
-  timelineInitialPhase: 0
+  // Boots at the shared Barker D=-1.088 for this encounter's coefficients.
+  timelineInitialPhase: 0.136741
 };
 
 const MASSIVE_BLACK_HOLE_PRESET: PresetDescriptor = {
@@ -154,11 +159,10 @@ const MASSIVE_BLACK_HOLE_PRESET: PresetDescriptor = {
     'M^(1/3), the horizon as M — the encounter moves relatively deeper into ' +
     'the strong-field zone while every length/time scale grows.',
   state: { ...MASSIVE_BH_STATE },
-  // polar 48deg, azimuth 20, d=1150 units (frames rt=215):
-  // dir = (0.271, 0.669, 0.693)
-  camera: { position: [311, 769, 797], target: [0, 0, 0], fovDeg: 55 },
+  // rt=215 stretches the corridor: same D-anchored boot, scaled position.
+  camera: { position: [-46.2, 69.1, 545.2], target: [-39.7, 0, 468.7], fovDeg: 55 },
   seed: 229,
-  timelineInitialPhase: 0
+  timelineInitialPhase: 0.160087
 };
 
 const GIANT_STAR_PRESET: PresetDescriptor = {
@@ -172,11 +176,10 @@ const GIANT_STAR_PRESET: PresetDescriptor = {
     'hole at beta=1: tripled stellar radius stretches the tidal radius and ' +
     'lengthens the fallback chain relative to the canonical event.',
   state: { ...GIANT_STAR_STATE },
-  // polar 66deg, azimuth -15, d=1650 units (frames rt=378):
-  // dir = (-0.251, 0.407, 0.879)
-  camera: { position: [-414, 671, 1451], target: [0, 0, 0], fovDeg: 55 },
+  // rt=378: same D-anchored boot, scaled position.
+  camera: { position: [-83.6, 73.8, 987.4], target: [-69.6, 0, 822.3], fovDeg: 55 },
   seed: 233,
-  timelineInitialPhase: 0
+  timelineInitialPhase: 0.160087
 };
 
 /** All tidal-disruption presets, default first. */

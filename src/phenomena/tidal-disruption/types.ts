@@ -172,6 +172,17 @@ export const DEFORMATION_GAIN = 0.45;
  */
 export const PARTIAL_SPREAD_FRACTION = 0.35;
 
+/**
+ * DISCLOSED PRESENTATION EXAGGERATION (CA6-01): a sun-like star has radius
+ * 1 scene unit while the encounter lives at tens-to-hundreds of units, so
+ * the TRUE disc would subtend ~1 px. Rendered stellar discs therefore use
+ * max(R_*, VISUAL_STAR_MIN_FRACTION_OF_RT * r_t) — a pure DISPLAY choice;
+ * every model quantity (deformation, disruption, debris energies, stream
+ * orbits) continues to use the true radius. Stated in preset fidelity
+ * notes and the destination disclosure.
+ */
+export const VISUAL_STAR_MIN_FRACTION_OF_RT = 0.12;
+
 // ---------------------------------------------------------------------------
 // Resolved scenario (derived constants consumed by renderers)
 // ---------------------------------------------------------------------------
@@ -382,6 +393,14 @@ export function resolveTidalDisruptionEncounter(
     partialSpreadFraction: PARTIAL_SPREAD_FRACTION,
     fallbackSeconds
   };
+}
+
+/**
+ * Rendered stellar-disc radius (scene units): the disclosed display
+ * exaggeration above. Model code must never consume this.
+ */
+export function visualStarRadius(encounter: ResolvedTdeEncounter): number {
+  return Math.max(encounter.rStarUnits, VISUAL_STAR_MIN_FRACTION_OF_RT * encounter.rtUnits);
 }
 
 // ---------------------------------------------------------------------------

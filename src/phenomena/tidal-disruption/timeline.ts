@@ -89,7 +89,7 @@ export function tdeTimelineBounds(encounter: ResolvedTdeEncounter): {
   disruptEdgeSeconds: number;
   fallbackAnchorSeconds: number;
 } {
-  const dIn = Math.sqrt(8); // r = 8 q inbound boundary
+  const dIn = Math.sqrt(8); // r = 9 q inbound boundary (r = q(1+D^2))
   const xiOpenD = Math.cbrt(1 / DEFORMATION_XI_OPEN); // r where xi reaches open threshold
   const dDef = Math.sqrt(Math.max((xiOpenD * encounter.rtUnits) / encounter.rpUnits - 1, 0.04));
   const dDisrupt = Math.sqrt(Math.max(DISRUPT_RADIUS_FACTOR - 1, 0.01));
