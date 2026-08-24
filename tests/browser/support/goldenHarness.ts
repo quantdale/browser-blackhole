@@ -525,5 +525,65 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
     notes:
       'Afterglow with prompt-BH remnant scenario (faint accretion glow, fading ejecta). Catches remnant-scenario and late-timeline resource regressions.'
+  },
+  // --- Tidal Disruption goldens (CA6) -----------------------------------------
+  // Timeline positions are deterministic: the destination enters paused and
+  // the harness scrubs to `scrubPhase` before capture; volume jitter is off
+  // and every model quantity is a pure function of the scrub position. The
+  // arrival camera frames the boot-phase star; later-phase rows rely on the
+  // star-anchored camera keeping the black-hole/shock region ~22 deg off-axis.
+  {
+    name: 'TDE_APPROACH',
+    url: '/atlas/tidal-disruption?preset=solar-canonical',
+    scrubPhase: 0.16,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Boot frame: tidally deformed star close-up on inbound corridor, BH marker near frame edge. Catches star-loss, deformation-graph, and arrival-framing regressions.'
+  },
+  {
+    name: 'TDE_DEFORMATION',
+    url: '/atlas/tidal-disruption?preset=solar-canonical',
+    scrubPhase: 0.26,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Strong pre-disruption elongation (stretch well above 1). Catches deformation ordering/cap regressions and axis-orientation breaks.'
+  },
+  {
+    name: 'TDE_DEBRIS',
+    url: '/atlas/tidal-disruption?preset=solar-canonical',
+    scrubPhase: 0.36,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Young debris: star faded, compact bound (warm) + unbound (cool) stream arcs near periapsis + accent particles. Catches stream-loss, handoff-fade and spine-crop regressions.'
+  },
+  {
+    name: 'TDE_WINDING',
+    url: '/atlas/tidal-disruption?preset=deep-penetration',
+    scrubPhase: 0.77,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Deep-penetration first wraps: differential Kepler winding of the most-bound family around the BH (beta 2.5 morphology, early shock segment). Catches winding-phase and energy-spread regressions.'
+  },
+  {
+    name: 'TDE_SHOCK',
+    url: '/atlas/tidal-disruption?preset=solar-canonical',
+    scrubPhase: 0.78,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Shock stage: equatorial emissivity volume active at the circularization radius. Catches volume-ignition and phase-gating regressions.'
+  },
+  {
+    name: 'TDE_NASCENT_DISK',
+    url: '/atlas/tidal-disruption?preset=solar-canonical',
+    scrubPhase: 0.97,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    notes:
+      'Nascent-disk stage: procedural annulus gain ramp, streams retired, volume off. Catches late-phase resource-retirement and disk-gain regressions.'
   }
 ];

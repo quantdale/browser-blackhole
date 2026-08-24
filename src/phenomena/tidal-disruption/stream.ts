@@ -163,11 +163,16 @@ export function unboundStreamPoint(
 
 /**
  * Build a full stream polyline (bound or unbound branch) as pure samples in
- * the orbital plane. `energyFraction(i)` maps [0,1) -> (0,1]: fraction of
- * the half-spread assigned to each spine member (0 => COM-parabolic edge,
- * 1 => most-bound/most-unbound edge). The caller supplies the sampling so
- * quality tiers can change resolution without changing the model.
+ * the orbital plane. Presentation sampling (disclosed): member energies are
+ * CLUSTERED toward the band edge (f = FMIN + (1-FMIN)(1-(1-u)^CLUSTER)) so
+ * spine detail survives where the family actually wraps, and the near-
+ * parabolic far tail (f < FMIN, apoapsis far beyond any frame) is cropped.
+ * The caller supplies the sample count so quality tiers can change
+ * resolution without changing the model.
  */
+const SPINE_F_MIN = 1 / 30;
+const SPINE_CLUSTER_EXPONENT = 2.5;
+
 export function buildStreamSpine(
   encounter: ResolvedTdeEncounter,
   tSinceDisruptionSeconds: number,
@@ -179,7 +184,8 @@ export function buildStreamSpine(
   const spread = encounter.energySpreadJPerKg;
   const usable = Math.min(count, out.xs.length);
   for (let i = 0; i < usable; i += 1) {
-    const f = (i + 0.5) / count; // (0,1) strictly inside the band
+    const u = (i + 0.5) / count;
+    const f = SPINE_F_MIN + (1 - SPINE_F_MIN) * (1 - Math.pow(1 - u, SPINE_CLUSTER_EXPONENT));
     const epsMag = f * (spread / 2);
     const p = boundBranch
       ? boundStreamPoint(encounter, -epsMag, tSinceDisruptionSeconds)

@@ -37,15 +37,16 @@
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
-  abs,
   dot,
   float,
   length,
   max,
+  mix,
   normalize,
   positionLocal,
   smoothstep,
   uniform,
+  vec2,
   vec3,
   vec4
 } from 'three/tsl';
@@ -114,6 +115,12 @@ const ACCENT_ANGULAR_GATE_START = 0.015;
 const ACCENT_ANGULAR_GATE_FULL = 0.06;
 /** BH marker ring gain (cinematic site marker, NOT a lensing render). */
 const BH_MARKER_GAIN = 0.5;
+/**
+ * DISCLOSED presentation crop for stream ribbons: only the family's near-BH
+ * portion (r <= STREAM_RADIAL_CAP x periapsis) is rendered; the distant
+ * stream continues far beyond any presented frame by construction.
+ */
+const STREAM_RADIAL_CAP = 12;
 
 /** Phases during which the stream ribbons carry the morphology. */
 const STREAM_PHASES: ReadonlySet<string> = new Set(['disruption', 'debris', 'winding', 'shock']);
@@ -141,6 +148,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   const uStarGain = uniform(0);
   const uShockGain = uniform(0);
   const uShockRadius = uniform(1);
+  const uDiskGain = uniform(0);
 
   // Scratch spine buffers (allocated once per ribbon capacity).
   let boundScratch: ReturnType<typeof createSpineScratch> | null = null;
@@ -242,28 +250,21 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     const boundsRadius = shockBoundsRadiusUnits(res);
     const volume = ctx.services.volumes.createVolume({
       bounds: { kind: 'sphere', center: [0, 0, 0], radius: boundsRadius },
-      // Equatorial shell: dense where |y| is small relative to radius — the
-      // circularizing stream lives near the orbital plane. Pure function of
-      // the SAMPLE POSITION (observer-independent by contract). All
-      // smoothsteps use STRICTLY RISING edges (WGSL contract, see CA5).
+      // Equatorial TORUS (disclosed presentation of the circularizing
+      // stream): tube around the circle of radius uShockRadius in the
+      // orbital plane. Edge-on sight-lines read the classic ring; polar
+      // sight-lines pass through emptiness. WGSL CONTRACT: smoothstep edges
+      // must be CONSTANT and RISING (low < high) — reversed edges are
+      // undefined and light the entire bounds sphere (see CM volume note).
       density: ({ pos }) => {
         const p = vec3(pos as never);
-        const r = length(p);
-        const dirN = normalize(p.max(vec3(1e-9)));
-        const equatorialWeight = float(1).sub(abs(dirN.y));
-        const rise = smoothstep(
-          uShockRadius.mul(0.55),
-          uShockRadius.sub(uShockRadius.mul(0.12)),
-          r
-        );
-        const fall = smoothstep(
-          uShockRadius.add(uShockRadius.mul(0.12)),
-          uShockRadius.mul(1.35),
-          r
-        ).oneMinus();
-        return max(rise.mul(fall).mul(float(0.25).add(equatorialWeight.mul(0.75))), float(0));
+        const radial = length(p.xz);
+        const tubeDist = length(vec2(radial.sub(uShockRadius), p.y));
+        const minor = uShockRadius.mul(0.18).max(0.5);
+        const profile = smoothstep(minor.mul(0.45), minor.mul(1.6), tubeDist).oneMinus();
+        return max(profile, float(0));
       },
-      emission: () => vec3(1.0, 0.62, 0.38).mul(uShockGain),
+      emission: () => vec3(1.0, 0.62, 0.38).mul(uShockGain.mul(0.22)),
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       halfResolution: true,
       earlyAlphaTermination: true,
@@ -352,6 +353,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // --- nascent-disk annulus (procedural presentation, disclosed) ----------
     ctx.reportProgress(0.9, 'Preparing nascent-disk annulus');
     const diskGeo = nascentDiskGeometry(res);
+    const uDiskInner = uniform(diskGeo.innerRadiusUnits);
+    const uDiskOuter = uniform(diskGeo.outerRadiusUnits);
     const diskGeometry = new THREE.RingGeometry(
       diskGeo.innerRadiusUnits,
       diskGeo.outerRadiusUnits,
@@ -363,7 +366,17 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     diskMaterial.name = 'tde-nascent-disk';
     diskMaterial.transparent = true;
     diskMaterial.side = THREE.DoubleSide;
-    diskMaterial.colorNode = vec4(vec3(1.0, 0.72, 0.45), 1);
+    // Radial presentation falloff: brighter at the inner edge, dimming
+    // outward across the procedural annulus; uDiskGain carries the ramp-in.
+    // WGSL contract: constant rising edges (low < high).
+    const rLocal = length(positionLocal);
+    const radial = smoothstep(uDiskInner, uDiskOuter, rLocal);
+    diskMaterial.colorNode = vec4(
+      vec3(1.0, 0.72, 0.45)
+        .mul(mix(float(1.1), float(0.3), radial))
+        .mul(uDiskGain),
+      1
+    );
     diskMesh = new THREE.Mesh(diskGeometry, diskMaterial);
     diskMesh.name = 'tde-nascent-disk';
     diskMesh.visible = false;
@@ -425,7 +438,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       case 'shock':
         return 0.3;
       case 'nascent-disk':
-        return 0.15;
+        return 0; // accents retire with the disk stage (CA6-11)
       default:
         return 0; // approach/deformation keep debris systems OFF
     }
@@ -442,6 +455,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   }
 
   /** Rebuild both stream spines from the pure model (no history). */
+  let spineCount = 0;
+  let unboundCount = 0;
   function updateStreams(tSinceDisruption: number): void {
     const ready = assertReady();
     if (
@@ -461,12 +476,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       true,
       boundScratch
     );
+    // DISCLOSED presentation crop: ribbons render the family's near-BH
+    // portion (r <= STREAM_RADIAL_CAP x periapsis); the distant stream
+    // continues far beyond any presented frame by construction.
+    const rCap = STREAM_RADIAL_CAP * ready.resolved.rpUnits;
     spinePoints.length = 0;
     for (let i = nBound - 1; i >= 0; i -= 1) {
+      if (boundScratch.rs[i]! > rCap) continue;
       // Most-bound first so ribbon taper runs head -> tail along the arc.
       spinePoints.push(new THREE.Vector3(boundScratch.xs[i]!, 0, boundScratch.zs[i]!));
     }
     if (spinePoints.length >= 2) boundRibbon.setSpine(spinePoints);
+    spineCount = spinePoints.length;
 
     const nUnbound = buildStreamSpine(
       ready.resolved,
@@ -477,9 +498,11 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     );
     spinePoints.length = 0;
     for (let i = 0; i < nUnbound; i += 1) {
+      if (unboundScratch.rs[i]! > rCap) continue;
       spinePoints.push(new THREE.Vector3(unboundScratch.xs[i]!, 0, unboundScratch.zs[i]!));
     }
     if (spinePoints.length >= 2) unboundRibbon.setSpine(spinePoints);
+    unboundCount = spinePoints.length;
   }
 
   function update(ctx: FrameContext): void {
@@ -548,15 +571,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
 
     // --- nascent disk (late-phase procedural transition) ------------------------
     const diskGain = nascentDiskGainAt(res, tau, disrupts);
+    uDiskGain.value = diskGain;
     if (diskMesh !== null) {
       diskMesh.visible = diskGain > 0.001;
       const mat = diskMesh.material as THREE.Material & { opacity: number };
-      mat.opacity = 0.85 * diskGain;
+      mat.opacity = 0.55 * diskGain;
     }
 
     // --- diagnostics snapshot ----------------------------------------------------
     const fractions = classificationFractions(referenceCounts.boundCount, REFERENCE_PLAN_COUNT);
     debug['phase'] = phase;
+    debug['spineBoundPoints'] = spineCount;
+    debug['spineUnboundPoints'] = unboundCount;
     debug['timeSeconds'] = t;
     debug['beta'] = res.beta;
     debug['rtUnits'] = res.rtUnits;
