@@ -98,22 +98,27 @@ Prefer simple, documented, deterministic formats over clever opaque compression.
 
 ## 5. Black-Hole Merger pipeline
 
-Candidate sources: SXS catalog and Einstein Toolkit examples, subject to source/license validation.
+IMPLEMENTED (CA8). The production pipeline lives in `tools/cosmic-data/`
+(fetch_sxs_record.py + reduce_bbh_merger.py; see that directory's README for
+the reproduction gate) and reduces the PINNED source recorded in
+`DATA_SOURCES_BBH_MERGER.md` / CA-ADR-021:
 
-Offline work:
+- pinned source: SXS:BBH:0001 Lev5, Zenodo record 13166927, CC-BY-4.0;
+- extraction: component metadata (mass fractions, spins), horizon coordinate
+  trajectories (recentered on the fitted midpoint — gauge-dependent paths,
+  labeled as such), and the h22 strain from the N=4 extrapolated file;
+- alignment: t=0 at the h22 amplitude peak; data-derived phase anchors
+  (mergerEndM / ringdownEndM at |h| fractions of peak);
+- resampling: deterministic two-segment scheme — inspiral uniform in
+  cumulative GW phase (70% of samples), ringdown uniform in time — emitted
+  into the versioned BBM1 binary with a manifest + reduction-error report;
+- validation: committed fixture compares runtime decode against reduction
+  output exactly at keyframes and against native source samples within
+  documented tolerance (tests/unit/bbmSourceParity.test.ts).
 
-1. choose reference simulation;
-2. record source identifiers and publication/context;
-3. extract component physical metadata;
-4. choose visualization trajectory representation carefully—coordinate trajectories in numerical relativity can be gauge-dependent, so do not present them as invariant observables;
-5. extract/normalize waveform modes or strain representation;
-6. define merger time and remnant metadata;
-7. resample to compact timeline;
-8. quantify interpolation error;
-9. emit runtime binary + manifest;
-10. compare decoded runtime samples to source extraction.
-
-Runtime must not fetch terabyte-scale raw output.
+Candidate sources originally identified: SXS catalog (SELECTED) and Einstein
+Toolkit examples (rejected: no suitable per-dataset redistribution grant).
+Runtime never fetches raw multi-terabyte output; it loads one ~74 KB asset.
 
 ## 6. Galaxy Collision pipeline
 

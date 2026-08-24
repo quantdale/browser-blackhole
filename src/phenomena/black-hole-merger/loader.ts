@@ -15,12 +15,7 @@
  * says splitting it buys nothing (DATA_PIPELINE §11 "do not over-engineer").
  */
 
-import {
-  BbmLoadError,
-  cacheDataset,
-  decodeBbm1,
-  type BbmDataset
-} from './dataset.js';
+import { BbmLoadError, cacheDataset, decodeBbm1, type BbmDataset } from './dataset.js';
 
 export interface BbmManifestRuntime {
   readonly encoding: string;

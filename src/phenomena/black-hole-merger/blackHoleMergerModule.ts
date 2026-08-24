@@ -32,7 +32,7 @@
 
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { float, vec3, vec4 } from 'three/tsl';
+import { float, length, positionLocal, smoothstep, vec3, vec4 } from 'three/tsl';
 import { uniform } from 'three/tsl';
 
 import type {
@@ -60,6 +60,7 @@ import {
 } from './timeline.js';
 import {
   normalizeBlackHoleMergerState,
+  TIER_KERR_STEPS,
   TIER_TRAIL_SAMPLES,
   type BlackHoleMergerPublicState,
   type BbmPhase
@@ -74,6 +75,9 @@ const MARKER_RADIUS_UNITS = 1;
 /** Illustrative photon-ring accent radii (presentation; photon sphere 3m). */
 const RING_INNER_UNITS = 1.32;
 const RING_OUTER_UNITS = 1.62;
+/** Illustrative soft-glow accent annulus around each component. */
+const GLOW_INNER_UNITS = 1.05;
+const GLOW_OUTER_UNITS = 3.1;
 /** Merger flash envelope peak gain (bloom carries it further). */
 const FLASH_PEAK_GAIN = 5;
 /** Trail ribbon arc behind the current position, NR M units. */
@@ -112,9 +116,22 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   let markerB: THREE.Mesh | null = null;
   let ringA: THREE.Mesh | null = null;
   let ringB: THREE.Mesh | null = null;
+  let glowA: THREE.Mesh | null = null;
+  let glowB: THREE.Mesh | null = null;
   let flash: THREE.Mesh | null = null;
   let trailA: RibbonHandle | null = null;
   let trailB: RibbonHandle | null = null;
+  /** Remnant Kerr pass handle (uniform-state pushes; disposal via scope). */
+  let kerrPass: {
+    object3d(): THREE.Mesh;
+    setUniformsFromState(state: Record<string, unknown>): void;
+    dispose(): void;
+  } | null = null;
+
+  // Scratch basis vectors for the Kerr uniform-state record (no allocation).
+  const basisRight = new THREE.Vector3();
+  const basisUp = new THREE.Vector3();
+  const basisForward = new THREE.Vector3();
 
   // Scratch objects (zero per-frame allocation).
   const sample: BbmSampleOut = { ax: 0, ay: 0, az: 0, bx: 0, by: 0, bz: 0, hRe: 0, hIm: 0 };
@@ -131,16 +148,19 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
 
   /** EXCLUSIVE visibility between the two render systems. */
   function applySystemVisibility(phase: BbmPhase): void {
-    const markersVisible = phase === 'inspiral' || phase === 'merger';
-    const ringsWanted = markersVisible && (stateValue?.illustrativeLensing ?? true);
+    const inspiralActive = phase === 'inspiral' || phase === 'merger';
+    const markersVisible = inspiralActive;
+    const accentsWanted = markersVisible && (stateValue?.illustrativeLensing ?? true);
     const trailsWanted = phase === 'inspiral' && (stateValue?.showOrbitTrails ?? true);
 
-    if (inspiralGroup !== null) inspiralGroup.visible = phase !== 'remnant';
+    if (inspiralGroup !== null) inspiralGroup.visible = inspiralActive;
     if (markerA !== null) markerA.visible = markersVisible;
     if (markerB !== null) markerB.visible = markersVisible;
-    if (ringA !== null) ringA.visible = ringsWanted;
-    if (ringB !== null) ringB.visible = ringsWanted;
-    if (flash !== null) flash.visible = flash.visible && phase !== 'remnant';
+    if (ringA !== null) ringA.visible = accentsWanted;
+    if (ringB !== null) ringB.visible = accentsWanted;
+    if (glowA !== null) glowA.visible = accentsWanted;
+    if (glowB !== null) glowB.visible = accentsWanted;
+    if (flash !== null) flash.visible = flash.visible && inspiralActive;
     if (trailA !== null) trailA.setVisible(trailsWanted);
     if (trailB !== null) trailB.setVisible(trailsWanted);
     if (remnantGroup !== null) {
@@ -182,6 +202,8 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     const coreGeometry = new THREE.SphereGeometry(MARKER_RADIUS_UNITS, 40, 28);
     const ringGeometry = new THREE.RingGeometry(RING_INNER_UNITS, RING_OUTER_UNITS, 72, 1);
     ringGeometry.rotateX(-Math.PI / 2);
+    const glowGeometry = new THREE.RingGeometry(GLOW_INNER_UNITS, GLOW_OUTER_UNITS, 72, 1);
+    glowGeometry.rotateX(-Math.PI / 2);
 
     const coreMaterialA = new MeshBasicNodeMaterial();
     coreMaterialA.name = 'bbm-core-a';
@@ -199,24 +221,51 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     ringMaterialA.name = 'bbm-ring-a';
     ringMaterialA.colorNode = vec4(vec3(0.85, 0.9, 1.0).mul(uMarkerGain), 1);
     ringMaterialA.transparent = true;
-    ringMaterialA.opacity = 0.55;
+    ringMaterialA.opacity = 0.85;
     ringMaterialA.blending = THREE.AdditiveBlending;
     ringMaterialA.depthWrite = false;
     ringMaterialA.side = THREE.DoubleSide;
     const ringMaterialB = ringMaterialA.clone();
     ringMaterialB.name = 'bbm-ring-b';
+
+    // Soft illustrative glow annulus (radial fade, presentation-only).
+    const glowMaterial = new MeshBasicNodeMaterial();
+    glowMaterial.name = 'bbm-glow';
+    const glowT = length(positionLocal.xz)
+      .sub(float(GLOW_INNER_UNITS))
+      .div(float(GLOW_OUTER_UNITS - GLOW_INNER_UNITS));
+    const glowFade = smoothstep(float(0), float(0.25), glowT).mul(
+      smoothstep(float(1), float(0.45), glowT)
+    );
+    glowMaterial.colorNode = vec4(vec3(0.62, 0.72, 1.0).mul(uMarkerGain), glowFade.mul(0.22));
+    glowMaterial.transparent = true;
+    glowMaterial.blending = THREE.AdditiveBlending;
+    glowMaterial.depthWrite = false;
+    glowMaterial.side = THREE.DoubleSide;
     ringA = new THREE.Mesh(ringGeometry, ringMaterialA);
     ringA.name = 'bbm-ring-a';
     ringB = new THREE.Mesh(ringGeometry, ringMaterialB);
     ringB.name = 'bbm-ring-b';
     inspiralGroup.add(ringA, ringB);
+    glowA = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowA.name = 'bbm-glow-a';
+    glowB = new THREE.Mesh(glowGeometry, glowMaterial);
+    glowB.name = 'bbm-glow-b';
+    inspiralGroup.add(glowA, glowB);
 
     const bytesGeo =
       (coreGeometry.attributes.position?.count ?? 0) * 12 +
       (ringGeometry.attributes.position?.count ?? 0) * 12;
-    ctx.scope.track('geometry', coreGeometry, () => coreGeometry.dispose(), bytesGeo * 0.5);
-    ctx.scope.track('geometry', ringGeometry, () => ringGeometry.dispose(), bytesGeo * 0.5);
-    for (const material of [coreMaterialA, coreMaterialB, ringMaterialA, ringMaterialB]) {
+    ctx.scope.track('geometry', coreGeometry, () => coreGeometry.dispose(), bytesGeo * 0.4);
+    ctx.scope.track('geometry', ringGeometry, () => ringGeometry.dispose(), bytesGeo * 0.3);
+    ctx.scope.track('geometry', glowGeometry, () => glowGeometry.dispose(), bytesGeo * 0.3);
+    for (const material of [
+      coreMaterialA,
+      coreMaterialB,
+      ringMaterialA,
+      ringMaterialB,
+      glowMaterial
+    ]) {
       ctx.scope.track('material', material, () => material.dispose(), 4096);
     }
 
@@ -265,9 +314,12 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       massRg: ds.remnantMassOverM,
       spinDimensionless: ds.remnantChiZ,
       backgroundEquirect: null,
-      diskEnabled: false,
-      diskInnerRg: 0,
-      diskOuterRg: 0,
+      // Illustrative remnant presentation: a faint hot inner-glow proxy on
+      // the validated Kerr backend (labeled ILLUSTRATIVE — no post-merger
+      // accretion-disk physics is claimed).
+      diskEnabled: true,
+      diskInnerRg: 4,
+      diskOuterRg: 14,
       qualityTier: ctx.quality
     });
     remnantGroup = new THREE.Group();
@@ -275,6 +327,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     remnantGroup.add(kerr.object3d());
     remnantGroup.visible = false;
     destinationScene.add(remnantGroup);
+    kerrPass = kerr;
     ctx.scope.track('renderTarget', kerr.object3d(), () => kerr.dispose(), 12 << 20);
 
     scene = destinationScene;
@@ -340,17 +393,18 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
         markerB.position.set(sample.bx, sample.by, sample.bz);
         if (ringA !== null) ringA.position.copy(markerA.position);
         if (ringB !== null) ringB.position.copy(markerB.position);
+        if (glowA !== null) glowA.position.copy(markerA.position);
+        if (glowB !== null) glowB.position.copy(markerB.position);
       }
     }
     uMarkerGain.value = markersActive ? 1 : 0;
 
     // Merger flash: exponential-decay envelope anchored at t=0 (the peak).
     const flashTau = clampedT <= 0 ? 0 : clampedT / Math.max(ds.mergerEndM, 1e-6);
-    const flashGain =
-      clampedT >= 0 && flashTau < 1 ? FLASH_PEAK_GAIN * Math.exp(-3 * flashTau) : 0;
+    const flashGain = clampedT >= 0 && flashTau < 1 ? FLASH_PEAK_GAIN * Math.exp(-3 * flashTau) : 0;
     uFlashGain.value = flashGain;
     if (flash !== null) {
-      flash.visible = flashGain > 0.001 && phase !== 'remnant';
+      flash.visible = flashGain > 0.001 && markersActive;
       flash.scale.setScalar(1.6 + flashTau * 2.4);
     }
 
@@ -381,8 +435,43 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     debug['tier'] = lastTier;
   }
 
+  /**
+   * Canonical Kerr uniform-state record for the CURRENT camera (same field
+   * contract as the black-hole destination's lensing state; scene units are
+   * total-mass M and the remnant parameters are SOURCE-DERIVED).
+   */
+  function pushKerrUniforms(camera: THREE.PerspectiveCamera): void {
+    if (kerrPass === null || dataset === null) return;
+    camera.updateMatrixWorld();
+    const e = camera.matrixWorld.elements;
+    basisRight.set(e[0] ?? 0, e[1] ?? 0, e[2] ?? 0).normalize();
+    basisUp.set(e[4] ?? 0, e[5] ?? 0, e[6] ?? 0).normalize();
+    basisForward.set(-(e[8] ?? 0), -(e[9] ?? 0), -(e[10] ?? 0)).normalize();
+    const aspect = camera.aspect;
+    kerrPass.setUniformsFromState({
+      cameraPositionRg: [camera.position.x, camera.position.y, camera.position.z],
+      cameraRight: [basisRight.x, basisRight.y, basisRight.z],
+      cameraUp: [basisUp.x, basisUp.y, basisUp.z],
+      cameraForward: [basisForward.x, basisForward.y, basisForward.z],
+      tanHalfFovY: Math.tan((camera.fov * Math.PI) / 360),
+      aspect: Number.isFinite(aspect) && aspect > 0 ? aspect : 1,
+      massRg: dataset.remnantMassOverM,
+      spinDimensionless: dataset.remnantChiZ,
+      centerRg: [0, 0, 0],
+      diskEnabled: true,
+      diskInnerRg: 4,
+      diskOuterRg: 14,
+      maxSteps: TIER_KERR_STEPS[lastTier],
+      escapeRadiusRg: 60,
+      backgroundIntensity: 1
+    });
+  }
+
   function render(ctx: RenderContext): void {
     if (ctx.scene !== null && ctx.camera !== null) {
+      if (remnantGroup !== null && remnantGroup.visible) {
+        pushKerrUniforms(ctx.camera);
+      }
       ctx.renderer.render(ctx.scene, ctx.camera);
     }
   }
@@ -402,9 +491,12 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     markerB = null;
     ringA = null;
     ringB = null;
+    glowA = null;
+    glowB = null;
     flash = null;
     trailA = null;
     trailB = null;
+    kerrPass = null;
     dataset = null;
     stateValue = null;
     trailPointsA.length = 0;
@@ -431,7 +523,8 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       disclosure: BBM_DISCLOSURE,
       fidelityBreakdown: {
         dynamics: 'DATA_DRIVEN (reduced NR trajectories + waveform)',
-        illustrativeVisuals: 'PROCEDURAL_SCIENTIFIC (markers/rings/trails presentation)',
+        illustrativeVisuals:
+          'PROCEDURAL_SCIENTIFIC (markers/rings/trails/glow + remnant glow presentation)',
         remnantGr: 'DIRECT (validated Kerr backend, source-derived spin/mass)',
         flash: 'CINEMATIC presentation envelope over data-derived timing'
       }

@@ -1,0 +1,69 @@
+{
+ "schemaVersion": 1,
+ "kind": "black-hole-merger-phase-characterization",
+ "date": "2026-08-24T23:02:47.828Z",
+ "label": "medium",
+ "commit": "4564c74ee7fc2e930b96e88513a78c05dc77c7bc",
+ "destination": "black-hole-merger",
+ "preset": "sxs-bbh-0001-inspiral",
+ "dataset": {
+  "id": "sxs-bbh-0001-lev5",
+  "sha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
+  "bytes": 73888,
+  "sourceSimulation": "SXS:BBH:0001"
+ },
+ "phase": {
+  "requested": "remnant",
+  "active": "remnant"
+ },
+ "visibleSystems": [
+  "remnant"
+ ],
+ "kerrSpinDimensionless": 0.6864817488889335,
+ "waveformPanelActive": false,
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "amd rdna-2"
+ },
+ "backend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  778,
+  581
+ ],
+ "quality": {
+  "requested": "medium",
+  "effectiveTier": "medium"
+ },
+ "renderScale": 0.8,
+ "warmupMs": 9000,
+ "sampleFrames": 400,
+ "frameCpuMs": {
+  "min": 6.9,
+  "median": 41.6,
+  "p90": 41.8,
+  "p95": 41.8,
+  "p99": 76.5,
+  "max": 76.6,
+  "mean": 38.64,
+  "stdev": 7.13
+ },
+ "frameGpuMs": null,
+ "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+ "memory": {
+  "estimatedGpuBytesTotal": 17040444,
+  "textureCount": 0
+ },
+ "consoleErrors": 0,
+ "notes": "governor-managed dynamic resolution"
+}

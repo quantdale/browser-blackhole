@@ -279,7 +279,19 @@
   gap: 6px;
   flex: 1 1 auto;
   min-width: 0;
+  flex-wrap: nowrap; /* legacy styles.css wraps; overflow-scroll instead */
   overflow-x: auto;
+  /* The destination set grows over time; the nav scrolls horizontally.
+     A visible scrollbar would change TOPBAR HEIGHT between destinations
+     with few/many chips and invalidate canvas-sized visual goldens, so the
+     bar itself is visually hidden (scrolling stays available via wheel,
+     drag and keyboard focus traversal). */
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+
+.atlas-nav::-webkit-scrollbar {
+  display: none;
 }
 
 .atlas-nav-chip {

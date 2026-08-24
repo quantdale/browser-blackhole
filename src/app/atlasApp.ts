@@ -227,6 +227,37 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   let readouts: ReadoutListHandle | null = null;
   /** CA8-13 waveform panel (Black-Hole Merger only); rebuilt with the panel. */
   let waveformPanel: WaveformPanelHandle | null = null;
+  /** Asset id currently bound into the panel (null = unbound). */
+  let waveformBoundAssetId: string | null = null;
+
+  /**
+   * Bind the waveform panel once the destination's dataset has landed in
+   * the validated cache (navigation flips activeDestination BEFORE prepare
+   * completes, so the first bind attempt can legitimately miss).
+   */
+  function bindWaveformPanel(): void {
+    if (waveformPanel === null || host.state.atlas.activeDestination !== 'black-hole-merger') {
+      return;
+    }
+    const snapshot = host.activeDestinationDebugSnapshot();
+    const raw = snapshot?.['datasetId'];
+    const assetId = typeof raw === 'string' ? raw : null;
+    if (assetId === null || assetId === waveformBoundAssetId) return;
+    const ds = getCachedDataset(assetId);
+    if (ds === null) return;
+    waveformPanel.setSeries({
+      assetId: ds.assetId,
+      timesM: ds.timesM,
+      h22Re: ds.h22Re,
+      h22Im: ds.h22Im,
+      tStartM: ds.tStartM,
+      tEndM: ds.tEndM,
+      h22PeakAmplitude: ds.h22PeakAmplitude,
+      mergerEndM: ds.mergerEndM,
+      ringdownEndM: ds.ringdownEndM
+    });
+    waveformBoundAssetId = assetId;
+  }
   /** Empty signature forces a rebuild on the next UI sync tick. */
   let panelSignature = '';
   const markPanelDirty = (): void => {
@@ -243,6 +274,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     readouts = null;
     waveformPanel?.dispose();
     waveformPanel = null;
+    waveformBoundAssetId = null;
     panelElement.replaceChildren(status);
 
     const { destId, presetId } = activeSelection();
@@ -549,25 +581,9 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
 
       const waveSection = createCollapsibleSection({ title: 'Waveform (h22)', open: true });
       waveformPanel = createWaveformPanel();
-      const assetId = host.activeDestinationDebugSnapshot()?.['datasetId'];
-      const ds = typeof assetId === 'string' ? getCachedDataset(assetId) : null;
-      waveformPanel.setSeries(
-        ds === null
-          ? null
-          : {
-              assetId: ds.assetId,
-              timesM: ds.timesM,
-              h22Re: ds.h22Re,
-              h22Im: ds.h22Im,
-              tStartM: ds.tStartM,
-              tEndM: ds.tEndM,
-              h22PeakAmplitude: ds.h22PeakAmplitude,
-              mergerEndM: ds.mergerEndM,
-              ringdownEndM: ds.ringdownEndM
-            }
-      );
       waveSection.body.append(waveformPanel.root);
       panelElement.append(waveSection.root);
+      bindWaveformPanel();
     }
 
     // -- Diagnostics (Debug domain; opt-in) ------------------------------------
@@ -770,6 +786,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         transport.setPhase01(host.time.simulationPhase);
       }
       if (waveformPanel !== null) {
+        bindWaveformPanel();
         const physicalTime = host.time.snapshot().physicalTime;
         waveformPanel.update(typeof physicalTime === 'number' ? physicalTime : 0);
       }

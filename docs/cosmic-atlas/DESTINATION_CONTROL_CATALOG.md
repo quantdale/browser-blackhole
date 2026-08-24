@@ -194,6 +194,39 @@ Avoid a free slider that implies exact TDE hydrodynamics unless supported.
 
 Do not let a visual jet-brightness slider masquerade as intrinsic jet power.
 
+## Black-Hole Merger
+
+DATA_DRIVEN reference-event destination (CA8; CA-ADR-021). The loaded NR
+dataset supports exactly ONE physical configuration — arbitrary mass/spin
+sliders are deliberately absent (no freeform physics can be honest).
+
+### Data/scenario
+
+- `referenceEvent` — pinned dataset id (`SXS-BBH-0001`); validated against
+  the shipped asset registry, unknown values collapse to the default.
+- Presets are REFERENCE-EVENT VIEWS of the same dataset (inspiral / merger /
+  ringdown / remnant timeline windows), never different physical events.
+
+### Visual
+
+- `showOrbitTrails` — orbit-trail ribbons behind the components.
+- `illustrativeLensing` — labeled ILLUSTRATIVE photon-ring/glow accents;
+  toggling never touches model state.
+
+### Timeline
+
+- Shared transport; internal coordinate is NR time in total-mass M units
+  with t=0 at the source h22 amplitude peak; phase boundaries are
+  DATA-DERIVED amplitude thresholds (mergerEndM / ringdownEndM).
+
+### Waveform panel
+
+- Read-only h22 strain plot synchronized to the transport cursor at the UI
+  cadence; numeric readout mirrors cursor time/amplitude/phase.
+
+Do not add mass/spin/eccentricity sliders: the pinned simulation cannot
+support varying them consistently.
+
 ## Galaxy Collision
 
 ### Data/scenario

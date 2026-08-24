@@ -82,7 +82,9 @@ export function uiPhaseToTimeM(phase01: number, dataset: BbmDataset): number {
     if (ui <= segment.w1 || segment.w1 === 1) {
       const span = segment.t1 - segment.t0;
       const local =
-        segment.w1 > segment.w0 ? Math.min(1, Math.max(0, (ui - segment.w0) / (segment.w1 - segment.w0))) : 1;
+        segment.w1 > segment.w0
+          ? Math.min(1, Math.max(0, (ui - segment.w0) / (segment.w1 - segment.w0)))
+          : 1;
       const value = segment.t0 + span * local;
       return Number.isFinite(value) ? value : segment.t1;
     }
@@ -96,7 +98,9 @@ export function timeMToUiPhase(timeM: number, dataset: BbmDataset): number {
   for (const segment of segmentsFor(dataset)) {
     if (t <= segment.t1 || segment.w1 === 1) {
       const local =
-        segment.t1 > segment.t0 ? Math.min(1, Math.max(0, (t - segment.t0) / (segment.t1 - segment.t0))) : 1;
+        segment.t1 > segment.t0
+          ? Math.min(1, Math.max(0, (t - segment.t0) / (segment.t1 - segment.t0)))
+          : 1;
       return Math.min(1, Math.max(0, segment.w0 + local * (segment.w1 - segment.w0)));
     }
   }
@@ -129,8 +133,7 @@ export function makeBbmPhaseMapping(dataset: BbmDataset): PhaseMapping {
     label: 'NR timeline (M units)',
     forward: (phase01) => uiPhaseToTimeM(phase01, dataset),
     inverse: (internal) => timeMToUiPhase(internal, dataset),
-    formatDisplay: (internal) =>
-      `${formatBbmTime(internal)} · ${phaseAt(internal, dataset)}`
+    formatDisplay: (internal) => `${formatBbmTime(internal)} · ${phaseAt(internal, dataset)}`
   };
 }
 
@@ -169,11 +172,7 @@ export interface BbmSampleOut {
  * Positions/strain are linear between reduced samples — exactly what the
  * reduction-error report quantifies.
  */
-export function sampleBbmAt(
-  dataset: BbmDataset,
-  t: number,
-  out: BbmSampleOut
-): void {
+export function sampleBbmAt(dataset: BbmDataset, t: number, out: BbmSampleOut): void {
   const i = sampleIndexAt(dataset.timesM, t);
   const t0 = dataset.timesM[i] as number;
   const t1 = dataset.timesM[i + 1] as number;

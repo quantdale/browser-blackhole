@@ -276,11 +276,38 @@ Keep expensive stages dormant outside their active phase.
 
 Scientific data and observables differ fundamentally from luminous compact mergers.
 
-### Fidelity
+### Fidelity (implemented CA8)
 
-Initial orbital/waveform dynamics: `DATA_DRIVEN`.
+Mixed, disclosed per-preset and in the About panel:
 
-Initial lensing: potentially `PROCEDURAL_SCIENTIFIC`/illustrative unless full dynamical-spacetime ray data is used.
+- orbital progression + waveform + metadata: `DATA_DRIVEN` (pinned SXS NR
+  dataset, CA-ADR-021);
+- marker/ring/glow/trail presentation: `PROCEDURAL_SCIENTIFIC` (labeled
+  illustrative);
+- remnant GR view: DIRECT reuse of the validated Kerr backend with
+  SOURCE-DERIVED remnant mass/spin;
+- merger flash envelope: cinematic presentation over data-derived timing.
+
+Required disclosure sentence (SCIENTIFIC_FIDELITY §9) ships verbatim in the
+destination debug snapshot and preset notes.
+
+### Implemented model (CA8 shipped)
+
+- pinned source SXS:BBH:0001 Lev5 (Zenodo 13166927, CC-BY-4.0); reduced to a
+  2048-sample BBM1 binary (~74 KB) by tools/cosmic-data;
+- timeline: internal coordinate = NR M time relative to the h22 peak;
+  phases INSPIRAL → MERGER → RINGDOWN → REMNANT anchored on data-derived
+  amplitude thresholds; exact round-trip scrubbing (unit-tested);
+- inspiral/merger visuals: horizon-scaled markers on the reduced coordinate
+  paths (gauge-dependent, labeled), illustrative ring/glow accents,
+  phase-gated trails; exclusive visibility guard asserted in snapshots;
+- ringdown/remnant visuals: validated Kerr pass (no black-hole physics
+  changed), source-derived spin/mass, illustrative glow proxy disclosed.
+
+### Data source strategy
+
+See docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md for the survey, license
+decision, trajectory gauge-dependence boundary, and attribution chain.
 
 ### Data source strategy
 

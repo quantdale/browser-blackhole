@@ -30,12 +30,7 @@ export const REFERENCE_EVENT_IDS: readonly ReferenceEventId[] = ['SXS-BBH-0001']
 /** Product phases (CA8-12). Anchors are DATA-DERIVED (see dataset.ts). */
 export type BbmPhase = 'inspiral' | 'merger' | 'ringdown' | 'remnant';
 
-export const BBM_PHASE_ORDER: readonly BbmPhase[] = [
-  'inspiral',
-  'merger',
-  'ringdown',
-  'remnant'
-];
+export const BBM_PHASE_ORDER: readonly BbmPhase[] = ['inspiral', 'merger', 'ringdown', 'remnant'];
 
 // ---------------------------------------------------------------------------
 // Public state schema

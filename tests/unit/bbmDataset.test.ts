@@ -48,18 +48,12 @@ const manifest = JSON.parse(
 
 function loadCommitted(): { buffer: ArrayBuffer; dataset: BbmDataset } {
   const buffer = readFileSync(BIN_PATH);
-  const arrayBuffer = buffer.buffer.slice(
-    buffer.byteOffset,
-    buffer.byteOffset + buffer.byteLength
-  );
+  const arrayBuffer = buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + buffer.byteLength);
   const dataset = decodeBbm1(arrayBuffer, manifest.id, manifest.runtime.checksumSha256);
   return { buffer: arrayBuffer, dataset };
 }
 
-function corrupted(
-  source: ArrayBuffer,
-  mutate: (view: DataView) => void
-): ArrayBuffer {
+function corrupted(source: ArrayBuffer, mutate: (view: DataView) => void): ArrayBuffer {
   const copy = source.slice(0);
   mutate(new DataView(copy));
   return copy;
@@ -144,7 +138,7 @@ describe('committed BBM1 asset integrity', () => {
       }
     }
     expect(Math.abs(peakIndex - dataset.mergerIndex)).toBeLessThanOrEqual(1);
-    expect((dataset.timesM[peakIndex] as number)).toBeCloseTo(0, 1);
+    expect(dataset.timesM[peakIndex] as number).toBeCloseTo(0, 1);
   });
 });
 
@@ -166,15 +160,24 @@ describe('fail-closed decoding of corrupt payloads', () => {
   }
 
   it('rejects bad magic', () => {
-    expectCode(corrupted(buffer, (v) => v.setUint32(0, 0xdeadbeef, true)), 'bad-magic');
+    expectCode(
+      corrupted(buffer, (v) => v.setUint32(0, 0xdeadbeef, true)),
+      'bad-magic'
+    );
   });
 
   it('rejects unsupported schema version', () => {
-    expectCode(corrupted(buffer, (v) => v.setUint32(4, 999, true)), 'bad-schema-version');
+    expectCode(
+      corrupted(buffer, (v) => v.setUint32(4, 999, true)),
+      'bad-schema-version'
+    );
   });
 
   it('rejects wrong header length field', () => {
-    expectCode(corrupted(buffer, (v) => v.setUint32(8, 32, true)), 'bad-header-length');
+    expectCode(
+      corrupted(buffer, (v) => v.setUint32(8, 32, true)),
+      'bad-header-length'
+    );
   });
 
   it('rejects truncated payloads', () => {
@@ -182,12 +185,21 @@ describe('fail-closed decoding of corrupt payloads', () => {
   });
 
   it('rejects invalid sample counts', () => {
-    expectCode(corrupted(buffer, (v) => v.setUint32(12, 0, true)), 'bad-sample-count');
-    expectCode(corrupted(buffer, (v) => v.setUint32(12, 1 << 25, true)), 'bad-sample-count');
+    expectCode(
+      corrupted(buffer, (v) => v.setUint32(12, 0, true)),
+      'bad-sample-count'
+    );
+    expectCode(
+      corrupted(buffer, (v) => v.setUint32(12, 1 << 25, true)),
+      'bad-sample-count'
+    );
   });
 
   it('rejects out-of-range merger index', () => {
-    expectCode(corrupted(buffer, (v) => v.setUint32(16, 1 << 30, true)), 'bad-merger-index');
+    expectCode(
+      corrupted(buffer, (v) => v.setUint32(16, 1 << 30, true)),
+      'bad-merger-index'
+    );
   });
 
   it('rejects embedded asset-id mismatch (wrong destination)', () => {
@@ -214,16 +226,24 @@ describe('fail-closed decoding of corrupt payloads', () => {
 
   it('rejects NaN injected into numeric channels', () => {
     const strainOffset = 160 + 7 * datasetSampleCount() * 4;
-    expectCode(corrupted(buffer, (v) => v.setFloat32(strainOffset, Number.NaN, true)), 'non-finite-values');
+    expectCode(
+      corrupted(buffer, (v) => v.setFloat32(strainOffset, Number.NaN, true)),
+      'non-finite-values'
+    );
   });
 
   it('rejects impossible strain ranges', () => {
     const strainOffset = 160 + 7 * datasetSampleCount() * 4;
-    expectCode(corrupted(buffer, (v) => v.setFloat32(strainOffset, 500, true)), 'impossible-channel-range');
+    expectCode(
+      corrupted(buffer, (v) => v.setFloat32(strainOffset, 500, true)),
+      'impossible-channel-range'
+    );
   });
 
   it('rejects checksum mismatches when verification is requested', () => {
-    const flipped = corrupted(buffer, (v) => v.setFloat32(160, v.getFloat32(160, true) + 0.5, true));
+    const flipped = corrupted(buffer, (v) =>
+      v.setFloat32(160, v.getFloat32(160, true) + 0.5, true)
+    );
     let caught: unknown = null;
     try {
       decodeBbm1(flipped, manifest.id, manifest.runtime.checksumSha256);

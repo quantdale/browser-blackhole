@@ -650,5 +650,50 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
     notes:
       'Blazar orientation (~3 deg from the jet axis): approaching lobe dominates via the disclosed constant-sum beaming gains. Catches lobe-asymmetry regressions.'
+  },
+  // --- Black-Hole Merger goldens (CA8) ----------------------------------------
+  // DATA_DRIVEN destination: every row is a pure function of the scrub
+  // position over the reduced NR timeline (paused capture, pinned tier).
+  {
+    name: 'BHM_INSPIRAL',
+    url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Late NR inspiral (~4 orbits before the h22 peak): two horizon-scaled markers with illustrative ring/glow accents on reduced coordinate paths + trails. Catches marker/trail loss and orbit-phase regressions.'
+  },
+  {
+    name: 'BHM_NEAR_MERGER',
+    url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral',
+    scrubPhase: 0.56,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Final approach just before the merger anchor: converged separation from the source trajectories. Catches late-inspiral sampling and convergence regressions.'
+  },
+  {
+    name: 'BHM_MERGER_FLASH',
+    url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-merger',
+    scrubPhase: 0.615,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 10, pctPixelsBeyond: 6, perChannelThreshold: 56 },
+    notes:
+      'Merger anchor window: CINEMATIC flash envelope over the DATA_DRIVEN timing (t=0 at the h22 amplitude peak). Catches flash-envelope and anchor-alignment regressions.'
+  },
+  {
+    name: 'BHM_RINGDOWN',
+    url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-ringdown',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Ringdown: exclusive swap to the validated Kerr backend with SOURCE-DERIVED remnant spin/mass and illustrative glow proxy. Catches Kerr-parameter wiring and system-handoff regressions.'
+  },
+  {
+    name: 'BHM_REMNANT',
+    url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-remnant',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Final Kerr remnant view (mass 0.9516 M, |chi| = 0.6865). Must differ geometrically from KERR presets only through the source-derived parameters; catches silent parameter drift.'
   }
 ];

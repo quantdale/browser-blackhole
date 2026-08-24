@@ -32,7 +32,8 @@
     "bench:compact-merger": "node scripts/bench-compact-merger.mjs",
     "bench:tidal-disruption": "node scripts/bench-tidal-disruption.mjs",
     "check": "npm run format:check \u0026\u0026 npm run lint \u0026\u0026 npm run typecheck \u0026\u0026 npm run test \u0026\u0026 npm run build",
-    "bench:quasar-agn": "node scripts/bench-quasar-agn.mjs"
+    "bench:quasar-agn": "node scripts/bench-quasar-agn.mjs",
+    "bench:black-hole-merger": "node scripts/bench-black-hole-merger.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

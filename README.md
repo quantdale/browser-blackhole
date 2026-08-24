@@ -13,6 +13,8 @@ The application is **implemented and running** — this is no longer a planning 
 | Stellar Explosion | `/atlas/stellar-explosion` | PROCEDURAL_SCIENTIFIC reduced core-collapse/hypernova/long-GRB models on shared GPU volume/particle services. |
 | Compact Merger | `/atlas/compact-merger` | NS–NS binary inspiral (closed-form quadrupole GW decay law — DIRECT reduced model), contact/merger transition, two-component kilonova, short-GRB bipolar jet with beaming-inspired viewing response, scenario-based remnants. PROCEDURAL_SCIENTIFIC post-merger; not NR/hydrodynamics. |
 | Tidal Disruption | `/atlas/tidal-disruption` | Star–black-hole encounter: closed-form parabolic Kepler orbit (Barker timing — DIRECT reduced model), tidal-tensor deformation proxy, energy-spread debris family on Newtonian Kepler orbits (bound/unbound split, differential winding), circularization shock ring, procedural nascent-disk transition. PROCEDURAL_SCIENTIFIC; not SPH/GRMHD/NR, no GR apsidal precession; stellar disc rendered at a disclosed exaggerated radius. |
+| Quasar / AGN | `/atlas/quasar-agn` | Scale-zone architecture (INNER direct reuse of the validated lensing backend with exclusive-visibility cost guard; NUCLEAR/GALACTIC procedural disk/torus/jets/host), blazar orientation model. Mixed fidelity, disclosed per zone. |
+| Black-Hole Merger | `/atlas/black-hole-merger` | DATA_DRIVEN reference-event destination over a pinned SXS numerical-relativity simulation (SXS:BBH:0001, CC-BY-4.0): reduced coordinate-path inspiral playback (gauge-dependence labeled), merger/ringdown/remnant phases anchored on data-derived amplitude thresholds, synchronized h22 waveform panel, remnant rendered with the validated Kerr backend using source-derived mass/spin. Live lensing visuals are labeled illustrative — not dynamical-spacetime ray tracing (`docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md`). |
 
 A developer `Diagnostic` destination (Debug mode) exercises the host lifecycle.
 
@@ -26,13 +28,14 @@ npm run lut:validate -- public/luts/schwarzschild-v1-415dea94
 npm run bench:black-hole        # numerical-vs-LUT frame-time harness
 npm run bench:compact-merger    # phase-aware merger harness (--phase=...)
 npm run bench:tidal-disruption  # phase-aware TDE harness (--phase=...)
+npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)
 ```
 
 Unit/reference tests: Vitest (`npm run test`). Browser/E2E/goldens: Playwright (`npm run e2e`). Visual goldens live in `tests/browser/goldens/` and are NEVER regenerated merely to go green (`docs/cosmic-atlas/GOLDEN_IMAGES.md`).
 
 ## Current development continuation point
 
-The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: M8 (Schwarzschild LUT backend) **CLOSED** with a measured auto-default policy; CA5 (Compact Merger) and CA6 (Tidal Disruption) **implemented end-to-end**; next milestone per `docs/cosmic-atlas/ROADMAP.md`.
+The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **CA8 (Black-Hole Merger) implemented end-to-end** as the first DATA_DRIVEN Cosmic Atlas destination on pinned SXS provenance; next milestone per `docs/cosmic-atlas/ROADMAP.md`.
 
 ## Autonomous agent quick start
 

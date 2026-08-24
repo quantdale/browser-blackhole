@@ -55,7 +55,8 @@ export const BBM_DISCLOSURE =
   'Orbital motion and waveform are derived from numerical-relativity data ' +
   '(SXS:BBH:0001, CC-BY-4.0). The live lensing visualization is illustrative ' +
   'and does not ray trace the full dynamical spacetime. The remnant phase ' +
-  'reuses the validated Kerr backend with source-derived remnant spin/mass.';
+  'reuses the validated Kerr backend with source-derived remnant mass/spin; ' +
+  'its glow is an illustrative presentation proxy.';
 
 const INSPIRAL_PRESET: PresetDescriptor = {
   id: 'sxs-bbh-0001-inspiral',

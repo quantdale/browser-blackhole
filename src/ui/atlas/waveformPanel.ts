@@ -28,7 +28,11 @@ export interface WaveformSeries {
 
 export interface WaveformPanelHandle {
   root: HTMLElement;
-  /** Bind (or clear) the plotted series. Marks the plot dirty. */
+  /**
+   * Bind (or clear) the plotted series. Marks the plot dirty. Call again any
+   * time the underlying dataset may have changed (e.g. once the destination
+   * finishes preparing and the cache fills).
+   */
   setSeries(series: WaveformSeries | null): void;
   /** Push current internal time into cursor/readout. */
   update(timeM: number): void;
@@ -182,7 +186,7 @@ export function createWaveformPanel(): WaveformPanelHandle {
         readout.textContent = 'Waveform dataset unavailable.';
         return;
       }
-      if (!resizeCanvas()) return;
+      resizeCanvas();
       // Redraw includes the cursor; a single bounded 2D-canvas pass per UI
       // tick (4 Hz), never per animation frame.
       redraw();

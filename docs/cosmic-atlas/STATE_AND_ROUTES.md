@@ -241,6 +241,18 @@ seed
 timeSeconds
 ```
 
+### Black-Hole Merger (CA8)
+
+```text
+referenceEvent        # pinned dataset id ('SXS-BBH-0001')
+showOrbitTrails       # illustrative trails visibility
+illustrativeLensing   # labeled ring/glow accents visibility
+```
+
+Internal timeline coordinate: NR geometric time in total-mass M units,
+t=0 at the source h22 amplitude peak; phase boundaries are data-derived
+(see docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md).
+
 ### Galaxy Collision
 
 ```text

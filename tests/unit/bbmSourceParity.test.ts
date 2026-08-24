@@ -21,10 +21,7 @@ import { fileURLToPath } from 'node:url';
 
 import { describe, expect, it } from 'vitest';
 
-import {
-  decodeBbm1,
-  type BbmDataset
-} from '../../src/phenomena/black-hole-merger/dataset.js';
+import { decodeBbm1, type BbmDataset } from '../../src/phenomena/black-hole-merger/dataset.js';
 import {
   bbmTimeSpanM,
   makeBbmPhaseMapping,
@@ -91,22 +88,22 @@ describe('source-vs-runtime equivalence (CA8-17)', () => {
     for (const row of fixture.rows) {
       const i = row.index;
       // timesM is stored as float32: compare within f32 resolution of ~2 kM.
-      expect((dataset.timesM[i] as number)).toBeCloseTo(row.timeM, 3);
-      expect((dataset.bhAxyz[i * 3] as number)).toBeCloseTo(row.bhA[0], 4);
-      expect((dataset.bhAxyz[i * 3 + 1] as number)).toBeCloseTo(row.bhA[1], 4);
-      expect((dataset.bhAxyz[i * 3 + 2] as number)).toBeCloseTo(row.bhA[2], 4);
-      expect((dataset.bhBxyz[i * 3] as number)).toBeCloseTo(row.bhB[0], 4);
-      expect((dataset.bhBxyz[i * 3 + 1] as number)).toBeCloseTo(row.bhB[1], 4);
-      expect((dataset.bhBxyz[i * 3 + 2] as number)).toBeCloseTo(row.bhB[2], 4);
-      expect((dataset.h22Re[i] as number)).toBeCloseTo(row.h22Re, 5);
-      expect((dataset.h22Im[i] as number)).toBeCloseTo(row.h22Im, 5);
+      expect(dataset.timesM[i] as number).toBeCloseTo(row.timeM, 3);
+      expect(dataset.bhAxyz[i * 3] as number).toBeCloseTo(row.bhA[0], 4);
+      expect(dataset.bhAxyz[i * 3 + 1] as number).toBeCloseTo(row.bhA[1], 4);
+      expect(dataset.bhAxyz[i * 3 + 2] as number).toBeCloseTo(row.bhA[2], 4);
+      expect(dataset.bhBxyz[i * 3] as number).toBeCloseTo(row.bhB[0], 4);
+      expect(dataset.bhBxyz[i * 3 + 1] as number).toBeCloseTo(row.bhB[1], 4);
+      expect(dataset.bhBxyz[i * 3 + 2] as number).toBeCloseTo(row.bhB[2], 4);
+      expect(dataset.h22Re[i] as number).toBeCloseTo(row.h22Re, 5);
+      expect(dataset.h22Im[i] as number).toBeCloseTo(row.h22Im, 5);
     }
   });
 
   it('interpolation returns reduced samples EXACTLY at sample points', () => {
     const out: BbmSampleOut = { ax: 0, ay: 0, az: 0, bx: 0, by: 0, bz: 0, hRe: 0, hIm: 0 };
     for (const row of fixture.rows) {
-      const t = (dataset.timesM[row.index] as number); // exact stored sample
+      const t = dataset.timesM[row.index] as number; // exact stored sample
       sampleBbmAt(dataset, t, out);
       expect(out.hRe).toBeCloseTo(row.h22Re, 5);
       expect(out.hIm).toBeCloseTo(row.h22Im, 5);
@@ -128,9 +125,21 @@ describe('source-vs-runtime equivalence (CA8-17)', () => {
   it('reduction error report stays within its declared thresholds', () => {
     interface ReductionReport {
       readonly errors: {
-        readonly trajectoryA: { readonly maxAbsError: number; readonly rmsError: number; readonly normalizedBy: number };
-        readonly trajectoryB: { readonly maxAbsError: number; readonly rmsError: number; readonly normalizedBy: number };
-        readonly waveformH22: { readonly maxAbsError: number; readonly rmsError: number; readonly normalizedBy: number };
+        readonly trajectoryA: {
+          readonly maxAbsError: number;
+          readonly rmsError: number;
+          readonly normalizedBy: number;
+        };
+        readonly trajectoryB: {
+          readonly maxAbsError: number;
+          readonly rmsError: number;
+          readonly normalizedBy: number;
+        };
+        readonly waveformH22: {
+          readonly maxAbsError: number;
+          readonly rmsError: number;
+          readonly normalizedBy: number;
+        };
         readonly peakShiftSamples: number;
       };
     }
@@ -223,7 +232,7 @@ describe('timeline determinism + phase anchoring', () => {
   it('binary-search sampler agrees with a linear reference scan', () => {
     const out: BbmSampleOut = { ax: 0, ay: 0, az: 0, bx: 0, by: 0, bz: 0, hRe: 0, hIm: 0 };
     for (let k = 0; k <= 200; k += 1) {
-      const t = dataset.tStartM + (k / 200) * (bbmTimeSpanM(dataset));
+      const t = dataset.tStartM + (k / 200) * bbmTimeSpanM(dataset);
       const i = sampleIndexAt(dataset.timesM, t);
       let reference = 0;
       while (

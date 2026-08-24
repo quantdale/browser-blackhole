@@ -62,6 +62,8 @@ interface AtlasHook {
       pause(): void;
       play(): void;
       scrubTo(phase01: number): void;
+      /** Deterministic reset to the given (or preset initial) phase. */
+      reset(initialPhase?: number): void;
       snapshot(): { paused: boolean; simulationPhase: number; physicalTime: number | null };
     };
     /** Quality surface used to pin tiers in deterministic spec flows. */
