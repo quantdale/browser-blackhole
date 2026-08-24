@@ -126,4 +126,4 @@ Dependency versions are pinned exactly in `package.json` + lockfile.
 
 ## Current status
 
-**Implemented.** Cosmic Atlas host + five production destinations; M8 closed with a measured LUT auto-default policy; CA5 Compact Merger and CA6 Tidal Disruption complete; **M9 Kerr spacetime complete**: numerical Kerr geodesic backend with signed spin, spin-dependent ISCO disk, Schwarzschild-limit convergence gate, prograde/retrograde validation, Kerr presets/goldens/benchmarks. See `.agent/STATE.md` for exact evidence and the next milestone.
+**Implemented.** Cosmic Atlas host + six production destinations; M8 closed with a measured LUT auto-default policy; CA5 Compact Merger, CA6 Tidal Disruption and CA7 Quasar/AGN complete. **M9 Kerr spacetime complete**: numerical Kerr geodesic backend with signed spin, spin-dependent ISCO disk, convergence/parity gates, presets/goldens/benchmarks. See `.agent/STATE.md` for exact evidence and the next milestone.
