@@ -48,6 +48,7 @@ async function waitForArrival(page: Page, destinationId: string, presetId?: stri
             if (preset !== undefined && app.host.state.atlas.activePreset !== preset) {
               return `preset:${app.host.state.atlas.activePreset}`;
             }
+            if (app.host.activeDestinationDebugSnapshot() === null) return 'preparing';
             return 'arrived';
           },
           { dest: destinationId, preset: presetId }
@@ -242,6 +243,28 @@ test.describe('Compact Merger validation (CA5)', () => {
       () => window.__ATLAS_APP__!.host.state.atlas.transition.phase === 'hyperspace'
     );
     void sawHyperspace; // reduced-motion path may skip the phase entirely
+    expect(errors).toEqual([]);
+  });
+
+  test('share-link dc controls survive the deep-link round trip (CA6 generalization)', async ({
+    page
+  }) => {
+    const errors = collectErrors(page);
+    // dc payload: {"viewingAngleDeg":12,"jetScenario":"thin","remnantScenario":"prompt-bh"}
+    const dc = encodeURIComponent(
+      JSON.stringify({ viewingAngleDeg: 12, jetScenario: 'thin', remnantScenario: 'prompt-bh' })
+    );
+    await page.goto(
+      `/atlas/compact-merger?preset=equal-mass-nsns&v=1&d=compact-merger&dc=${dc}`
+    );
+    await waitForArrival(page, 'compact-merger', 'equal-mass-nsns');
+    await page.waitForTimeout(800);
+    const share = await page.evaluate(
+      () => window.__ATLAS_APP__!.host.state.destinations['compact-merger']?.state ?? {}
+    );
+    expect(share['viewingAngleDeg']).toBe(12);
+    expect(share['jetScenario']).toBe('thin');
+    expect(share['remnantScenario']).toBe('prompt-bh');
     expect(errors).toEqual([]);
   });
 

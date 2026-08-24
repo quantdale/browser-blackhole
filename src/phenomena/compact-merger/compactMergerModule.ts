@@ -243,15 +243,21 @@ export function createCompactMergerModule(): PhenomenonModule {
     // per-frame gain control, and the viewing-response modulation needs one
     // every frame. Two tapered emissive cones (bipolar, +Y/-Y) keep the
     // representation bounded and deterministic.
+    // READABILITY (CA6-campaign stretch B, presentation-only): the lobes use
+    // ADDITIVE blending and a cooler, brighter tint so they read against the
+    // warm merger-core/kilonova glow; lobes are slightly narrower. No model
+    // semantic changes (front cap, viewing response, gains untouched).
     ctx.reportProgress(0.5, 'Preparing jet presentation');
     const jetGeometry = new THREE.CylinderGeometry(0.12, 1, 1, 20, 1, true);
     jetGeometry.translate(0, 0.5, 0); // base at origin, extends +Y
     const jetMaterialTop = new MeshBasicNodeMaterial();
     jetMaterialTop.name = 'compact-merger-jet-top';
-    jetMaterialTop.colorNode = vec4(vec3(1.6, 1.8, 2.4).mul(uJetGain), 1);
+    jetMaterialTop.colorNode = vec4(vec3(2.4, 2.8, 4.0).mul(uJetGain), 1);
     jetMaterialTop.side = THREE.DoubleSide;
     jetMaterialTop.transparent = true;
-    jetMaterialTop.opacity = 0.85;
+    jetMaterialTop.opacity = 0.9;
+    jetMaterialTop.blending = THREE.AdditiveBlending;
+    jetMaterialTop.depthWrite = false;
     const jetMaterialBottom = jetMaterialTop.clone();
     jetMaterialBottom.name = 'compact-merger-jet-bottom';
     const jetTop = new THREE.Mesh(jetGeometry, jetMaterialTop);
@@ -540,7 +546,8 @@ export function createCompactMergerModule(): PhenomenonModule {
     if (jetGroup !== null) {
       jetGroup.visible = jetVisible;
       const capped = Math.min(front, JET_FRONT_EJECTA_CAP * Math.max(shell, 1e-6));
-      jetGroup.scale.set(capped * 0.35, Math.max(capped, 1e-4), capped * 0.35);
+      // Narrower lobes (0.28 vs 0.35): readability presentation, CA6 stretch B.
+      jetGroup.scale.set(capped * 0.28, Math.max(capped, 1e-4), capped * 0.28);
     }
 
     // --- particles (phase-gated population) -----------------------------------
