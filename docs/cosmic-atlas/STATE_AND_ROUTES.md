@@ -229,6 +229,18 @@ jetScenario
 kilonovaScenario
 ```
 
+### Tidal Disruption
+
+```text
+preset
+blackHoleMassSolar
+stellarPreset
+penetrationScenario
+observerInclinationDeg
+seed
+timeSeconds
+```
+
 ### Galaxy Collision
 
 ```text
@@ -250,7 +262,12 @@ Share links contain:
 - preset;
 - compact overrides;
 - camera if stable/useful;
-- timeline phase.
+- timeline phase;
+- `dc=` destination controls (CA6): JSON of the ACTIVE destination's
+  normalized control state. The destination module remains the
+  normalization authority — parsed values re-enter through the module's
+  ONE normalizer via the host control channel, never straight to uniforms.
+  Malformed payloads are ignored, never thrown.
 
 Binary data always referenced by versioned dataset ID.
 

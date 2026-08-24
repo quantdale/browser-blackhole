@@ -336,6 +336,33 @@ Initial: `PROCEDURAL_SCIENTIFIC` driven by validated orbital/tidal parameters.
 
 Later: selected SPH/GRMHD-derived reduced data possible.
 
+### Implemented model (CA6, shipped)
+
+- encounter: closed-form PARABOLIC Kepler orbit via Barker's equation
+  (exact forward/inverse timing, no iteration — DIRECT reduced Newtonian
+  model; NOT a relativistic stellar geodesic; no pericenter precession);
+- deformation: tidal-tensor amplitude (rt/r)^3 driving a bounded
+  volume-preserving ellipsoid proxy (presentation gain/cap disclosed);
+- disruption criterion: beta = rt/rp with full/partial/fly-by bands and an
+  explicit direct-capture verdict (Newtonian geometric statement, NOT a
+  relativistic capture computation);
+- debris: deterministic spherical-Fibonacci sampling with a tidal-tensor
+  energy-spread estimate (G MBH R*/rp^2, partial stripping scaled down);
+  bound/unbound = sign of the energy offset (reduced proxy);
+- streams: the debris family propagated on Newtonian Kepler orbits
+  (bisect+Newton elliptic solver, Newton hyperbolic); winding is
+  DIFFERENTIAL KEPLER MOTION — GR apsidal precession is NOT modeled;
+  ribbons render the near-BH portion (r <= 12 rp, disclosed crop);
+- shock: VolumeService equatorial torus at the circularization proxy
+  Rc = 2 rp, phase-gated to the shock stage;
+- fallback/shock trigger: first periapsis return of the most-bound element
+  (derived from the model's own orbit family, not a fitted formula);
+- nascent disk: procedural annulus with radial falloff after several
+  fallback times (NOT an accretion-disk simulation);
+- display: the stellar disc is rendered at an exaggerated radius
+  (max(R*, min(0.12 rt, 20 units))) — pure presentation, model quantities
+  use the true radius.
+
 ### Minimum viable sequence
 
 ```text

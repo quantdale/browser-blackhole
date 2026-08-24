@@ -182,6 +182,30 @@ Before implementing each phenomenon, add peer-reviewed/reference sources for gov
 - debris energy distribution;
 - fallback/stream self-intersection model.
 
+Implemented-model sources (CA6, conventions encoded in
+`src/phenomena/tidal-disruption/`):
+
+- parabolic encounter timing: Barker's equation (standard celestial-
+  mechanics closed form for e = 1; e.g. Danby, "Fundamentals of Celestial
+  Mechanics" — Cardano inversion used verbatim);
+- tidal radius rt = R* (MBH/M*)^(1/3); penetration beta = rt/rp
+  (standard TDE literature convention; Hills-limit margin documented in
+  types.ts);
+- debris energy spread: tidal-tensor order-of-magnitude estimate
+  DEpsilon = G MBH R*/rp^2 evaluated at the actual periapsis (same
+  scaling family as Lodato & Rossi 2011 / Stone et al. 2013 reviews;
+  order-unity coefficient NOT claimed — the model uses coefficient 1 and
+  labels the estimate as such);
+- fallback time: first periapsis return of the most-bound element derived
+  from the model's own orbit family (P(a_min) with a_min = mu/DEpsilon),
+  not a fitted astrophysical formula;
+- bound/unbound split: sign of the first-order energy offset across the
+  stellar diameter (classical picture; explicitly NOT hydrodynamic).
+
+NOT modeled (disclosed in code/presets/UI): GR apsidal precession,
+self-gravity of the stream, hydrodynamics/SPH/GRMHD, radiative transfer,
+relativistic capture dynamics (an explicit verdict flag only).
+
 ### Quasar/AGN
 
 - accretion disk regions;

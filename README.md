@@ -12,6 +12,7 @@ The application is **implemented and running** — this is no longer a planning 
 | Neutron Star | `/atlas/neutron-star` | Compact-surface ray tracing, gravitational redshift, hot spots, pulsar/magnetar presets, dipole field lines. |
 | Stellar Explosion | `/atlas/stellar-explosion` | PROCEDURAL_SCIENTIFIC reduced core-collapse/hypernova/long-GRB models on shared GPU volume/particle services. |
 | Compact Merger | `/atlas/compact-merger` | NS–NS binary inspiral (closed-form quadrupole GW decay law — DIRECT reduced model), contact/merger transition, two-component kilonova, short-GRB bipolar jet with beaming-inspired viewing response, scenario-based remnants. PROCEDURAL_SCIENTIFIC post-merger; not NR/hydrodynamics. |
+| Tidal Disruption | `/atlas/tidal-disruption` | Star–black-hole encounter: closed-form parabolic Kepler orbit (Barker timing — DIRECT reduced model), tidal-tensor deformation proxy, energy-spread debris family on Newtonian Kepler orbits (bound/unbound split, differential winding), circularization shock ring, procedural nascent-disk transition. PROCEDURAL_SCIENTIFIC; not SPH/GRMHD/NR, no GR apsidal precession; stellar disc rendered at a disclosed exaggerated radius. |
 
 A developer `Diagnostic` destination (Debug mode) exercises the host lifecycle.
 
@@ -24,13 +25,14 @@ npm run e2e            # Playwright browser suite (incl. visual goldens)
 npm run lut:validate -- public/luts/schwarzschild-v1-415dea94
 npm run bench:black-hole        # numerical-vs-LUT frame-time harness
 npm run bench:compact-merger    # phase-aware merger harness (--phase=...)
+npm run bench:tidal-disruption  # phase-aware TDE harness (--phase=...)
 ```
 
 Unit/reference tests: Vitest (`npm run test`). Browser/E2E/goldens: Playwright (`npm run e2e`). Visual goldens live in `tests/browser/goldens/` and are NEVER regenerated merely to go green (`docs/cosmic-atlas/GOLDEN_IMAGES.md`).
 
 ## Current development continuation point
 
-The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: M8 (Schwarzschild LUT backend) **CLOSED** with a measured auto-default policy; CA5 (Compact Merger) **implemented end-to-end**; next milestone per `docs/cosmic-atlas/ROADMAP.md`.
+The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: M8 (Schwarzschild LUT backend) **CLOSED** with a measured auto-default policy; CA5 (Compact Merger) and CA6 (Tidal Disruption) **implemented end-to-end**; next milestone per `docs/cosmic-atlas/ROADMAP.md`.
 
 ## Autonomous agent quick start
 
@@ -124,4 +126,4 @@ Dependency versions are pinned exactly in `package.json` + lockfile.
 
 ## Current status
 
-**Implemented.** Cosmic Atlas host + four production destinations; M8 closed with a measured LUT auto-default policy; CA5 Compact Merger complete. See `.agent/STATE.md` for exact evidence and the next milestone.
+**Implemented.** Cosmic Atlas host + five production destinations; M8 closed with a measured LUT auto-default policy; CA5 Compact Merger and CA6 Tidal Disruption complete. See `.agent/STATE.md` for exact evidence and the next milestone.

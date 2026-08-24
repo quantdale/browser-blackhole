@@ -64,6 +64,12 @@ A golden passes iff `meanAbsDelta <= tolerance.meanAbsDelta` AND
 | CM_GRB_ON | `?preset=short-grb-on-axis` @ phase 0.54 | Short-GRB jet on-axis (saturated response) lost or dimmed | 8 / 48 / 5% | stable |
 | CM_GRB_OFF | `?preset=short-grb-off-axis` @ phase 0.54 | Off-axis bipolar geometry flattening into a brightness multiplier | 8 / 48 / 5% | stable |
 | CM_REMNANT | `?preset=kilonova-focus` @ phase 0.9 | Afterglow + prompt-BH remnant scenario + late-timeline resources | 8 / 48 / 5% | stable |
+| TDE_APPROACH | `/atlas/tidal-disruption?preset=solar-canonical` @ phase 0.16 | Boot frame: tidally deformed star (disclosed display exaggeration) with BH marker ~9.5 deg off-axis; catches star-loss, deformation-graph, arrival-framing regressions | 6 / 2 / 32 | stable |
+| TDE_DEFORMATION | `?preset=solar-canonical` @ phase 0.26 | Strong pre-disruption elongation; catches deformation ordering/cap and axis-orientation breaks | 6 / 2 / 32 | stable |
+| TDE_DEBRIS | `?preset=solar-canonical` @ phase 0.36 | Young debris: star faded, compact bound+unbound stream arcs near periapsis + accent particles | 8 / 48 / 4% | stable |
+| TDE_WINDING | `?preset=deep-penetration` @ phase 0.77 | First differential-Kepler wraps of the most-bound family (beta 2.5 morphology) | 8 / 48 / 4% | stable |
+| TDE_SHOCK | `?preset=solar-canonical` @ phase 0.78 | Edge-on circularization ring (VolumeService torus) + BH marker; catches volume-ignition and phase-gating regressions | 8 / 48 / 4% | stable |
+| TDE_NASCENT_DISK | `?preset=solar-canonical` @ phase 0.97 | Procedural annulus with radial falloff, streams/accents retired; catches late-phase resource-retirement and disk-gain regressions | 8 / 48 / 5% | stable |
 
 ## Update procedure
 
@@ -97,4 +103,7 @@ Rules:
   deterministic (pre-pause accumulation varies) and was removed as unsound.
 - Bloom/exposure presentation: neutralized by the forced linear chain.
 - Transition frame timing: NOT fully neutralizable — the hyperspace golden
-  therefore carries deliberately loose tolerances.
+  therefore carries deliberately loose tolerances. During the CA6 golden
+  establishment run (2026-08-24) ATLAS_HYPERSPACE_BH_NS was re-baselined by
+  exactly this documented jitter (different mid-transition streak frame); the
+  new baseline was verified twice-stable and no other existing golden moved.
