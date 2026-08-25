@@ -26,6 +26,49 @@
  *   tilted axes are an explicitly unsupported/degraded configuration.
  */
 
+/** Physical observer mode ids (OBSERVER_FRAME_ADR §2; `camera` = legacy semantics). */
+export type ObserverControlMode = 'camera' | 'static' | 'circular' | 'flyby' | 'freefall';
+
+/**
+ * M10 physical-observer control sub-record. Owned/normalized HERE so presets,
+ * share links and live calls flow through the ONE normalizer
+ * (docs/OBSERVER_FRAME_ADR.md §8).
+ */
+export interface ObserverControlState {
+  mode: ObserverControlMode;
+  /** Circular orbit radius (r_g); clamped above the sense's photon orbit. */
+  circularRadiusRg: number;
+  /** +1 orbits toward +phi (prograde relative to POSITIVE spin). */
+  circularSense: 1 | -1;
+  /** Flyby asymptotic speed |beta| < 1 (sets conserved E = gamma). */
+  flybyBetaInfinity: number;
+  /** Flyby impact parameter b (r_g); sign selects the orbital sense. */
+  flybyImpactParameterRg: number;
+  /** Freefall release radius (r_g), dropped from rest relative to statics. */
+  freefallReleaseRadiusRg: number;
+  /** Proper-time rate multiplier (deterministic; paused freezes evolution). */
+  timeScale: number;
+}
+
+export const DEFAULT_OBSERVER_CONTROLS: Readonly<ObserverControlState> = {
+  mode: 'camera',
+  circularRadiusRg: 9,
+  circularSense: 1,
+  flybyBetaInfinity: 0.5,
+  flybyImpactParameterRg: 7,
+  freefallReleaseRadiusRg: 14,
+  timeScale: 1
+};
+
+/** Documented validation ranges (clamped, never rejected for finite input). */
+export const OBSERVER_RANGES = {
+  circularRadiusRg: { min: 1.05, max: 60 },
+  flybyBetaInfinity: { min: 0.05, max: 0.95 },
+  flybyImpactParameterRg: { min: -40, max: 40 },
+  freefallReleaseRadiusRg: { min: 1.05, max: 60 },
+  timeScale: { min: -5, max: 5 }
+} as const;
+
 /** Public, serializable control record for the black-hole destination. */
 export interface BlackHoleControlState {
   metric: 'schwarzschild' | 'kerr';
@@ -35,6 +78,8 @@ export interface BlackHoleControlState {
   orbit: boolean;
   /** Debug parity encoding view (debug tooling only). */
   debugParity: boolean;
+  /** M10 physical observer configuration. */
+  observer: ObserverControlState;
 }
 
 /** Canonical defaults; identical to the historical preset behavior. */
@@ -42,7 +87,8 @@ export const DEFAULT_BLACK_HOLE_CONTROLS: Readonly<BlackHoleControlState> = {
   metric: 'schwarzschild',
   spin: 0,
   orbit: false,
-  debugParity: false
+  debugParity: false,
+  observer: DEFAULT_OBSERVER_CONTROLS
 };
 
 /** Absolute clamp shared with canonical app state (docs/STATE_SCHEMA.md). */
@@ -60,6 +106,61 @@ function pickBool(raw: unknown, fallback: boolean): boolean {
   return fallback;
 }
 
+function clampNumber(raw: unknown, fallback: number, min: number, max: number): number {
+  if (typeof raw !== 'number' || !Number.isFinite(raw)) return fallback;
+  return Math.min(max, Math.max(min, raw));
+}
+
+/**
+ * The ONE observer sub-record normalizer. Never throws; invalid fields fall
+ * back to documented defaults (mode 'camera' = pre-M10 semantics), so hostile
+ * share-state payloads cannot change the physical meaning of old links.
+ */
+export function normalizeObserverControls(raw: unknown): ObserverControlState {
+  const source = typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+  const d = DEFAULT_OBSERVER_CONTROLS;
+  const modeRaw = source['mode'];
+  const mode: ObserverControlMode =
+    modeRaw === 'static' || modeRaw === 'circular' || modeRaw === 'flyby' || modeRaw === 'freefall'
+      ? modeRaw
+      : 'camera';
+  const senseRaw = source['circularSense'];
+  return {
+    mode,
+    circularRadiusRg: clampNumber(
+      source['circularRadiusRg'],
+      d.circularRadiusRg,
+      OBSERVER_RANGES.circularRadiusRg.min,
+      OBSERVER_RANGES.circularRadiusRg.max
+    ),
+    circularSense: senseRaw === -1 ? -1 : 1,
+    flybyBetaInfinity: clampNumber(
+      source['flybyBetaInfinity'],
+      d.flybyBetaInfinity,
+      OBSERVER_RANGES.flybyBetaInfinity.min,
+      OBSERVER_RANGES.flybyBetaInfinity.max
+    ),
+    flybyImpactParameterRg: clampNumber(
+      source['flybyImpactParameterRg'],
+      d.flybyImpactParameterRg,
+      OBSERVER_RANGES.flybyImpactParameterRg.min,
+      OBSERVER_RANGES.flybyImpactParameterRg.max
+    ),
+    freefallReleaseRadiusRg: clampNumber(
+      source['freefallReleaseRadiusRg'],
+      d.freefallReleaseRadiusRg,
+      OBSERVER_RANGES.freefallReleaseRadiusRg.min,
+      OBSERVER_RANGES.freefallReleaseRadiusRg.max
+    ),
+    timeScale: clampNumber(
+      source['timeScale'],
+      d.timeScale,
+      OBSERVER_RANGES.timeScale.min,
+      OBSERVER_RANGES.timeScale.max
+    )
+  };
+}
+
 /**
  * The ONE normalizer. Never throws; invalid fields fall back to documented
  * defaults so hostile share-state payloads cannot break the destination.
@@ -75,7 +176,8 @@ export function normalizeBlackHoleControls(raw: unknown): BlackHoleControlState 
     metric,
     spin: clampSpin(source['spin']),
     orbit: pickBool(source['orbit'], DEFAULT_BLACK_HOLE_CONTROLS.orbit),
-    debugParity: pickBool(source['debugParity'], DEFAULT_BLACK_HOLE_CONTROLS.debugParity)
+    debugParity: pickBool(source['debugParity'], DEFAULT_BLACK_HOLE_CONTROLS.debugParity),
+    observer: normalizeObserverControls(source['observer'])
   };
 }
 

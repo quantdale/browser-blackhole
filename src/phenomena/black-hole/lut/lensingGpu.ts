@@ -30,7 +30,13 @@
  * decides captured vs escaped (ADR section 6).
  */
 
-import { BufferGeometry, Float32BufferAttribute, NodeMaterial, Vector3 } from 'three/webgpu';
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  NodeMaterial,
+  Vector3,
+  Vector4
+} from 'three/webgpu';
 import type { Texture } from 'three';
 import type { Node } from 'three/webgpu';
 import {
@@ -50,6 +56,7 @@ import {
   mix,
   normalize,
   pow,
+  abs as tslAbs,
   select,
   sin,
   sqrt,
@@ -152,6 +159,15 @@ function readFiniteNumber(raw: unknown): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+function readVec4Components(raw: unknown): [number, number, number, number] | null {
+  if (Array.isArray(raw)) {
+    if (raw.length !== 4) return null;
+    const c = [Number(raw[0]), Number(raw[1]), Number(raw[2]), Number(raw[3])];
+    return c.every(Number.isFinite) ? (c as [number, number, number, number]) : null;
+  }
+  return null;
+}
+
 function readVec3Components(raw: unknown): [number, number, number] | null {
   if (Array.isArray(raw)) {
     if (raw.length !== 3) return null;
@@ -194,7 +210,14 @@ export function createLutLensingMaterial(
   const uDebugMode = uniform(0);
   const uLutEnabled = uniform(0);
   const uLutDebugStatus = uniform(0);
-
+  // --- M10 observer-frame block (mirrors schwarzschildIntegrator) ---
+  const observerLegU = { value: new Vector4() };
+  const observerLegA1 = { value: new Vector4() };
+  const observerLegA2 = { value: new Vector4() };
+  const observerLegA3 = { value: new Vector4() };
+  const observerLegW1 = { value: new Vector3() };
+  const observerLegW2 = { value: new Vector3() };
+  const observerLegW3 = { value: new Vector3() };
   const uniforms: LutLensingUniforms = {
     cameraPositionRg: { value: new Vector3() },
     cameraRight: { value: new Vector3() },
@@ -220,6 +243,16 @@ export function createLutLensingMaterial(
   };
 
   const uCamPos = uniform(uniforms.cameraPositionRg.value);
+  // M10 observer-frame graph nodes (pass-by-reference to the block entries).
+  const uObserverActiveF = uniform(0);
+  const uComovingF = uniform(0);
+  const uLegU = uniform(observerLegU.value);
+  const uLegA1 = uniform(observerLegA1.value);
+  const uLegA2 = uniform(observerLegA2.value);
+  const uLegA3 = uniform(observerLegA3.value);
+  const uW1 = uniform(observerLegW1.value);
+  const uW2 = uniform(observerLegW2.value);
+  const uW3 = uniform(observerLegW3.value);
   const uRight = uniform(uniforms.cameraRight.value);
   const uUp = uniform(uniforms.cameraUp.value);
   const uForward = uniform(uniforms.cameraForward.value);
@@ -266,7 +299,7 @@ export function createLutLensingMaterial(
   const positionAttr = attribute<'vec3'>('position', 'vec3');
   const vX = varying(positionAttr.x);
   const vY = varying(positionAttr.y);
-  const rayDir = normalize(
+  const legacyRayDir = normalize(
     uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
   );
 
@@ -274,14 +307,40 @@ export function createLutLensingMaterial(
   const r0 = length(relPos);
   const denomFloor = float(DENOM_FLOOR);
   const e0 = relPos.div(max(r0, denomFloor));
+  const f0 = float(1).sub(uMassRg.mul(2).div(max(r0, denomFloor)));
+  const f0Safe = max(f0, denomFloor);
+
+  // --- M10 observer-frame photon initialization (OBSERVER_FRAME_ADR §5) —
+  // mirrors schwarzschildIntegrator exactly (shared uniform contract).
+  const obsNx = vX.mul(uTanHalfFovY).mul(uAspect);
+  const obsNy = vY.mul(uTanHalfFovY);
+  const obsNz = float(1);
+  const obsLen = sqrt(obsNx.mul(obsNx).add(obsNy.mul(obsNy)).add(obsNz.mul(obsNz)));
+  const nxO = obsNx.div(obsLen);
+  const nyO = obsNy.div(obsLen);
+  const nzO = obsNz.div(obsLen);
+  const observerWorldDir = normalize(uW1.mul(nxO).add(uW2.mul(nyO)).add(uW3.mul(nzO)));
+  const obsKT = uLegU.x.add(nxO.mul(uLegA1.x)).add(nyO.mul(uLegA2.x)).add(nzO.mul(uLegA3.x));
+  const obsEnergy = f0.mul(obsKT);
+  const activeF = uObserverActiveF.greaterThan(0.5);
+  const energyMultiplier = select(
+    uComovingF.greaterThan(0.5),
+    float(1).div(max(tslAbs(obsEnergy), denomFloor)),
+    float(1)
+  );
+  const observerValidGate = select(
+    activeF,
+    select(obsEnergy.greaterThan(denomFloor), float(1), float(0)),
+    float(1)
+  );
+  const rayDir = select(activeF, observerWorldDir, legacyRayDir);
+
   const nRadial = dot(rayDir, e0);
   const tangent = rayDir.sub(e0.mul(nRadial));
   const tangential = length(tangent);
   const radialEps = float(RADIAL_EPSILON);
   const isRadial = tangential.lessThan(radialEps);
   const e1 = tangent.div(max(tangential, radialEps));
-  const f0 = float(1).sub(uMassRg.mul(2).div(max(r0, denomFloor)));
-  const f0Safe = max(f0, denomFloor);
   const angularMomentum = select(isRadial, float(0), r0.mul(tangential).div(sqrt(f0Safe)));
   const prInitial = nRadial.div(f0Safe);
   const planeNormal = select(isRadial, vec3(0, 1, 0), normalize(cross(e0, e1)));
@@ -291,6 +350,7 @@ export function createLutLensingMaterial(
   const initValid = select(r0.greaterThan(captureRadius), float(1), float(0))
     .mul(select(r0.lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
     .mul(select(f0.greaterThan(0), float(1), float(0)))
+    .mul(observerValidGate)
     .greaterThan(0.5);
 
   const planeDerivativesFn = Fn(([rIn, prIn]: [unknown, unknown]): Vec3Node => {
@@ -526,11 +586,13 @@ export function createLutLensingMaterial(
               select(dopplerDenom.greaterThan(0), float(1), float(0))
             );
             const dopplerDenomSafe = max(dopplerDenom.mul(gValid), denomFloor);
+            // M10 comoving-observer convention (ADR §6): ×nu_obs/E_ray; exactly
+            // 1 for legacy camera/static paths.
             const gFactor = select(
               gValid.greaterThan(0.5),
               float(1).div(ut.mul(dopplerDenomSafe)),
               float(0)
-            );
+            ).mul(energyMultiplier);
             const emitted = diskEmission.emit({
               r: bestR,
               gFactor,
@@ -662,11 +724,12 @@ export function createLutLensingMaterial(
                             select(dopplerDenom.greaterThan(0), float(1), float(0))
                           );
                           const dopplerDenomSafe = max(dopplerDenom.mul(gValid), denomFloor);
+                          // M10 comoving-observer convention (ADR §6).
                           const gFactor = select(
                             gValid.greaterThan(0.5),
                             float(1).div(ut.mul(dopplerDenomSafe)),
                             float(0)
-                          );
+                          ).mul(energyMultiplier);
                           const emitted = diskEmission.emit({
                             r: rHit,
                             gFactor,
@@ -862,6 +925,26 @@ export function createLutLensingMaterial(
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
+
+      // --- M10 observer-frame block ---
+      const legU = readVec4Components(state['observerLegU']);
+      if (legU) observerLegU.value.set(legU[0], legU[1], legU[2], legU[3]);
+      const legA1v = readVec4Components(state['observerLegA1']);
+      if (legA1v) observerLegA1.value.set(legA1v[0], legA1v[1], legA1v[2], legA1v[3]);
+      const legA2v = readVec4Components(state['observerLegA2']);
+      if (legA2v) observerLegA2.value.set(legA2v[0], legA2v[1], legA2v[2], legA2v[3]);
+      const legA3v = readVec4Components(state['observerLegA3']);
+      if (legA3v) observerLegA3.value.set(legA3v[0], legA3v[1], legA3v[2], legA3v[3]);
+      const legW1v = readVec3Components(state['observerLegW1']);
+      if (legW1v) observerLegW1.value.set(legW1v[0], legW1v[1], legW1v[2]);
+      const legW2v = readVec3Components(state['observerLegW2']);
+      if (legW2v) observerLegW2.value.set(legW2v[0], legW2v[1], legW2v[2]);
+      const legW3v = readVec3Components(state['observerLegW3']);
+      if (legW3v) observerLegW3.value.set(legW3v[0], legW3v[1], legW3v[2]);
+      const obsActiveV = readFiniteNumber(state['observerActive']);
+      if (obsActiveV !== null) uObserverActiveF.value = obsActiveV;
+      const comovingV = readFiniteNumber(state['observerFrequencyComoving']);
+      if (comovingV !== null) uComovingF.value = comovingV;
       const lutGate = readFiniteNumber(state['lutEnabled']);
       if (lutGate !== null && lutGate >= 0) uLutEnabled.value = lutGate;
       const lutDbg = readFiniteNumber(state['lutDebugStatus']);

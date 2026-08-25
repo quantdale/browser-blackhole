@@ -51,6 +51,12 @@ import {
   effectiveSpin,
   type BlackHoleControlState
 } from '../../phenomena/black-hole/controlState.js';
+import {
+  buildObserverUniformPayload,
+  seedGeodesicWorldline,
+  type ObserverReadout
+} from '../../phenomena/black-hole/observer/observerUniforms.js';
+import type { TimelikeWorldline } from '../../phenomena/black-hole/observer/worldlines.js';
 import { kerrIscoRadius } from '../../phenomena/black-hole/kerr/characteristics.js';
 import type { ILensingService, KerrLensingParams } from '../types.js';
 import type {
@@ -111,7 +117,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'default',
     displayName: 'Black Hole — Default',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Full numerical Schwarzschild backwards ray tracing (GPU f32 integrator; CPU binary64 reference is the oracle). Disk: Shakura-Sunyaev thin disk, ISCO inner edge.',
     state: { orbit: false },
@@ -128,7 +134,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'cinematic-orbit',
     displayName: 'Black Hole — Cinematic Orbit',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Same Schwarzschild lensing path as the default preset; differs only in arrival camera and a slow time-driven orbit.',
     state: { orbit: true },
@@ -145,7 +151,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'face-on-disk',
     displayName: 'Face-on Disk',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Same full numerical Schwarzschild ray tracer as the default preset; observer placed near the disk symmetry axis so the face-on reference geometry (no Doppler asymmetry expected) can be inspected directly.',
     state: { orbit: false },
@@ -159,7 +165,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'edge-on-lensing',
     displayName: 'Edge-on Lensing',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Identical lensing/disk model viewed from near the disk plane, emphasizing the upper/lower secondary disk images produced by strong-field light bending.',
     state: { orbit: false },
@@ -173,7 +179,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'photon-ring',
     displayName: 'Photon Ring',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Identical lensing/disk model with a closer camera framing the critical impact parameter; display recommendation raises exposure slightly to keep high-order ring structure readable. Physics unchanged.',
     state: { orbit: false },
@@ -187,7 +193,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'doppler-demo',
     displayName: 'Doppler Demonstration',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Edge-on-ish view of the SAME Shakura-Sunyaev disk with relativistic beaming enabled, making the approaching/receding brightness contrast directly visible. No model change versus other presets.',
     state: { orbit: false },
@@ -205,7 +211,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'kerr-zero-spin',
     displayName: 'Kerr — Zero Spin (Validation)',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Numerical Kerr backend at a* = 0: the primary spin->0 convergence reference. Must be visually and physically indistinguishable from the Schwarzschild path within documented tolerances.',
     state: { metric: 'kerr', spin: 0, orbit: false },
@@ -219,7 +225,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'kerr-moderate-prograde',
     displayName: 'Kerr — Moderate Prograde (a*=0.6)',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Numerical Kerr backend, prograde thin disk corotating with a*= +0.6. Disk inner edge at the Bardeen-Press-Teukolsky ISCO (~4.38 r_g); frame dragging shifts the photon ring asymmetrically.',
     state: { metric: 'kerr', spin: 0.6, orbit: false },
@@ -233,7 +239,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'kerr-high-prograde',
     displayName: 'Kerr — High Prograde (a*=0.9)',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Numerical Kerr backend near the supported spin ceiling: a*= +0.9, disk down to ISCO ~2.32 r_g. Strong frame dragging and pronounced shadow asymmetry; numerical failures stay explicitly classified.',
     state: { metric: 'kerr', spin: 0.9, orbit: false },
@@ -247,7 +253,7 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     id: 'kerr-retrograde',
     displayName: 'Kerr — Retrograde Disk (a*=-0.7)',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'Numerical Kerr backend with the disk still corotating with world +Y while the hole spins a*= -0.7 (retrograde relative to the disk): ISCO pushed to ~8.05 r_g, counter-rotating frame dragging.',
     state: { metric: 'kerr', spin: -0.7, orbit: false },
@@ -258,10 +264,89 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
     recommendedQuality: 'high'
   },
   {
+    id: 'observer-static',
+    displayName: 'Observer — Static Reference (M10)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 2,
+    fidelityNote:
+      'M10 compatibility anchor: the explicit STATIC observer mode routes through the new observer-frame abstraction while reproducing the legacy static physics exactly (OBSERVER_FRAME_ADR §5 equivalence gate).',
+    state: { orbit: false, observer: { mode: 'static' } },
+    camera: { position: [0, 2.5, 16], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    seed: 7,
+    timelineInitialPhase: 0
+  },
+  {
+    id: 'observer-circular',
+    displayName: 'Physical Circular Observer (M10)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 2,
+    fidelityNote:
+      'Timelike equatorial circular geodesic at r = 12 r_g (stable, above the Schwarzschild ISCO): aberration and Doppler come from the comoving tetrad via g = (-k.u_obs)/(-k.u_emit), not from camera motion. Physically distinct from the cinematic Orbit preset.',
+    state: {
+      orbit: false,
+      observer: { mode: 'circular', circularRadiusRg: 12, circularSense: 1 }
+    },
+    camera: { position: [0, 0.5, 13.5], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    recommendedQuality: 'high'
+  },
+  {
+    id: 'observer-flyby',
+    displayName: 'Flyby Observer (M10)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 2,
+    fidelityNote:
+      'Unbound equatorial timelike geodesic (E = gamma(0.6) ~ 1.25, impact parameter 8 r_g): a scattering encounter with conserved E/L_z; periastron and outbound asymptote are integrated, never scripted.',
+    state: {
+      orbit: false,
+      observer: { mode: 'flyby', flybyBetaInfinity: 0.6, flybyImpactParameterRg: 8 }
+    },
+    camera: { position: [0, 2, 10], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    recommendedQuality: 'high'
+  },
+  {
+    id: 'observer-freefall',
+    displayName: 'Freefall Observer (M10)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 2,
+    fidelityNote:
+      'Drop from rest relative to static observers at r0 = 14 r_g. Proper-time worldline ends at the declared horizon stop band (r_+ * 1.001) with an explicit TERMINAL state — rendering inside the horizon is NOT claimed (OBSERVER_FRAME_ADR §3).',
+    state: {
+      orbit: false,
+      observer: { mode: 'freefall', freefallReleaseRadiusRg: 14 }
+    },
+    camera: { position: [0, 0.4, 6], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 70 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    recommendedQuality: 'high'
+  },
+  {
+    id: 'kerr-circular-observer',
+    displayName: 'Kerr Circular Observer (a* = +0.6, M10)',
+    destinationId: 'black-hole',
+    stateSchemaVersion: 2,
+    fidelityNote:
+      'Physical circular observer on the numerical Kerr backend at a* = +0.6, r = 8 r_g prograde: frame-dragged comoving optics through the full Kerr tetrad chain.',
+    state: {
+      metric: 'kerr',
+      spin: 0.6,
+      orbit: false,
+      observer: { mode: 'circular', circularRadiusRg: 8, circularSense: 1 }
+    },
+    camera: { position: [0, 0.8, 9.5], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
+    seed: 7,
+    timelineInitialPhase: 0,
+    display: DISPLAY_SCIENTIFIC,
+    recommendedQuality: 'ultra'
+  },
+  {
     id: 'debug-parity',
     displayName: 'Black Hole — Debug Parity View',
     destinationId: 'black-hole',
-    stateSchemaVersion: 1,
+    stateSchemaVersion: 2,
     fidelityNote:
       'DEBUG TOOL, not a presentation: ESCAPED rays output their terminal tetrad-projected direction encoded rgb = dir*0.5+0.5 (linear); CAPTURED rays pure black; numerical failures failure-magenta. Disk disabled. Consumed by tests/browser/integrator-parity.spec.ts against cpuReference.integratePhoton and by the M9 Kerr parity spec against the binary64 kerr reference.',
     state: { debugParity: true },
@@ -342,6 +427,41 @@ export class BlackHoleModule implements PhenomenonModule {
   private readonly lutDebugView: boolean =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lutdebug');
 
+  // --- M10 physical observer state (OBSERVER_FRAME_ADR) ---------------------
+  /** Deterministic proper-time clock (t_g units); advanced ONLY from the
+   * frame-loop delta while the atlas transport is playing. */
+  private observerTau = 0;
+  /** Geodesic worldline for flyby/freefall; reseeded on control changes. */
+  private geodesicWorldline: TimelikeWorldline | null = null;
+  /** Signature of the observer-relevant controls at seed time. */
+  private observerSeedSignature = '';
+  /** Latest observer readout for the debug snapshot. */
+  private lastObserverReadout: ObserverReadout | null = null;
+
+  /** Reseed the geodesic worldline when observer controls change (deterministic). */
+  private syncObserverSeed(): void {
+    const o = this.controls.observer;
+    const signature = JSON.stringify([
+      o.mode,
+      effectiveSpin(this.controls),
+      o.circularRadiusRg,
+      o.circularSense,
+      o.flybyBetaInfinity,
+      o.flybyImpactParameterRg,
+      o.freefallReleaseRadiusRg
+    ]);
+    if (signature !== this.observerSeedSignature) {
+      this.observerSeedSignature = signature;
+      if (o.mode === 'flyby' || o.mode === 'freefall') {
+        const seeded = seedGeodesicWorldline(this.controls);
+        this.geodesicWorldline = seeded.ok ? seeded.worldline : null;
+      } else {
+        this.geodesicWorldline = null;
+      }
+      this.observerTau = 0;
+    }
+  }
+
   async prepare(ctx: PrepareContext): Promise<{
     module: PhenomenonModule;
     scope: PrepareContext['scope'];
@@ -356,6 +476,8 @@ export class BlackHoleModule implements PhenomenonModule {
 
     // Preset state flows through the ONE normalizer before anything consumes it.
     this.controls = normalizeBlackHoleControls(ctx.preset.state);
+    this.observerTau = 0;
+    this.syncObserverSeed();
     const presetSpin = effectiveSpin(this.controls);
 
     // --- LUT family load (M8-06): best-effort, never blocks the numerical
@@ -479,17 +601,34 @@ export class BlackHoleModule implements PhenomenonModule {
     if (this.fallbackPass !== null) this.fallbackPass.uniforms.viewOff.value = 0;
     // Preset state re-normalized here so preset switches reset controls.
     this.controls = normalizeBlackHoleControls(ctx.preset.state);
+    // M10: deterministic observer reset on every enter/preset load.
+    this.observerTau = 0;
+    this.syncObserverSeed();
   }
 
   /**
    * Advances the gentle orbit ONLY when the active control state asks for it;
    * otherwise a no-op. Driven by frame dt for determinism under the atlas
-   * timeline.
+   * timeline. M10: also advances the deterministic PROPER-TIME clock of the
+   * physical observer (frozen when the atlas transport is paused; frozen at
+   * terminal worldline states).
    */
   update(ctx: FrameContext): void {
     this.lastQualityTier = ctx.quality;
     // M8-09: canonical Schwarzschild trajectory preference rides FrameContext.
     this.frameTrajectoryBackend = ctx.trajectoryBackend;
+    if (!this.disposed && !ctx.services.time.snapshot().paused) {
+      const mode = this.controls.observer.mode;
+      const physicalMode = mode === 'circular' || mode === 'flyby' || mode === 'freefall';
+      if (physicalMode && this.lastObserverReadout?.terminalReason == null) {
+        this.observerTau += ctx.time.dt * this.controls.observer.timeScale;
+        if (this.geodesicWorldline !== null) {
+          // Worldline integrator consumes the SAME delta so position and
+          // clock stay exactly coherent.
+          this.geodesicWorldline.advance(ctx.time.dt * this.controls.observer.timeScale);
+        }
+      }
+    }
     if (this.disposed || !this.controls.orbit) return;
     const rig = ctx.services.cameraRig;
     const orbit = rig.getOrbit();
@@ -540,7 +679,7 @@ export class BlackHoleModule implements PhenomenonModule {
       kerr.object3d().visible = kind === 'kerr';
 
       const spin = effectiveSpin(this.controls);
-      const lensingState: Record<string, unknown> = useKerr
+      const baseState = useKerr
         ? {
             ...cameraLensingState(
               ctx.camera,
@@ -555,6 +694,34 @@ export class BlackHoleModule implements PhenomenonModule {
             maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
             lutEnabled: kind === 'lut' ? 1 : 0
           };
+
+      // M10 physical observer: per-frame tetrad payload from the canonical
+      // snapshot builder. Moving modes also OVERRIDE the ray origin with the
+      // worldline position (the camera keeps supplying only LOOK axes).
+      this.syncObserverSeed();
+      const cameraAxes = currentCameraBasis(ctx.camera);
+      const observerPayload = buildObserverUniformPayload({
+        controls: this.controls,
+        cameraPositionWorld: [ctx.camera.position.x, ctx.camera.position.y, ctx.camera.position.z],
+        cameraAxes,
+        tau: this.observerTau,
+        geodesicWorldline: this.geodesicWorldline
+      });
+      this.lastObserverReadout = observerPayload.readout;
+      const lensingState: Record<string, unknown> = {
+        ...baseState,
+        ...observerPayload.stateKeys
+      };
+      const obsMode = this.controls.observer.mode;
+      const movingMode =
+        obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
+      if (
+        movingMode &&
+        observerPayload.readout.valid &&
+        Number.isFinite(observerPayload.readout.positionWorld[0])
+      ) {
+        lensingState['cameraPositionRg'] = observerPayload.readout.positionWorld;
+      }
 
       if (this.controls.debugParity) {
         lensingState['diskEnabled'] = false;
@@ -593,6 +760,8 @@ export class BlackHoleModule implements PhenomenonModule {
   applyControlState(partial: Record<string, unknown>): void {
     if (this.disposed) return;
     this.controls = normalizeBlackHoleControls({ ...this.controls, ...partial });
+    // M10: mode/parameter changes reseed the deterministic worldline.
+    this.syncObserverSeed();
   }
 
   serializeShareState(): Record<string, unknown> {
@@ -600,7 +769,8 @@ export class BlackHoleModule implements PhenomenonModule {
       metric: this.controls.metric,
       spin: this.controls.spin,
       orbit: this.controls.orbit,
-      debugParity: this.controls.debugParity
+      debugParity: this.controls.debugParity,
+      observer: { ...this.controls.observer }
     };
   }
 
@@ -636,7 +806,11 @@ export class BlackHoleModule implements PhenomenonModule {
       lutFamilyDir: this.lut?.familyDir ?? null,
       lutWebgl2Filterable: this.lut?.webgl2Filterable ?? null,
       lutFallbackReason: this.lastFallbackReason,
-      estimatedGpuMemoryMBIsEstimate: true
+      estimatedGpuMemoryMBIsEstimate: true,
+      // M10 physical observer truth:
+      observerMode: this.controls.observer.mode,
+      observerReadout: this.lastObserverReadout,
+      observerProperTimeTau: this.observerTau
     };
   }
 }
@@ -759,17 +933,13 @@ function cameraLensingState(
   diskInnerRg: number,
   diskOuterRg: number
 ): Record<string, unknown> {
-  camera.updateMatrixWorld();
-  const e = camera.matrixWorld.elements;
-  scratchRight.set(e[0] ?? 0, e[1] ?? 0, e[2] ?? 0).normalize();
-  scratchUp.set(e[4] ?? 0, e[5] ?? 0, e[6] ?? 0).normalize();
-  scratchForward.set(-(e[8] ?? 0), -(e[9] ?? 0), -(e[10] ?? 0)).normalize();
+  const basis = currentCameraBasis(camera);
   const aspect = camera.aspect;
   return {
     cameraPositionRg: [camera.position.x, camera.position.y, camera.position.z],
-    cameraRight: [scratchRight.x, scratchRight.y, scratchRight.z],
-    cameraUp: [scratchUp.x, scratchUp.y, scratchUp.z],
-    cameraForward: [scratchForward.x, scratchForward.y, scratchForward.z],
+    cameraRight: basis.right,
+    cameraUp: basis.up,
+    cameraForward: basis.forward,
     tanHalfFovY: Math.tan((camera.fov * Math.PI) / 360),
     aspect: Number.isFinite(aspect) && aspect > 0 ? aspect : 1,
     massRg: 1,
@@ -779,5 +949,23 @@ function cameraLensingState(
     diskOuterRg,
     escapeRadiusRg: ESCAPE_RADIUS_RG,
     backgroundIntensity: 1
+  };
+}
+
+/** World-space look axes of the camera (presentation inputs for M10). */
+function currentCameraBasis(camera: PerspectiveCamera): {
+  right: [number, number, number];
+  up: [number, number, number];
+  forward: [number, number, number];
+} {
+  camera.updateMatrixWorld();
+  const e = camera.matrixWorld.elements;
+  scratchRight.set(e[0] ?? 0, e[1] ?? 0, e[2] ?? 0).normalize();
+  scratchUp.set(e[4] ?? 0, e[5] ?? 0, e[6] ?? 0).normalize();
+  scratchForward.set(-(e[8] ?? 0), -(e[9] ?? 0), -(e[10] ?? 0)).normalize();
+  return {
+    right: [scratchRight.x, scratchRight.y, scratchRight.z],
+    up: [scratchUp.x, scratchUp.y, scratchUp.z],
+    forward: [scratchForward.x, scratchForward.y, scratchForward.z]
   };
 }

@@ -60,7 +60,13 @@
  *   — NEVER black — so numerical failure can never masquerade as the shadow.
  */
 
-import { BufferGeometry, Float32BufferAttribute, NodeMaterial, Vector3 } from 'three/webgpu';
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  NodeMaterial,
+  Vector3,
+  Vector4
+} from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import {
   Break,
@@ -80,6 +86,7 @@ import {
   mix,
   normalize,
   pow,
+  abs as tslAbs,
   select,
   sin,
   sqrt,
@@ -227,8 +234,7 @@ export interface SchwarzschildIntegratorUniforms {
 
   // --- VisualGpuParams ---
   /** Linear multiplier on sampled environment radiance (escaped rays). */
-  backgroundIntensity: { value: number };
-  /**
+  backgroundIntensity: { value: number }; /**
    * Debug view selector (0 = physical radiance, >= 0.5 = parity view).
    * Parity view: ESCAPED rays output the terminal tetrad-projected escape
    * direction encoded as `dir * 0.5 + 0.5` in LINEAR space — directly
@@ -239,6 +245,21 @@ export interface SchwarzschildIntegratorUniforms {
    * cinematic/scientific presentation.
    */
   debugMode: { value: number };
+
+  // --- ObserverFrameGpuParams (M10, OBSERVER_FRAME_ADR §5) ---
+  /** Tetrad legs U (=u^mu) and A1..A3 (spatial legs), BL contravariant. */
+  observerLegU: { value: Vector4 };
+  observerLegA1: { value: Vector4 };
+  observerLegA2: { value: Vector4 };
+  observerLegA3: { value: Vector4 };
+  /** World-space directions of the three spatial tetrad legs. */
+  observerLegW1: { value: Vector3 };
+  observerLegW2: { value: Vector3 };
+  observerLegW3: { value: Vector3 };
+  /** 1 when the M10 observer block drives ray initialization. */
+  observerActive: { value: number };
+  /** 1 when shading must scale the legacy emitter factor by 1/E_ray. */
+  observerFrequencyComoving: { value: number };
 }
 
 /** Return shape of {@link createLensingMaterial} (consumer-locked additive superset). */
@@ -267,6 +288,16 @@ function readFiniteNumber(raw: unknown): number | null {
   }
   const value = Number(raw);
   return Number.isFinite(value) ? value : null;
+}
+
+/** Reads a vec4 as a 4-number array; null when malformed/non-finite. */
+function readVec4Components(raw: unknown): [number, number, number, number] | null {
+  if (Array.isArray(raw)) {
+    if (raw.length !== 4) return null;
+    const c = [Number(raw[0]), Number(raw[1]), Number(raw[2]), Number(raw[3])];
+    return c.every(Number.isFinite) ? (c as [number, number, number, number]) : null;
+  }
+  return null;
 }
 
 /** Reads a vec3 as a 3-number array or {x,y,z}; null when malformed/non-finite. */
@@ -332,6 +363,10 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const uBackgroundIntensity = uniform(1);
   const uDebugMode = uniform(0);
 
+  // --- M10 observer-frame block (OBSERVER_FRAME_ADR §5) ---
+  const uObserverActive = uniform(0);
+  const uObserverFrequencyComoving = uniform(0);
+
   const uniforms: SchwarzschildIntegratorUniforms = {
     cameraPositionRg: { value: new Vector3() },
     cameraRight: { value: new Vector3() },
@@ -351,7 +386,16 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
     escapeRadiusRg: uEscapeRadiusRg,
     captureEpsilon: uCaptureEpsilon,
     backgroundIntensity: uBackgroundIntensity,
-    debugMode: uDebugMode
+    debugMode: uDebugMode,
+    observerLegU: { value: new Vector4() },
+    observerLegA1: { value: new Vector4() },
+    observerLegA2: { value: new Vector4() },
+    observerLegA3: { value: new Vector4() },
+    observerLegW1: { value: new Vector3() },
+    observerLegW2: { value: new Vector3() },
+    observerLegW3: { value: new Vector3() },
+    observerActive: uObserverActive,
+    observerFrequencyComoving: uObserverFrequencyComoving
   };
 
   // Vector uniforms reference the SAME Vector3 instances stored in the block,
@@ -361,6 +405,15 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const uUp = uniform(uniforms.cameraUp.value);
   const uForward = uniform(uniforms.cameraForward.value);
   const uCenter = uniform(uniforms.centerRg.value);
+  const uActiveF = uniform(uniforms.observerActive.value);
+  const uComovingF = uniform(uniforms.observerFrequencyComoving.value);
+  const uLegU = uniform(uniforms.observerLegU.value);
+  const uLegA1 = uniform(uniforms.observerLegA1.value);
+  const uLegA2 = uniform(uniforms.observerLegA2.value);
+  const uLegA3 = uniform(uniforms.observerLegA3.value);
+  const uW1 = uniform(uniforms.observerLegW1.value);
+  const uW2 = uniform(uniforms.observerLegW2.value);
+  const uW3 = uniform(uniforms.observerLegW3.value);
 
   // Pinned collaborators (contracts owned by concurrent modules).
   const sampleEnvironment = createEnvironmentSamplerNode(makeStarfieldParams());
@@ -384,7 +437,11 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   // --- World-ray reconstruction; NDC convention of src/shaders/cameraRayMath.ts
   // --- (+x right, +y up, pixel-center exact): dir = normalize(forward +
   // --- right*x*tanHalfFovY*aspect + up*y*tanHalfFovY).
-  const rayDir = normalize(
+  // M10: this is the pixel direction in the CAMERA frame; when the physical
+  // observer block is active the camera supplies only LOOK orientation and
+  // the photon's world direction comes from the observer tetrad legs (the
+  // local components n are identical — legs A1/A2/A3 ARE right/up/forward).
+  const legacyRayDir = normalize(
     uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
   );
 
@@ -396,14 +453,47 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const r0 = length(relPos);
   const denomFloor = float(DENOM_FLOOR);
   const e0 = relPos.div(max(r0, denomFloor)); // radial plane axis (guarded normalize)
+  const f0 = float(1).sub(uMassRg.mul(2).div(max(r0, denomFloor)));
+  const f0Safe = max(f0, denomFloor); // §14 division-by-f guard
+
+  // --- M10 observer-frame photon initialization (OBSERVER_FRAME_ADR §5) ---
+  const obsNx = vX.mul(uTanHalfFovY).mul(uAspect);
+  const obsNy = vY.mul(uTanHalfFovY);
+  const obsNz = float(1);
+  const obsLen = sqrt(obsNx.mul(obsNx).add(obsNy.mul(obsNy)).add(obsNz.mul(obsNz)));
+  const nxO = obsNx.div(obsLen);
+  const nyO = obsNy.div(obsLen);
+  const nzO = obsNz.div(obsLen);
+  // Photon world direction: sum of leg world directions weighted by the
+  // LOCAL components (legs are orthonormal in the observer rest frame).
+  const observerWorldDir = normalize(uW1.mul(nxO).add(uW2.mul(nyO)).add(uW3.mul(nzO)));
+  // Conserved energy E = -k_t = f * k^t with k^t = U_t + sum n_a A_a,t.
+  const obsKT = uLegU.x.add(nxO.mul(uLegA1.x)).add(nyO.mul(uLegA2.x)).add(nzO.mul(uLegA3.x));
+  const obsEnergy = f0.mul(obsKT); // g_tt = -f on Schwarzschild
+  const activeF = uActiveF.greaterThan(0.5);
+  // Comoving frequency convention scales the legacy emitter factor by
+  // nu_obs / E_ray with nu_obs = 1 by construction (ADR §6). Static/camera
+  // keep the exact legacy value (multiplier 1).
+  const energyMultiplier = select(
+    uComovingF.greaterThan(0.5),
+    float(1).div(max(tslAbs(obsEnergy), denomFloor)),
+    float(1)
+  );
+  // Pixels whose traced photon cannot reach infinity (E <= 0 under a moving
+  // observer) have no stationary image: truthful INVALID, never a fake sky.
+  const observerValidGate = select(
+    activeF,
+    select(obsEnergy.greaterThan(denomFloor), float(1), float(0)),
+    float(1)
+  );
+  const rayDir = select(activeF, observerWorldDir, legacyRayDir);
+
   const nRadial = dot(rayDir, e0);
   const tangent = rayDir.sub(e0.mul(nRadial)); // tangential component (unnormalized)
   const tangential = length(tangent);
   const radialEps = float(RADIAL_EPSILON);
   const isRadial = tangential.lessThan(radialEps); // dedicated radial path selector (NM §13)
   const e1 = tangent.div(max(tangential, radialEps)); // unit only when !isRadial
-  const f0 = float(1).sub(uMassRg.mul(2).div(max(r0, denomFloor)));
-  const f0Safe = max(f0, denomFloor); // §14 division-by-f guard
   // E-normalized constants of motion (NM §4 rescaling): L stores b = L/E.
   const angularMomentum = select(isRadial, float(0), r0.mul(tangential).div(sqrt(f0Safe)));
   // p_r(E=1) = n_r / f (NM §7 scaled by 1/E; cpuReference parity).
@@ -425,6 +515,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const initValid = select(r0.greaterThan(captureRadius), float(1), float(0))
     .mul(select(r0.lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
     .mul(select(f0.greaterThan(0), float(1), float(0)))
+    .mul(observerValidGate)
     .greaterThan(0.5);
 
   // ---------------------------------------------------------------------------
@@ -634,11 +725,16 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
                   select(dopplerDenom.greaterThan(0), float(1), float(0))
                 );
                 const dopplerDenomSafe = max(dopplerDenom.mul(gValid), denomFloor);
+                // M10 comoving-observer convention (OBSERVER_FRAME_ADR §6):
+                // scale the legacy distant-astronomer factor by nu_obs/E_ray
+                // (nu_obs = 1 by tetrad construction). The multiplier is
+                // exactly 1 for the legacy camera/static paths — bit-stable
+                // historical output.
                 const gFactor = select(
                   gValid.greaterThan(0.5),
                   float(1).div(ut.mul(dopplerDenomSafe)),
                   float(0)
-                );
+                ).mul(energyMultiplier);
                 // emit() applies the g^3 Liouville transform INTERNALLY (its
                 // contract) — pass raw g, never re-multiply (NM §17).
                 const emitted = diskEmission.emit({
@@ -822,6 +918,26 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
+
+      // --- M10 observer-frame block ---
+      const legU = readVec4Components(state['observerLegU']);
+      if (legU) uniforms.observerLegU.value.set(legU[0], legU[1], legU[2], legU[3]);
+      const legA1 = readVec4Components(state['observerLegA1']);
+      if (legA1) uniforms.observerLegA1.value.set(legA1[0], legA1[1], legA1[2], legA1[3]);
+      const legA2 = readVec4Components(state['observerLegA2']);
+      if (legA2) uniforms.observerLegA2.value.set(legA2[0], legA2[1], legA2[2], legA2[3]);
+      const legA3 = readVec4Components(state['observerLegA3']);
+      if (legA3) uniforms.observerLegA3.value.set(legA3[0], legA3[1], legA3[2], legA3[3]);
+      const legW1 = readVec3Components(state['observerLegW1']);
+      if (legW1) uniforms.observerLegW1.value.set(legW1[0], legW1[1], legW1[2]);
+      const legW2 = readVec3Components(state['observerLegW2']);
+      if (legW2) uniforms.observerLegW2.value.set(legW2[0], legW2[1], legW2[2]);
+      const legW3 = readVec3Components(state['observerLegW3']);
+      if (legW3) uniforms.observerLegW3.value.set(legW3[0], legW3[1], legW3[2]);
+      const obsActive = readFiniteNumber(state['observerActive']);
+      if (obsActive !== null) uObserverActive.value = obsActive;
+      const comoving = readFiniteNumber(state['observerFrequencyComoving']);
+      if (comoving !== null) uObserverFrequencyComoving.value = comoving;
     },
     dispose(): void {
       if (disposed) return;

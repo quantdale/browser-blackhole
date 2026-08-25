@@ -65,7 +65,6 @@ export interface SnapshotRequest {
   /** User look axes (presentation inputs only). */
   cameraAxes: CameraAxisDirections;
 
-
   /** Circular parameters + seed azimuth. */
   readonly circularRadiusRg: number;
   readonly circularSense: 1 | -1;
@@ -135,14 +134,20 @@ function invalidSnapshot(
 }
 
 /** World cartesian -> BL spherical for the canonical embedding (+Y axis). */
-export function worldToPolar(
-  pos: readonly [number, number, number]
-): { r: number; theta: number; phiWorld: number } {
+export function worldToPolar(pos: readonly [number, number, number]): {
+  r: number;
+  theta: number;
+  phiWorld: number;
+} {
   const x = pos[0];
   const y = pos[1];
   const z = pos[2];
   const r = Math.hypot(x, y, z);
-  return { r, theta: Math.acos(Math.min(1, Math.max(-1, y / (r || 1)))), phiWorld: Math.atan2(z, x) };
+  return {
+    r,
+    theta: Math.acos(Math.min(1, Math.max(-1, y / (r || 1)))),
+    phiWorld: Math.atan2(z, x)
+  };
 }
 
 function betaRelativeToStatics(
@@ -183,12 +188,17 @@ export function buildObserverFrameSnapshot(
   let coordinateTime = Number.NaN;
   let statusOk = true;
   let terminalReason: ObserverTerminalReason = null;
-  let invalidReason: ObserverInvalidReason | null = null;
+  const invalidReason: ObserverInvalidReason | null = null;
 
   if (request.mode === 'circular') {
     const event =
-      circularEventAt(spin, request.circularRadiusRg, request.circularSense, request.circularPhi0Rad, request.properTimeTau) ??
-      null;
+      circularEventAt(
+        spin,
+        request.circularRadiusRg,
+        request.circularSense,
+        request.circularPhi0Rad,
+        request.properTimeTau
+      ) ?? null;
     if (!event) {
       return invalidSnapshot(request, 'no-circular-orbit-below-photon-orbit');
     }
@@ -303,9 +313,7 @@ export function buildObserverFrameSnapshot(
     legA3: flatten(legs[2]),
     observerActive: 1,
     observerFrequencyConvention:
-      request.mode === 'circular' ||
-      request.mode === 'flyby' ||
-      request.mode === 'freefall',
+      request.mode === 'circular' || request.mode === 'flyby' || request.mode === 'freefall',
     horizonStopRadiusRg: horizonStopRadius(spin)
   };
 }

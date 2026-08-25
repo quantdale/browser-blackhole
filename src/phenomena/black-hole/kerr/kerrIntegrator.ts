@@ -50,7 +50,13 @@
  *   guard only defends degenerate numerics (ADR §1.19).
  */
 
-import { BufferGeometry, Float32BufferAttribute, NodeMaterial, Vector3 } from 'three/webgpu';
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  NodeMaterial,
+  Vector3,
+  Vector4
+} from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import {
   Break,
@@ -221,6 +227,15 @@ function readFiniteNumber(raw: unknown): number | null {
   return Number.isFinite(value) ? value : null;
 }
 
+function readVec4Components(raw: unknown): [number, number, number, number] | null {
+  if (Array.isArray(raw)) {
+    if (raw.length !== 4) return null;
+    const c = [Number(raw[0]), Number(raw[1]), Number(raw[2]), Number(raw[3])];
+    return c.every(Number.isFinite) ? (c as [number, number, number, number]) : null;
+  }
+  return null;
+}
+
 function readVec3Components(raw: unknown): [number, number, number] | null {
   if (Array.isArray(raw)) {
     if (raw.length !== 3) {
@@ -280,6 +295,12 @@ export function createKerrLensingMaterial(
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
   const uDebugMode = uniform(0);
+  // --- M10 observer-frame block (OBSERVER_FRAME_ADR §5) ---
+  const uObserverF = uniform(0);
+  const observerLegU = { value: new Vector4() };
+  const observerLegA1 = { value: new Vector4() };
+  const observerLegA2 = { value: new Vector4() };
+  const observerLegA3 = { value: new Vector4() };
 
   const uniforms: KerrIntegratorUniforms = {
     cameraPositionRg: { value: new Vector3() },
@@ -306,6 +327,11 @@ export function createKerrLensingMaterial(
 
   // Vector uniforms reference the SAME Vector3 instances (pass-by-reference).
   const uCamPos = uniform(uniforms.cameraPositionRg.value);
+  // M10 observer-frame graph nodes (pass-by-reference to block entries).
+  const uLegU = uniform(observerLegU.value);
+  const uLegA1 = uniform(observerLegA1.value);
+  const uLegA2 = uniform(observerLegA2.value);
+  const uLegA3 = uniform(observerLegA3.value);
   const uRight = uniform(uniforms.cameraRight.value);
   const uUp = uniform(uniforms.cameraUp.value);
   const uForward = uniform(uniforms.cameraForward.value);
@@ -337,9 +363,18 @@ export function createKerrLensingMaterial(
 
   // --- World-ray reconstruction (NDC convention of shaders/cameraRayMath.ts):
   // --- dir = normalize(forward + right*x*tanHalfFovY*aspect + up*y*tanHalfFovY)
-  const rayDir = normalize(
+  const legacyRayDir = normalize(
     uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
   );
+
+  // --- M10 observer-frame local components (OBSERVER_FRAME_ADR §5) ---
+  const obsNx = vX.mul(uTanHalfFovY).mul(uAspect);
+  const obsNy = vY.mul(uTanHalfFovY);
+  const obsNz = float(1);
+  const obsLen = sqrt(obsNx.mul(obsNx).add(obsNy.mul(obsNy)).add(obsNz.mul(obsNz)));
+  const nxObs = obsNx.div(obsLen);
+  const nyObs = obsNy.div(obsLen);
+  const nzObs = obsNz.div(obsLen);
 
   // ---------------------------------------------------------------------------
   // Shared node helpers
@@ -384,10 +419,10 @@ export function createKerrLensingMaterial(
   );
 
   // Local static-frame direction components (world spherical axes at camera).
-  const dirLen = length(rayDir);
-  const nx = rayDir.x.div(dirLen);
-  const ny = rayDir.y.div(dirLen);
-  const nz = rayDir.z.div(dirLen);
+  const dirLen = length(legacyRayDir);
+  const nx = legacyRayDir.x.div(dirLen);
+  const ny = legacyRayDir.y.div(dirLen);
+  const nz = legacyRayDir.z.div(dirLen);
   const nRadial = nx.mul(e0.x).add(ny.mul(e0.y)).add(nz.mul(e0.z));
   const s0Safe = max(sinTheta0, float(SIN2_FLOOR));
   const nTh = cosTheta0
@@ -402,26 +437,54 @@ export function createKerrLensingMaterial(
   const s20 = max(sinTheta0.mul(sinTheta0), float(SIN2_FLOOR));
   const fS0 = sig0.sub(uMassRg.mul(2).mul(r0)).div(sig0);
   const gTphi0 = uMassRg.mul(-2).mul(uSpin).mul(r0).mul(s20).div(sig0);
+  const bigA0 = r0.add(uSpin).mul(r0.add(uSpin)).sub(uSpin.mul(uSpin).mul(del0).mul(s20));
 
-  const energy = sqrt(max(fS0, denomFloor));
-  const lZ = nPh
+  // --- M10 observer-frame extraction (OBSERVER_FRAME_ADR §5): when active,
+  // pixel-local components map through the tetrad legs directly — valid
+  // INSIDE the ergosphere (no static frame required). Legacy path keeps the
+  // validated ADR §1.8 static decomposition bit-for-bit.
+  const obsKT = uLegU.x.add(nxObs.mul(uLegA1.x)).add(nyObs.mul(uLegA2.x)).add(nzObs.mul(uLegA3.x));
+  const obsKR = uLegU.y.add(nxObs.mul(uLegA1.y)).add(nyObs.mul(uLegA2.y)).add(nzObs.mul(uLegA3.y));
+  const obsKTH = uLegU.z.add(nxObs.mul(uLegA1.z)).add(nyObs.mul(uLegA2.z)).add(nzObs.mul(uLegA3.z));
+  const obsKPH = uLegU.w.add(nxObs.mul(uLegA1.w)).add(nyObs.mul(uLegA2.w)).add(nzObs.mul(uLegA3.w));
+  // Covariant components at the event (metric folded once per pixel):
+  //   k_t = -f_s k^t + g_tphi k^phi;  k_phi = g_tphi k^t + g_phiphi k^phi;
+  //   k_r = (Sigma/Delta) k^r;        k_theta = Sigma k^theta.
+  const energyMoving = fS0.mul(obsKT).sub(gTphi0.mul(obsKPH));
+  const lZMoving = gTphi0.mul(obsKT).add(bigA0.mul(s20).div(sig0).mul(obsKPH));
+  const prMoving = sig0.div(del0).mul(obsKR);
+  const pthMoving = sig0.mul(obsKTH);
+
+  const energyStatic = sqrt(max(fS0, denomFloor));
+  const lZStatic = nPh
     .mul(sinTheta0)
     .mul(sqrt(del0.div(max(fS0, denomFloor))))
     .add(gTphi0.div(max(fS0, denomFloor)));
-  const prInitial = sqrt(sig0.div(del0)).mul(nRadial);
-  const pthInitial = sqrt(sig0).mul(nTh);
+  const prStatic = sqrt(sig0.div(del0)).mul(nRadial);
+  const pthStatic = sqrt(sig0).mul(nTh);
+
+  const activeSel = uObserverF.greaterThan(0.5);
+  const energy = select(activeSel, energyMoving, energyStatic) as FloatNode;
+  const lZ = select(activeSel, lZMoving, lZStatic) as FloatNode;
+  const prInitial = select(activeSel, prMoving, prStatic) as FloatNode;
+  const pthInitial = select(activeSel, pthMoving, pthStatic) as FloatNode;
 
   // Outer horizon r+ = M(1 + sqrt(1 - a*^2)); capture band above it.
   const rPlus = uMassRg.add(uMassRg.mul(sqrt(max(float(1).sub(uSpin.mul(uSpin)), float(0)))));
   const captureRadius = rPlus.add(uCaptureEpsilon.mul(uMassRg));
 
   // Degenerate cameras: below horizon band, inside ergosphere (f_s <= 0),
-  // on-axis (static tetrad singular), or non-finite radius.
-  const initValid = select(r0.greaterThan(captureRadius), float(1), float(0))
+  // on-axis (static tetrad singular), or non-finite radius — LEGACY path.
+  // M10 active observers relax the ergosphere/on-axis gates (their tetrad
+  // needs no static frame) and keep only the horizon band + finiteness.
+  const legacyGates = select(r0.greaterThan(captureRadius), float(1), float(0))
     .mul(select(fS0.greaterThan(float(DENOM_FLOOR)), float(1), float(0)))
     .mul(select(sinTheta0.greaterThan(1e-4), float(1), float(0)))
+    .mul(select(r0.lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)));
+  const movingGates = select(r0.greaterThan(captureRadius), float(1), float(0))
     .mul(select(r0.lessThan(FINITE_MAGNITUDE_BOUND), float(1), float(0)))
-    .greaterThan(0.5);
+    .mul(select(energyMoving.abs().greaterThan(float(DENOM_FLOOR)), float(1), float(0)));
+  const initValid = select(uObserverF.greaterThan(0.5), movingGates, legacyGates).greaterThan(0.5);
 
   // ---------------------------------------------------------------------------
   // Hamiltonian sub-graphs (geometry only — SHADER_CONTRACTS §5)
@@ -701,11 +764,14 @@ export function createKerrLensingMaterial(
                   select(dopplerDenom.greaterThan(0), float(1), float(0))
                 );
                 const dopplerSafe = max(dopplerDenom.mul(gValid), denomFloor);
+                // M10 comoving-observer convention (ADR §6): the legacy factor
+                // assumed numerator E; the comoving measurement is nu_obs = 1
+                // so scale by 1/E. Exactly 1 for legacy camera/static paths.
                 const gFactor = select(
                   gValid.greaterThan(0.5),
                   float(1).div(max(ut, denomFloor).mul(dopplerSafe)),
                   float(0)
-                );
+                ).div(max(energy.abs(), denomFloor));
                 // emit() applies the g^3 Liouville transform INTERNALLY (its
                 // contract) — pass RAW g, never re-multiply (NM §17).
                 const emitted = diskEmission.emit({
@@ -935,6 +1001,18 @@ export function createKerrLensingMaterial(
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
+
+      // --- M10 observer-frame block ---
+      const obsLegU = readVec4Components(state['observerLegU']);
+      if (obsLegU) observerLegU.value.set(obsLegU[0], obsLegU[1], obsLegU[2], obsLegU[3]);
+      const obsA1 = readVec4Components(state['observerLegA1']);
+      if (obsA1) observerLegA1.value.set(obsA1[0], obsA1[1], obsA1[2], obsA1[3]);
+      const obsA2v = readVec4Components(state['observerLegA2']);
+      if (obsA2v) observerLegA2.value.set(obsA2v[0], obsA2v[1], obsA2v[2], obsA2v[3]);
+      const obsA3v = readVec4Components(state['observerLegA3']);
+      if (obsA3v) observerLegA3.value.set(obsA3v[0], obsA3v[1], obsA3v[2], obsA3v[3]);
+      const obsFlagV = readFiniteNumber(state['observerActive']);
+      if (obsFlagV !== null) uObserverF.value = obsFlagV;
     },
     dispose(): void {
       if (disposed) return;

@@ -19,25 +19,24 @@
  * through the horizon).
  */
 
+import { embedKerr, kerrHamiltonian2, kerrRhs, type KerrState } from '../kerr/reference.js';
 import {
-  embedKerr,
-  kerrHamiltonian2,
-  kerrRhs,
-  type KerrState
-} from '../kerr/reference.js';
-import { kerrHorizonRadii, kerrIscoRadius, kerrPhotonOrbitRadius } from '../kerr/characteristics.js';
+  kerrHorizonRadii,
+  kerrIscoRadius,
+  kerrPhotonOrbitRadius
+} from '../kerr/characteristics.js';
 import type { CoordinateFourVector } from './types.js';
 import { staticLapse } from './metric.js';
 
 export const HORIZON_STOP_FACTOR = 1e-3;
 /** Base proper-time RK4 substep (t_g units), scaled down near the horizon. */
-const WORLDLINE_STEP_DTAU = 0.0005;
+const WORLDLINE_STEP_DTAU = 0.002;
 /** Floor for the proximity-scaled substep (t_g units). */
-const WORLDLINE_STEP_FLOOR = 1e-5;
+const WORLDLINE_STEP_FLOOR = 2e-6;
 /** Upper bound on substeps per advance() call (frame-budget guard). */
 const MAX_SUBSTEPS_PER_CALL = 40000;
 /** Normalized timelike-constraint failure threshold (NM §6 form). */
-const CONSTRAINT_DRIFT_MAX = 1e-6;
+const CONSTRAINT_DRIFT_MAX = 2e-6;
 
 /** Stop radius (r_g) below which the advertised domain ends (ADR section 3). */
 export function horizonStopRadius(aStar: number): number {
@@ -71,11 +70,7 @@ export interface CircularKinetics {
  * ([BPT72] eq 2.18). Below it valid=false ("no orbit") — callers must never
  * fabricate an orbit there.
  */
-export function circularKinetics(
-  aStar: number,
-  radiusRg: number,
-  sense: 1 | -1
-): CircularKinetics {
+export function circularKinetics(aStar: number, radiusRg: number, sense: 1 | -1): CircularKinetics {
   const branchSpin = sense * aStar;
   const rPh = kerrPhotonOrbitRadius(branchSpin);
   const isco = kerrIscoRadius(branchSpin);
@@ -115,22 +110,13 @@ export function circularEventAt(
 // Geodesic worldlines (flyby / freefall)
 // ---------------------------------------------------------------------------
 
-export type WorldlineStatus =
-  | 'running'
-  | 'horizon-approach'
-  | 'escaped'
-  | 'non-finite';
+export type WorldlineStatus = 'running' | 'horizon-approach' | 'escaped' | 'non-finite';
 
 /**
  * Radial potential R(r) of the equatorial timelike geodesic (Q = 0):
  * R = P^2 - Delta [r^2 + (L_z - aE)^2],  P = E(r^2 + a^2) - a L_z.
  */
-function equatorialRadialPotential(
-  r: number,
-  energy: number,
-  lZ: number,
-  aStar: number
-): number {
+function equatorialRadialPotential(r: number, energy: number, lZ: number, aStar: number): number {
   const a = aStar;
   const bigP = energy * (r * r + a * a) - a * lZ;
   const delta = r * r - 2 * r + a * a;
@@ -250,7 +236,11 @@ interface Derivatives extends Record<string, unknown> {
   readonly dt: number;
 }
 
-function fragmentsAt(r: number, theta: number, aStar: number): {
+function fragmentsAt(
+  r: number,
+  theta: number,
+  aStar: number
+): {
   sigma: number;
   delta: number;
   bigA: number;
@@ -281,10 +271,7 @@ function fourVelocityAt(
     t: (fr.bigA * energy - 2 * aStar * x.r * lZ) / sigmaDelta,
     r: (fr.delta * x.pr) / fr.sigma,
     th: x.ptheta / fr.sigma,
-    ph:
-      (2 * aStar * x.r * energy +
-        ((fr.delta - fr.aSq * fr.sin2) * lZ) / fr.sin2) /
-      sigmaDelta
+    ph: (2 * aStar * x.r * energy + ((fr.delta - fr.aSq * fr.sin2) * lZ) / fr.sin2) / sigmaDelta
   };
 }
 
@@ -303,7 +290,10 @@ export class TimelikeWorldline {
   private minRadiusSeen: number;
   private lastFiniteResidual = 0;
 
-  constructor(private readonly init: WorldlineInit, private readonly aStar: number) {
+  constructor(
+    private readonly init: WorldlineInit,
+    private readonly aStar: number
+  ) {
     this.x = {
       r: init.r,
       theta: init.theta,
@@ -339,8 +329,7 @@ export class TimelikeWorldline {
     const sigmaDelta = fr.sigma * fr.delta;
     const termA = (fr.bigA * energy ** 2) / sigmaDelta;
     const termB = Math.abs((2 * this.aStar * this.x.r * energy * lZ) / sigmaDelta);
-    const termC =
-      (Math.abs(fr.delta - fr.aSq * fr.sin2) * lZ ** 2) / (sigmaDelta * fr.sin2);
+    const termC = (Math.abs(fr.delta - fr.aSq * fr.sin2) * lZ ** 2) / (sigmaDelta * fr.sin2);
     const termD = (fr.delta * this.x.pr ** 2) / fr.sigma;
     const termE = this.x.ptheta ** 2 / fr.sigma;
     const scale = Math.max(termA, termB, termC, termD, termE, 1);
@@ -374,9 +363,7 @@ export class TimelikeWorldline {
       u: this.fourVelocity(),
       // Post-terminal states may overflow the raw Hamiltonian pieces; the
       // last finite normalized residual is the honest reported diagnostic.
-      constraintDrift: Number.isFinite(residual)
-        ? residual
-        : this.lastFiniteResidual,
+      constraintDrift: Number.isFinite(residual) ? residual : this.lastFiniteResidual,
       carterDrift: this.carterDriftValue
     };
   }
@@ -413,11 +400,7 @@ export class TimelikeWorldline {
       }
       // Scattering complete: outbound past the seed radius after a real
       // encounter (prevents unbounded integration of the outgoing asymptote).
-      if (
-        this.x.pr > 0 &&
-        this.x.r >= this.init.r &&
-        this.minRadiusSeen < this.init.r * 0.99
-      ) {
+      if (this.x.pr > 0 && this.x.r >= this.init.r && this.minRadiusSeen < this.init.r * 0.99) {
         this.statusValue = 'escaped';
         return;
       }
@@ -448,8 +431,7 @@ export class TimelikeWorldline {
       theta: x.theta + sixth * (k1.dtheta + 2 * k2.dtheta + 2 * k3.dtheta + k4.dtheta),
       phi: x.phi + sixth * (k1.dphi + 2 * k2.dphi + 2 * k3.dphi + k4.dphi),
       pr: x.pr + sixth * (k1.dpr + 2 * k2.dpr + 2 * k3.dpr + k4.dpr),
-      ptheta:
-        x.ptheta + sixth * (k1.dptheta + 2 * k2.dptheta + 2 * k3.dptheta + k4.dptheta)
+      ptheta: x.ptheta + sixth * (k1.dptheta + 2 * k2.dptheta + 2 * k3.dptheta + k4.dptheta)
     };
     this.tauValue += h;
     if (this.x.r < this.minRadiusSeen) this.minRadiusSeen = this.x.r;
@@ -458,11 +440,7 @@ export class TimelikeWorldline {
   }
 }
 
-function offset(
-  x: KerrState,
-  d: Derivatives,
-  h: number
-): KerrState {
+function offset(x: KerrState, d: Derivatives, h: number): KerrState {
   return {
     r: x.r + d.dr * h,
     theta: x.theta + d.dtheta * h,

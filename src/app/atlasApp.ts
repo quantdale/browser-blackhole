@@ -479,6 +479,122 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       panelElement.append(mergerSection.root);
     }
 
+    // -- Black-hole M10 observer controls (canonical applyControlState) ------
+    if (destId === 'black-hole') {
+      const bhSection = createCollapsibleSection({ title: 'Observer (relativistic)', open: false });
+      const readObs = (): Record<string, unknown> => {
+        const share = (host.state.destinations['black-hole']?.state ?? {}) as Record<
+          string,
+          unknown
+        >;
+        const raw = share['observer'];
+        return typeof raw === 'object' && raw !== null ? (raw as Record<string, unknown>) : {};
+      };
+      const num = (key: string, fallback: number): number => {
+        const v = readObs()[key];
+        return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
+      };
+      const setObserver = (patch: Record<string, unknown>): void => {
+        host.setDestinationControl('black-hole', { observer: { ...readObs(), ...patch } });
+        markPanelDirty();
+      };
+      const modeRaw = readObs()['mode'];
+      const modeValue =
+        modeRaw === 'static' ||
+        modeRaw === 'circular' ||
+        modeRaw === 'flyby' ||
+        modeRaw === 'freefall'
+          ? modeRaw
+          : 'camera';
+      bhSection.body.append(
+        createSelectRow({
+          label: 'Observer mode',
+          options: [
+            { value: 'camera', label: 'Camera (legacy)' },
+            { value: 'static', label: 'Static' },
+            { value: 'circular', label: 'Physical Circular' },
+            { value: 'flyby', label: 'Flyby' },
+            { value: 'freefall', label: 'Freefall / Plunge' }
+          ],
+          value: modeValue,
+          onChange: (value) => {
+            setObserver({ mode: value });
+          }
+        }).root
+      );
+      if (modeValue === 'circular') {
+        bhSection.body.append(
+          createSliderRow({
+            label: 'Orbit radius',
+            min: 3.2,
+            max: 40,
+            step: 0.1,
+            unit: ' r_g',
+            value: num('circularRadiusRg', 9),
+            onInput: (value) => setObserver({ circularRadiusRg: value })
+          }).root,
+          createSelectRow({
+            label: 'Orbit sense',
+            options: [
+              { value: '1', label: 'Prograde (+phi)' },
+              { value: '-1', label: 'Retrograde' }
+            ],
+            value: String(readObs()['circularSense'] === -1 ? -1 : 1),
+            onChange: (value) => setObserver({ circularSense: Number(value) })
+          }).root
+        );
+      }
+      if (modeValue === 'flyby') {
+        bhSection.body.append(
+          createSliderRow({
+            label: 'Asymptotic speed',
+            min: 0.05,
+            max: 0.95,
+            step: 0.01,
+            unit: ' c',
+            value: num('flybyBetaInfinity', 0.5),
+            onInput: (value) => setObserver({ flybyBetaInfinity: value })
+          }).root,
+          createSliderRow({
+            label: 'Impact parameter',
+            min: -40,
+            max: 40,
+            step: 0.5,
+            unit: ' r_g',
+            value: num('flybyImpactParameterRg', 7),
+            onInput: (value) => setObserver({ flybyImpactParameterRg: value })
+          }).root
+        );
+      }
+      if (modeValue === 'freefall') {
+        bhSection.body.append(
+          createSliderRow({
+            label: 'Release radius',
+            min: 1.2,
+            max: 60,
+            step: 0.1,
+            unit: ' r_g',
+            value: num('freefallReleaseRadiusRg', 14),
+            onInput: (value) => setObserver({ freefallReleaseRadiusRg: value })
+          }).root
+        );
+      }
+      if (modeValue !== 'camera' && modeValue !== 'static') {
+        bhSection.body.append(
+          createSliderRow({
+            label: 'Proper-time rate',
+            min: -5,
+            max: 5,
+            step: 0.1,
+            unit: 'x',
+            value: num('timeScale', 1),
+            onInput: (value) => setObserver({ timeScale: value })
+          }).root
+        );
+      }
+      panelElement.append(bhSection.root);
+    }
+
     // -- Tidal Disruption controls (canonical applyControlState channel) ------
     if (destId === 'tidal-disruption') {
       const tdeSection = createCollapsibleSection({ title: 'Encounter', open: false });

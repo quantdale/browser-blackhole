@@ -74,11 +74,8 @@ export interface ObserverFrameSnapshot {
    * observer rest frame, aligned to camera right/up/forward respectively).
    * Null for invalid configurations.
    */
-  readonly tetradLegs: readonly [
-    CoordinateFourVector,
-    CoordinateFourVector,
-    CoordinateFourVector
-  ] | null;
+  readonly tetradLegs:
+    readonly [CoordinateFourVector, CoordinateFourVector, CoordinateFourVector] | null;
 
   /** Speed measured by LOCAL STATIC observers (null inside ergosphere). */
   readonly betaStatic: readonly [number, number, number] | null;

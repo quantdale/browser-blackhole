@@ -21,9 +21,7 @@ import {
   kerrPhotonOrbitRadius
 } from '../../src/phenomena/black-hole/kerr/characteristics.js';
 import { metricInner } from '../../src/phenomena/black-hole/observer/metric.js';
-import {
-  staticOrthonormalTriad
-} from '../../src/phenomena/black-hole/observer/metric.js';
+import { staticOrthonormalTriad } from '../../src/phenomena/black-hole/observer/metric.js';
 import {
   buildObserverTetrad,
   coordinateVectorToWorldDirection,
@@ -47,11 +45,7 @@ function cross3(
   a: readonly [number, number, number],
   b: readonly [number, number, number]
 ): [number, number, number] {
-  return [
-    a[1] * b[2] - a[2] * b[1],
-    a[2] * b[0] - a[0] * b[2],
-    a[0] * b[1] - a[1] * b[0]
-  ];
+  return [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
 }
 
 function normalize3(v: readonly [number, number, number]): [number, number, number] {
@@ -62,9 +56,7 @@ function normalize3(v: readonly [number, number, number]): [number, number, numb
 /** Camera axes looking from `position` toward the origin (+Y-ish up). */
 function axesLookingAt(position: readonly [number, number, number]): CameraAxisDirections {
   const forward = normalize3(sub3([0, 0, 0], position));
-  const right = normalize3(
-    cross3(forward, Math.abs(forward[1]) > 0.95 ? [0, 0, 1] : [0, 1, 0])
-  );
+  const right = normalize3(cross3(forward, Math.abs(forward[1]) > 0.95 ? [0, 0, 1] : [0, 1, 0]));
   const up = cross3(right, forward);
   return { right, up, forward };
 }
@@ -143,8 +135,7 @@ describe('M10 observer tetrads', () => {
       const sigma = ctx.r ** 2 + c.aStar ** 2 * Math.cos(ctx.theta) ** 2;
       const delta = ctx.r ** 2 - 2 * ctx.r + c.aStar ** 2;
       const sinTheta = Math.sin(ctx.theta);
-      const bigA =
-        (ctx.r ** 2 + c.aStar ** 2) ** 2 - c.aStar ** 2 * delta * sinTheta ** 2;
+      const bigA = (ctx.r ** 2 + c.aStar ** 2) ** 2 - c.aStar ** 2 * delta * sinTheta ** 2;
       const gTT = -(1 - (2 * ctx.r) / sigma);
       const gTPh = (-2 * ctx.r * c.aStar * sinTheta ** 2) / sigma;
       const gPhPh = (bigA * sinTheta ** 2) / sigma;
@@ -170,15 +161,9 @@ describe('M10 observer tetrads', () => {
         // of local frame axis 3 rotated into the requested n by combining the
         // triad's world directions (linear combination of orthonormal axes).
         const w = normalize3([
-          nn[0] * alignedAxes[0]![0] +
-            nn[1] * alignedAxes[1]![0] +
-            nn[2] * alignedAxes[2]![0],
-          nn[0] * alignedAxes[0]![1] +
-            nn[1] * alignedAxes[1]![1] +
-            nn[2] * alignedAxes[2]![1],
-          nn[0] * alignedAxes[0]![2] +
-            nn[1] * alignedAxes[1]![2] +
-            nn[2] * alignedAxes[2]![2]
+          nn[0] * alignedAxes[0]![0] + nn[1] * alignedAxes[1]![0] + nn[2] * alignedAxes[2]![0],
+          nn[0] * alignedAxes[0]![1] + nn[1] * alignedAxes[1]![1] + nn[2] * alignedAxes[2]![1],
+          nn[0] * alignedAxes[0]![2] + nn[1] * alignedAxes[1]![2] + nn[2] * alignedAxes[2]![2]
         ]);
         const reference = initKerrRay(c.pos, w, c.aStar);
         expect(energyMine).toBeCloseTo(reference.energy, 10);
@@ -219,10 +204,11 @@ describe('M10 observer tetrads', () => {
       };
       expect(metricInner(ctx, u, u)).toBeCloseTo(-1, 9);
       for (let i = 0; i < 3; i += 1) {
-        expect(Math.abs(metricInner(ctx, u, legs[i]))).toBeLessThan(1e-9);
+        const li = legs[i]!;
+        expect(Math.abs(metricInner(ctx, u, li))).toBeLessThan(1e-9);
         for (let j = 0; j < 3; j += 1) {
           const expected = i === j ? 1 : 0;
-          expect(metricInner(ctx, legs[i], legs[j])).toBeCloseTo(expected, 9);
+          expect(metricInner(ctx, li, legs[j]!)).toBeCloseTo(expected, 9);
         }
       }
       for (const raw of [
@@ -293,9 +279,11 @@ describe('M10 observer tetrads', () => {
       // Measured photon energy fixes the local scale: nu' = -k.u.
       const nuObs = -metricInner(ctx, k, u);
       // Observer-frame DIRECTION: k = nu'(u + n') => n'_a = (k.A_a)/nu'.
-      const nObs = legs!.map(
-        (leg) => metricInner(ctx, k, leg) / nuObs
-      ) as unknown as [number, number, number];
+      const nObs = legs!.map((leg) => metricInner(ctx, k, leg) / nuObs) as unknown as [
+        number,
+        number,
+        number
+      ];
       // legs[2] = forward -> motion direction (+x); 0/1 transverse:
       const expectedParallel = (nStatic[0] - beta) / (1 - beta * nStatic[0]);
       expect(nuObs).toBeCloseTo(gamma * (1 - beta * nStatic[0]), 8);
