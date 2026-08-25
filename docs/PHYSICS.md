@@ -140,3 +140,22 @@ Summary of locked conventions:
 - Known f32 limitations are DECLARED in ADR §1.19: near-critical winding and
   coordinate-pole passages carry an explicit CPU/GPU-mirrored honesty gate
   (pole-grazing escaped rays classify as numerical failure, never silently).
+
+## 12. Relativistic observer modes (M10)
+
+IMPLEMENTED as of M10. Convention authority: `docs/OBSERVER_FRAME_ADR.md`
+(CPU physics in `src/phenomena/black-hole/observer/`). Locked summary:
+
+- Physical observer worldlines/four-velocities are owned by the physics
+  layer; the ordinary camera supplies ONLY look orientation.
+- Modes: `camera` (legacy semantics, bit-stable), `static`, `circular`
+  (equatorial timelike geodesic, BPT72), `flyby` and `freefall` (integrated
+  geodesics with exact conserved E/L_z; Carter diagnostic).
+- Photon initialization: `k^mu = u^mu + n_a e_(a)^mu` from the event-built
+  tetrad; per pixel each backend forms k from per-frame leg uniforms.
+- Frequency: `g = (-k.u_obs)/(-k.u_emit)` with `nu_obs = 1` by construction;
+  dual convention — moving modes measure comoving, camera/static keep the
+  historical distant-astronomer recording bit-for-bit (goldens unchanged).
+- Horizon policy: freefall/plunge terminates at `r_stop = r+·(1+1e-3)` with
+  an explicit terminal state; Boyer-Lindquist retained (Kerr-Schild decision
+  recorded in OBSERVER_FRAME_ADR §3 / KERR_BACKEND_ADR §3).

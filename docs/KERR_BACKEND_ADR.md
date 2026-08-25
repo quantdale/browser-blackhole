@@ -444,3 +444,15 @@ sections), docs/SHADER_CONTRACTS.md §6 codes and §12 debug enum, and the
 existing intensity-transform chain is inherited verbatim. New debug quantities
 (L_z/E display, Carter proxy, turn counts, frame-dragging comparison) EXTEND
 the enum via the documented extension procedure rather than renumbering.
+
+## 3. M10 resolution of §1.10/§1.22 (Kerr-Schild decision)
+
+RESOLVED 2026-08-25 (M10 campaign): Boyer-Lindquist is RETAINED; ingoing
+Kerr-Schild is NOT implemented. The §1.22 trigger — plunge observers REQUIRING
+through-horizon integration — was not met: the shipped freefall contract
+terminates at the declared stop band r_stop = r+ · (1 + 1e-3) with an explicit
+TERMINAL state, and worldline integration uses the regular-at-horizon radial
+form so no coordinate singularity is ever integrated through. Full decision,
+fidelity boundaries and migration triggers:
+docs/OBSERVER_FRAME_ADR.md §3. The conversion record in §1.10 stands for any
+future migration.

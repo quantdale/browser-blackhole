@@ -70,6 +70,16 @@ interface ObserverState {
 
 M0–M8 only require `free/static` geometry as roadmap permits. Later modes may add typed substate; do not fake them as camera animations.
 
+M10 IMPLEMENTATION STATUS: the five-mode enum is now LIVE for the Cosmic
+Atlas black-hole destination through its per-module control record
+(`normalizeObserverControls` in `src/phenomena/black-hole/controlState.ts`;
+conventions in `docs/OBSERVER_FRAME_ADR.md`). The destination record is the
+production authority (share links/presets/live calls); `mode: 'camera'` is
+the total v1→v2 migration default so every historical preset/URL keeps its
+exact meaning. `simulationTime`/`timeScale`/`paused` above remain the app-
+schema surface; worldline evolution uses deterministic proper time gated on
+the atlas transport pause.
+
 Validation:
 
 - observer must remain outside the horizon for ordinary static/free controls unless a plunge backend explicitly owns inside-horizon behavior;

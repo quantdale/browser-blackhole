@@ -139,6 +139,14 @@ existing init mappings EXACTLY (Schwarzschild NM §2/§7; Kerr ADR §1.8
 including the orthogonalized phi-leg) — asserted numerically against
 `cpuReference` / `initKerrRay` outputs.
 
+LOCKED GPU POLICY (added at implementation): only MOVING modes drive the
+tetrad init path ON THE GPU. `camera`/`static` keep the legacy init
+bit-for-bit — f32 reordering inside an algebraically identical path still
+shifts golden frames, and the historical goldens are a hard gate. The
+static-equivalence proof therefore lives in the binary64 CPU suite
+(`tests/unit/observerFrame.test.ts`, machine precision), while the GPU
+anchor is behavioral: static mode renders exactly the pre-M10 image.
+
 ## 6. Frequency and aberration (locked)
 
 - Aberration is not a separate effect: it FOLLOWS from decomposing `n` on the
