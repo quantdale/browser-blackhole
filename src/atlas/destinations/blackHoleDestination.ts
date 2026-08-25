@@ -437,6 +437,8 @@ export class BlackHoleModule implements PhenomenonModule {
   private observerSeedSignature = '';
   /** Latest observer readout for the debug snapshot. */
   private lastObserverReadout: ObserverReadout | null = null;
+  /** Specific worldline-seed failure (surfaced verbatim in debug truth). */
+  private lastObserverSeedFailure: string | null = null;
 
   /** Reseed the geodesic worldline when observer controls change (deterministic). */
   private syncObserverSeed(): void {
@@ -454,9 +456,17 @@ export class BlackHoleModule implements PhenomenonModule {
       this.observerSeedSignature = signature;
       if (o.mode === 'flyby' || o.mode === 'freefall') {
         const seeded = seedGeodesicWorldline(this.controls);
-        this.geodesicWorldline = seeded.ok ? seeded.worldline : null;
+        if (seeded.ok) {
+          this.geodesicWorldline = seeded.worldline;
+          this.lastObserverSeedFailure = null;
+        } else {
+          this.geodesicWorldline = null;
+          // Surface the SPECIFIC domain violation verbatim (campaign §8).
+          this.lastObserverSeedFailure = seeded.reason;
+        }
       } else {
         this.geodesicWorldline = null;
+        this.lastObserverSeedFailure = null;
       }
       this.observerTau = 0;
     }
@@ -705,7 +715,8 @@ export class BlackHoleModule implements PhenomenonModule {
         cameraPositionWorld: [ctx.camera.position.x, ctx.camera.position.y, ctx.camera.position.z],
         cameraAxes,
         tau: this.observerTau,
-        geodesicWorldline: this.geodesicWorldline
+        geodesicWorldline: this.geodesicWorldline,
+        seedFailureReason: this.lastObserverSeedFailure
       });
       this.lastObserverReadout = observerPayload.readout;
       const lensingState: Record<string, unknown> = {
@@ -713,8 +724,7 @@ export class BlackHoleModule implements PhenomenonModule {
         ...observerPayload.stateKeys
       };
       const obsMode = this.controls.observer.mode;
-      const movingMode =
-        obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
+      const movingMode = obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
       if (
         movingMode &&
         observerPayload.readout.valid &&

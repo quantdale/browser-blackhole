@@ -72,6 +72,9 @@ export interface SnapshotRequest {
 
   /** Active geodesic worldline for flyby/freefall (seeded by the owner). */
   readonly geodesicWorldline: TimelikeWorldline | null;
+
+  /** Specific seeding failure to surface verbatim when the worldline is null. */
+  readonly seedFailureReason?: string | null;
 }
 
 /** Minimal circular diagnostics surfaced on the snapshot. */
@@ -79,6 +82,23 @@ export interface CircularKineticsLike {
   readonly omega: number | null;
   readonly unstable: boolean;
 }
+
+/** Runtime set of valid reasons for verbatim pass-through validation. */
+const INVALID_REASON_SET: ReadonlySet<string> = new Set([
+  'static-inside-ergosphere',
+  'observer-at-or-inside-horizon',
+  'observer-on-axis',
+  'no-circular-orbit-below-photon-orbit',
+  'degenerate-camera-axis',
+  'non-finite-parameter',
+  'flyby-captured-worldline',
+  'non-finite-worldline-state',
+  'release-inside-ergosphere',
+  'release-below-stop-band',
+  'flyby-energy-not-unbound',
+  'flyby-start-radius-out-of-domain',
+  'flyby-start-radius-no-inward-motion'
+]);
 
 export interface SnapshotWithUniforms {
   readonly snapshot: ObserverFrameSnapshot;
@@ -213,7 +233,17 @@ export function buildObserverFrameSnapshot(
   } else if (request.mode === 'flyby' || request.mode === 'freefall') {
     const wl: TimelikeWorldline | null = request.geodesicWorldline;
     if (!wl) {
-      return invalidSnapshot(request, 'non-finite-parameter');
+      // Surface the SPECIFIC seed failure verbatim (e.g.
+      // 'release-inside-ergosphere'); fall back only when the owner did not
+      // provide one. The reason string must already be a valid
+      // ObserverInvalidReason by the seeder's contract.
+      const specific = request.seedFailureReason ?? null;
+      return invalidSnapshot(
+        request,
+        specific !== null && INVALID_REASON_SET.has(specific)
+          ? (specific as ObserverInvalidReason)
+          : 'non-finite-parameter'
+      );
     }
     const sample = wl.sample();
     if (sample.status === 'non-finite') {

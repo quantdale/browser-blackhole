@@ -36,6 +36,8 @@ export interface ObserverFrameInput {
   readonly tau: number;
   /** Live geodesic worldline for flyby/freefall modes (owned by destination). */
   readonly geodesicWorldline: TimelikeWorldline | null;
+  /** Specific seeding failure for worldline modes (surfaced verbatim). */
+  readonly seedFailureReason?: string | null;
 }
 
 export interface ObserverReadout {
@@ -127,11 +129,13 @@ export function buildObserverUniformPayload(input: ObserverFrameInput): Observer
   const observer = controls.observer;
 
   const geodesic = input.geodesicWorldline;
-  let seedFailure: string | null = null;
-  if (observer.mode === 'flyby' || observer.mode === 'freefall') {
-    if (geodesic === null) {
-      seedFailure = 'worldline-not-seeded';
-    }
+  let seedFailure: string | null = input.seedFailureReason ?? null;
+  if (
+    (observer.mode === 'flyby' || observer.mode === 'freefall') &&
+    geodesic === null &&
+    seedFailure === null
+  ) {
+    seedFailure = 'worldline-not-seeded';
   }
 
   let circular: ReturnType<typeof circularDiagnostics> | null = null;
@@ -150,14 +154,14 @@ export function buildObserverUniformPayload(input: ObserverFrameInput): Observer
       circularRadiusRg: observer.circularRadiusRg,
       circularSense: observer.circularSense,
       circularPhi0Rad: 0,
-      geodesicWorldline: geodesic
+      geodesicWorldline: geodesic,
+      seedFailureReason: seedFailure
     },
     circular ?? undefined
   );
 
   const invalidReason =
-    built.snapshot.invalidReason ??
-    (seedFailure && !built.snapshot.valid ? seedFailure : null);
+    built.snapshot.invalidReason ?? (seedFailure && !built.snapshot.valid ? seedFailure : null);
 
   // LOCKED GPU policy (OBSERVER_FRAME_ADR §5 note): only MOVING modes drive
   // the tetrad init path on the GPU. Camera/static keep the legacy init
@@ -165,9 +169,7 @@ export function buildObserverUniformPayload(input: ObserverFrameInput): Observer
   // shifts golden frames) — the static-equivalence gate lives in the CPU
   // reference suite, where it holds to machine precision.
   const movingMode =
-    observer.mode === 'circular' ||
-    observer.mode === 'flyby' ||
-    observer.mode === 'freefall';
+    observer.mode === 'circular' || observer.mode === 'flyby' || observer.mode === 'freefall';
   const active = movingMode && built.observerActive === 1 && invalidReason === null ? 1 : 0;
 
   // World-space directions of the three spatial legs at this event (used by
@@ -199,14 +201,16 @@ export function buildObserverUniformPayload(input: ObserverFrameInput): Observer
     observerLegW2: activeFinal ? (legWorldDirs?.[1] ?? [0, 0, 0]) : [0, 0, 0],
     observerLegW3: activeFinal ? (legWorldDirs?.[2] ?? [0, 0, 0]) : [0, 0, 0],
     observerActive: activeFinal,
-    observerFrequencyComoving:
-      built.observerFrequencyConvention && activeFinal === 1 ? 1 : 0
+    observerFrequencyComoving: built.observerFrequencyConvention && activeFinal === 1 ? 1 : 0
   };
 
   return {
     stateKeys,
     readout: {
-      valid: active === 1,
+      // Physical validity of the observer configuration — INDEPENDENT of
+      // whether the GPU tetrad block is active (camera/static stay legacy on
+      // the GPU by locked policy but remain valid physical observers).
+      valid: invalidReason === null,
       invalidReason,
       terminalReason: built.snapshot.terminalReason,
       radiusRg: built.snapshot.radiusRg,
