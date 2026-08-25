@@ -171,3 +171,34 @@ Consequences:
   only — no SXS/sxs code or dependency enters the runtime bundle;
 - NR coordinate trajectories are consumed as gauge-dependent coordinate
   paths and must be labeled as such (never invariant observables).
+
+## CA-ADR-022 — Galaxy Collision regenerates Toomre & Toomre (1972) from published parameters
+
+The CA9 data-driven destination does not pin a third-party particle dataset.
+No galaxy-collision simulation with a verifiable explicit redistribution
+license existed at decision time (registration-gated portals, unreachable
+terms pages, ICs-only open records — full survey in
+`DATA_SOURCES_GALAXY_COLLISION.md`). Instead the destination pins the classic
+restricted three-body reference experiment (Toomre & Toomre 1972, ApJ 178,
+623, DOI 10.1086/151823) and REGENERATES its test-particle trajectories
+offline with repository-owned deterministic tooling.
+
+Reasons:
+
+- Gate G requires an explicit grant for redistributing derived artifacts of
+  external data; regeneration from published parameter facts needs none and
+  removes the licensing risk class entirely;
+- the restricted three-body method is small enough to re-implement exactly,
+  unlike NR waveforms (CA8), so self-generation is scientifically honest
+  rather than a shortcut;
+- determinism/reproducibility gates apply fully to our own integrator and
+  pinned parameters.
+
+Consequences:
+
+- citation obligations (Toomre & Toomre 1972) ride in the manifest, doc set,
+  and About/Fidelity panel;
+- the model's physical scope (no disk self-gravity, no hydrodynamics, no
+  halos, no star formation) must be disclosed wherever dynamics are shown;
+- morphology validation compares regenerated output against the published
+  configurations at reference phases — not against any third-party dump.
