@@ -26,6 +26,7 @@ SPH evolution required). Gate G satisfied by regeneration instead of grant. |
 | CA9-02 dataset selection | DONE | Pinned reference experiment recorded §2 + CA-ADR-022: Toomre & Toomre 1972 restricted three-body test-particle experiments; exact encounter parameters to be transcribed from the paper during CA9-03 with citations; morphology validated against published configurations at CA9-16. |
 | CA9-03 offline fetch/normalization | PENDING | Parameter transcription + deterministic IC sampling + integrator skeleton. |
 | CA9-04..CA9-19 | NOT STARTED | See docs/cosmic-atlas/WORK_PACKETS.md §CA9. |
+| State hygiene | DONE | Head recorded post-commit (this entry); tree clean between packets. |
 
 ## CA8 closure (carried context)
 
@@ -38,7 +39,7 @@ closure commit 0139e65). Full suite at closure: vitest 454/454, Playwright
 ## Commit chain this campaign
 
 ```
-<pending: research: lock CA9 source survey and regeneration decision>
+996bad7 research: lock CA9 galaxy-collision source decision and provenance survey
 ```
 
 ## Validation evidence
