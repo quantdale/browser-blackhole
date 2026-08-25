@@ -25,6 +25,7 @@
     "lut:study": "tsx tools/generate-luts/study.ts",
     "data:bbh:fetch": "python tools/cosmic-data/fetch_sxs_record.py",
     "data:bbh:reduce": "python tools/cosmic-data/reduce_bbh_merger.py",
+    "data:galaxy:selfcheck": "python tools/cosmic-data/restricted_three_body.py",
     "bench:black-hole": "node scripts/bench-black-hole.mjs",
     "bench:black-hole:numerical": "node scripts/bench-black-hole.mjs --backend=numerical --label=numerical",
     "bench:black-hole:lut": "node scripts/bench-black-hole.mjs --backend=lut --label=lut",

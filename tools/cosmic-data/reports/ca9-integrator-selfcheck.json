@@ -1,0 +1,98 @@
+{
+  "schemaVersion": 1,
+  "toolVersion": "ca9-03.1",
+  "packet": "CA9-03",
+  "provenance": {
+    "referenceExperiment": "Toomre & Toomre (1972), ApJ 178, 623",
+    "doi": "10.1086/151823",
+    "decisionAdr": "CA-ADR-022",
+    "parametersStatus": "placeholder-exercise-config",
+    "note": "Exercise configuration validates the ENGINE only; published encounter parameters arrive with CA9-03 parameter transcription against a legitimately obtained paper copy."
+  },
+  "units": {
+    "gravitationalConstant": 1.0,
+    "totalPairMass": 1.0,
+    "lengthUnitDiskRadius": 1.0,
+    "integrator": "velocity-verlet",
+    "fixedStepDt": 0.01,
+    "primaryPropagation": "barker-exact-parabolic"
+  },
+  "sampling": {
+    "seed": 1972,
+    "tracersPerGalaxy": 1024,
+    "diskRin": 0.5,
+    "diskRout": 2.5,
+    "diskProfileAlpha": 1.0,
+    "initialConditionsSha256": "0ec68875efab070499659964a552ca1f55f5b4a011ad4d9ee4b5e7d64d4b69a9"
+  },
+  "determinism": {
+    "icSha256Repeat": "0ec68875efab070499659964a552ca1f55f5b4a011ad4d9ee4b5e7d64d4b69a9",
+    "icBytesIdenticalOnResample": true
+  },
+  "checks": [
+    {
+      "id": "barker-finite-difference",
+      "threshold": 1e-8,
+      "measured": 3.4734198162905244e-10,
+      "pass": true
+    },
+    {
+      "id": "conic-invariants",
+      "threshold": 1e-12,
+      "measured": 6.2803698347351e-16,
+      "pass": true
+    },
+    {
+      "id": "time-reversal",
+      "threshold": 1e-9,
+      "measured": 0.0,
+      "comparedParticles": 1097,
+      "quarantineCountsForwardBackward": [1, 74],
+      "pass": true
+    },
+    {
+      "id": "reflection-symmetry",
+      "threshold": 1e-9,
+      "measured": 0.0,
+      "comparedParticles": 1931,
+      "pass": true
+    },
+    {
+      "id": "circular-orbit-single-mass",
+      "thresholds": {
+        "radiusAmplitude": 0.001,
+        "freqRelErr": 0.0001
+      },
+      "measured": {
+        "radiusAmplitude": 2.958237371974981e-5,
+        "freqRelErr": 1.406573099831577e-5
+      },
+      "pass": true
+    },
+    {
+      "id": "frozen-potential-energy-drift",
+      "threshold": 5e-6,
+      "measured": 0.0,
+      "quarantineCount": 341,
+      "pass": true
+    },
+    {
+      "id": "quarantine-fail-closed",
+      "thresholds": {
+        "quarantineCount": 1
+      },
+      "measured": {
+        "quarantineCount": 1,
+        "finalStateFinite": true
+      },
+      "pass": true
+    }
+  ],
+  "exerciseMetrics": {
+    "windowT": [-50.0, 70.0],
+    "keyframeCount": 481,
+    "unboundBothFractionAtEnd": 0.03125,
+    "quarantineCount": 0
+  },
+  "allPass": true
+}

@@ -34,6 +34,7 @@ committed. No SXS/sxs code or dependency reaches the browser bundle.
 | --- | --- | --- |
 | `fetch_sxs_record.py` | CA8-03 | Pinned-record fetcher with checksum verification |
 | `reduce_bbh_merger.py` | CA8-04..08 | Extract → align → resample → error report → BBM1 binary |
+| `restricted_three_body.py` | CA9-03..05 | Galaxy-collision engine: Barker-exact parabolic primaries + velocity-Verlet tracer integration + analytic self-checks (`reports/ca9-integrator-selfcheck.json`; gated by `tests/unit/ca9Integrator.test.ts`) |
 | `scratch/` | — | Local cache for raw source files (not committed) |
 
 ## Binary schema (BBM1, version 1)
