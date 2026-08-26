@@ -39,12 +39,34 @@ export default defineConfig({
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
   timeout: 60_000,
-  use: {
-    ...(channel ? { channel } : {}),
-    ...devices['Desktop Chrome'],
-    viewport: { width: 1280, height: 800 },
-    baseURL: `http://127.0.0.1:${e2ePort}`
-  },
+  // M11-01: the default (Channel/desktop-Chrome) project runs the whole
+  // suite; the firefox project runs ONLY the engine-agnostic compatibility
+  // matrix (fallback/unsupported logic on a second engine). It is selected
+  // explicitly (`--project=firefox`) so ordinary runs stay unchanged.
+  projects: [
+    {
+      name: 'default',
+      use: {
+        ...(channel ? { channel } : {}),
+        ...devices['Desktop Chrome'],
+        viewport: { width: 1280, height: 800 },
+        baseURL: `http://127.0.0.1:${e2ePort}`
+      }
+    },
+    {
+      name: 'firefox',
+      testMatch: /compatibility-matrix\.spec\.ts/,
+      // Headless Firefox renders through software WebGL2: parallel workers
+      // starve each other past the arrival polls. Serial keeps the run
+      // honest (the suite asserts correctness, never speed).
+      workers: 1,
+      use: {
+        ...devices['Desktop Firefox'],
+        viewport: { width: 1280, height: 800 },
+        baseURL: `http://127.0.0.1:${e2ePort}`
+      }
+    }
+  ],
   webServer: {
     command: `npm run preview -- --host 127.0.0.1 --port ${e2ePort} --strictPort`,
     url: `http://127.0.0.1:${e2ePort}`,
