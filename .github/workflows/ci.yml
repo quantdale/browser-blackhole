@@ -25,11 +25,14 @@ jobs:
       - run: npm run test
       - run: npm run build
 
-  browser-smoke-webgl-fallback:
-    # Hosted runners provide no representative WebGPU adapter; this job runs
-    # the backend-agnostic smoke suite on Chromium (WebGL2 fallback expected).
-    # It must never be read as a WebGPU validation.
-    name: browser-smoke (Chromium, WebGL2 fallback expected)
+  browser-fallback:
+    # Hosted runners provide no representative WebGPU adapter. This job runs
+    # the FULL Playwright `default` project on Chromium; tests that require
+    # WebGPU adapt to the WebGL2 fallback path (they are not skipped). It is
+    # therefore a broad fallback-suite run, NOT a curated smoke subset, and it
+    # must never be read as a WebGPU validation. Full WebGPU/parity/golden
+    # evidence is produced by local capable runners (docs/CI_CD.md §16).
+    name: browser (Chromium, full suite; WebGL2 fallback)
     needs: quality
     runs-on: ubuntu-latest
     steps:

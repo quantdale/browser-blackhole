@@ -6,7 +6,7 @@ The planning repository intentionally does not freeze package versions. The firs
 
 Chosen package manager: **npm** (default per this document; lockfile: `package-lock.json`, lockfileVersion 3).
 
-Environment verified: Node v22.23.2 / npm 10.9.8 on Windows (Git Bash). All versions below are exact pins in `package.json`; no `^`/`~` ranges.
+Environment verified: Node v22.23.2 / npm 10.9.8 on Windows (Git Bash). All versions below are exact pins in `package.json`; no `^`/`~` ranges. (The `tsx` dev dependency was historically a `^` range and has been pinned to its resolved 4.23.12 in the M12-RI integrity pass.)
 
 | Package | Version | Role / rationale |
 | --- | --- | --- |
@@ -20,6 +20,7 @@ Environment verified: Node v22.23.2 / npm 10.9.8 on Windows (Git Bash). All vers
 | `prettier` | 3.9.6 | Deterministic formatter. |
 | `@types/three` | 0.185.4 | Type declarations matching `three` 0.185.1 (three ships no bundled types). |
 | `@types/node` | 22.20.1 | Node types for config files, matching the Node 22 runtime line. |
+| `tsx` | 4.23.12 | TypeScript/ESM script runner for `tools/cosmic-data` Python-calling helpers and `*.mjs`/`*.ts` dev scripts (e.g. bench harnesses, LUT generators). Exact pin; the manifest had carried a `^` range which contradicted the exact-pin policy — corrected in the M12-RI integrity pass. |
 
 No frontend framework and no other runtime dependency is used (per policy below). Re-verify these import paths after any Three.js upgrade; upgrades happen in isolated commits.
 

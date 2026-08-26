@@ -1,8 +1,26 @@
 # Galaxy Collision — data source decision (CA9-01/02)
 
 Status: LOCKED for CA9. Recorded 2026-08-25 against catalog/site state as of
-that date. Any change requires a new ADR and re-running the reduction +
-validation chain.
+that date; **updated 2026-08-26** (deep-audit addendum below). Any change
+requires a new ADR and re-running the reduction + validation chain.
+
+### 2026-08-26 addendum — primary-source access changed from BLOCKED to TRANSCRIBE
+
+The 2026-08-25 survey recorded the paper as effectively closed-access for exact
+parameter extraction. A 2026-08-26 source scan found the paper is now publicly
+reachable as a scanned PDF:
+
+- NASA GISS publication page: `https://pubs.giss.nasa.gov/abs/to01000a.html`
+- NASA NTRS reprint record: `https://ntrs.nasa.gov/citations/19720056411`
+- DOI: `10.1086/151825` (note: the canonical DOI is `10.1086/151823`; cite the
+  published version precisely when transcribing).
+
+This moves CA9 from "source inaccessible" to "source must be transcribed and
+validated" (audit F-04). It does **not** by itself grant redistribution rights
+for the scanned PDF: production parameter transcription still happens once, in
+CA9-03, against a legitimately obtained copy, and lands in the repo as cited
+constants. Do NOT commit the paper PDF unless its redistribution rights are
+independently established.
 
 ## 1. Survey (CA9-01)
 
@@ -64,9 +82,13 @@ Notes:
   license beyond honest citation. What IS forbidden (START_HERE hard
   constraints) is copying anyone's code or data dumps without provenance —
   none enters this destination.
-- The paper itself remains CLOSED-access (verified via Semantic Scholar API).
-  We cite it and use its published parameter values as facts; we neither
-  redistribute its figures/text nor claim access-derived numbers we cannot
+- The paper is now publicly reachable as a scanned PDF via NASA GISS
+  (`pubs.giss.nasa.gov/abs/to01000a.html`) and NASA NTRS
+  (`ntrs.nasa.gov/citations/19720056411`); the 2026-08-25 "CLOSED-access"
+  assessment is superseded for parameter transcription purposes. We cite it and
+  use its published parameter values as facts; we neither redistribute its
+  figures/text (the scanned PDF is not committed without independently
+  established redistribution rights) nor claim access-derived numbers we cannot
   transcribe and cite precisely. Parameter transcription happens once, in
   CA9-03, against a legitimately obtained copy, and lands in the repo as
   cited constants.

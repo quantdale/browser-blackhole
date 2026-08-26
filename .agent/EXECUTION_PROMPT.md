@@ -6,6 +6,10 @@ Mode: autonomous implementation with evidence-driven gates
 Canonical audit: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`
 Canonical requirements/tasks: `openspec/changes/*`
 
+**Status (2026-08-26):** Phase A — `m12-neutron-star-surface-lensing` — is **COMPLETE**
+(commit `a827563`, pushed to `origin/main`). Phase B — `m12-repository-integrity` — is the
+**ACTIVE** phase. Phase C — `ca9-galaxy-collision` — remains blocked until Phase B gates pass.
+
 ## Mission
 
 Execute the next Browser Blackhole campaign from the current repository state. Do not redo completed M0–M11 work. Do not treat the old roadmap order as more important than a proven production defect.
@@ -236,4 +240,4 @@ Stop the dependent workstream and record evidence rather than improvising when:
 
 The campaign is complete when every unblocked OpenSpec change is implemented, validated, documented, committed and pushed; all completed task checkboxes reflect evidence; durable state/backlog identify the true next work; and no production scientific claim exceeds the model actually running in the browser.
 
-Begin with `m12-neutron-star-surface-lensing` now.
+Begin with `m12-repository-integrity` now (Phase A is closed).

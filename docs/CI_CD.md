@@ -30,14 +30,14 @@ Recommended jobs:
 - unit/reference tests;
 - build.
 
-### browser-smoke
+### browser (Chromium, full suite; WebGL2 fallback)
 
 - install pinned Playwright browser;
 - serve built artifact;
-- run smoke navigation/init/error tests;
+- run the FULL Playwright `default` project (`npx playwright test`), not a curated smoke subset;
 - archive screenshot/console logs on failure.
 
-If WebGPU is unavailable on hosted runner, assert the intended fallback/unsupported UX explicitly rather than pretending WebGPU rendered.
+Hosted runners provide no representative WebGPU adapter, so this job exercises the WebGL2 fallback path for every test that adapts to backend. It is a broad fallback-suite run, NOT a WebGPU validation: never read a green run as proof the WebGPU path rendered. Full WebGPU/parity/golden evidence is produced by local capable runners (see `.agent/STATE.md`). Coverage is deliberately NOT narrowed to shorten CI.
 
 ### visual
 
@@ -246,4 +246,4 @@ Release only when:
 
 ## 16. CI truthfulness rule
 
-Every job name and report must say what actually ran. Prefer `browser-smoke-webgl-fallback` over `gpu-test` when the runner never acquired WebGPU. Environment-deferred gates are recorded explicitly, not silently marked successful.
+Every job name and report must say what actually ran. The hosted browser job is `browser-fallback` (full Playwright suite on Chromium under WebGL2 fallback), never `gpu-test`, because the runner never acquired WebGPU. Environment-deferred gates are recorded explicitly, not silently marked successful.

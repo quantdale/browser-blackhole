@@ -179,9 +179,10 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
       h.time.pause();
       h.time.scrubTo(0.2);
     });
-    await page.waitForTimeout(400);
+    // Wait on the observable postcondition (readout reflects the scrubbed
+    // phase) instead of an arbitrary fixed delay.
+    await expect(readout).toContainText('inspiral', { timeout: 5000 });
     const textAt02 = (await readout.textContent()) ?? '';
-    expect(textAt02).toContain('inspiral');
 
     const timelineTimeAt02 = await page.evaluate(
       () => window.__ATLAS_APP__!.host.time.snapshot().physicalTime
@@ -195,9 +196,9 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
       const h = window.__ATLAS_APP__!.host;
       h.time.scrubTo(0.67);
     });
-    await page.waitForTimeout(400);
-    const textAt067 = (await readout.textContent()) ?? '';
-    expect(textAt067).toContain('ringdown');
+    // Wait on the observable postcondition (readout reflects the scrubbed
+    // phase) instead of an arbitrary fixed delay.
+    await expect(readout).toContainText('ringdown', { timeout: 5000 });
     expect(errors).toEqual([]);
   });
 

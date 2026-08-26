@@ -37,11 +37,11 @@ npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)
 
 Unit/reference tests: Vitest (`npm run test`). Browser/E2E/goldens: Playwright (`npm run e2e`). Visual goldens live in `tests/browser/goldens/` and are NEVER regenerated merely to go green (`docs/cosmic-atlas/GOLDEN_IMAGES.md`).
 
-Frame-time benchmarks report CPU-side rAF deltas; `frameGpuMs` is `null` unless genuine GPU timestamp queries are wired (`docs/BENCHMARK_MATRIX.md`).
+Frame-time benchmarks report CPU-side rAF frame deltas and, when the WebGPU backend exposes hardware timestamp queries, a true GPU pass time in `frameGpuMs` (e.g. the black-hole and neutron-star harnesses populate it; each record's `gpuTimingNote` states the source). CPU/rAF and GPU timing are never conflated (`docs/BENCHMARK_MATRIX.md`).
 
 ## Current development continuation point
 
-The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **M11 production hardening & release candidate** (compatibility matrix, mobile/touch, device-loss terminal state, resource-leak torture, accessibility, license audit, deployment contract, matched moving-observer benchmarks; M10 relativistic observer modes complete).
+The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **M12-NS (neutron-star direct surface ray tracing) COMPLETE** and **M12-RI (repository integrity) ACTIVE** (see `.agent/STATE.md` for exact evidence). M11 production hardening & release candidate is closed (compatibility matrix, mobile/touch, device-loss terminal state, resource-leak torture, accessibility, license audit, deployment contract, matched moving-observer benchmarks; M10 relativistic observer modes complete).
 
 ## Autonomous agent quick start
 
@@ -137,4 +137,4 @@ Dependency versions are pinned exactly in `package.json` + lockfile.
 
 ## Current status
 
-**Implemented.** Cosmic Atlas host + seven production destinations; M8 closed with a measured LUT auto-default policy; CA5–CA8 complete; **M9 Kerr spacetime complete**; **M10 relativistic observer modes complete** (physical static/circular/flyby/freefall observers with comoving-tetrad aberration/Doppler, deterministic proper-time playback, truthful near-horizon stop band); **M11 production hardening release candidate in progress** — see `.agent/STATE.md` for exact evidence.
+**Implemented.** Cosmic Atlas host + seven production destinations; M8 closed with a measured LUT auto-default policy; CA5–CA8 complete; **M9 Kerr spacetime complete**; **M10 relativistic observer modes complete** (physical static/circular/flyby/freefall observers with comoving-tetrad aberration/Doppler, deterministic proper-time playback, truthful near-horizon stop band); **M11 production hardening release candidate COMPLETE**; **M12-NS neutron-star direct surface ray tracing COMPLETE** (direct Schwarzschild surface pass, CPU/GPU parity, regenerated NS goldens); **M12-RI repository integrity ACTIVE** — see `.agent/STATE.md` for exact evidence.

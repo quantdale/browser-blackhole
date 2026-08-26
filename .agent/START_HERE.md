@@ -17,15 +17,15 @@ The historical M0–M11 campaign is complete. **Do not restart M0, M1, or any co
 
 Execute these in order and treat each gate as a dependency barrier:
 
-1. `openspec/changes/m12-neutron-star-surface-lensing/`
-2. `openspec/changes/m12-repository-integrity/`
-3. `openspec/changes/ca9-galaxy-collision/`
+1. ~~`openspec/changes/m12-neutron-star-surface-lensing/`~~ — **COMPLETE** (2026-08-26, commit `a827563`; direct Schwarzschild surface ray tracing implemented and validated).
+2. `openspec/changes/m12-repository-integrity/` — **ACTIVE** (the current phase).
+3. `openspec/changes/ca9-galaxy-collision/` — blocked until M12-RI gates pass; then source-lock from Toomre & Toomre 1972 via NASA GISS/NTRS.
 
 Why this order: the deep audit found a HIGH scientific-fidelity mismatch in the already-production Neutron Star destination. Its documentation/spec requires direct Schwarzschild backward ray tracing to the material surface, while current implementation comments explicitly say photon paths remain straight and that surface ray tracing is not implemented. Close that production defect before adding CA9.
 
 ## First commands
 
-From repository root, after reading the active change:
+From repository root, after reading the active change (`openspec/changes/m12-repository-integrity/`):
 
 ```bash
 git status --short

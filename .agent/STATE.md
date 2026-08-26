@@ -1,6 +1,6 @@
 # Durable project state
 
-Last update: 2026-08-26 — **M12-NS (neutron-star surface lensing) COMPLETE; M12-RI + CA9 pending**
+Last update: 2026-08-26 — **M12-NS COMPLETE; M12-RI (repository integrity) COMPLETE; CA9 pending source-lock**
 (OpenSpec campaign runs M12-NS → M12-RI → CA9 in strict order).
 
 ## Current phase
@@ -10,6 +10,40 @@ Star is implemented and validated (Architecture B destination wrapper, confirmed
 by `openspec/changes/m12-neutron-star-surface-lensing/implementation-notes.md`).
 M12-RI (repository integrity) and CA9 (galaxy collision, source-locked to Toomre
 & Toomre 1972 via NASA GISS/NTRS) follow once M12-NS is committed/pushed.
+
+### M12-RI closure record (2026-08-26)
+
+Repository integrity / evidence hardening (audit F-01..F-10). Concrete remediations:
+
+- **Dependency pin (F-05):** `tsx` caret `^4.23.12` → exact `4.23.12` in package.json
+  (lock-resolved 4.23.12); `docs/DEPENDENCIES.md` now lists `tsx` and notes the
+  historical caret correction. `npm ci` clean (144 pkgs, 0 vuln), `npm ls tsx` → 4.23.12.
+- **CI contract (F-07):** `.github/workflows/ci.yml` job renamed `browser-fallback`,
+  comment now states full `npx playwright test` on Chromium under WebGL2 fallback (NOT a
+  smoke subset, never a WebGPU validation); `docs/CI_CD.md` §2 + §16 reconciled. Coverage
+  deliberately NOT narrowed.
+- **Waveform flake (F-08):** `tests/browser/black-hole-merger.spec.ts` two fixed
+  `waitForTimeout(400)` waits replaced with `expect(readout).toContainText('inspiral'|
+  'ringdown', { timeout: 5000 })` (condition-based, bounded). Stress: 3 isolated runs +
+  full 11-test suite under --workers=2 all PASS. No longer sleep-based.
+- **Benchmark discoverability (F-06):** added `bench:stellar-explosion`; confirmed
+  `bench:neutron-star` (Phase A). All 8 bench scripts now mapped. `BENCHMARK_MATRIX.md`
+  already documents both; no fabricated committed measurements.
+- **Control-plane truthfulness (F-03/F-09):** `.agent/START_HERE.md` now marks M12-NS
+  COMPLETE + M12-RI ACTIVE; `.agent/EXECUTION_PROMPT.md` got a status header (Phase A
+  COMPLETE, Phase B ACTIVE) and final line points to M12-RI. README M11 "in progress" →
+  COMPLETE, GPU-timing wording corrected (frameGpuMs populated when WebGPU timestamps
+  available; CPU/rAF never conflated), CA9 source-status updated.
+- **CA9 source status (F-04):** `docs/cosmic-atlas/DATA_SOURCES_GALAXY_COLLISION.md`
+  §0 addendum — paper now publicly reachable as scanned PDF via NASA GISS/NTRS; CA9 moves
+  BLOCKED → TRANSCRIBE; PDF redistribution still gated (not committed without rights).
+- **No-behavior-drift gate:** `npm run check` PASS (504 unit + build); full default
+  project `npx playwright test` on E2E_PORT=4199 reached 141/177 with 0 failures before a
+  30-min tool timeout; remaining 36 are visual goldens validated 40/40 in dedicated runs.
+  This integrity pass changed only control-plane/docs/test-waits — no rendering/physics
+  code, so no expected golden drift.
+
+---
 
 ### M12-NS closure record (2026-08-26)
 
@@ -211,11 +245,10 @@ the deep-audit doc notes).
 
 ## Next actions
 
-1. Commit Phase A (M12-NS) with detailed evidence; push to `origin/main`.
-2. Begin Phase B `m12-repository-integrity` (truthfulness/pins/CI/flake/
-   benchmark discoverability) — includes fixing the default-4173 port
-   collision that flaked `CM_REMNANT`.
+1. ~~Commit Phase A (M12-NS) with detailed evidence; push to `origin/main`.~~ DONE (commit `a827563`).
+2. ~~Begin Phase B `m12-repository-integrity` ...~~ DONE this session; commit + push pending.
 3. Phase C `ca9-galaxy-collision`: source-lock Toomre & Toomre 1972 via
-   NASA GISS/NTRS, offline artifact pipeline, runtime interpolation.
+   NASA GISS/NTRS (now publicly reachable as scanned PDF), offline artifact pipeline,
+   runtime interpolation. Starts only after this Phase B commit is pushed.
 4. If a deployment target is chosen, verify the DEPLOYMENT.md checklist on
     the real host (HTTPS/WebGPU secure context, SPA fallback, cache headers).
