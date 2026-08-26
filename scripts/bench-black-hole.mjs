@@ -15,6 +15,21 @@
  *        [--width=1280] [--height=800] [--render-scale=1|0]
  *        [--frames=600] [--warmup-ms=9000] [--channel=msedge|chrome|chromium]
  *        [--label=run] [--port=4183]
+ *        [--observer=camera|static|circular|flyby|freefall]
+ *        [--observer-radius=12] [--observer-sense=1]
+ *        [--observer-beta=0.6] [--observer-impact=8] [--observer-release=14]
+ *
+ * M11 (WS1B): --observer drives the M10 physical observer through the
+ * canonical control channel as a FIRST-CLASS benchmark input. The atlas
+ * transport is PAUSED, so the worldline sits at its deterministic tau = 0
+ * epoch for the whole run (matched moving-observer comparisons measure the
+ * same spacetime/view state). The record's `observer` block carries the
+ * mode plus the live readout (radius/beta) so a mis-applied mode fails the
+ * comparison honestly instead of silently benchmarking the wrong scene.
+ * Moving-observer Kerr workloads run the scaled step budget (see
+ * blackHoleDestination) — the record's quality block reports the tier, and
+ * the preset contract (recommendedQuality) should be respected when a
+ * comparison intends to represent the shipped experience.
  *
  * --render-scale=0 keeps governor-managed dynamic resolution; any value in
  * [0.25, 2] pins a FIXED internal resolution (dynamicResolution off), which is
@@ -50,6 +65,27 @@ const warmupMs = Number(arg('warmup-ms', '9000'));
 const channel = String(arg('channel', 'msedge'));
 const label = String(arg('label', 'run'));
 const port = Number(arg('port', '4183'));
+const observer = String(arg('observer', ''));
+const observerRadius = Number(arg('observer-radius', '12'));
+const observerSense = Number(arg('observer-sense', '1'));
+const observerBeta = Number(arg('observer-beta', '0.6'));
+const observerImpact = Number(arg('observer-impact', '8'));
+const observerRelease = Number(arg('observer-release', '14'));
+
+const OBSERVER_MODES = new Set([
+  '',
+  'camera',
+  'static',
+  'circular',
+  'flyby',
+  'freefall'
+]);
+if (!OBSERVER_MODES.has(observer)) {
+  console.error(
+    `[bench] invalid --observer=${observer} (camera|static|circular|flyby|freefall)`
+  );
+  process.exit(2);
+}
 
 if (!BACKENDS.has(backend)) {
   console.error(`[bench] invalid --backend=${backend} (numerical|lut|auto)`);
@@ -118,6 +154,48 @@ if (backend !== 'auto') {
     window.__ATLAS_APP__.host.setTrajectoryBackend(pref);
   }, backend);
 }
+
+// M11 WS1B: first-class observer selection through the canonical control
+// channel. Applied AFTER the backend so a Kerr destination override (which
+// forces the numerical backend) still reports its truthful effective backend
+// below. The transport stays PAUSED: the worldline sits at tau = 0.
+if (observer !== '') {
+  await page.evaluate(
+    ({ mode, radius, sense, beta, impact, release }) => {
+      const patch = { mode };
+      if (mode === 'circular') {
+        patch.circularRadiusRg = radius;
+        patch.circularSense = sense >= 0 ? 1 : -1;
+      }
+      if (mode === 'flyby') {
+        patch.flybyBetaInfinity = beta;
+        patch.flybyImpactParameterRg = impact;
+      }
+      if (mode === 'freefall') {
+        patch.freefallReleaseRadiusRg = release;
+      }
+      const host = window.__ATLAS_APP__.host;
+      // Deterministic epoch: a preset-borne observer starts integrating at
+      // destination ENTER, which precedes the transition-inactive signal the
+      // harness waits on, so tau may already have advanced by a
+      // machine-load-dependent amount. Observer control changes reseed tau
+      // to 0 (M10-07), so route through 'camera' and back — the final
+      // signature is the requested one and the worldline sits at tau = 0
+      // under the paused transport.
+      host.setDestinationControl('black-hole', { observer: { mode: 'camera' } });
+      host.setDestinationControl('black-hole', { observer: patch });
+    },
+    {
+      mode: observer,
+      radius: observerRadius,
+      sense: observerSense,
+      beta: observerBeta,
+      impact: observerImpact,
+      release: observerRelease
+    }
+  );
+  await page.waitForTimeout(warmupMs / 4);
+}
 await page.waitForTimeout(warmupMs / 2);
 
 const info = await page.evaluate(() => {
@@ -136,6 +214,17 @@ const info = await page.evaluate(() => {
   return {
     activeDestination: host.state.atlas.activeDestination,
     activePreset: host.state.atlas.activePreset || '(default)',
+    observerMode: snap.observerMode ?? null,
+    observerReadout: (() => {
+      const ro = snap.observerReadout ?? {};
+      return {
+        valid: ro.valid ?? null,
+        invalidReason: ro.invalidReason ?? null,
+        radiusRg: ro.radiusRg ?? null,
+        betaMagnitude: ro.betaMagnitude ?? null,
+        properTimeTau: ro.properTimeTau ?? null
+      };
+    })(),
     requestedBackend: snap.trajectoryBackendRequested ?? null,
     effectiveBackend: snap.trajectoryBackendEffective ?? null,
     fallbackReason: snap.lutFallbackReason ?? null,
@@ -204,6 +293,14 @@ const record = {
     effective: info.effectiveBackend,
     fallbackReason: info.fallbackReason
   },
+  // M11 WS1B: first-class observer evidence. `requested` is the harness
+  // input; `effectiveMode`/`readout` come from the destination debug
+  // snapshot so a mis-applied mode is visible in the record itself.
+  observer: {
+    requested: observer === '' ? null : observer,
+    effectiveMode: info.observerMode,
+    readout: info.observerReadout
+  },
   lut: {
     familyLoaded: info.lutFamilyLoaded,
     familyDir: info.lutFamilyDir,
@@ -261,8 +358,13 @@ const backendMismatch =
   backend !== 'auto' && info.effectiveBackend !== backend
     ? `[bench] WARNING: requested ${backend}, effective ${info.effectiveBackend} (${info.fallbackReason})`
     : null;
+const observerMismatch =
+  observer !== '' && info.observerMode !== observer
+    ? `[bench] WARNING: requested observer ${observer}, effective ${info.observerMode}`
+    : null;
 if (qualityMismatch !== null) {
   console.error(`[bench] WARNING: quality tier mismatch ${qualityMismatch}`);
 }
 if (backendMismatch !== null) console.error(backendMismatch);
+if (observerMismatch !== null) console.error(observerMismatch);
 process.exit(0);

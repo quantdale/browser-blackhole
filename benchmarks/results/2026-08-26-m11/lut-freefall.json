@@ -1,0 +1,96 @@
+{
+ "schemaVersion": 1,
+ "kind": "black-hole-backend-comparison",
+ "date": "2026-08-26T06:27:30.465Z",
+ "label": "m11-lut-freefall",
+ "commit": "2156d464ec44caad01391b0d502ca326fb8d3b6e",
+ "destination": "black-hole",
+ "preset": "default",
+ "trajectoryBackend": {
+  "requested": "lut",
+  "effective": "lut",
+  "fallbackReason": null
+ },
+ "observer": {
+  "requested": "freefall",
+  "effectiveMode": "freefall",
+  "readout": {
+   "valid": true,
+   "invalidReason": null,
+   "radiusRg": 14,
+   "betaMagnitude": 0,
+   "properTimeTau": 0
+  }
+ },
+ "lut": {
+  "familyLoaded": true,
+  "familyDir": "schwarzschild-v1-415dea94",
+  "webgl2Filterable": true
+ },
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "amd rdna-2"
+ },
+ "backend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  972,
+  727
+ ],
+ "quality": {
+  "requested": "medium",
+  "effectiveTier": "medium",
+  "mismatch": null
+ },
+ "renderScale": 1,
+ "activityMode": "stable",
+ "warmupMs": 9000,
+ "sampleFrames": 600,
+ "frameCpuMs": {
+  "min": 4,
+  "median": 7,
+  "p90": 7.1,
+  "p95": 7.1,
+  "p99": 7.3,
+  "max": 13.9,
+  "mean": 7,
+  "stdev": 0.58
+ },
+ "frameGpuMs": null,
+ "gpuTimingNote": "not available: rAF frame deltas are CPU-side measurements, not GPU timestamps",
+ "memory": {
+  "estimatedGpuBytesTotal": 12304900,
+  "textureCount": 1,
+  "resourceScopes": [
+   {
+    "name": "shared-post",
+    "textures": 0,
+    "bytes": 8488452
+   },
+   {
+    "name": "transition-director",
+    "textures": 0,
+    "bytes": 921600
+   },
+   {
+    "name": "destination:black-hole",
+    "textures": 1,
+    "bytes": 2894848
+   }
+  ]
+ },
+ "consoleErrors": 0,
+ "suppressedConsoleErrors": 0,
+ "consoleErrorSamples": [],
+ "notes": "fixed internal resolution via render-scale=1"
+}
