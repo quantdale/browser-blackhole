@@ -205,3 +205,21 @@ M11 release audit checks:
 - repository LICENSE/NOTICE completeness.
 
 Any unknown-provenance asset is removed or replaced before release.
+
+## 18. M11 release license/provenance audit (2026-08-26)
+
+Result: **PASS** — no unknown-provenance production asset; CA9 source status
+truthfully blocked. Evidence a maintainer can verify from the repo alone:
+
+| Check | Result | Evidence |
+| --- | --- | --- |
+| Repository license | FIXED this audit: root `LICENSE` (MIT) added — `package.json` declared `"license": "MIT"` but no license text file existed | `LICENSE` |
+| Runtime dependencies | `three@0.185.1` only — MIT | `node_modules/three/package.json` |
+| Dev/tooling dependencies | MIT or Apache-2.0 (eslint/prettier/vite/vitest/tsx MIT; @playwright/test, typescript, @types/* Apache-2.0); none ship in the production bundle | `package.json`, bundled-output audit below |
+| Copied/adapted external code | None beyond the documented LUT-generator lineage (CPU RHS/RK4 primitives shared with `tools/generate-luts`, in-repo, no external source) | this doc §3.1 |
+| Generated asset lineage | LUT binaries regenerate from in-repo recipes; manifests carry schema version + checksums validated before runtime trust | `tools/generate-luts/`, `src/phenomena/black-hole/lut/validate.ts`, `docs/BENCHMARK_MATRIX.md` |
+| Scientific/data citations | SXS BBH record attribution + reduction provenance documented; CA9 galaxy-collision source remains BLOCKED (Toomre & Toomre 1972 closed-access) — placeholder exercise configuration is labeled as such and never presented as published data | `docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md`, `docs/cosmic-atlas/DATA_SOURCES_GALAXY_COLLISION.md` |
+| External fonts/images/media | None — system font stack, no third-party media assets | `index.html`, `src/ui/*` |
+| Secrets / machine artifacts in production output | Automated scan of `dist/index.html` + all `dist/assets/*.js` for absolute user paths and API-key patterns: CLEAN (12 files) | scan command in the M11 campaign record |
+| Telemetry | None; adapter/benchmark data never transmitted automatically | this doc §13/§14 |
+| CSP compatibility | Bundled scripts/styles only, no `eval`, no inline remote code; final directives remain a deployment-time decision per §16 | `vite.config.ts`, bundle audit |
