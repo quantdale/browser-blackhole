@@ -521,13 +521,7 @@ export function createKerrLensingMaterial(
    * (capture fires before they bind on valid rays).
    */
   const coreDerivsFn = Fn(
-    ([rIn, thIn, prIn, pthIn, metric]: [
-      unknown,
-      unknown,
-      unknown,
-      unknown,
-      unknown
-    ]): Vec4Node => {
+    ([rIn, thIn, prIn, pthIn, metric]: [unknown, unknown, unknown, unknown, unknown]): Vec4Node => {
       const r = max(float(rIn as FloatNode), denomFloor);
       const th = float(thIn as FloatNode);
       const pr = float(prIn as FloatNode);
@@ -625,10 +619,7 @@ export function createKerrLensingMaterial(
     const th = float(thIn as FloatNode);
     const st = sin(th);
     const s2 = max(st.mul(st), float(SIN2_FLOOR));
-    const sigma = max(
-      r.mul(r).add(uSpin.mul(uSpin).mul(cos(th).mul(cos(th)))),
-      denomFloor
-    );
+    const sigma = max(r.mul(r).add(uSpin.mul(uSpin).mul(cos(th).mul(cos(th)))), denomFloor);
     const delta = max(r.mul(r).sub(uMassRg.mul(2).mul(r)).add(uSpin.mul(uSpin)), denomFloor);
     return vec4(sigma, delta, s2, st);
   });

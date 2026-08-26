@@ -1,13 +1,76 @@
 # Durable project state
 
-Last update: 2026-08-26 — **M11 PRODUCTION HARDENING & RELEASE CANDIDATE COMPLETE.**
-
-Campaign: `.agent/EXECUTION_PROMPT.md` (M11, Planned-From `6a51389`) executed
-to its completion gate and marked COMPLETED. Baseline reconciled at startup:
-local `main` fast-forwarded `6a51389` → `3b25cb1` (remote planner commit);
-worktree clean; no destructive operations at any point.
+Last update: 2026-08-26 (later) — **POST-M11 SYSTEMIC OPTIMIZATION CAMPAIGN COMPLETE**
+(user-mandated; BH-121 closed, Kerr hot loop deduplicated, full-repository
+performance characterization recorded in `docs/PERFORMANCE.md` §14).
 
 ## Current phase
+
+**Optimization campaign complete; no active planner prompt.** The completed
+M11 release candidate (below) is unchanged except for the two validated
+optimization commits described here.
+
+### Optimization campaign record (2026-08-26)
+
+Scope inspected with evidence: Kerr numerical pass (hot loop read line-by-line,
+benchmarked), Schwarzschild numerical + LUT passes, all seven CA destinations,
+atlas frame orchestration/governor, startup/boot path and bundle composition,
+benchmark harnesses, unit-test/build runtimes.
+
+Landed:
+
+1. **BH-121 GPU timestamp timing** (`e2375cf`): `trackTimestamp` on both
+   renderer construction paths, bounded 90-frame pool-resolve cadence,
+   `kernel.gpuFrameMs` = last resolved frame's summed render-pass ms (verbatim
+   three.js TimestampQueryPool semantics — per-frame total, never averaged
+   into CPU windows), surfaced via debugInventory + `frameGpuMs`
+   in bench-black-hole/bench-kerr records. Overhead measured nil vs baseline
+   commit (interleaved A/B).
+2. **Kerr RK4 common-subexpression elimination** (`a36fed1`): shared
+   per-stage metric block (`stageMetricFn` vec4 Sigma/Delta/sin²/sin consumed
+   by RHS + azimuthal rate), hoisted pixel-invariant conserved products
+   (E², 4MaE·Lz prefix-factored to preserve op order exactly), carried
+   segment-start world-Y height instead of re-embedding last iteration's
+   endpoint every disk-enabled step. Provably bit-identical trajectories.
+3. Docs: `docs/PERFORMANCE.md` §14 — first true GPU-ms table per backend,
+   methodology warning (bimodal machine state ~97–160 ms across same-day
+   reruns; headless rAF quantizes to ~7 ms quanta → interleaved A/B required
+   for any claim).
+
+Evidence highlights (amd rdna-2, headless msedge 151, 972×727 internal,
+medium tier): LUT ~10.2 ms GPU / CA destinations 0.5–0.8 ms GPU /
+numerical-Schwarzschild 40.7 ms GPU / Kerr static ~129 ms GPU — the Kerr
+backend is the only GPU-bound heavy scene and its cost is mandated by the
+validated integration budgets (deeper cuts would change trajectories and
+goldens; explicitly out of scope). OPT-2's effect sits below this
+environment's measurement floor (~1 quantum); kept as strictly-less-work,
+zero-drift.
+
+Investigated and deliberately NOT changed (with reasons):
+
+- Idle-frame skipping for paused/static scenes (paused-state-only benefit;
+  stale-frame invalidation risk High; would invalidate benchmark methodology).
+- Step-size policy / bisection iterations / escape radius changes (locked
+  CPU-parity formulas; goldens must stay stable).
+- Startup waterfall (assets lazy per destination; local boot ≈3.4 s dominated
+  by WebGPU pipeline compilation — expected per PERFORMANCE_BUDGETS §15).
+- Bundle splitting of `three.webgpu` (prebundled 1.03 MB / 284 KB gz; not
+  tree-shakeable; lazy destination chunks already exist).
+- Per-frame JS allocations in destination.render (whole orchestrated JS
+  frame measures 0.24–0.6 ms — immaterial).
+
+Validation: `npm run check` PASS (prettier/eslint/tsc clean, vitest 476/476,
+vite build PASS); `npm run e2e` **169/169 PASS** (one unrelated timing flake
+in black-hole-merger waveform cursor sync on run 1 under 6-worker GPU load;
+passed standalone and in the full rerun — test uses a fixed 400 ms wait);
+parity corpora (kerr/integrator/ray) webgpu+webgl2 twice; visual goldens
+40/40 across two independent runs over the modified shader codegen.
+Temporary probe scripts and machine-local benchmark JSONs were removed
+before closure (raw machine records are not committed by policy).
+
+---
+
+# Previous phase (M11)
 
 **M11 COMPLETE — release candidate.** Packet status:
 

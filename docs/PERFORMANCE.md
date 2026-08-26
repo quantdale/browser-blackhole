@@ -152,3 +152,48 @@ machine, so the Kerr path's extra cost is real and visible at default tiers.
 All numbers are CPU-side rAF deltas (`frameGpuMs: null` — no GPU timestamps).
 No optimization was performed in M9 beyond establishing this telemetry
 (BH-206 gate: optimize only against trustworthy failure/error telemetry).
+
+## 14. GPU-timestamp characterization and first optimization pass (2026-08-26 campaign)
+
+BH-121 landed: `SharedRendererKernel` constructs the renderer with
+`trackTimestamp: true` (three.js self-gates on device `timestamp-query`
+support) and resolves the shared render pool on a bounded 90-frame cadence.
+`kernel.gpuFrameMs` exposes the LAST resolved frame's summed render-pass
+time — a real GPU measurement, never inferred from CPU deltas; surfaced via
+debugInventory and both benchmark harnesses
+(`frameGpuMs.lastResolvedFrame`). Measured overhead of enabling timestamps:
+none (interleaved same-day A/B against the pre-change commit was identical
+within noise).
+
+First honest per-backend GPU readings on the same machine/adapter (headless
+msedge, pinned medium tier, `render-scale=1`, internal 972×727; rAF medians
+from matched runs the same day):
+
+| Backend / scene | CPU rAF median | GPU render-pass ms |
+| --- | ---: | ---: |
+| Schwarzschild LUT (`default`) | ~13.8 ms | ~10.2 ms |
+| Schwarzschild numerical | 41.7 ms | 40.7 ms |
+| Kerr static `a*=+0.9` | ~132 ms | ~129 ms |
+| CA destinations (all others) | ~7 ms (vsync) | 0.5–0.8 ms |
+
+Corrections to earlier wording this supersedes: the "numerical path is
+vsync-bound (~7 ms)" reading described an earlier era/smaller internal size;
+at the current default viewport it measures ~40 ms GPU. Every non-black-hole
+CA destination is idle-cheap (sub-millisecond GPU). The Kerr numerical
+backend is fully GPU-bound and dominates application frame cost; its cost is
+mandated integration fidelity at the validated step budgets, so the shipped
+mitigations remain the Auto tier ladder + preset fidelity notes.
+
+Measurement-methodology warning recorded with this data: same-commit reruns
+of `bench-kerr.mjs` on one day spanned ~97–160 ms medians (bimodal machine
+state), and headless rAF deltas quantize to ~7 ms compositing quanta. Any
+before/after performance claim from this environment MUST use interleaved
+A/B runs; single-run cross-session comparisons are not valid evidence.
+
+Kerr hot-loop optimization landed in the same campaign (see `.agent/STATE.md`):
+pure common-subexpression elimination inside the RK4 stage evaluation (shared
+per-stage metric block, hoisted conserved-product nodes, carried segment-start
+height). Provably identical trajectories (term-for-term operation order);
+kerr/integrator/ray parity corpora and all 40 goldens unchanged. Its frame-time
+effect sits below this environment's quantized measurement floor; it is kept as
+strictly-less-work with zero drift risk.

@@ -337,9 +337,9 @@ export class SharedRendererKernel implements IRendererKernel {
 
   /** Best-effort async resolve of the shared render timestamp pool. */
   private async resolveGpuTimestamps(): Promise<void> {
-    const renderer = this.rendererValue as
-      | { resolveTimestampsAsync?: (type: string) => Promise<unknown> }
-      | null;
+    const renderer = this.rendererValue as {
+      resolveTimestampsAsync?: (type: string) => Promise<unknown>;
+    } | null;
     if (renderer === null || this.gpuResolveInFlight) return;
     if (this.disposed || this.deviceLost) {
       // Reset the counter so a recovered session starts a fresh window.
