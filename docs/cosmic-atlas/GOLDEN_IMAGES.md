@@ -70,6 +70,51 @@ A golden passes iff `meanAbsDelta <= tolerance.meanAbsDelta` AND
 | TDE_WINDING | `?preset=deep-penetration` @ phase 0.77 | First differential-Kepler wraps of the most-bound family (beta 2.5 morphology) | 8 / 48 / 4% | stable |
 | TDE_SHOCK | `?preset=solar-canonical` @ phase 0.78 | Edge-on circularization ring (VolumeService torus) + BH marker; catches volume-ignition and phase-gating regressions | 8 / 48 / 4% | stable |
 | TDE_NASCENT_DISK | `?preset=solar-canonical` @ phase 0.97 | Procedural annulus with radial falloff, streams/accents retired; catches late-phase resource-retirement and disk-gain regressions | 8 / 48 / 5% | stable |
+| KERR_ZERO_SPIN | `/atlas/black-hole?preset=kerr-zero-spin` | Numerical Kerr a*=0 spin->0 convergence view; catches silent backend/fallback flips | 6 / 2 / 32 | hardware WebGPU |
+| KERR_HIGH_PROGRADE | `?preset=kerr-high-prograde` | a*=+0.9 prograde disk to the BPT ISCO; frame-dragged asymmetric photon ring | 8 / 3 / 40 | hardware WebGPU |
+| KERR_RETROGRADE | `?preset=kerr-retrograde` | a*=-0.7 retrograde-relative disk; ISCO ~8 r_g; must differ geometrically from prograde | 8 / 3 / 40 | hardware WebGPU |
+| AGN_INNER_ENGINE | `/atlas/quasar-agn?preset=inner-engine` | INNER zone DIRECT lensing + corona proxy | 6 / 2 / 32 | stable |
+| AGN_NUCLEAR | `?preset=quasar-reference` | NUCLEAR zone outer disk + torus + jet base | 8 / 3 / 40 | stable |
+| AGN_RADIO_GALAXY | `?preset=radio-galaxy` | GALACTIC zone kpc jets + procedural host | 8 / 3 / 40 | stable |
+| AGN_BLAZAR_VIEW | `?preset=blazar-view` | Blazar orientation beaming asymmetry | 8 / 3 / 40 | stable |
+| BHM_INSPIRAL | `/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral` @ 0 | Late NR inspiral markers + reduced coordinate trails | 6 / 2 / 32 | stable |
+| BHM_NEAR_MERGER | same @ 0.56 | Final approach convergence | 8 / 4 / 48 | stable |
+| BHM_MERGER_FLASH | `?preset=sxs-bbh-0001-merger` @ 0.615 | Merger flash envelope over DATA_DRIVEN timing | 10 / 6 / 56 | stable |
+| BHM_RINGDOWN | `?preset=sxs-bbh-0001-ringdown` | Kerr handoff with source-derived remnant spin/mass | 8 / 4 / 48 | stable |
+| BHM_REMNANT | `?preset=sxs-bbh-0001-remnant` | Final Kerr remnant view (source-derived parameters) | 8 / 4 / 48 | stable |
+| OBSERVER_CIRCULAR | `/atlas/black-hole?preset=observer-circular` | M10/M11: physical circular observer (r=12) frozen at tau=0; aberrated/Doppler comoving-tetrad view; catches silent reversion to camera-mode rendering | 8 / 3 / 40 | stable |
+| OBSERVER_FLYBY | `?preset=observer-flyby` | M10/M11: flyby observer (beta_inf 0.6, b=8) at its integrated epoch state | 8 / 3 / 40 | stable |
+| OBSERVER_FREEFALL | `?preset=observer-freefall` | M10/M11: freefall observer at release epoch (tau=0, r0=14) | 8 / 3 / 40 | stable |
+| KERR_CIRCULAR_OBSERVER | `?preset=kerr-circular-observer` | M10/M11: Kerr moving-observer comoving optics (r=8, a*=+0.6); catches tetrad-composition and double-counting regressions | 8 / 4 / 48 | ultra pinned (preset recommendedQuality; scaled moving-observer step budget) |
+
+## Baseline corrections (M11 campaign, 2026-08-25)
+
+Two reviewed corrections were required; both are harness/evidence defects, not
+physics tolerance changes:
+
+1. **Vacuous Kerr/BHM baselines.** `runGoldenExpectation` skipped its
+   navigation step for every URL whose path started with `/atlas/black-hole` —
+   which silently included `?preset=...` rows AND the whole
+   `black-hole-merger` destination. All three KERR_* and all five BHM_*
+   baselines were byte-identical captures of the DEFAULT black-hole view
+   (verified by MD5), so their regression gate compared the default scene
+   against itself. The parser now navigates on any destination/preset
+   difference and asserts the requested destination+preset before capture.
+   The eight affected baselines were regenerated (they now contain real Kerr
+   and merger imagery); every other existing baseline stayed byte-identical
+   across the fix, and the full 40-row suite was verified twice-stable.
+2. **M10 moving-observer baselines established (after a High render fix).**
+   The first GPU implementation of the M10 moving-observer photon
+   initialization derived conserved quantities with static-emitter direction
+   formulas (dropping u's spatial drift and mis-deriving L), so all four
+   moving-observer presets rendered an empty sky (Schwarzschild) or mass
+   numerical-failure magenta (Kerr). The corrected covariant init
+   (k = u + sum n_a A_a; E = -k_t; pr = k_r/E; b = L/E with the world
+   direction Wu + sum n_a W_a), sight-line-corrected preset camera poses, and
+   the scaled Kerr moving-observer step budget shipped together; the four new
+   baselines were then established and verified twice-stable. Numeric gates:
+   `tests/unit/observerPhotonInit.test.ts` (static-equivalence to 1e-12,
+   null constraint, Kerr near-null constants) and the existing parity suites.
 
 ## Update procedure
 

@@ -154,6 +154,13 @@ async function compareInPage(
 
 /** Poll until the atlas app reports arrival at a non-transitioning state. */
 async function waitForArrival(page: Page): Promise<void> {
+  // Identity guard: `reuseExistingServer` only checks URL reachability, so a
+  // foreign server answering on the e2e port must fail loudly here instead of
+  // producing confusing per-test timeouts.
+  await expect(
+    page.locator('#scene'),
+    'served page has no #scene — a foreign server is answering on the e2e port (set E2E_PORT)'
+  ).toBeAttached({ timeout: 10_000 });
   await expect
     .poll(
       async () =>
@@ -285,16 +292,36 @@ export async function runGoldenExpectation(page: Page, spec: GoldenSpec): Promis
       host.time.scrubTo(0);
     });
   }
+  // Parse the FULL destination id and preset from the spec URL. The legacy
+  // `startsWith('/atlas/black-hole')` skip silently swallowed every
+  // '?preset=...' row AND the whole black-hole-merger destination (its id
+  // shares the prefix), so KERR_*/BHM_* baselines captured the DEFAULT view.
+  // Navigate whenever the parsed target differs from the boot route.
   const target = url.replace(/^.*\/atlas\//, '/atlas/');
-  if (!target.startsWith('/atlas/black-hole')) {
-    await page.evaluate((route) => {
-      const [pathAndQuery] = [route];
-      const withoutPrefix = pathAndQuery.replace(/^\/atlas\//, '');
-      const [dest, query] = withoutPrefix.split('?');
-      const preset = new URLSearchParams(query ?? '').get('preset') ?? undefined;
-      (window.__ATLAS_APP__!.host as unknown as GoldenControlSurface).navigate(dest!, preset);
-    }, target);
+  const pathAndQuery = target.slice('/atlas/'.length);
+  const [destId, query] = pathAndQuery.split('?');
+  const requestedPreset = new URLSearchParams(query ?? '').get('preset') ?? undefined;
+  if (destId !== 'black-hole' || requestedPreset !== undefined) {
+    await page.evaluate(
+      ({ dest, preset }) => {
+        (window.__ATLAS_APP__!.host as unknown as GoldenControlSurface).navigate(dest!, preset);
+      },
+      { dest: destId!, preset: requestedPreset }
+    );
     await waitForArrival(page);
+  }
+  // Defensive post-conditions: the capture must show the REQUESTED
+  // destination and preset. A navigation regression must fail loudly here,
+  // never compare the wrong scene against a committed baseline.
+  await expect
+    .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.activeDestination))
+    .toBe(destId);
+  if (requestedPreset !== undefined) {
+    await expect
+      .poll(() =>
+        page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.activePreset || 'default')
+      )
+      .toBe(requestedPreset);
   }
 
   await applyDeterminismForcing(page, spec);
@@ -695,5 +722,46 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
     notes:
       'Final Kerr remnant view (mass 0.9516 M, |chi| = 0.6865). Must differ geometrically from KERR presets only through the source-derived parameters; catches silent parameter drift.'
+  },
+  // --- M10 moving-observer goldens -------------------------------------------
+  // The observer worldline is frozen at the deterministic epoch tau = 0
+  // (global clock paused BEFORE destination enter reseeds tau), so these
+  // frames are as deterministic as the Kerr rows; tolerances match the
+  // spinning Kerr class because comoving-tetrad ray init adds f32 winding
+  // sensitivity per pixel.
+  {
+    name: 'OBSERVER_CIRCULAR',
+    url: '/atlas/black-hole?preset=observer-circular',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'Physical circular observer at r = 12 r_g frozen at tau = 0: aberrated/Doppler-shifted disk from the comoving tetrad. Catches loss of observer-frame aberration/frequency physics and silent reversion to camera-mode rendering.'
+  },
+  {
+    name: 'OBSERVER_FLYBY',
+    url: '/atlas/black-hole?preset=observer-flyby',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'Flyby observer (beta_inf = 0.6, b = 8 r_g) at its integrated epoch-tau state: scattering-encounter optics from conserved E/L_z worldline. Catches flyby-worldline/tetrad regressions and scripted-motion impostors.'
+  },
+  {
+    name: 'OBSERVER_FREEFALL',
+    url: '/atlas/black-hole?preset=observer-freefall',
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    notes:
+      'Freefall observer at release epoch (tau = 0, r0 = 14 r_g, at rest relative to static observers): infalling-frame view of disk/sky. Catches freefall initial-condition and stop-band truthfulness regressions.'
+  },
+  {
+    name: 'KERR_CIRCULAR_OBSERVER',
+    url: '/atlas/black-hole?preset=kerr-circular-observer',
+    // Ultra = the preset's recommendedQuality: the moving-observer Kerr
+    // workload needs the scaled step budget (M11), and pinning low would
+    // baseline a known budget-limited failure band instead of the scene.
+    pinTier: 'ultra',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Kerr a* = +0.6 prograde circular observer at r = 8 r_g, epoch-frozen: frame dragging composed with comoving aberration through the full Kerr tetrad chain. Catches Kerr/moving-observer composition and double-counting regressions.'
   }
 ];
