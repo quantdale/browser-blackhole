@@ -931,7 +931,9 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   const tick = (nowMs: number): void => {
     const dtSeconds = Math.min((nowMs - lastMs) / 1000, 0.25);
     lastMs = nowMs;
-    host.frame(dtSeconds);
+    if (!host.isFatalDeviceLoss) {
+      host.frame(dtSeconds);
+    }
 
     uiTimer += dtSeconds;
     if (uiTimer >= UI_SYNC_INTERVAL_SECONDS) {
@@ -986,6 +988,15 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     }
   });
 
+  // M11-03 device-loss terminal state: the status line is the app's
+  // user-visible error surface (same presentation as boot failures). Frame
+  // submission stops — the kernel refuses work on a lost device and the
+  // tick skips host.frame so the governor stops sampling a dead pipeline.
+  const unsubscribeFatal = host.onFatal(() => {
+    status.textContent =
+      'Atlas error [GPU_DEVICE_LOST]: Graphics device was lost — reload the page to restart with a fresh device.';
+  });
+
   // Test/inspection hook (mirrors __BLACKHOLE_TEST__ convention from main.ts).
   // Shape is load-bearing for tests/browser/support/atlasHook.ts — do not change
   // without updating that declaration and the specs that consume it.
@@ -1032,6 +1043,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       unsubscribeStatus();
+      unsubscribeFatal();
       delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];
       waveformPanel?.dispose();
       waveformPanel = null;

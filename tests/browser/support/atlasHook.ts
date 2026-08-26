@@ -30,6 +30,10 @@ interface InventoryView {
   pendingPrepares: number;
   /** Present when a backend engaged; null during boot or before first frame. */
   backend: { api: string; adapterName: string } | null;
+  /** Monotonic renderer generation (bumped on device loss / re-init). */
+  rendererGeneration: number;
+  /** Quality governor view (tier + live dynamic-resolution scale). */
+  governor: { tier: string; renderScale: number };
 }
 
 /**
@@ -84,6 +88,14 @@ interface AtlasHook {
     setDestinationControl(destinationId: string, partial: Record<string, unknown>): void;
     /** Debug snapshot of the active destination module (null when none). */
     activeDestinationDebugSnapshot(): Record<string, unknown> | null;
+    /** Manual render-scale override (null = governor-managed). */
+    renderScaleOverride: number | null;
+    /** True once the rendering device was lost (terminal for the session). */
+    isFatalDeviceLoss: boolean;
+    /** M11-03 TEST-ONLY: inject device loss through the production path. */
+    simulateDeviceLoss(): void;
+    /** Navigate to a destination (latest-wins through the director). */
+    navigate(destinationId: string, presetId?: string): unknown;
   };
   navigate(destinationId: string, presetId?: string): unknown;
   /** Renders one deterministic frame in-task and returns a 5x5 RGB grid ("r,g,b"). */

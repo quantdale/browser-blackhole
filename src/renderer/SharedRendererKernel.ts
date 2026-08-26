@@ -304,6 +304,17 @@ export class SharedRendererKernel implements IRendererKernel {
   }
 
   /**
+   * TEST-ONLY fault injection (M11-03): fire the PRODUCTION device-loss path
+   * for the current generation exactly as the real loss sources would.
+   * Never called by production code; consumed by the device-loss browser
+   * suite through the host test hook so the injected fault exercises the
+   * same notify -> subscriber state machine, not a parallel fake path.
+   */
+  simulateDeviceLossForTest(reason = 'test-injection'): void {
+    this.notifyDeviceLoss(this.generation, reason);
+  }
+
+  /**
    * Wire all loss sources for the current generation. Deduplicated by
    * {@link notifyDeviceLoss} so the same physical loss event notifies once even
    * though three's unified hook, the raw `device.lost` promise, and (on WebGL)

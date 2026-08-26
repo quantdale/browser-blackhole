@@ -259,6 +259,9 @@ export class CosmicAtlasHost {
   private initPromise: Promise<void> | null = null;
   private disposed = false;
   private unsubscribeDeviceLost: (() => void) | null = null;
+  /** M11-03: set when the rendering device is lost (terminal for the session). */
+  private fatalDeviceLoss = false;
+  private readonly fatalCallbacks = new Set<() => void>();
 
   // Visual presentation state mirrored for the public snapshot; applied to the
   // shared post through the deferred front-end.
@@ -364,6 +367,20 @@ export class CosmicAtlasHost {
 
     this.unsubscribeDeviceLost = this.kernel.onDeviceLost(() => {
       this.rendererGeneration += 1;
+      // M11-03: a lost device is TERMINAL for the session. The documented
+      // product recovery strategy is "reload required": the renderer instance
+      // is entangled with SharedPost/service state that cannot be swapped
+      // invisibly, and a botched automatic re-init would corrupt state
+      // silently — worse than an explicit, explained stop. Surface the
+      // user-visible terminal state instead of a misleading READY.
+      this.fatalDeviceLoss = true;
+      for (const cb of [...this.fatalCallbacks]) {
+        try {
+          cb();
+        } catch (error) {
+          console.error('[CosmicAtlasHost] fatal-error listener threw:', error);
+        }
+      }
     });
   }
 
@@ -513,6 +530,30 @@ export class CosmicAtlasHost {
   /** Request travel; delegates to NavigationController → director. */
   navigate(destinationId: string, presetId?: string): NavigationIntent | null {
     return this.navigation.navigate(destinationId, presetId);
+  }
+
+  /** True once the rendering device has been lost (terminal for the session). */
+  get isFatalDeviceLoss(): boolean {
+    return this.fatalDeviceLoss;
+  }
+
+  /** Subscribe to fatal (session-terminal) renderer events. */
+  onFatal(cb: () => void): () => void {
+    this.fatalCallbacks.add(cb);
+    if (this.fatalDeviceLoss) cb();
+    return () => {
+      this.fatalCallbacks.delete(cb);
+    };
+  }
+
+  /**
+   * TEST-ONLY (M11-03): inject a device loss through the kernel's PRODUCTION
+   * loss path. Not reachable from production code; the device-loss browser
+   * suite drives this so the injected fault exercises the real
+   * notify -> subscriber -> terminal-state machine.
+   */
+  simulateDeviceLoss(): void {
+    this.kernel.simulateDeviceLossForTest();
   }
 
   /** Forward window resizes; keeps the transition overlay at internal pixels. */
@@ -821,6 +862,7 @@ export class CosmicAtlasHost {
 
     this.unsubscribeDeviceLost?.();
     this.unsubscribeDeviceLost = null;
+    this.fatalCallbacks.clear();
 
     try {
       this.director.dispose();
