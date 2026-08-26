@@ -499,30 +499,52 @@ export function createKerrLensingMaterial(
   // ---------------------------------------------------------------------------
 
   /**
+   * Loop-invariant scalar pieces of the Hamiltonian: E and L_z are fixed per
+   * pixel for the whole integration, so their products are common nodes.
+   * Prefix factoring ONLY — each consumer's original left-to-right operation
+   * order is preserved exactly, so values are bit-identical to the previous
+   * per-stage re-evaluation (SHADER_CONTRACTS §5).
+   */
+  const energySqInv = energy.mul(energy);
+  const mass4SpinInv = uMassRg.mul(4).mul(uSpin);
+
+  /**
    * Core RHS (ADR §1.10) for (dr, dtheta, dpr, dptheta) given (r, theta,
    * p_r, p_theta). Mirrors kerr/reference.kerrRhs exactly; denominator floors
    * are §14 guards (capture fires before they bind on valid rays).
    */
+  /**
+   * Core RHS (ADR §1.10) for (dr, dtheta, dpr, dptheta) given (r, theta,
+   * p_r, p_theta) and the SHARED stage metric block vec4(Sigma, Delta,
+   * sin^2(theta), sin(theta)) from {@link stageMetricFn}. Mirrors
+   * kerr/reference.kerrRhs exactly; denominator floors are §14 guards
+   * (capture fires before they bind on valid rays).
+   */
   const coreDerivsFn = Fn(
-    ([rIn, thIn, prIn, pthIn]: [unknown, unknown, unknown, unknown]): Vec4Node => {
+    ([rIn, thIn, prIn, pthIn, metric]: [
+      unknown,
+      unknown,
+      unknown,
+      unknown,
+      unknown
+    ]): Vec4Node => {
       const r = max(float(rIn as FloatNode), denomFloor);
       const th = float(thIn as FloatNode);
       const pr = float(prIn as FloatNode);
       const pth = float(pthIn as FloatNode);
-      const st = sin(th);
+      const metricV = metric as Vec4Node;
+      const sigma = metricV.x;
+      const delta = metricV.y;
+      const s2 = metricV.z;
+      const st = metricV.w;
       const ct = cos(th);
-      const s2 = max(st.mul(st), float(SIN2_FLOOR));
-      const c2 = ct.mul(ct);
-      const sigma = max(r.mul(r).add(uSpin.mul(uSpin).mul(c2)), denomFloor);
-      const delta = max(r.mul(r).sub(uMassRg.mul(2).mul(r)).add(uSpin.mul(uSpin)), denomFloor);
       const aSq = uSpin.mul(uSpin);
       const r2 = r.mul(r);
       const bigA = r2.add(aSq).pow(2).sub(aSq.mul(delta).mul(s2));
 
-      const energySq = energy.mul(energy);
       const w = bigA
-        .mul(energySq.mul(-1))
-        .add(uMassRg.mul(4).mul(uSpin).mul(r).mul(energy).mul(lZ))
+        .mul(energySqInv.mul(-1))
+        .add(mass4SpinInv.mul(r).mul(energy).mul(lZ))
         .add(delta.sub(aSq.mul(s2)).mul(lZ).mul(lZ).div(s2));
 
       const sigmaDelta = sigma.mul(delta);
@@ -536,8 +558,8 @@ export function createKerrLensingMaterial(
       const deltaR = r.sub(uMassRg).mul(2);
       const bigAR = r.mul(4).mul(r2.add(aSq)).sub(aSq.mul(deltaR).mul(s2));
       const wR = bigAR
-        .mul(energySq.mul(-1))
-        .add(uMassRg.mul(4).mul(uSpin).mul(energy).mul(lZ))
+        .mul(energySqInv.mul(-1))
+        .add(mass4SpinInv.mul(energy).mul(lZ))
         .add(deltaR.mul(lZ).mul(lZ).div(s2));
       const dhdr = float(0.5)
         .mul(
@@ -561,7 +583,7 @@ export function createKerrLensingMaterial(
       const bigATh = aSq.mul(delta).mul(sinTwo).mul(-1);
       const sin3 = max(st.mul(s2), float(SIN2_FLOOR));
       const wTh = bigATh
-        .mul(energySq.mul(-1))
+        .mul(energySqInv.mul(-1))
         .sub(uMassRg.mul(2).mul(delta).mul(lZ).mul(lZ).mul(ct).div(sin3));
       const dhdtheta = float(0.5)
         .mul(wTh.div(sigmaDelta).sub(w.mul(sigmaTh).mul(delta).div(sigmaDelta.mul(sigmaDelta))))
@@ -571,22 +593,44 @@ export function createKerrLensingMaterial(
     }
   );
 
-  /** Azimuthal rate dphi/dlambda — depends on (r, theta) only (+params). */
-  const phiRateFn = Fn(([rIn, thIn]: [unknown, unknown]): FloatNode => {
+  /** Azimuthal rate dphi/dlambda — depends on (r, theta) only (+params);
+   * consumes the SHARED stage metric block (no duplicate trig/metric work).
+   * The stage point's theta enters only through the metric block. */
+  const phiRateFn = Fn(([rIn, metric]: [unknown, unknown]): FloatNode => {
     const r = max(float(rIn as FloatNode), denomFloor);
-    const th = float(thIn as FloatNode);
-    const st = sin(th);
-    const s2 = max(st.mul(st), float(SIN2_FLOOR));
-    const sigma = max(r.mul(r).add(uSpin.mul(uSpin).mul(cos(th).mul(cos(th)))), denomFloor);
-    const delta = max(r.mul(r).sub(uMassRg.mul(2).mul(r)).add(uSpin.mul(uSpin)), denomFloor);
+    const metricV = metric as Vec4Node;
+    const mSigma = metricV.x;
+    const mDelta = metricV.y;
+    const s2 = metricV.z;
     const aSq = uSpin.mul(uSpin);
     return uMassRg
       .mul(2)
       .mul(uSpin)
       .mul(r)
       .mul(energy)
-      .add(delta.sub(aSq.mul(s2)).mul(lZ).div(s2))
-      .div(sigma.mul(delta)) as FloatNode;
+      .add(mDelta.sub(aSq.mul(s2)).mul(lZ).div(s2))
+      .div(mSigma.mul(mDelta)) as FloatNode;
+  });
+
+  /**
+   * Shared per-stage metric block: vec4(Sigma, Delta, sin^2(theta), sin(theta))
+   * at ONE stage point. Each RK4 stage evaluates this once and both consumers
+   * ({@link coreDerivsFn}, {@link phiRateFn}) read it — previously the azimuthal
+   * rate re-evaluated the identical trig/metric chain a second time per stage.
+   * Operation order matches the original expressions term-for-term, so emitted
+   * values are bit-identical (SHADER_CONTRACTS §5 geometry-only).
+   */
+  const stageMetricFn = Fn(([rIn, thIn]: [unknown, unknown]): Vec4Node => {
+    const r = max(float(rIn as FloatNode), denomFloor);
+    const th = float(thIn as FloatNode);
+    const st = sin(th);
+    const s2 = max(st.mul(st), float(SIN2_FLOOR));
+    const sigma = max(
+      r.mul(r).add(uSpin.mul(uSpin).mul(cos(th).mul(cos(th)))),
+      denomFloor
+    );
+    const delta = max(r.mul(r).sub(uMassRg.mul(2).mul(r)).add(uSpin.mul(uSpin)), denomFloor);
+    return vec4(sigma, delta, s2, st);
   });
 
   // ---------------------------------------------------------------------------
@@ -627,6 +671,14 @@ export function createKerrLensingMaterial(
       const prevR = float(0).toVar();
       const prevTh = float(0).toVar();
       const prevPh = float(0).toVar();
+      /** World-Y height (relative to center) of the segment START point;
+       * carried across iterations — identical to re-embedding (prevR, prevTh,
+       * prevPh), which hold exactly last iteration's endpoint.
+       */
+      const prevHeight = float(0).toVar();
+
+      // First segment's start height comes from the initial world point.
+      prevHeight.assign(embedWorldFn(r0, theta0, phiW0).y.sub(uCenter.y));
 
       Loop(MAX_COMPILE_LOOP_BOUND, ({ i }) => {
         If(float(i).greaterThanEqual(uMaxSteps), () => {
@@ -652,31 +704,36 @@ export function createKerrLensingMaterial(
         prevPh.assign(phVar);
         minSinTheta.assign(min(minSinTheta, sin(thVar).abs()));
 
-        // --- Inline classical RK4 (NM §8.1) over the five-var state.
-        const d1 = coreDerivsFn(rVar, thVar, prVar, pthVar);
-        const k1phi = phiRateFn(rVar, thVar);
+        // --- Inline classical RK4 (NM §8.1) over the five-var state. Each
+        // stage evaluates the shared metric block once (see stageMetricFn).
+        const m1 = stageMetricFn(rVar, thVar);
+        const d1 = coreDerivsFn(rVar, thVar, prVar, pthVar, m1);
+        const k1phi = phiRateFn(rVar, m1);
         const halfH = hStep.mul(0.5);
         const r1 = rVar.add(halfH.mul(d1.x));
         const th1 = thVar.add(halfH.mul(d1.y));
         const pr1 = prVar.add(halfH.mul(d1.z));
         const pth1 = pthVar.add(halfH.mul(d1.w));
 
-        const d2 = coreDerivsFn(r1, th1, pr1, pth1);
-        const k2phi = phiRateFn(r1, th1);
+        const m2 = stageMetricFn(r1, th1);
+        const d2 = coreDerivsFn(r1, th1, pr1, pth1, m2);
+        const k2phi = phiRateFn(r1, m2);
         const r2s = rVar.add(halfH.mul(d2.x));
         const th2s = thVar.add(halfH.mul(d2.y));
         const pr2s = prVar.add(halfH.mul(d2.z));
         const pth2s = pthVar.add(halfH.mul(d2.w));
 
-        const d3 = coreDerivsFn(r2s, th2s, pr2s, pth2s);
-        const k3phi = phiRateFn(r2s, th2s);
+        const m3 = stageMetricFn(r2s, th2s);
+        const d3 = coreDerivsFn(r2s, th2s, pr2s, pth2s, m3);
+        const k3phi = phiRateFn(r2s, m3);
         const r3 = rVar.add(hStep.mul(d3.x));
         const th3 = thVar.add(hStep.mul(d3.y));
         const pr3 = prVar.add(hStep.mul(d3.z));
         const pth3 = pthVar.add(hStep.mul(d3.w));
 
-        const d4 = coreDerivsFn(r3, th3, pr3, pth3);
-        const k4phi = phiRateFn(r3, th3);
+        const m4 = stageMetricFn(r3, th3);
+        const d4 = coreDerivsFn(r3, th3, pr3, pth3, m4);
+        const k4phi = phiRateFn(r3, m4);
 
         const sixthH = hStep.mul(1 / 6);
         rVar.addAssign(sixthH.mul(d1.x.add(d2.x.mul(2)).add(d3.x.mul(2)).add(d4.x)));
@@ -719,9 +776,11 @@ export function createKerrLensingMaterial(
         // Euclidean camera-ray test (NM §10.2 / ADR §1.14). Runs before
         // capture/escape so a terminal-segment crossing still contributes.
         If(uDiskEnabled.greaterThan(0.5), () => {
-          const segStart = embedWorldFn(prevR, prevTh, prevPh);
+          // Segment-start height carried from the previous iteration's
+          // endpoint embed (identical inputs → bit-identical value): one full
+          // world embedding saved per integration step.
+          const hStart = prevHeight;
           const segEnd = embedWorldFn(rVar, thVar, phVar);
-          const hStart = segStart.y.sub(uCenter.y);
           const hEnd = segEnd.y.sub(uCenter.y);
 
           If(hStart.mul(hEnd).lessThan(0), () => {
@@ -797,6 +856,11 @@ export function createKerrLensingMaterial(
               }
             );
           });
+
+          // Carry this segment's end height into the next iteration. Every
+          // completed iteration reaches here: capture/escape Breaks below
+          // terminate the loop only AFTER this block has run.
+          prevHeight.assign(hEnd);
         });
 
         // --- Horizon capture (ADR §1.12), priority over escape:
