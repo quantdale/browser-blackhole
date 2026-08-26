@@ -126,6 +126,8 @@ Do not imply that galaxy collisions occur over seconds simply because the animat
 
 Initial exterior model may use Schwarzschild outside a spherical star with configurable mass/radius if rotation is visually modeled separately.
 
+**M12-NS status (2026-08-26): DIRECT** exterior Schwarzschild backwards ray tracing to the material surface is now implemented and validated (surface hit/escape with refined crossing, starfield background, redshift `g = sqrt(1-2r_g/R)`). Hot-spot emission is evaluated at the geodesic hit coordinate. Still deliberately omitted and disclosed: Doppler/aberration from rotating surface elements, Hartle-Thorne frame dragging, atmosphere/radiative transfer, oblate figure, interior metric/time-of-flight.
+
 If rapid-rotation spacetime effects are not included, say so.
 
 Pulsar beam and magnetic field-line visuals are illustrative magnetosphere representations unless a specific validated model is implemented.

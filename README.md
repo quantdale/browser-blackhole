@@ -10,7 +10,7 @@ The application is **implemented and running** — this is no longer a planning 
 | --- | --- | --- |
 | Black Hole | `/atlas/black-hole` | Full numerical Schwarzschild backwards ray tracer (GPU f32 integrator, CPU binary64 oracle) with thin accretion disk, HDR pipeline, production presets. An optimized **LUT trajectory backend** (validated precomputed family, `docs/LUT_BACKEND_ADR.md`) is now the measured **auto default**; numerical remains explicitly selectable and every fallback is truthful. **M10 relativistic observer modes**: physical static/circular/flyby/freefall observers drive aberration and frequency shifts through comoving tetrads and invariant `g = (-k·u_obs)/(-k·u_emit)` — not camera animation; worldlines terminate at a declared horizon stop band (rendering inside the horizon is not claimed). |
 | Kerr (black-hole presets) | `/atlas/black-hole?preset=kerr-*` | Numerical Kerr geodesic backend with signed spin, spin-dependent ISCO disk, frame dragging, and a physical circular Kerr observer (M10). |
-| Neutron Star | `/atlas/neutron-star` | Compact-surface ray tracing, gravitational redshift, hot spots, pulsar/magnetar presets, dipole field lines. |
+| Neutron Star | `/atlas/neutron-star` | **DIRECT** Schwarzschild backwards ray tracing to the material surface (`R > 2 r_g`, refined crossing, `g = sqrt(1-2r_g/R)`) with hot spots evaluated at the geodesic hit coordinate; pulsar/magnetar presets, dipole field lines. Validated by CPU/GPU parity (WebGPU+WebGL2) and analytic limb `b_limb = R/sqrt(1-2r_g/R)`; Doppler/aberration/frame dragging deliberately omitted and disclosed. |
 | Stellar Explosion | `/atlas/stellar-explosion` | PROCEDURAL_SCIENTIFIC reduced core-collapse/hypernova/long-GRB models on shared GPU volume/particle services. |
 | Compact Merger | `/atlas/compact-merger` | NS–NS binary inspiral (closed-form quadrupole GW decay law — DIRECT reduced model), contact/merger transition, two-component kilonova, short-GRB bipolar jet with beaming-inspired viewing response, scenario-based remnants. PROCEDURAL_SCIENTIFIC post-merger; not NR/hydrodynamics. |
 | Tidal Disruption | `/atlas/tidal-disruption` | Star–black-hole encounter: closed-form parabolic Kepler orbit (Barker timing — DIRECT reduced model), tidal-tensor deformation proxy, energy-spread debris family on Newtonian Kepler orbits (bound/unbound split, differential winding), circularization shock ring, procedural nascent-disk transition. PROCEDURAL_SCIENTIFIC; not SPH/GRMHD/NR, no GR apsidal precession; stellar disc rendered at a disclosed exaggerated radius. |
@@ -29,6 +29,7 @@ npx playwright test --project=firefox compatibility-matrix  # cross-engine fallb
 npm run lut:validate -- public/luts/schwarzschild-v1-415dea94
 npm run bench:black-hole        # numerical-vs-LUT frame-time harness
 npm run bench:black-hole -- --observer=circular   # M10 moving-observer benchmark rows
+npm run bench:neutron-star      # direct Schwarzschild surface-ray harness (--preset=surface|pulsar|magnetar)
 npm run bench:compact-merger    # phase-aware merger harness (--phase=...)
 npm run bench:tidal-disruption  # phase-aware TDE harness (--phase=...)
 npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)

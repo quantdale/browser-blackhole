@@ -1,5 +1,6 @@
 /**
- * Neutron Star destination module (CA3-01/03/04/05/06/07/09/10/11/12 code core).
+ * Neutron Star destination module (CA3-01/03/04/05/06/07/09/10/11/12 code core;
+ * M12-NS direct surface-ray rendering).
  *
  * Spec sources implemented here:
  * - docs/cosmic-atlas/PHENOMENA_IMPLEMENTATION.md section 2 "Neutron Star"
@@ -10,28 +11,38 @@
  * - docs/cosmic-atlas/ARCHITECTURE.md sections 4/5/8 (lifecycle ordering
  *   prepare -> enter -> (update -> render)* -> exit -> dispose, resource
  *   scopes, deterministic time model).
+ * - openspec/changes/m12-neutron-star-surface-lensing/ (design/tasks/spec):
+ *   the rendered star is now the DIRECT Schwarzschild surface-ray image.
  *
  * FIDELITY (honest disclosure, mirrored in every preset fidelityNote):
- * - DIRECT: exterior Schwarzschild surface redshift g = sqrt(1 - 2 r_g/R)
- *   and the analytic spin-frame beacon/pulse geometry (see ./physics.ts).
+ * - DIRECT: exterior Schwarzschild backwards ray tracing to the material
+ *   surface at R > 2 r_g or escape to the celestial background
+ *   (./surfaceLensingGpu.ts, validated against ./surfaceRayReference.ts);
+ *   surface redshift g = sqrt(1 - 2 r_g/R); analytic spin-frame beacon/pulse
+ *   geometry (see ./physics.ts).
  * - PROCEDURAL_SCIENTIFIC: dipole field-line visualization (shared
  *   FieldLineService traces the idealized vacuum dipole r = L sin^2theta)
  *   and the flare state machine.
- * - NOT YET IMPLEMENTED (deferred, not claimed): backwards ray tracing to
- *   the surface (ray-bent limb/apparent radius), Doppler/aberration,
- *   frame dragging. The rendered surface is therefore direct emission; the
- *   lensing pass arrives via the shared LensingService.
+ * - STILL DELIBERATELY OMITTED (not claimed): Doppler/aberration from
+ *   rotating surface elements, frame dragging (Hartle-Thorne exterior),
+ *   atmosphere/radiative transfer, oblate figure, interior solution.
  *
- * SCENE SCALE: 1 scene unit = 1 km for this destination. Every km <-> scene
- * conversion goes through {@link KM_TO_SCENE_UNITS}; camera coordinates in
- * presets.ts are baked in the same convention.
+ * RAY MODEL: every camera pixel launches a backwards geodesic in the star's
+ * r_g-native frame (star centered at the origin). A ray terminating on the
+ * refined material-surface crossing shades base graybody emission plus up to
+ * two hot-spot cones AT THE GEODESIC HIT COORDINATE (normal = normalized hit
+ * point); escaped rays sample the pinned procedural celestial environment
+ * along the terminal tetrad-projected direction; numerical failures render
+ * explicit failure magenta, never black. The retired straight-line sphere
+ * mesh was removed with the physics change (reviewed golden regeneration).
  *
- * EMISSION MODEL DISCLOSURE: the star uses a MeshBasicNodeMaterial whose
- * color node evaluates base graybody emission plus up to two hot-spot cones
- * in world space. Temperature -> RGB uses a hand-picked ramp (crude
- * approximation, explicitly NOT Planck integration); spot intensities are
- * not Stefan-Boltzmann scaled; the redshift factor multiplies emission as a
- * scalar. Full radiometry is deferred with the lensing pass.
+ * SCENE SCALE: 1 scene unit = 1 km for this destination. The single km -> r_g
+ * conversion happens per frame in render() via gravitationalRadiusKm(mass).
+ *
+ * EMISSION MODEL DISCLOSURE (unchanged): temperature -> RGB uses a hand-picked
+ * ramp (crude approximation, explicitly NOT Planck integration); spot
+ * intensities are not Stefan-Boltzmann scaled; the redshift factor multiplies
+ * emission as a scalar. Full radiometry remains deferred.
  *
  * Determinism: no wall-clock reads anywhere. Rotation advances from the
  * FrameTimeInfo delta supplied by the kernel, gated by the TimeController
@@ -40,8 +51,6 @@
  */
 
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { dot, normalize, positionWorld, smoothstep, sub, uniform, vec4 } from 'three/tsl';
 import {
   DEFAULT_MASS_SOLAR,
   DEFAULT_RADIUS_KM,
@@ -60,6 +69,15 @@ import {
   type FlareState,
   type Vec3
 } from './physics.js';
+import {
+  NS_RAY_ESCAPED,
+  NS_RAY_INVALID_INITIAL_STATE,
+  NS_RAY_NUMERICAL_FAILURE,
+  NS_RAY_SURFACE_HIT,
+  createNeutronStarSurfaceMaterial,
+  nsQualityTierStepBudget,
+  type NeutronStarSurfaceMaterial
+} from './surfaceLensingGpu.js';
 import type {
   EnterContext,
   ExitContext,
@@ -97,9 +115,6 @@ const TIMELINE_ROTATIONS = 50;
 /** Energy-input rate fed to the flare machine per simulated second. */
 const FLARE_ENERGY_INPUT_PER_SECOND = 1;
 
-/** Cosine-space softness of the hot-spot rim (angular radius smoothing). */
-const SPOT_EDGE_SOFTNESS = 0.02;
-
 /** Base emissive gain per hot spot before the folded redshift factor. */
 const SPOT_BASE_GAIN = 1.0;
 
@@ -111,8 +126,10 @@ const SPOT_BASE_GAIN = 1.0;
 const BASE_SURFACE_TINT: readonly [number, number, number] = [0.55, 0.58, 0.62];
 const BASE_EMISSION_SCALE = 1.2;
 
-/** Conservative byte estimate for one compiled node material. */
+/** Conservative byte estimate for the compiled node material. */
 const MATERIAL_BYTE_ESTIMATE = 4096;
+/** Fullscreen triangle: 3 vertices x 3 float32 positions. */
+const FULLSCREEN_TRIANGLE_BYTES = 36;
 
 // Dipole field-line visualization parameters (PROCEDURAL_SCIENTIFIC).
 const FIELD_LINE_STRENGTH = 1;
@@ -136,13 +153,17 @@ const MIN_ANGULAR_RADIUS_DEG = 0.5;
 const MAX_ANGULAR_RADIUS_DEG = 60;
 const AXIS_EPSILON = 1e-9;
 
-/** Sphere tessellation per quality tier (bounded; governor-aware). */
-const SPHERE_SEGMENTS: Record<QualityTier, { width: number; height: number }> = {
-  low: { width: 32, height: 24 },
-  medium: { width: 48, height: 32 },
-  high: { width: 64, height: 48 },
-  ultra: { width: 96, height: 64 }
-};
+/**
+ * Dev/test-only debug view (?nssurfacedebug=1): the surface pass swaps
+ * radiance for its documented parity encoding (hit normal / escape direction,
+ * linear space). Same gated-URL-override precedent as the black-hole
+ * destination's ?trajectory override; never part of the public state schema.
+ */
+function readSurfaceDebugUrlOverride(): boolean {
+  if (typeof window === 'undefined') return false;
+  const raw = new URLSearchParams(window.location.search).get('nssurfacedebug');
+  return raw === '1' || raw === 'true';
+}
 
 // ---------------------------------------------------------------------------
 // Public state schema (STATE_AND_ROUTES section 8, Neutron Star)
@@ -322,79 +343,6 @@ function temperatureKToLinearRgb(temperatureK: number): [number, number, number]
 }
 
 // ---------------------------------------------------------------------------
-// TSL uniform bundle and surface color graph
-// ---------------------------------------------------------------------------
-
-/**
- * Uniform bundle types are deliberately INFERRED (ReturnType of the factory
- * functions) instead of naming node classes: under @types/three 0.185
- * `uniform`'s generic parameter is a UniformValue KEY ('float', 'vec3',
- * ...), not the value type, so `typeof uniform<number>` does not exist, and
- * the concrete UniformNode/NodeObject classes are not re-exported from
- * 'three/tsl'. Inference tracks the shipped overloads exactly.
- */
-function createSlotUniforms() {
-  return {
-    /** World-frame spot direction; Vector3 held BY REFERENCE and mutated. */
-    direction: uniform(new THREE.Vector3(0, 1, 0)),
-    cosAngularRadius: uniform(0.99),
-    tint: uniform(new THREE.Vector3(1, 1, 1)),
-    gain: uniform(0)
-  };
-}
-
-function createUniformBundle() {
-  return {
-    surfaceTint: uniform(new THREE.Vector3(1, 1, 1)),
-    emissionScale: uniform(1),
-    redshiftFactor: uniform(1),
-    flareBoost: uniform(1),
-    slotA: createSlotUniforms(),
-    slotB: createSlotUniforms()
-  };
-}
-
-type StarUniformBundle = ReturnType<typeof createUniformBundle>;
-
-/**
- * Surface emission graph: base graybody term plus two fixed (unrolled,
- * bounded) hot-spot slots, all multiplied by the flare envelope uniform.
- *
- * Scalars are uniform NODE objects mutated via `.value`; vector uniforms
- * hold their Vector3 by reference and are mutated component-wise. The
- * graph is written in METHOD-CHAIN form (.mul/.add) deliberately: under
- * @types/three 0.185 the free-function operators lose the literal node-type
- * branding on mixed operands, which breaks downstream vec4() overloads,
- * while the chained methods preserve it.
- */
-function buildColorGraph(u: StarUniformBundle) {
-  // Star mesh sits at the origin, so the world-space normal of a fragment
-  // is simply its normalized world position.
-  const surfaceNormal = normalize(positionWorld);
-
-  const base = u.surfaceTint.mul(u.emissionScale).mul(u.redshiftFactor);
-
-  const dotA = dot(surfaceNormal, u.slotA.direction);
-  const profileA = smoothstep(
-    sub(u.slotA.cosAngularRadius, SPOT_EDGE_SOFTNESS),
-    u.slotA.cosAngularRadius,
-    dotA
-  );
-  const glowA = u.slotA.tint.mul(u.slotA.gain).mul(profileA);
-
-  const dotB = dot(surfaceNormal, u.slotB.direction);
-  const profileB = smoothstep(
-    sub(u.slotB.cosAngularRadius, SPOT_EDGE_SOFTNESS),
-    u.slotB.cosAngularRadius,
-    dotB
-  );
-  const glowB = u.slotB.tint.mul(u.slotB.gain).mul(profileB);
-
-  const flared = base.add(glowA).add(glowB).mul(u.flareBoost);
-  return vec4(flared, 1);
-}
-
-// ---------------------------------------------------------------------------
 // Spin-frame geometry (shared by prepare-time uniform seeding and enter)
 // ---------------------------------------------------------------------------
 
@@ -462,13 +410,6 @@ function toTuple(v: THREE.Vector3): Vec3 {
 // Byte estimates (ResourceScope accounting; conservative approximations)
 // ---------------------------------------------------------------------------
 
-/** pos(12) + normal(12) + uv(8) bytes per vertex, plus uint32 indices. */
-function estimateSphereBytes(widthSegments: number, heightSegments: number): number {
-  const vertices = (widthSegments + 1) * (heightSegments + 1);
-  const indices = widthSegments * heightSegments * 6;
-  return vertices * 32 + indices * 4;
-}
-
 /** position (12 B) + color (12 B) per segment endpoint vertex. */
 function estimateLineBytes(lineCount: number, pointsPerLine: number): number {
   return lineCount * (pointsPerLine - 1) * 2 * 24;
@@ -479,10 +420,11 @@ function estimateLineBytes(lineCount: number, pointsPerLine: number): number {
 // ---------------------------------------------------------------------------
 
 /**
- * GPU memory estimates (MB, conservative): sphere geometry ~0.10-0.35 MB by
- * tier, dipole lines ~0.15 MB, materials/uniform buffers <0.05 MB; the
- * remainder is driver/headroom margin. Shared HDR targets and post chains
- * are host-owned and intentionally excluded.
+ * GPU memory estimates (MB, conservative): the surface pass is a fullscreen
+ * triangle (<0.001 MB geometry) whose cost lives in the compiled pipeline,
+ * dipole lines ~0.15 MB, materials/uniform buffers <0.05 MB; the remainder
+ * is driver/headroom margin. Shared HDR targets and post chains are
+ * host-owned and intentionally excluded.
  */
 export const NEUTRON_STAR_DESCRIPTOR: PhenomenonDescriptor = {
   id: 'neutron-star',
@@ -542,26 +484,37 @@ export function createNeutronStarModule(): PhenomenonModule {
   let disposed = false;
   let scene: THREE.Scene | null = null;
   let fieldLines: THREE.LineSegments | null = null;
-  let uniforms: StarUniformBundle | null = null;
+  let surfacePass: NeutronStarSurfaceMaterial | null = null;
   let runtime: NeutronStarRuntimeState | null = null;
   let lastDebugSnapshot: Record<string, unknown> = {};
+  let surfaceDebugOverride = false;
+  /** Governor tier observed on the last update frame (RenderContext has none). */
+  let lastQualityTier: QualityTier = 'medium';
 
-  // Per-frame scratch objects: no allocation churn inside update().
+  // Per-frame scratch objects: no allocation churn inside update()/render().
   const scratchQuaternion = new THREE.Quaternion();
   const scratchInverse = new THREE.Quaternion();
   const scratchAxis = new THREE.Vector3();
   const scratchSpot = new THREE.Vector3();
   const scratchObserver = new THREE.Vector3();
   const scratchSpherical = new THREE.Spherical();
+  const scratchRight = new THREE.Vector3();
+  const scratchUp = new THREE.Vector3();
+  const scratchForward = new THREE.Vector3();
 
   function assertNotDisposed(): void {
     if (disposed) throw new Error('neutron-star: module has been disposed');
   }
 
-  /** Seed all uniforms from validated state (phase-0 configuration). */
-  function writeStaticUniforms(state: NeutronStarPublicState): void {
-    const u = uniforms;
-    if (!u) return;
+  /**
+   * Seed all emission uniforms from validated state (phase-0 configuration).
+   * Hot-spot gains fold in the DIRECT redshift factor exactly as before the
+   * ray-tracing change; the shading site merely moved to the geodesic hit.
+   */
+  function writeEmissionUniforms(state: NeutronStarPublicState): void {
+    const pass = surfacePass;
+    if (!pass) return;
+    const u = pass.uniforms;
     const redshift = surfaceRedshift(state.mass, state.radius * 1000);
     u.redshiftFactor.value = redshift;
     u.surfaceTint.value.set(BASE_SURFACE_TINT[0], BASE_SURFACE_TINT[1], BASE_SURFACE_TINT[2]);
@@ -578,9 +531,9 @@ export function createNeutronStarModule(): PhenomenonModule {
       slot.cosAngularRadius.value = Math.cos(THREE.MathUtils.degToRad(spot.angularRadiusDeg));
       const tint = temperatureKToLinearRgb(spot.temperatureK);
       slot.tint.value.set(tint[0], tint[1], tint[2]);
-      // Gain folds in the DIRECT redshift factor: every surface photon loses
-      // energy g regardless of position. Relative intensities between spots
-      // are deliberately NOT Stefan-Boltzmann scaled (disclosed deferral).
+      // Every surface photon loses energy g regardless of hit position.
+      // Relative intensities between spots are deliberately NOT
+      // Stefan-Boltzmann scaled (disclosed deferral).
       slot.gain.value = SPOT_BASE_GAIN * redshift;
     });
     // Slots without a configured spot stay disabled via zero gain.
@@ -600,29 +553,39 @@ export function createNeutronStarModule(): PhenomenonModule {
     const state = normalizeNeutronStarState(ctx.preset.state);
     abortGuard('state');
 
-    ctx.reportProgress(0.25, 'Building star surface');
-    const segments = SPHERE_SEGMENTS[ctx.quality];
-    const radiusUnits = state.radius * KM_TO_SCENE_UNITS;
-    const geometry = new THREE.SphereGeometry(radiusUnits, segments.width, segments.height);
-    const material = new MeshBasicNodeMaterial();
-    material.name = 'neutron-star-surface';
-    const bundle = createUniformBundle();
-    material.colorNode = buildColorGraph(bundle);
-    const mesh = new THREE.Mesh(geometry, material);
-    mesh.name = 'neutron-star-surface';
+    ctx.reportProgress(0.25, 'Building Schwarzschild surface-ray pass');
+    const rgKm = gravitationalRadiusKm(state.mass);
+    const surfaceRadiusRg = (state.radius * KM_TO_SCENE_UNITS) / rgKm;
+    const pass = createNeutronStarSurfaceMaterial({
+      qualityTier: ctx.quality,
+      massRg: 1, // r_g-native convention: lengths are multiples of GM/c^2
+      surfaceRadiusRg
+    });
+    pass.uniforms.redshiftFactor.value = surfaceRedshift(state.mass, state.radius * 1000);
+    surfaceDebugOverride = readSurfaceDebugUrlOverride();
+    const passMesh = new THREE.Mesh(pass.geometry, pass.material);
+    passMesh.name = 'neutron-star-surface-pass';
+    passMesh.frustumCulled = false;
+    // Draw order contract: the fullscreen pass paints star + sky FIRST;
+    // overlays (dipole lines) composite afterwards without depth feedback
+    // (the pass disables depth writes so line visibility never depends on
+    // screen-space depth of bent rays).
+    passMesh.renderOrder = -10;
+    pass.material.depthTest = false;
+    pass.material.depthWrite = false;
 
     const destinationScene = new THREE.Scene();
     destinationScene.name = 'neutron-star';
-    destinationScene.add(mesh);
+    destinationScene.add(passMesh);
 
     ctx.scope.track(
       'geometry',
-      geometry,
-      () => geometry.dispose(),
-      estimateSphereBytes(segments.width, segments.height)
+      pass.geometry,
+      () => pass.geometry.dispose(),
+      FULLSCREEN_TRIANGLE_BYTES
     );
-    ctx.scope.track('material', material, () => material.dispose(), MATERIAL_BYTE_ESTIMATE);
-    abortGuard('surface');
+    ctx.scope.track('material', pass.material, () => pass.dispose(), MATERIAL_BYTE_ESTIMATE);
+    abortGuard('surface-pass');
 
     ctx.reportProgress(0.55, 'Tracing dipole field lines');
     // Consumed from HostServices per contract: the shared FieldLineService
@@ -632,6 +595,7 @@ export function createNeutronStarModule(): PhenomenonModule {
     const momentAxis = magneticAxisVector(THREE.MathUtils.degToRad(state.magneticTiltDeg), 0, [
       ...state.spinAxis
     ]);
+    const radiusUnits = state.radius * KM_TO_SCENE_UNITS;
     const lines = ctx.services.fieldLines.createDipoleLines({
       momentAxis,
       strength: FIELD_LINE_STRENGTH,
@@ -659,10 +623,10 @@ export function createNeutronStarModule(): PhenomenonModule {
     abortGuard('field-lines');
 
     ctx.reportProgress(0.85, 'Configuring emission uniforms');
-    uniforms = bundle;
+    surfacePass = pass;
     scene = destinationScene;
     fieldLines = lines;
-    writeStaticUniforms(state);
+    writeEmissionUniforms(state);
 
     ctx.reportProgress(1, 'Ready');
     return { module: moduleObject, scope: ctx.scope, scene: destinationScene, preset: ctx.preset };
@@ -694,6 +658,8 @@ export function createNeutronStarModule(): PhenomenonModule {
       envelopeValue: FLARE_QUIESCENT_LEVEL,
       pulseVisibilityValue: 0
     };
+    // Preset switches must also reseed emission uniforms (mass/radius/spots).
+    writeEmissionUniforms(state);
 
     // Arrival framing: eased unless reduced motion demands an instant jump
     // (applyArrivalPreset treats non-positive durations as immediate).
@@ -717,8 +683,10 @@ export function createNeutronStarModule(): PhenomenonModule {
 
   function update(ctx: FrameContext): void {
     const rt = runtime;
-    const u = uniforms;
-    if (disposed || !rt || !u) return;
+    const pass = surfacePass;
+    if (disposed || !rt || !pass) return;
+    const u = pass.uniforms;
+    lastQualityTier = ctx.quality;
 
     const snapshot = ctx.services.time.snapshot();
     const dt = Number.isFinite(ctx.time.dt) ? Math.max(0, ctx.time.dt) : 0;
@@ -759,7 +727,12 @@ export function createNeutronStarModule(): PhenomenonModule {
     // around the PHASE-0 magnetic axis, so rotating the whole object about
     // the spin axis keeps it aligned with magneticAxisVector(tilt, phase)
     // without rebuilding any vertex data.
-    if (fieldLines) fieldLines.quaternion.copy(scratchQuaternion);
+    if (fieldLines) {
+      fieldLines.quaternion.copy(scratchQuaternion);
+      // Test-only debug view: hide the decorative overlay so probe pixels
+      // carry pure ray-tracer encodings (blend corruption otherwise).
+      fieldLines.visible = !surfaceDebugOverride;
+    }
 
     // Analytic beacon readout for slot 0 (debug/graph value; the rendered
     // light curve emerges geometrically from the rotating spot itself).
@@ -800,6 +773,17 @@ export function createNeutronStarModule(): PhenomenonModule {
     }
     lastDebugSnapshot = {
       sceneUnitsPerKm: KM_TO_SCENE_UNITS,
+      pattern: 'direct Schwarzschild surface rays -> material surface | celestial background',
+      surfaceRayBackend: 'direct-schwarzschild-material-surface',
+      surfaceLensingWired: surfacePass !== null,
+      surfaceRadiusRg: rt.radiusKm / rgKm,
+      rayClassificationPacking: {
+        surfaceHit: NS_RAY_SURFACE_HIT,
+        escaped: NS_RAY_ESCAPED,
+        numericalFailure: NS_RAY_NUMERICAL_FAILURE,
+        invalidInitialState: NS_RAY_INVALID_INITIAL_STATE
+      },
+      surfaceDebugViewActive: surfaceDebugOverride,
       massSolar: rt.massSolar,
       radiusKm: rt.radiusKm,
       radiusSceneUnits: rt.radiusKm * KM_TO_SCENE_UNITS,
@@ -824,14 +808,41 @@ export function createNeutronStarModule(): PhenomenonModule {
 
   function render(ctx: RenderContext): void {
     // The destination owns its draw call, matching the diagnostic and
-    // black-hole destination modules: the kernel binds the shared HDR target
-    // and hands over the RenderContext; it does NOT traverse plan.scene
-    // itself. (The original pass-through assumption left the canvas showing
-    // the previous destination's last presented frame — found by first
-    // runtime validation of /atlas/neutron-star.)
-    if (ctx.scene && ctx.camera) {
-      ctx.renderer.render(ctx.scene, ctx.camera);
-    }
+    // black-hole destination modules. Per frame the canonical camera state
+    // flows through setUniformsFromState ONLY (controls never write shader
+    // uniforms outside this mapping — AGENTS.md rule).
+    const rt = runtime;
+    const pass = surfacePass;
+    if (disposed || !rt || !pass || !scene || !ctx.camera) return;
+
+    // Single km -> r_g conversion point for the geodesic frame.
+    const rgKm = gravitationalRadiusKm(rt.massSolar);
+    ctx.camera.updateMatrixWorld();
+    const e = ctx.camera.matrixWorld.elements;
+    scratchRight.set(e[0] ?? 0, e[1] ?? 0, e[2] ?? 0).normalize();
+    scratchUp.set(e[4] ?? 0, e[5] ?? 0, e[6] ?? 0).normalize();
+    scratchForward.set(-(e[8] ?? 0), -(e[9] ?? 0), -(e[10] ?? 0)).normalize();
+    const aspect = ctx.camera.aspect;
+
+    pass.setUniformsFromState({
+      cameraPositionRg: [
+        ctx.camera.position.x / rgKm,
+        ctx.camera.position.y / rgKm,
+        ctx.camera.position.z / rgKm
+      ],
+      cameraRight: [scratchRight.x, scratchRight.y, scratchRight.z],
+      cameraUp: [scratchUp.x, scratchUp.y, scratchUp.z],
+      cameraForward: [scratchForward.x, scratchForward.y, scratchForward.z],
+      tanHalfFovY: Math.tan((ctx.camera.fov * Math.PI) / 360),
+      aspect: Number.isFinite(aspect) && aspect > 0 ? aspect : 1,
+      massRg: 1,
+      surfaceRadiusRg: rt.radiusKm / rgKm,
+      maxSteps: nsQualityTierStepBudget(lastQualityTier),
+      backgroundIntensity: 1,
+      debugMode: surfaceDebugOverride ? 1 : 0
+    });
+
+    ctx.renderer.render(scene, ctx.camera);
   }
 
   function exit(_ctx: ExitContext): void {
@@ -849,10 +860,10 @@ export function createNeutronStarModule(): PhenomenonModule {
     if (scene) scene.clear();
     scene = null;
     fieldLines = null;
+    surfacePass = null;
     runtime = null;
-    uniforms = null;
     lastDebugSnapshot = {};
-    // Geometry/material GPU release is owned by the host ResourceScope
+    // Pass/material/geometry GPU release is owned by the host ResourceScope
     // (tracked during prepare); this module holds no untracked GPU handles.
   }
 

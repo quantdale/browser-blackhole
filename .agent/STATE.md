@@ -1,14 +1,47 @@
 # Durable project state
 
-Last update: 2026-08-26 (later) — **POST-M11 SYSTEMIC OPTIMIZATION CAMPAIGN COMPLETE**
-(user-mandated; BH-121 closed, Kerr hot loop deduplicated, full-repository
-performance characterization recorded in `docs/PERFORMANCE.md` §14).
+Last update: 2026-08-26 — **M12-NS (neutron-star surface lensing) COMPLETE; M12-RI + CA9 pending**
+(OpenSpec campaign runs M12-NS → M12-RI → CA9 in strict order).
 
 ## Current phase
 
-**Optimization campaign complete; no active planner prompt.** The completed
-M11 release candidate (below) is unchanged except for the two validated
-optimization commits described here.
+**M12-NS done (Phase A).** Direct Schwarzschild surface ray tracing for Neutron
+Star is implemented and validated (Architecture B destination wrapper, confirmed
+by `openspec/changes/m12-neutron-star-surface-lensing/implementation-notes.md`).
+M12-RI (repository integrity) and CA9 (galaxy collision, source-locked to Toomre
+& Toomre 1972 via NASA GISS/NTRS) follow once M12-NS is committed/pushed.
+
+### M12-NS closure record (2026-08-26)
+
+- Surface-ray direct path: `surfaceRayReference.ts` (binary64 oracle, NS codes
+  11..14) + `surfaceLensingGpu.ts` (TSL fullscreen pass mirroring the
+  Schwarzschild integrator) + `neutronStarModule.ts` rewired (sphere mesh
+  removed; km→r_g per-frame uniform; `?nssurfacedebug=1`).
+- Tests: `neutronStarSurfaceRay.test.ts` + `neutronStarPhysics.test.ts` (28
+  unit); `tests/browser/neutron-star.spec.ts` 8/8 (parity corpus webgpu+webgl2).
+- `npm run check`: PASS (504 unit, build/lint/typecheck/format green).
+- Black-hole non-regression: `integrator-parity` 4/4 + `ray-parity` 1/1 PASS;
+  shared `schwarzschildIntegrator.ts`/`cpuReference.ts` untouched; BH/Kerr goldens
+  unchanged.
+- Visual goldens: regenerated ONLY `NS_SURFACE`/`NS_PULSAR`/`NS_MAGNETAR`;
+  full suite 40/40 on `E2E_PORT=4199`. (Default 4173 produced one
+  `ERR_CONNECTION_REFUSED` flake on `CM_REMNANT` — port-collision, not drift;
+  M12-RI item.)
+- Benchmark: `scripts/bench-neutron-star.mjs` + `bench:neutron-star` script;
+  smoke run median CPU 20.9 ms / GPU 19.01 ms (timestamp queries), 0 console
+  errors.
+- Docs truthfulness: README NS row DIRECT + disclosed omissions;
+  PHENOMENA_IMPLEMENTATION §2 status; SCIENTIFIC_FIDELITY §6; BENCHMARK_MATRIX
+  NS-01/02 links.
+- Known omissions (disclosed): Doppler/aberration, frame dragging, atmosphere,
+  oblate figure, interior metric. Static `g = sqrt(1-2r_g/R)` only.
+
+---
+
+## Previous phase note (M11)
+
+M11 SYSTEMIC OPTIMIZATION CAMPAIGN remains complete (BH-121 closed, Kerr hot
+loop deduplicated; performance characterization in `docs/PERFORMANCE.md` §14).
 
 ### Optimization campaign record (2026-08-26)
 
@@ -178,7 +211,11 @@ the deep-audit doc notes).
 
 ## Next actions
 
-1. Planner pass selects the next campaign (CA9 remains blocked on the Toomre
-   & Toomre source; no M12 exists — stop rather than manufacture work).
-2. If a deployment target is chosen, verify the DEPLOYMENT.md checklist on
-   the real host (HTTPS/WebGPU secure context, SPA fallback, cache headers).
+1. Commit Phase A (M12-NS) with detailed evidence; push to `origin/main`.
+2. Begin Phase B `m12-repository-integrity` (truthfulness/pins/CI/flake/
+   benchmark discoverability) — includes fixing the default-4173 port
+   collision that flaked `CM_REMNANT`.
+3. Phase C `ca9-galaxy-collision`: source-lock Toomre & Toomre 1972 via
+   NASA GISS/NTRS, offline artifact pipeline, runtime interpolation.
+4. If a deployment target is chosen, verify the DEPLOYMENT.md checklist on
+    the real host (HTTPS/WebGPU secure context, SPA fallback, cache headers).

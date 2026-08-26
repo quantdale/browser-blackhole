@@ -67,6 +67,7 @@ Acceptance: Atlas wrapper must not cause material unexplained regression.
 - no magnetosphere particles.
 
 Measures surface ray tracing.
+Harness: `npm run bench:neutron-star -- --preset=surface --quality=medium` (M12-NS, same record schema as black-hole harness; reports `frameCpuMs`/`frameGpuMs`, `surfaceRayBackend`, `effectiveRenderSize`, `quality` tier, backend/adapter; paused at phase 0).
 
 ### CA-BENCH-NS-02 — Pulsar full
 
@@ -76,6 +77,7 @@ Measures surface ray tracing.
 - beams/particles.
 
 Measures combined cost.
+Harness: same `bench:neutron-star` entry with `--preset=pulsar` (or `magnetar` for flare-active workload).
 
 ### CA-BENCH-SN-01 — Supernova interactive
 

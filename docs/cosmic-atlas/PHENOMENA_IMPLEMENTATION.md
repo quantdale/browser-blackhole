@@ -116,6 +116,25 @@ HDR/post
 - pulse geometry deterministic tests;
 - GPU/reference ray comparisons.
 
+### Implementation status (M12-NS, 2026-08-26)
+
+Implemented **DIRECT** exterior Schwarzschild surface-ray path: every camera pixel
+integrates a backwards geodesic (r_g-native RK4, same Hamiltonian/step policy as
+the black-hole oracle) and terminates on the refined material-surface crossing
+(`R/r_g > 2`, 24-iteration linear bisection) or escapes to the procedural
+celestial environment. Hit emission/hot-spots are evaluated at the geodesic hit
+coordinate (normal = normalized hit point); static redshift
+`g = sqrt(1 - 2 r_g/R)` is applied consistently; Doppler/aberration/frame
+dragging remain deliberately omitted and disclosed. Validated by
+`src/phenomena/neutron-star/surfaceRayReference.ts` (binary64 oracle, radial/
+off-axis/near-limb/analytic-limb `b_limb = R/sqrt(1-2r_g/R)`/ultra-compact
+multiple-image/deterministic tests), GPU/TSL pass
+`src/phenomena/neutron-star/surfaceLensingGpu.ts` (formulation-for-formulation
+mirror, debug parity encoding `hitNormal*0.5+0.5` / `escapeDir*0.5+0.5`),
+`tests/browser/neutron-star.spec.ts` parity corpus (WebGPU+WebGL2, center/
+near-limb hit/escape/off-axis/high-deflection, `?nssurfacedebug=1` probes),
+and dedicated physics suite `tests/unit/neutronStarPhysics.test.ts`.
+
 ---
 
 ## 3. Stellar Explosion
