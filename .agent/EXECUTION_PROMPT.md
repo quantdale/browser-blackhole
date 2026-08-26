@@ -1,6 +1,8 @@
 # EXECUTION PROMPT — M11 Production Hardening & Release Candidate
 
-Status: ACTIVE
+Status: COMPLETED
+Completed-At: 2026-08-26
+Completed-On: local main `2156d46` + closure commit (see `.agent/STATE.md` commit chain)
 Planned-From: 6a51389fcd1fa98270eff62ffe119976fd58da97
 Planned-At: 2026-08-25T17:34:00+08:00
 Target-Branch: main

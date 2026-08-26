@@ -1,126 +1,114 @@
 # Durable project state
 
-Last update: 2026-08-26 — **M11 PRODUCTION HARDENING IN PROGRESS (WS0+WS1A core landed).**
+Last update: 2026-08-26 — **M11 PRODUCTION HARDENING & RELEASE CANDIDATE COMPLETE.**
 
-Campaign: `.agent/EXECUTION_PROMPT.md` (M11 Production Hardening & Release
-Candidate, Status ACTIVE, Planned-From `6a51389`). Baseline reconciled: local
-`main` fast-forwarded `6a51389` → `3b25cb1` (remote planner commit) at startup;
-worktree was clean; no destructive operations.
+Campaign: `.agent/EXECUTION_PROMPT.md` (M11, Planned-From `6a51389`) executed
+to its completion gate and marked COMPLETED. Baseline reconciled at startup:
+local `main` fast-forwarded `6a51389` → `3b25cb1` (remote planner commit);
+worktree clean; no destructive operations at any point.
 
 ## Current phase
 
-M11 workstream progress:
+**M11 COMPLETE — release candidate.** Packet status:
 
-| Workstream | Status | Evidence |
+| Packet | Status | Evidence |
 | --- | --- | --- |
-| WS0 baseline release audit | CORE DONE (ongoing ledger below) | Findings ledger in this file; two High defects found and fixed (see Defects). |
-| WS1A M10 observer goldens | **DONE** | 4 new baselines (`OBSERVER_CIRCULAR/FLYBY/FREEFALL`, `KERR_CIRCULAR_OBSERVER`), twice-stable 40/40 twice; see Golden corrections. |
-| WS1B moving-observer bench harness | NOT STARTED | next action |
-| WS2..WS11 (M11-01..M11-10) | NOT STARTED | browser matrix, mobile/touch, device-loss, leak torture, a11y, provenance, prod build, final bench, docs, release gate |
+| M11-01 browser/fallback matrix | DONE | `docs/COMPATIBILITY_MATRIX.md` + `tests/browser/compatibility-matrix.spec.ts` (4/4 Chromium, 4/4 Firefox 153 headless WebGL2 fallback, serial); WebKit + real devices `DEFERRED_ENVIRONMENT` with reasons. |
+| M11-02 mobile/touch/DPR | DONE | `tests/browser/mobile-touch.spec.ts` 5/5 (portrait DPR-3 pixel cap, orientation flip, tiny-viewport recovery, mobile-layout drag without scroll trapping, no-hover panel operability). Emulated only — no device performance claims. |
+| M11-03 device-loss recovery | DONE | Locked terminal reload-required contract implemented (`isFatalDeviceLoss`, `onFatal`, truthful `GPU_DEVICE_LOST` status line, frame submission stop) + `tests/browser/device-loss.spec.ts` 3/3 via production-path fault injection (`simulateDeviceLossForTest`). `docs/FAILURE_RECOVERY.md` §5 records the decision + rationale. |
+| M11-04 resource-leak torture | DONE | `tests/browser/resource-leak.spec.ts` 3/3: 12 cross-destination cycles return to scope/GPU-byte baselines; observer churn bounded; resize storm live+bounded (debug-inventory counters, no new telemetry). |
+| M11-05 accessibility | DONE | `tests/browser/accessibility.spec.ts` 4/4: keyboard core flow (nav → mode switch → panel → observer select), canvas text companion, labeled range inputs with text readouts + arrow-key operation, post-switch focus never stranded in disposed nodes. |
+| M11-06 assets/provenance/licenses | DONE | `docs/ASSET_PROVENANCE.md` §18 dated audit: PASS. **Missing root LICENSE added (MIT)**; three@0.185.1 sole runtime dep (MIT); bundle scanned clean of machine paths/keys; CA9 source status truthfully blocked. |
+| M11-07 production build/deployment | DONE | `npm ci` fresh-lockfile proof (144 pkgs, 0 vulnerabilities) + full `npm run check` green; `docs/DEPLOYMENT.md` provider-neutral contract (SPA fallback, HTTPS, cache policy, no secrets, CSP, no COOP/COEP); the whole e2e suite runs on the production preview build. |
+| M11-08 final benchmark report | DONE | `benchmarks/results/2026-08-26-m11/` — first-class `--observer` harness + matched 5-scenario series + `SUMMARY.md` (honest CPU-rAF labeling, frameGpuMs=null, single-machine caveats, regression audit vs M10 baseline). |
+| M11-09 user-facing docs | DONE | README status/truthfulness refresh (M10 observer modes + stop-band limitation + Kerr presets + new suites + timing wording); `docs/FAILURE_RECOVERY.md` §5 rewritten to the locked contract; `docs/OBSERVABILITY_DIAGNOSTICS.md` §8.1 documents `?lutdebug`/`?kerrstatus` classification views. |
+| M11-10 release-candidate full gate | DONE | Final cumulative run (below). |
 
-## WS0/WS1 defect ledger (found -> fixed this campaign)
+M10 release-evidence debts closed: observer goldens materialized + twice-stable;
+matched moving-observer benchmarks recorded.
 
-1. **HIGH — vacuous Kerr/BHM golden baselines (harness defect).**
-   `runGoldenExpectation` skipped navigation for any URL starting
-   `/atlas/black-hole`, silently swallowing `?preset=...` rows AND the whole
-   `black-hole-merger` destination. All 3 KERR_* and 5 BHM_* baselines were
-   byte-identical MD5 copies of the DEFAULT black-hole frame — their Gate D
-   regression gate was vacuous. FIXED: full destination+preset URL parsing,
-   navigation on any difference, defensive post-capture
-   destination/preset assertion, and the `#scene` identity guard (foreign
-   server on the e2e port now fails loudly). 8 baselines regenerated; the
-   other 27 pre-existing baselines stayed byte-identical across the fix.
-2. **HIGH — M10 moving-observer GPU photon initialization was physically
-   wrong (blank-sky / failure-magenta renders on all four moving presets).**
-   The Schwarzschild numerical and LUT backends derived conserved quantities
-   from static-emitter DIRECTION formulas applied to a world direction built
-   WITHOUT u's spatial drift (missing Wu term; sign-lost L; O(beta) plane
-   misorientation). Kerr momentum extraction was already covariant-correct but
-   its step budget starved (moving rays need ~2-4x affine path; measured
-   census: median ~215 / p95 ~1260 / max ~2600 policy steps).
-   FIXED:
-   - `observerUniforms.ts` ships `observerLegWu` (world direction of u's
-     spatial part);
-   - `schwarzschildIntegrator.ts` + `lut/lensingGpu.ts`: moving-observer init
-     now covariant — `E = f0*k^t`, `pr = k_r/E`, `b = (r0*|world tangential
-     rate|)/E`, world direction `Wu + sum n_a W_a`; legacy camera/static math
-     preserved bit-for-bit (all 27 unaffected goldens byte-stable, KERR_*/BHM
-     static rows pass against pre-fix baselines);
-   - Kerr: `MAX_COMPILE_LOOP_BOUND` decoupled from the ultra tier budget
-     (x3 headroom) and the destination scales `maxSteps` x3 (clamped to the
-     compile bound) ONLY for active moving observers — static-camera budgets
-     unchanged;
-   - new Kerr classification debug view (`?kerrstatus`, debugMode>=2) with
-     non-finite sub-reasons (theta-wrap red / pole-passage yellow / other
-     magenta) — Gate D debug-observability addition;
-   - the residual Kerr failure band was identified as the DOCUMENTED
-     pole-passage honesty gate (ADR §1.19): near-polar (Lz~0) photons coast
-     over the pole where f32 cannot certify accuracy — truthful explicit
-     failure, not a defect.
-3. **MEDIUM — M10 observer preset framings pointed the observer away from the
-   hole.** Camera poses supplied LOOK axes relative to the pose->origin line,
-   but the render origin is the WORLDLINE position ((r,0,0) at tau=0); the
-   hole sat ~90 deg outside the 60 deg FOV. FIXED: sight-line-corrected poses
-   for `observer-circular` [19,2.2,0], `observer-flyby` [48,6,0],
-   `observer-freefall` [21,2.5,0], `kerr-circular-observer` [13,1.8,0]
-   (documented in preset comments).
-4. **MEDIUM — control panel showed stale values after deep-link/preset boot**
-   (Observer mode displayed "Camera (legacy)" while the destination state was
-   `circular`; same race for every destination control). Root cause: panel
-   builds before the arrival transition seeds destination state; the rebuild
-   signature was already final. FIXED: one forced rebuild per completed
-   transition + observer MODE added to the signature + per-tick value sync
-   (`observerSync`) for mode-specific rows.
-5. **MEDIUM — dragging any observer slider rebuilt the entire panel
-   mid-gesture** (`setObserver` called `markPanelDirty()` per input event).
-   FIXED: value changes no longer rebuild; mode changes rebuild via the
-   signature; values reflect via per-tick sync.
+## High defects found and fixed (all validated)
 
-## M10 release-evidence closure (WS1A)
+1. **Vacuous Kerr/BHM golden baselines** — harness `startsWith('/atlas/black-hole')`
+   navigation skip swallowed `?preset=` rows AND `black-hole-merger`; 8
+   baselines were byte-identical default-view captures (MD5-verified). Fixed
+   (full URL parsing + post-capture destination/preset assertion + `#scene`
+   identity guard); 8 re-baselined; the other 27 pre-existing baselines
+   byte-identical across the fix.
+2. **M10 moving-observer GPU init physically wrong** — static-emitter
+   direction formulas without u's spatial drift → empty-sky (Schwarzschild
+   numerical+LUT) / failure-magenta (Kerr) renders on all four moving
+   presets. Fixed covariantly (`E=-k_t`, `pr=k_r/E`, `b=L/E`,
+   `Wu + Σn_a W_a`, new `observerLegWu` uniform) with binary64 mirror
+   (`observer/photonInit.ts`) + 5 unit gates (static-formula reduction exact
+   to 1e-12); Kerr step budget scaled ×3 for moving observers only
+   (compile bound decoupled from the tier ladder; measured census median
+   ~215 / p95 ~1260 / max ~2600 steps). Residual Kerr failure band =
+   DOCUMENTED pole-passage honesty gate (near-polar Lz≈0 photons) — now
+   visible per-reason via `?kerrstatus`.
+3. **Device loss had no user-visible path** — `GPU_DEVICE_LOST` copy existed
+   but was unreachable; loss left a misleading READY. Fixed with the locked
+   terminal reload-required contract.
+4. **Observer preset framings** pointed the observer ~90° away from the hole
+   (hole outside the FOV) — sight-line-corrected poses.
+5. **Control-panel staleness/mid-drag rebuilds** — deep-link boots showed
+   stale values forever; slider drags rebuilt the panel per input event.
+   Fixed (one rebuild per completed transition, mode in signature, per-tick
+   value sync).
+6. **Missing root LICENSE** (package.json declared MIT, no file).
 
-- 40 golden rows total (36 prior + 4 new M10 observer rows).
-- New baselines established AFTER the render fix, verified **twice-stable**
-  (two consecutive full-suite runs 40/40, plus a third pass inside the full
-  e2e run below).
-- KERR_*/BHM_* re-baselines captured BEFORE the render fixes still pass after
-  them — static-camera output is unchanged (locked bit-for-bit policy holds).
-- `ATLAS_HYPERSPACE_BH_NS` re-baselined by its documented jitter tolerance.
-- Numeric gates for the moving-observer fix: `tests/unit/observerPhotonInit.test.ts`
-  (5 tests: pixel-photon null constraint; covariant-init EXACT reduction to
-  legacy static formulas at 1e-12; angular-momentum identity; Kerr near-null
-  constants with prograde/retrograde structure; deterministic injected-constant
-  plane traces). Full unit suite 476/476.
-
-## Validation evidence (this checkpoint)
+## Final cumulative validation (release gate)
 
 | Gate | Result |
 | --- | --- |
+| `npm ci` fresh lockfile | PASS — 144 packages, 0 vulnerabilities |
 | `npm run check` | PASS — prettier clean; eslint clean; tsc clean; vitest **476/476** (32 files); vite build PASS |
-| `npm run e2e` (workers=2) | **146/146 PASS** (142 prior + 4 new observer goldens) incl. integrator-parity (webgpu/webgl2 x numerical/lut), kerr-parity 322-corpus, lut-disk-parity, observer-modes suite |
-| Visual goldens | 40/40, twice-stable (two consecutive standalone runs + e2e pass) |
-| Environment | Windows 11, Node v22.23.2, Playwright `msedge 151` headless, hardware WebGPU (amd rdna-2); e2e port moved off 4173 (`E2E_PORT`) because a FOREIGN app occupied it |
+| `npm run e2e` (workers=2, production preview) | **169/169 PASS** — 165 default-project (all destination suites, parity corpora ×4 backends, 40 goldens, observer modes, compatibility matrix, mobile-touch, device-loss, resource-leak, accessibility) + 4 firefox-project matrix tests |
+| Visual goldens | 40/40, twice-stable (two standalone runs + the final e2e) |
+| Environment | Windows 11 (10.0.26200), Node v22.23.2, Playwright `msedge 151` headless + Firefox 153 headless, hardware WebGPU `amd rdna-2`; e2e on `E2E_PORT=4199` (4173 occupied by a foreign app) |
 
-## Known debt / limitations (updated)
+## Known limitations / deferred (truthful)
 
-1. Kerr moving-observer scenes: residual explicit failure classes are
-   TRUTHFUL (pole-passage honesty gate + max-steps at low tiers). Low-tier
-   (256x3) traces still fail the p95 tail; the preset recommends ultra.
-   Documented in GOLDEN_IMAGES.md and the preset fidelity note.
-2. Carried M8/M9/CA8/CA9 debts unchanged (see git history of this file).
-3. `frameGpuMs` remains null everywhere (no GPU timestamp queries wired).
-4. WS1B (moving-observer benchmark harness) and WS2..WS11 are open (above).
+- WebKit: `DEFERRED_ENVIRONMENT` (Playwright ships no Windows WebKit builds).
+- Real mobile devices: `DEFERRED_ENVIRONMENT` (emulated viewport/touch only;
+  no device GPU/performance claims).
+- Kerr moving-observer scenes: residual explicit failures are the documented
+  pole-passage honesty gate + max-steps at low tiers (preset recommends
+  ultra); disclosed in GOLDEN_IMAGES.md and the preset fidelity note.
+- `frameGpuMs` null everywhere (no GPU timestamp queries wired).
+- Hosted CI: `.github/workflows/ci.yml` runs format/lint/typecheck/unit/build
+  + a WebGL2-fallback smoke job; hosted runners provide no representative
+  WebGPU, so the full browser/golden evidence is local-run (recorded
+  honestly; not silently claimed as CI-passed).
+- Carried debts unchanged: CA9 Toomre & Toomre transcription blocked on the
+  paper source; CA8 remnant perf note; Kerr perf headroom.
 
 ## Critical/High defects remaining
 
-Zero known. (Two High defects found this campaign are fixed and validated.)
+Zero known.
+
+## Commit chain this campaign
+
+```
+3b25cb1 docs(agent): plan M11 production hardening and release-candidate campaign
+7855f67 fix: correct M10 moving-observer GPU photon initialization, preset sight lines, and observer panel sync
+13f3adb test: golden harness destination/preset guard, corrected Kerr/BHM baselines, M10 observer goldens
+2156d46 state: record M11 WS0/WS1A defect ledger, moving-observer render fix evidence, and next workstreams
+422b13d bench: first-class moving-observer selection in the black-hole benchmark harness (M11 WS1B)
+1ee1606 test: M11-01 compatibility matrix with engine-agnostic fallback suite (Chromium + Firefox)
+75fd95b test: M11-02 mobile/touch/DPR hardening suite (device-emulated)
+6c21a54 fix: explicit terminal device-loss state with production-path fault injection (M11-03)
+662b8bc test: M11-04 quantitative resource-ownership torture across destinations
+afe16a9 test: M11-05 accessibility suite - keyboard core flow and text-first state
+1862937 fix: add missing MIT LICENSE text and record the M11 license/provenance audit (M11-06)
+60da148 docs: provider-neutral deployment contract (M11-07)
+0471db5 docs: M11 final benchmark summary, device-loss contract reconciliation, README truthfulness (M11-08/09)
+<pending: closure commit — final gate evidence, prompt COMPLETED, state>
+```
 
 ## Next actions
 
-1. **WS1B**: extend `scripts/bench-black-hole.mjs` with `--observer=<mode>`
-   + deterministic phase, record matched static/circular/flyby/freefall/kerr
-   evidence under `benchmarks/results/` (CPU rAF deltas labeled; no GPU claims).
-2. WS2 (M11-01): compatibility matrix doc + fallback tests.
-3. WS3 (M11-02): mobile/touch/DPR suite.
-4. WS4/WS5 (M11-03/04): device-loss + leak torture coverage.
-5. WS6..WS11 per EXECUTION_PROMPT; close with Gate I and flip the prompt to
-   COMPLETED only when the release condition holds.
+1. Planner pass selects the next campaign (CA9 remains blocked on the Toomre
+   & Toomre source; no M12 exists — stop rather than manufacture work).
+2. If a deployment target is chosen, verify the DEPLOYMENT.md checklist on
+   the real host (HTTPS/WebGPU secure context, SPA fallback, cache headers).
