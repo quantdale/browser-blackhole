@@ -103,8 +103,15 @@ afe16a9 test: M11-05 accessibility suite - keyboard core flow and text-first sta
 1862937 fix: add missing MIT LICENSE text and record the M11 license/provenance audit (M11-06)
 60da148 docs: provider-neutral deployment contract (M11-07)
 0471db5 docs: M11 final benchmark summary, device-loss contract reconciliation, README truthfulness (M11-08/09)
-<pending: closure commit — final gate evidence, prompt COMPLETED, state>
+55a1bc5 release: M11 production hardening release candidate - full campaign closure
+b94d129 fix: complete the pushed tree - hook type surface, formatting, and deep-audit doc notes
+<pending: state commit recording this chain; it is the campaign tip>
 ```
+
+Final pushed `origin/main` at the time of this state update: `b94d129`
+(closure commit `55a1bc5` + the tree-completion follow-up `b94d129` that
+carries the hook type surface the committed specs typecheck against, plus
+the deep-audit doc notes).
 
 ## Next actions
 
