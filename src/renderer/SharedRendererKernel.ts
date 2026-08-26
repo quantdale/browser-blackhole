@@ -178,6 +178,17 @@ export class SharedRendererKernel implements IRendererKernel {
   private detachRendererLostHook: (() => void) | null = null;
   private hdrTargetContractWarned = false;
 
+  // -- GPU timestamp accounting (BH-121) -------------------------------------
+
+  /** Resolve cadence: the shared query pool holds ~1024 render contexts;
+   * resolving every 90 orchestrated frames keeps large headroom while making
+   * any mapAsync stall a sub-percent event on the CPU frame timeline. */
+  private static readonly GPU_RESOLVE_INTERVAL_FRAMES = 90;
+  private gpuResolveInFlight = false;
+  private gpuFramesSinceResolve = 0;
+  /** Render-pass GPU ms of the most recently resolved frame. */
+  private lastGpuFrameMs: number | null = null;
+
   constructor(options: SharedRendererKernelOptions) {
     this.options = options;
   }
@@ -209,7 +220,14 @@ export class SharedRendererKernel implements IRendererKernel {
     if (this.options.forcedBackend !== 'webgl2') {
       try {
         const webgpuModule = await import('three/webgpu');
-        const candidate = new webgpuModule.WebGPURenderer({ canvas, antialias: false });
+        const candidate = new webgpuModule.WebGPURenderer({
+          canvas,
+          antialias: false,
+          // BH-121: request GPU timestamp tracking. three self-gates on the
+          // device's 'timestamp-query' feature (WebGPU) / disjoint-timer
+          // extension (WebGL2) and disables the pools when absent.
+          trackTimestamp: true
+        });
         partialRenderer = candidate;
         await candidate.init();
         if (this.disposed || generation !== this.generation) {
@@ -252,7 +270,8 @@ export class SharedRendererKernel implements IRendererKernel {
       const candidate = new webgpuModule.WebGPURenderer({
         canvas,
         antialias: false,
-        forceWebGL: true
+        forceWebGL: true,
+        trackTimestamp: true
       });
       await candidate.init();
       if (this.disposed || generation !== this.generation) {
@@ -291,6 +310,56 @@ export class SharedRendererKernel implements IRendererKernel {
   /** True between a device-loss notification and kernel disposal/re-init. */
   get isDeviceLost(): boolean {
     return this.deviceLost;
+  }
+
+  /**
+   * GPU milliseconds per orchestrated frame (BH-121): the most recent
+   * timestamp-pool resolution returns the TOTAL render-pass time of the last
+   * resolved frame (three.js TimestampQueryPool semantics), which is used
+   * verbatim. Null when the backend does not expose timestamp queries or no
+   * window has resolved yet — never a CPU-derived estimate
+   * (docs/PERFORMANCE.md §13 measurement honesty).
+   */
+  get gpuFrameMs(): number | null {
+    const value = this.lastGpuFrameMs;
+    return value !== null && Number.isFinite(value) && value >= 0 ? value : null;
+  }
+
+  /**
+   * Force an immediate timestamp-pool resolve (benchmarks/debug tooling);
+   * resolves to the last resolved frame's GPU ms or null when unsupported.
+   * Safe to call concurrently — overlapping calls share one in-flight resolve.
+   */
+  async flushGpuTimestamps(): Promise<number | null> {
+    await this.resolveGpuTimestamps();
+    return this.gpuFrameMs;
+  }
+
+  /** Best-effort async resolve of the shared render timestamp pool. */
+  private async resolveGpuTimestamps(): Promise<void> {
+    const renderer = this.rendererValue as
+      | { resolveTimestampsAsync?: (type: string) => Promise<unknown> }
+      | null;
+    if (renderer === null || this.gpuResolveInFlight) return;
+    if (this.disposed || this.deviceLost) {
+      // Reset the counter so a recovered session starts a fresh window.
+      this.gpuFramesSinceResolve = 0;
+      return;
+    }
+    this.gpuResolveInFlight = true;
+    try {
+      const result = await renderer.resolveTimestampsAsync?.('render');
+      const lastFrameMs = typeof result === 'number' ? result : Number(result);
+      // three.js TimestampQueryPool returns the LAST frame's summed pass
+      // duration — a per-frame quantity. Record it verbatim (no averaging).
+      if (!Number.isFinite(lastFrameMs) || lastFrameMs < 0) return;
+      this.lastGpuFrameMs = lastFrameMs;
+    } catch {
+      // Timestamp resolution is optional telemetry; never surface as an app error.
+    } finally {
+      this.gpuResolveInFlight = false;
+      this.gpuFramesSinceResolve = 0;
+    }
   }
 
   // -- device loss ----------------------------------------------------------
@@ -469,6 +538,17 @@ export class SharedRendererKernel implements IRendererKernel {
       // Present even without an active destination so transition overlays
       // composite over the frozen/black state during travel.
       this.options.post.present(plan.transitionOverlay, plan.transitionOpacity);
+
+      // BH-121: advance the bounded-cadence timestamp resolve so the shared
+      // query pool cannot exhaust (~1024 contexts) and GPU frame times stay
+      // available to telemetry/benchmarks without per-frame mapAsync stalls.
+      this.gpuFramesSinceResolve += 1;
+      if (
+        this.gpuFramesSinceResolve >= SharedRendererKernel.GPU_RESOLVE_INTERVAL_FRAMES &&
+        !this.gpuResolveInFlight
+      ) {
+        void this.resolveGpuTimestamps();
+      }
     } finally {
       governor.endFrame();
     }

@@ -851,8 +851,17 @@ export class CosmicAtlasHost {
       rendererGeneration: this.rendererGeneration,
       pendingPrepares: this.pendingPrepares,
       governor: this.governor,
-      backend: this.kernel.backend
+      backend: this.kernel.backend,
+      gpuFrameMs: this.kernel.gpuFrameMs
     });
+  }
+
+  /**
+   * BH-121: force a GPU timestamp-pool resolve and return the window mean
+   * (null when the backend does not expose timestamp queries).
+   */
+  flushGpuTimestamps(): Promise<number | null> {
+    return this.kernel.flushGpuTimestamps();
   }
 
   /** Ordered teardown: director → modules/scopes → services → post → manager → kernel. */

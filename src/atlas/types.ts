@@ -696,5 +696,14 @@ export interface IRendererKernel {
   /** Execute one orchestrated frame; returns false if skipped by governor. */
   renderFrame(plan: FramePlan): boolean;
   capabilities(): CapabilityRequirement[] & { satisfied(id: CapabilityId): boolean };
+  /**
+   * BH-121: GPU milliseconds per orchestrated frame from the most recent
+   * timestamp-pool resolution (the last resolved frame's summed render-pass
+   * time); null when the backend lacks timestamp queries or nothing has
+   * resolved yet. Never inferred from CPU timing.
+   */
+  readonly gpuFrameMs: number | null;
+  /** Force a GPU timestamp-pool resolve; resolves to the window mean or null. */
+  flushGpuTimestamps(): Promise<number | null>;
   dispose(): void;
 }

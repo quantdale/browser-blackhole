@@ -49,7 +49,6 @@ export type DebugInventoryGovernorPiece = Pick<
   IPerformanceGovernor,
   'currentTier' | 'renderScale' | 'activityMode'
 > | null;
-
 /** Host pieces passed in by the boot/frame coordinator each dump. */
 export interface DebugInventoryHostPieces {
   resources: DebugInventoryResourceSource;
@@ -61,6 +60,8 @@ export interface DebugInventoryHostPieces {
   pendingPrepares: number;
   governor: DebugInventoryGovernorPiece;
   backend: BackendInfo | null;
+  /** BH-121 GPU frame ms of the last resolved frame (null = unavailable). */
+  gpuFrameMs: number | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -77,6 +78,8 @@ export interface DebugInventoryView {
     activityMode: GovernorActivityMode;
   } | null;
   backend: BackendInfo | null;
+  /** BH-121 GPU frame ms of the last resolved frame (null = unavailable). */
+  gpuFrameMs: number | null;
   /** Per-scope entries exactly as reported by the ResourceManager. */
   resourceScopes: readonly ResourceScopeInventoryEntry[];
   /** True when `debugInventory()` was reachable and returned without throwing. */
@@ -180,6 +183,7 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
             activityMode: pieces.governor.activityMode
           },
     backend: pieces.backend,
+    gpuFrameMs: pieces.gpuFrameMs,
     resourceScopes: scopes,
     resourceInventoryAvailable,
     resourceInventoryError,
@@ -242,6 +246,13 @@ export function formatInventoryText(view: DebugInventoryView): string {
     lines.push(`${label('timestamp query')}${boolLabel(backend.timestampQuery)}`);
     lines.push(`${label('storage buffers')}${boolLabel(backend.storageBuffers)}`);
     lines.push(`${label('device pixel ratio')}${formatFixed(backend.devicePixelRatio, 2)}`);
+    lines.push(
+      `${label('gpu frame time')}${
+        view.gpuFrameMs === null
+          ? 'unavailable (no resolved window)'
+          : `${formatFixed(view.gpuFrameMs, 2)} ms (window mean)`
+      }`
+    );
   } else {
     lines.push(`${label('backend')}none (not initialized)`);
   }

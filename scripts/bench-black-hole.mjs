@@ -265,6 +265,18 @@ const samples = await page.evaluate(
   frames
 );
 
+// BH-121: resolve the GPU timestamp pool after sampling and read the window
+// mean (null when this backend does not expose timestamp queries).
+const gpuFrameMs = await page.evaluate(async () => {
+  const app = window.__ATLAS_APP__;
+  if (!app || typeof app.host.flushGpuTimestamps !== 'function') return null;
+  try {
+    return await app.host.flushGpuTimestamps();
+  } catch {
+    return null;
+  }
+});
+
 const sorted = [...samples].sort((a, b) => a - b);
 const pick = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
@@ -323,10 +335,17 @@ const record = {
     mean: round2(mean),
     stdev: round2(Math.sqrt(variance))
   },
-  // Honest limitation: this harness has no GPU timestamp queries wired; these
-  // are CPU-side frame-time measurements only.
-  frameGpuMs: null,
-  gpuTimingNote: 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps',
+  // BH-121: real GPU timestamp reading when the backend exposes timestamp
+  // queries; otherwise honestly null — never inferred from CPU rAF deltas.
+  // The value is the LAST resolved frame's summed render-pass time.
+  frameGpuMs:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? null
+      : { lastResolvedFrame: round2(gpuFrameMs) },
+  gpuTimingNote:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps'
+      : 'GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame',
   memory: {
     estimatedGpuBytesTotal: info.totalEstimatedGpuBytes,
     textureCount: info.totalTextures,
