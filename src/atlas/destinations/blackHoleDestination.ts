@@ -286,7 +286,13 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
       orbit: false,
       observer: { mode: 'circular', circularRadiusRg: 12, circularSense: 1 }
     },
-    camera: { position: [0, 0.5, 13.5], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
+    // Camera pose = presentation-only look axes. The RENDER ORIGIN under a
+    // moving observer is the WORLDLINE position ((12,0,0) at tau=0), so the
+    // pose is placed on the same sight line (+X, slightly elevated) — looking
+    // at the scene ORIGIN means looking at the hole FROM THE OBSERVER.
+    // Framing defect fix (M11): the original pose [0,0.5,13.5] pointed the
+    // observer ~90 deg AWAY from the hole (outside the 60 deg FOV).
+    camera: { position: [19, 2.2, 0], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
     seed: 7,
     timelineInitialPhase: 0,
     recommendedQuality: 'high'
@@ -302,7 +308,9 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
       orbit: false,
       observer: { mode: 'flyby', flybyBetaInfinity: 0.6, flybyImpactParameterRg: 8 }
     },
-    camera: { position: [0, 2, 10], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
+    // Sight-line-corrected pose (see observer-circular note); flyby seeds at
+    // r = 40 on +X.
+    camera: { position: [48, 6, 0], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
     seed: 7,
     timelineInitialPhase: 0,
     recommendedQuality: 'high'
@@ -318,7 +326,9 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
       orbit: false,
       observer: { mode: 'freefall', freefallReleaseRadiusRg: 14 }
     },
-    camera: { position: [0, 0.4, 6], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 70 },
+    // Sight-line-corrected pose (see observer-circular note); release at
+    // r = 14 on +X, infalling along -X.
+    camera: { position: [21, 2.5, 0], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 70 },
     seed: 7,
     timelineInitialPhase: 0,
     recommendedQuality: 'high'
@@ -336,7 +346,9 @@ export const BLACK_HOLE_PRESETS: PresetDescriptor[] = [
       orbit: false,
       observer: { mode: 'circular', circularRadiusRg: 8, circularSense: 1 }
     },
-    camera: { position: [0, 0.8, 9.5], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
+    // Sight-line-corrected pose (see observer-circular note); Kerr circular
+    // observer at r = 8 on +X.
+    camera: { position: [13, 1.8, 0], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 60 },
     seed: 7,
     timelineInitialPhase: 0,
     display: DISPLAY_SCIENTIFIC,
@@ -426,6 +438,9 @@ export class BlackHoleModule implements PhenomenonModule {
     readTrajectoryUrlOverride();
   private readonly lutDebugView: boolean =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lutdebug');
+  /** M11 Kerr classification view (?kerrstatus): per-ray terminal classes. */
+  private readonly kerrStatusView: boolean =
+    typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('kerrstatus');
 
   // --- M10 physical observer state (OBSERVER_FRAME_ADR) ---------------------
   /** Deterministic proper-time clock (t_g units); advanced ONLY from the
@@ -732,6 +747,14 @@ export class BlackHoleModule implements PhenomenonModule {
       ) {
         lensingState['cameraPositionRg'] = observerPayload.readout.positionWorld;
       }
+      // M11: moving-observer Kerr rays traverse deeper potentials at E < 1
+      // with theta-motion — measured census for the kerr-circular-observer
+      // reference: median ~215 / p95 ~1260 / max ~2600 policy steps vs the
+      // static-camera workload. Scale the tier budget so the tier ladder
+      // keeps its meaning; the pass hard-clamps to its compile bound.
+      if (useKerr && movingMode && observerPayload.readout.valid) {
+        lensingState['maxSteps'] = Math.min(6144, TIER_STEP_BUDGETS[this.lastQualityTier] * 3);
+      }
 
       if (this.controls.debugParity) {
         lensingState['diskEnabled'] = false;
@@ -739,6 +762,9 @@ export class BlackHoleModule implements PhenomenonModule {
       }
       if (!useKerr && this.lutDebugView) {
         lensingState['lutDebugStatus'] = 1;
+      }
+      if (useKerr && this.kerrStatusView) {
+        lensingState['debugMode'] = 2;
       }
       selected.setUniformsFromState(lensingState);
     } else if (this.fallbackPass !== null) {

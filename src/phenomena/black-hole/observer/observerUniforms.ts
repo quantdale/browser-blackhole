@@ -191,6 +191,30 @@ export function buildObserverUniformPayload(input: ObserverFrameInput): Observer
       ] as [number, number, number];
     }) ?? null;
 
+  // World-space direction of u's SPATIAL part (same spherical embedding).
+  // k = u + sum(n_a A_a) is linear, so the photon's world spatial direction is
+  // Wu + sum(n_a W_a); without Wu the plane-solver backends would reconstruct
+  // the direction of (k - u) and misorient every geodesic plane by an O(beta)
+  // amount (M11 defect: moving-observer frames rendered an empty sky).
+  const wuWorldDir: [number, number, number] | null = built.observerActive
+    ? (() => {
+        const st = Math.sin(built.snapshot.thetaRad);
+        const ct = Math.cos(built.snapshot.thetaRad);
+        const sp = Math.sin(built.snapshot.phiWorldRad);
+        const cp = Math.cos(built.snapshot.phiWorldRad);
+        const v = { t: 0, r: built.legU[1], th: built.legU[2], ph: built.legU[3] };
+        return [
+          v.r * st * cp +
+            built.snapshot.radiusRg * v.th * ct * cp -
+            built.snapshot.radiusRg * st * v.ph * sp,
+          v.r * ct - built.snapshot.radiusRg * v.th * st,
+          v.r * st * sp +
+            built.snapshot.radiusRg * v.th * ct * sp +
+            built.snapshot.radiusRg * st * v.ph * cp
+        ] as [number, number, number];
+      })()
+    : null;
+
   const activeFinal = active;
   const stateKeys: Record<string, unknown> = {
     observerLegU: activeFinal ? built.legU : [0, 0, 0, 0],
@@ -200,6 +224,7 @@ export function buildObserverUniformPayload(input: ObserverFrameInput): Observer
     observerLegW1: activeFinal ? (legWorldDirs?.[0] ?? [0, 0, 0]) : [0, 0, 0],
     observerLegW2: activeFinal ? (legWorldDirs?.[1] ?? [0, 0, 0]) : [0, 0, 0],
     observerLegW3: activeFinal ? (legWorldDirs?.[2] ?? [0, 0, 0]) : [0, 0, 0],
+    observerLegWu: activeFinal ? (wuWorldDir ?? [0, 0, 0]) : [0, 0, 0],
     observerActive: activeFinal,
     observerFrequencyComoving: built.observerFrequencyConvention && activeFinal === 1 ? 1 : 0
   };

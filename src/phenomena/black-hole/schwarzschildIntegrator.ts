@@ -256,6 +256,8 @@ export interface SchwarzschildIntegratorUniforms {
   observerLegW1: { value: Vector3 };
   observerLegW2: { value: Vector3 };
   observerLegW3: { value: Vector3 };
+  /** World-space direction of u's spatial part (k = u + sum n_a A_a drift). */
+  observerLegWu: { value: Vector3 };
   /** 1 when the M10 observer block drives ray initialization. */
   observerActive: { value: number };
   /** 1 when shading must scale the legacy emitter factor by 1/E_ray. */
@@ -394,6 +396,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
     observerLegW1: { value: new Vector3() },
     observerLegW2: { value: new Vector3() },
     observerLegW3: { value: new Vector3() },
+    observerLegWu: { value: new Vector3() },
     observerActive: uObserverActive,
     observerFrequencyComoving: uObserverFrequencyComoving
   };
@@ -414,6 +417,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const uW1 = uniform(uniforms.observerLegW1.value);
   const uW2 = uniform(uniforms.observerLegW2.value);
   const uW3 = uniform(uniforms.observerLegW3.value);
+  const uWu = uniform(uniforms.observerLegWu.value);
 
   // Pinned collaborators (contracts owned by concurrent modules).
   const sampleEnvironment = createEnvironmentSamplerNode(makeStarfieldParams());
@@ -464,11 +468,15 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const nxO = obsNx.div(obsLen);
   const nyO = obsNy.div(obsLen);
   const nzO = obsNz.div(obsLen);
-  // Photon world direction: sum of leg world directions weighted by the
-  // LOCAL components (legs are orthonormal in the observer rest frame).
-  const observerWorldDir = normalize(uW1.mul(nxO).add(uW2.mul(nyO)).add(uW3.mul(nzO)));
-  // Conserved energy E = -k_t = f * k^t with k^t = U_t + sum n_a A_a,t.
+  // M11 FIX: k = u + sum(n_a A_a) is linear, so the photon's WORLD spatial
+  // direction is Wu + sum(n_a W_a). Dropping Wu reconstructed the direction of
+  // (k − u) instead — every geodesic plane was misoriented by an O(beta)
+  // amount and moving modes sampled an empty sky.
+  const kWorldRaw = uWu.add(uW1.mul(nxO)).add(uW2.mul(nyO)).add(uW3.mul(nzO)) as Vec3Node;
+  const observerWorldDir = normalize(kWorldRaw);
+  // Contravariant BL components of k (conserved-energy readout + covariant init).
   const obsKT = uLegU.x.add(nxO.mul(uLegA1.x)).add(nyO.mul(uLegA2.x)).add(nzO.mul(uLegA3.x));
+  const obsKR = uLegU.y.add(nxO.mul(uLegA1.y)).add(nyO.mul(uLegA2.y)).add(nzO.mul(uLegA3.y));
   const obsEnergy = f0.mul(obsKT); // g_tt = -f on Schwarzschild
   const activeF = uActiveF.greaterThan(0.5);
   // Comoving frequency convention scales the legacy emitter factor by
@@ -494,10 +502,24 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const radialEps = float(RADIAL_EPSILON);
   const isRadial = tangential.lessThan(radialEps); // dedicated radial path selector (NM §13)
   const e1 = tangent.div(max(tangential, radialEps)); // unit only when !isRadial
+  // Legacy (camera/static) conserved quantities: validated static-tetrad
+  // direction formulas (NM §4/§7), preserved BIT-FOR-BIT (locked policy).
+  const bLegacy = select(isRadial, float(0), r0.mul(tangential).div(sqrt(f0Safe)));
+  const prLegacy = nRadial.div(f0Safe);
+  // M11 FIX — moving observers derive their E-normalized constants from the
+  // COVARIANT photon momentum, not from static-emitter direction formulas:
+  //   k_r = g_rr k^r = k^r / f          -> pr = k_r / E
+  //   L   = r0 * |world tangential dλ⁻¹| -> b  = L / E
+  // (affine-invariant; the in-plane basis e1 is aligned with the tangential
+  // rate so the in-plane b is non-negative and planeNormal carries the sign.)
+  const kTangentialRate = length(kWorldRaw.sub(e0.mul(dot(kWorldRaw, e0))));
+  const energySafe = max(tslAbs(obsEnergy), denomFloor);
+  const bMoving = select(isRadial, float(0), r0.mul(kTangentialRate).div(energySafe));
+  const prMoving = obsKR.div(f0Safe.mul(energySafe));
   // E-normalized constants of motion (NM §4 rescaling): L stores b = L/E.
-  const angularMomentum = select(isRadial, float(0), r0.mul(tangential).div(sqrt(f0Safe)));
+  const angularMomentum = select(activeF, bMoving, bLegacy);
   // p_r(E=1) = n_r / f (NM §7 scaled by 1/E; cpuReference parity).
-  const prInitial = nRadial.div(f0Safe);
+  const prInitial = select(activeF, prMoving, prLegacy);
   // Plane normal N = normalize(e0 x e1); placeholder +Y on the radial path
   // where L = 0 makes b_z vanish regardless (NM §13).
   const planeNormal = select(isRadial, vec3(0, 1, 0), normalize(cross(e0, e1)));
@@ -934,6 +956,8 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       if (legW2) uniforms.observerLegW2.value.set(legW2[0], legW2[1], legW2[2]);
       const legW3 = readVec3Components(state['observerLegW3']);
       if (legW3) uniforms.observerLegW3.value.set(legW3[0], legW3[1], legW3[2]);
+      const legWu = readVec3Components(state['observerLegWu']);
+      if (legWu) uniforms.observerLegWu.value.set(legWu[0], legWu[1], legWu[2]);
       const obsActive = readFiniteNumber(state['observerActive']);
       if (obsActive !== null) uObserverActive.value = obsActive;
       const comoving = readFiniteNumber(state['observerFrequencyComoving']);

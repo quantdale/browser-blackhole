@@ -218,6 +218,7 @@ export function createLutLensingMaterial(
   const observerLegW1 = { value: new Vector3() };
   const observerLegW2 = { value: new Vector3() };
   const observerLegW3 = { value: new Vector3() };
+  const observerLegWu = { value: new Vector3() };
   const uniforms: LutLensingUniforms = {
     cameraPositionRg: { value: new Vector3() },
     cameraRight: { value: new Vector3() },
@@ -253,6 +254,7 @@ export function createLutLensingMaterial(
   const uW1 = uniform(observerLegW1.value);
   const uW2 = uniform(observerLegW2.value);
   const uW3 = uniform(observerLegW3.value);
+  const uWu = uniform(observerLegWu.value);
   const uRight = uniform(uniforms.cameraRight.value);
   const uUp = uniform(uniforms.cameraUp.value);
   const uForward = uniform(uniforms.cameraForward.value);
@@ -319,8 +321,12 @@ export function createLutLensingMaterial(
   const nxO = obsNx.div(obsLen);
   const nyO = obsNy.div(obsLen);
   const nzO = obsNz.div(obsLen);
-  const observerWorldDir = normalize(uW1.mul(nxO).add(uW2.mul(nyO)).add(uW3.mul(nzO)));
+  // M11 FIX: k = u + sum(n_a A_a) is linear — the photon's world spatial
+  // direction is Wu + sum(n_a W_a) (see schwarzschildIntegrator).
+  const kWorldRaw = uWu.add(uW1.mul(nxO)).add(uW2.mul(nyO)).add(uW3.mul(nzO)) as Vec3Node;
+  const observerWorldDir = normalize(kWorldRaw);
   const obsKT = uLegU.x.add(nxO.mul(uLegA1.x)).add(nyO.mul(uLegA2.x)).add(nzO.mul(uLegA3.x));
+  const obsKR = uLegU.y.add(nxO.mul(uLegA1.y)).add(nyO.mul(uLegA2.y)).add(nzO.mul(uLegA3.y));
   const obsEnergy = f0.mul(obsKT);
   const activeF = uObserverActiveF.greaterThan(0.5);
   const energyMultiplier = select(
@@ -341,8 +347,18 @@ export function createLutLensingMaterial(
   const radialEps = float(RADIAL_EPSILON);
   const isRadial = tangential.lessThan(radialEps);
   const e1 = tangent.div(max(tangential, radialEps));
-  const angularMomentum = select(isRadial, float(0), r0.mul(tangential).div(sqrt(f0Safe)));
-  const prInitial = nRadial.div(f0Safe);
+  // Legacy (camera/static): validated static-tetrad direction formulas,
+  // preserved BIT-FOR-BIT (locked policy).
+  const bLegacy = select(isRadial, float(0), r0.mul(tangential).div(sqrt(f0Safe)));
+  const prLegacy = nRadial.div(f0Safe);
+  // M11 FIX — moving observers: covariant E-normalized constants (mirrors
+  // the numerical pass; see the derivation note there).
+  const kTangentialRate = length(kWorldRaw.sub(e0.mul(dot(kWorldRaw, e0))));
+  const energySafe = max(tslAbs(obsEnergy), denomFloor);
+  const bMoving = select(isRadial, float(0), r0.mul(kTangentialRate).div(energySafe));
+  const prMoving = obsKR.div(f0Safe.mul(energySafe));
+  const angularMomentum = select(activeF, bMoving, bLegacy);
+  const prInitial = select(activeF, prMoving, prLegacy);
   const planeNormal = select(isRadial, vec3(0, 1, 0), normalize(cross(e0, e1)));
   const bzImpact = angularMomentum.mul(planeNormal.y);
   const captureRadius = uMassRg.mul(2).add(uCaptureEpsilon.mul(uMassRg));
@@ -941,6 +957,8 @@ export function createLutLensingMaterial(
       if (legW2v) observerLegW2.value.set(legW2v[0], legW2v[1], legW2v[2]);
       const legW3v = readVec3Components(state['observerLegW3']);
       if (legW3v) observerLegW3.value.set(legW3v[0], legW3v[1], legW3v[2]);
+      const legWuv = readVec3Components(state['observerLegWu']);
+      if (legWuv) observerLegWu.value.set(legWuv[0], legWuv[1], legWuv[2]);
       const obsActiveV = readFiniteNumber(state['observerActive']);
       if (obsActiveV !== null) uObserverActiveF.value = obsActiveV;
       const comovingV = readFiniteNumber(state['observerFrequencyComoving']);

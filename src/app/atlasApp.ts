@@ -225,6 +225,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // refresh survive rebuilds through the closures below.
   let transport: TimelineTransportHandle | null = null;
   let readouts: ReadoutListHandle | null = null;
+  /** M11: per-tick observer-control value sync (set by the BH panel build). */
+  let observerSync: (() => void) | null = null;
   /** CA8-13 waveform panel (Black-Hole Merger only); rebuilt with the panel. */
   let waveformPanel: WaveformPanelHandle | null = null;
   /** Asset id currently bound into the panel (null = unbound). */
@@ -272,6 +274,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   function buildPanel(): void {
     transport = null;
     readouts = null;
+    observerSync = null;
     waveformPanel?.dispose();
     waveformPanel = null;
     waveformBoundAssetId = null;
@@ -495,8 +498,11 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         return typeof v === 'number' && Number.isFinite(v) ? v : fallback;
       };
       const setObserver = (patch: Record<string, unknown>): void => {
+        // NOTE: no markPanelDirty here — dragging a slider must not rebuild
+        // the panel mid-gesture (M11 defect fix). External mode changes reach
+        // the panel through the observer-mode term in the panel signature;
+        // value-only changes are reflected by the per-tick sync closure.
         host.setDestinationControl('black-hole', { observer: { ...readObs(), ...patch } });
-        markPanelDirty();
       };
       const modeRaw = readObs()['mode'];
       const modeValue =
@@ -506,92 +512,132 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         modeRaw === 'freefall'
           ? modeRaw
           : 'camera';
-      bhSection.body.append(
-        createSelectRow({
-          label: 'Observer mode',
-          options: [
-            { value: 'camera', label: 'Camera (legacy)' },
-            { value: 'static', label: 'Static' },
-            { value: 'circular', label: 'Physical Circular' },
-            { value: 'flyby', label: 'Flyby' },
-            { value: 'freefall', label: 'Freefall / Plunge' }
-          ],
-          value: modeValue,
-          onChange: (value) => {
-            setObserver({ mode: value });
-          }
-        }).root
-      );
+      const modeSelect = createSelectRow({
+        label: 'Observer mode',
+        options: [
+          { value: 'camera', label: 'Camera (legacy)' },
+          { value: 'static', label: 'Static' },
+          { value: 'circular', label: 'Physical Circular' },
+          { value: 'flyby', label: 'Flyby' },
+          { value: 'freefall', label: 'Freefall / Plunge' }
+        ],
+        value: modeValue,
+        onChange: (value) => {
+          setObserver({ mode: value });
+        }
+      });
+      bhSection.body.append(modeSelect.root);
+      /** Live value handles refreshed from canonical state each UI tick. */
+      const liveRows: { apply(value: string): void; read(): string }[] = [];
       if (modeValue === 'circular') {
-        bhSection.body.append(
-          createSliderRow({
-            label: 'Orbit radius',
-            min: 3.2,
-            max: 40,
-            step: 0.1,
-            unit: ' r_g',
-            value: num('circularRadiusRg', 9),
-            onInput: (value) => setObserver({ circularRadiusRg: value })
-          }).root,
-          createSelectRow({
-            label: 'Orbit sense',
-            options: [
-              { value: '1', label: 'Prograde (+phi)' },
-              { value: '-1', label: 'Retrograde' }
-            ],
-            value: String(readObs()['circularSense'] === -1 ? -1 : 1),
-            onChange: (value) => setObserver({ circularSense: Number(value) })
-          }).root
+        const radius = createSliderRow({
+          label: 'Orbit radius',
+          min: 3.2,
+          max: 40,
+          step: 0.1,
+          unit: ' r_g',
+          value: num('circularRadiusRg', 9),
+          onInput: (value) => setObserver({ circularRadiusRg: value })
+        });
+        const sense = createSelectRow({
+          label: 'Orbit sense',
+          options: [
+            { value: '1', label: 'Prograde (+phi)' },
+            { value: '-1', label: 'Retrograde' }
+          ],
+          value: String(readObs()['circularSense'] === -1 ? -1 : 1),
+          onChange: (value) => setObserver({ circularSense: Number(value) })
+        });
+        bhSection.body.append(radius.root, sense.root);
+        liveRows.push(
+          {
+            apply: (v) => radius.setValue(Number(v)),
+            read: () => String(num('circularRadiusRg', 9))
+          },
+          {
+            apply: (v) => sense.setValue(v),
+            read: () => String(readObs()['circularSense'] === -1 ? -1 : 1)
+          }
         );
       }
       if (modeValue === 'flyby') {
-        bhSection.body.append(
-          createSliderRow({
-            label: 'Asymptotic speed',
-            min: 0.05,
-            max: 0.95,
-            step: 0.01,
-            unit: ' c',
-            value: num('flybyBetaInfinity', 0.5),
-            onInput: (value) => setObserver({ flybyBetaInfinity: value })
-          }).root,
-          createSliderRow({
-            label: 'Impact parameter',
-            min: -40,
-            max: 40,
-            step: 0.5,
-            unit: ' r_g',
-            value: num('flybyImpactParameterRg', 7),
-            onInput: (value) => setObserver({ flybyImpactParameterRg: value })
-          }).root
+        const beta = createSliderRow({
+          label: 'Asymptotic speed',
+          min: 0.05,
+          max: 0.95,
+          step: 0.01,
+          unit: ' c',
+          value: num('flybyBetaInfinity', 0.5),
+          onInput: (value) => setObserver({ flybyBetaInfinity: value })
+        });
+        const impact = createSliderRow({
+          label: 'Impact parameter',
+          min: -40,
+          max: 40,
+          step: 0.5,
+          unit: ' r_g',
+          value: num('flybyImpactParameterRg', 7),
+          onInput: (value) => setObserver({ flybyImpactParameterRg: value })
+        });
+        bhSection.body.append(beta.root, impact.root);
+        liveRows.push(
+          {
+            apply: (v) => beta.setValue(Number(v)),
+            read: () => String(num('flybyBetaInfinity', 0.5))
+          },
+          {
+            apply: (v) => impact.setValue(Number(v)),
+            read: () => String(num('flybyImpactParameterRg', 7))
+          }
         );
       }
       if (modeValue === 'freefall') {
-        bhSection.body.append(
-          createSliderRow({
-            label: 'Release radius',
-            min: 1.2,
-            max: 60,
-            step: 0.1,
-            unit: ' r_g',
-            value: num('freefallReleaseRadiusRg', 14),
-            onInput: (value) => setObserver({ freefallReleaseRadiusRg: value })
-          }).root
-        );
+        const release = createSliderRow({
+          label: 'Release radius',
+          min: 1.2,
+          max: 60,
+          step: 0.1,
+          unit: ' r_g',
+          value: num('freefallReleaseRadiusRg', 14),
+          onInput: (value) => setObserver({ freefallReleaseRadiusRg: value })
+        });
+        bhSection.body.append(release.root);
+        liveRows.push({
+          apply: (v) => release.setValue(Number(v)),
+          read: () => String(num('freefallReleaseRadiusRg', 14))
+        });
       }
       if (modeValue !== 'camera' && modeValue !== 'static') {
-        bhSection.body.append(
-          createSliderRow({
-            label: 'Proper-time rate',
-            min: -5,
-            max: 5,
-            step: 0.1,
-            unit: 'x',
-            value: num('timeScale', 1),
-            onInput: (value) => setObserver({ timeScale: value })
-          }).root
-        );
+        const rate = createSliderRow({
+          label: 'Proper-time rate',
+          min: -5,
+          max: 5,
+          step: 0.1,
+          unit: 'x',
+          value: num('timeScale', 1),
+          onInput: (value) => setObserver({ timeScale: value })
+        });
+        bhSection.body.append(rate.root);
+        liveRows.push({
+          apply: (v) => rate.setValue(Number(v)),
+          read: () => String(num('timeScale', 1))
+        });
       }
+      // Per-tick reflection: preset/control changes made OUTSIDE this panel
+      // (preset load, share state, reset) update the visible values without a
+      // rebuild. Mode changes rebuild via the signature term below.
+      observerSync = (): void => {
+        const modeNow = String(readObs()['mode'] ?? 'camera');
+        modeSelect.setValue(
+          modeNow === 'static' ||
+            modeNow === 'circular' ||
+            modeNow === 'flyby' ||
+            modeNow === 'freefall'
+            ? modeNow
+            : 'camera'
+        );
+        for (const row of liveRows) row.apply(row.read());
+      };
       panelElement.append(bhSection.root);
     }
 
@@ -881,6 +927,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   let rafId = 0;
   let lastMs = performance.now();
   let uiTimer = 0;
+  let wasTransitioning = false;
   const tick = (nowMs: number): void => {
     const dtSeconds = Math.min((nowMs - lastMs) / 1000, 0.25);
     lastMs = nowMs;
@@ -889,8 +936,26 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     uiTimer += dtSeconds;
     if (uiTimer >= UI_SYNC_INTERVAL_SECONDS) {
       uiTimer = 0;
+      // M11: destination state is seeded from preset/share state when the
+      // arrival transition completes — AFTER the first panel build. Deep-link
+      // boots (/?preset=...) would otherwise show stale control values forever
+      // (the signature is already final). Force exactly one rebuild per
+      // completed arrival so the panel reflects the landed canonical state.
+      const transitioning = host.state.atlas.transition.active;
+      if (wasTransitioning && !transitioning) markPanelDirty();
+      wasTransitioning = transitioning;
       const { destId, presetId } = activeSelection();
-      const signature = `${destId}|${presetId}|${host.experienceMode}|${String(host.diagnosticsEnabled)}`;
+      // Observer MODE participates in the signature: mode changes swap the
+      // mode-specific control rows (preset loads, share state, mode select).
+      const bhObs = host.state.destinations['black-hole']?.state as
+        Record<string, unknown> | undefined;
+      const bhObsMode =
+        bhObs && typeof bhObs['observer'] === 'object' && bhObs['observer'] !== null
+          ? String((bhObs['observer'] as Record<string, unknown>)['mode'] ?? 'camera')
+          : 'camera';
+      const signature = `${destId}|${presetId}|${host.experienceMode}|${String(host.diagnosticsEnabled)}|${
+        destId === 'black-hole' ? bhObsMode : ''
+      }`;
       if (signature !== panelSignature) {
         panelSignature = signature;
         modeSwitch.setValue(host.experienceMode);
@@ -901,6 +966,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         transport.setPlaying(!host.time.snapshot().paused);
         transport.setPhase01(host.time.simulationPhase);
       }
+      if (observerSync !== null) observerSync();
       if (waveformPanel !== null) {
         bindWaveformPanel();
         const physicalTime = host.time.snapshot().physicalTime;

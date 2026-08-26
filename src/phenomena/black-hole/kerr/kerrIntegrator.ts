@@ -144,8 +144,16 @@ const QUALITY_TIER_STEP_BUDGETS: Record<QualityTier, number> = {
   ultra: 2048
 };
 
-/** Compile-time hard ceiling of the integration loop (ultra budget). */
-const MAX_COMPILE_LOOP_BOUND = QUALITY_TIER_STEP_BUDGETS.ultra;
+/**
+ * Compile-time hard ceiling of the integration loop. M11: decoupled from the
+ * ultra TIER budget — moving-observer Kerr rays traverse deeper potentials at
+ * E < 1 with theta-motion and need up to ~3x the static-camera affine path
+ * (measured census for the kerr-circular-observer reference: median ~215,
+ * p95 ~1260, max ~2600 policy steps). The bound covers the scaled budgets the
+ * destination pushes for active moving observers; tier budgets themselves are
+ * unchanged so static-camera scenes keep their validated cost profile.
+ */
+const MAX_COMPILE_LOOP_BOUND = QUALITY_TIER_STEP_BUDGETS.ultra * 3;
 
 /** Production spin clamp (mirrors canonical STATE_RANGES.absSpin). */
 const SPIN_CLAMP = 0.998;
@@ -602,6 +610,11 @@ export function createKerrLensingMaterial(
     // Minimum |sin(theta)| along the trace: pole-grazing rays are f32-
     // limited and get reclassified to explicit failure below (ADR §1.19).
     const minSinTheta = float(1).toVar();
+    // M11 debug-only sub-reason flags for the ?kerrstatus view (never part
+    // of the stable RAY_* contract): theta-wrap vs pole-passage vs other
+    // non-finite.
+    const dbgWrap = float(0).toVar();
+    const dbgPole = float(0).toVar();
 
     If(initValid, () => {
       status.assign(int(RAY_ACTIVE));
@@ -695,6 +708,7 @@ export function createKerrLensingMaterial(
             .greaterThan(0.5),
           () => {
             status.assign(int(RAY_NON_FINITE));
+            dbgWrap.assign(1);
             Break();
           }
         );
@@ -842,6 +856,7 @@ export function createKerrLensingMaterial(
           .greaterThan(0.5),
         () => {
           status.assign(int(RAY_NON_FINITE));
+          dbgPole.assign(1);
         }
       );
 
@@ -912,14 +927,37 @@ export function createKerrLensingMaterial(
     // (the shadow); escaped -> accumulated disk light + environment (or the
     // parity encoding when uDebugMode is set); every other terminal code
     // -> explicit NUMERICAL_FAILURE magenta, never black.
-    return vec4(
+    const physicalRgb = select(
+      status.equal(int(RAY_CAPTURED)),
+      vec3(0, 0, 0),
+      select(status.equal(int(RAY_ESCAPED)), escapedOutput, vec3(...NUMERICAL_FAILURE_RGB))
+    ) as Vec3Node;
+    // M11 classification view (Gate D: debug views expose per-ray terminal
+    // classes; mirrors the LUT pass's lutDebugStatus). Active when uDebugMode
+    // >= 2 (destination ?kerrstatus): escaped cyan, captured black,
+    // max-steps orange, non-finite split by reason — theta-wrap red,
+    // pole-passage yellow, other/NaN bright magenta; invalid-initial-state
+    // dim magenta.
+    const statusViewMix = select(uDebugMode.greaterThan(1.5), float(1), float(0));
+    const nonFiniteColor = select(
+      dbgWrap.greaterThan(0.5),
+      vec3(1.0, 0.05, 0.05),
+      select(dbgPole.greaterThan(0.5), vec3(1.0, 0.9, 0.2), vec3(1.0, 0.2, 1.0))
+    ) as Vec3Node;
+    const statusColor = select(
+      status.equal(int(RAY_ESCAPED)),
+      vec3(0.0, 0.7, 1.0),
       select(
         status.equal(int(RAY_CAPTURED)),
-        vec3(0, 0, 0),
-        select(status.equal(int(RAY_ESCAPED)), escapedOutput, vec3(...NUMERICAL_FAILURE_RGB))
-      ),
-      float(1)
-    );
+        vec3(0.0, 0.0, 0.0),
+        select(
+          status.equal(int(RAY_MAX_STEPS)),
+          vec3(1.0, 0.45, 0.0),
+          select(status.equal(int(RAY_NON_FINITE)), nonFiniteColor, vec3(0.35, 0.0, 0.35))
+        )
+      )
+    ) as Vec3Node;
+    return vec4(mix(physicalRgb, statusColor, statusViewMix), float(1));
   });
 
   const material = new NodeMaterial();
