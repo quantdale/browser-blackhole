@@ -8,7 +8,8 @@ The application is **implemented and running** — this is no longer a planning 
 
 | Destination | Route | Scientific state |
 | --- | --- | --- |
-| Black Hole | `/atlas/black-hole` | Full numerical Schwarzschild backwards ray tracer (GPU f32 integrator, CPU binary64 oracle) with thin accretion disk, HDR pipeline, production presets. An optimized **LUT trajectory backend** (validated precomputed family, `docs/LUT_BACKEND_ADR.md`) is now the measured **auto default**; numerical remains explicitly selectable and every fallback is truthful. |
+| Black Hole | `/atlas/black-hole` | Full numerical Schwarzschild backwards ray tracer (GPU f32 integrator, CPU binary64 oracle) with thin accretion disk, HDR pipeline, production presets. An optimized **LUT trajectory backend** (validated precomputed family, `docs/LUT_BACKEND_ADR.md`) is now the measured **auto default**; numerical remains explicitly selectable and every fallback is truthful. **M10 relativistic observer modes**: physical static/circular/flyby/freefall observers drive aberration and frequency shifts through comoving tetrads and invariant `g = (-k·u_obs)/(-k·u_emit)` — not camera animation; worldlines terminate at a declared horizon stop band (rendering inside the horizon is not claimed). |
+| Kerr (black-hole presets) | `/atlas/black-hole?preset=kerr-*` | Numerical Kerr geodesic backend with signed spin, spin-dependent ISCO disk, frame dragging, and a physical circular Kerr observer (M10). |
 | Neutron Star | `/atlas/neutron-star` | Compact-surface ray tracing, gravitational redshift, hot spots, pulsar/magnetar presets, dipole field lines. |
 | Stellar Explosion | `/atlas/stellar-explosion` | PROCEDURAL_SCIENTIFIC reduced core-collapse/hypernova/long-GRB models on shared GPU volume/particle services. |
 | Compact Merger | `/atlas/compact-merger` | NS–NS binary inspiral (closed-form quadrupole GW decay law — DIRECT reduced model), contact/merger transition, two-component kilonova, short-GRB bipolar jet with beaming-inspired viewing response, scenario-based remnants. PROCEDURAL_SCIENTIFIC post-merger; not NR/hydrodynamics. |
@@ -24,8 +25,10 @@ A developer `Diagnostic` destination (Debug mode) exercises the host lifecycle.
 npm ci                 # exact lockfile install
 npm run check          # format + lint + typecheck + unit tests + build
 npm run e2e            # Playwright browser suite (incl. visual goldens)
+npx playwright test --project=firefox compatibility-matrix  # cross-engine fallback row
 npm run lut:validate -- public/luts/schwarzschild-v1-415dea94
 npm run bench:black-hole        # numerical-vs-LUT frame-time harness
+npm run bench:black-hole -- --observer=circular   # M10 moving-observer benchmark rows
 npm run bench:compact-merger    # phase-aware merger harness (--phase=...)
 npm run bench:tidal-disruption  # phase-aware TDE harness (--phase=...)
 npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)
@@ -33,9 +36,11 @@ npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)
 
 Unit/reference tests: Vitest (`npm run test`). Browser/E2E/goldens: Playwright (`npm run e2e`). Visual goldens live in `tests/browser/goldens/` and are NEVER regenerated merely to go green (`docs/cosmic-atlas/GOLDEN_IMAGES.md`).
 
+Frame-time benchmarks report CPU-side rAF deltas; `frameGpuMs` is `null` unless genuine GPU timestamp queries are wired (`docs/BENCHMARK_MATRIX.md`).
+
 ## Current development continuation point
 
-The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **CA8 (Black-Hole Merger) implemented end-to-end** as the first DATA_DRIVEN Cosmic Atlas destination on pinned SXS provenance; next milestone per `docs/cosmic-atlas/ROADMAP.md`.
+The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **M11 production hardening & release candidate** (compatibility matrix, mobile/touch, device-loss terminal state, resource-leak torture, accessibility, license audit, deployment contract, matched moving-observer benchmarks; M10 relativistic observer modes complete).
 
 ## Autonomous agent quick start
 
@@ -90,6 +95,8 @@ A fresh coding agent starts with **[`.agent/START_HERE.md`](.agent/START_HERE.md
 
 - [`docs/TESTING.md`](docs/TESTING.md) — overall testing strategy.
 - [`docs/CI_CD.md`](docs/CI_CD.md) — CI jobs, browser/golden automation, release pipeline.
+- [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md) — provider-neutral release/deployment contract.
+- [`docs/COMPATIBILITY_MATRIX.md`](docs/COMPATIBILITY_MATRIX.md) — browser/backend compatibility evidence.
 - [`docs/ASSET_PROVENANCE.md`](docs/ASSET_PROVENANCE.md) — licensing, external data/assets, security/privacy rules.
 - [`docs/DEPENDENCIES.md`](docs/DEPENDENCIES.md) — dependency/version/tooling policy.
 - [`docs/RESEARCH_REFERENCES.md`](docs/RESEARCH_REFERENCES.md) — primary references/prior art.
@@ -129,4 +136,4 @@ Dependency versions are pinned exactly in `package.json` + lockfile.
 
 ## Current status
 
-**Implemented.** Cosmic Atlas host + six production destinations; M8 closed with a measured LUT auto-default policy; CA5 Compact Merger, CA6 Tidal Disruption and CA7 Quasar/AGN complete. **M9 Kerr spacetime complete**: numerical Kerr geodesic backend with signed spin, spin-dependent ISCO disk, convergence/parity gates, presets/goldens/benchmarks. See `.agent/STATE.md` for exact evidence and the next milestone.
+**Implemented.** Cosmic Atlas host + seven production destinations; M8 closed with a measured LUT auto-default policy; CA5–CA8 complete; **M9 Kerr spacetime complete**; **M10 relativistic observer modes complete** (physical static/circular/flyby/freefall observers with comoving-tetrad aberration/Doppler, deterministic proper-time playback, truthful near-horizon stop band); **M11 production hardening release candidate in progress** — see `.agent/STATE.md` for exact evidence.

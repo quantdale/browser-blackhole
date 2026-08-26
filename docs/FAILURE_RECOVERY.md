@@ -87,19 +87,32 @@ Never silently disable physics and show an artistic fake while labeling it Scien
 
 ## 5. Device-loss recovery
 
+M11 LOCKED CONTRACT (supersedes the earlier automatic-recovery ladder; see
+the rationale below): a lost device is **terminal for the session** with an
+explicit user-visible "reload required" state.
+
 On device loss:
 
-1. stop submitting frames from the old generation;
-2. mark runtime `DEVICE_LOST`;
-3. cancel/ignore pending async work tied to old generation;
-4. dispose/release application-owned Three.js/GPU resources as appropriate;
-5. reset temporal history;
-6. reacquire adapter/device/renderer with bounded retries or one explicit retry sequence;
-7. rebuild resources from canonical AppState, not stale GPU objects;
-8. resume a single frame loop;
-9. surface terminal error if recovery fails.
+1. stop submitting frames from the old generation (kernel refuses work);
+2. latch a fatal device-loss flag on the host (`isFatalDeviceLoss`);
+3. surface the user-visible terminal status line
+   `Atlas error [GPU_DEVICE_LOST]: … reload the page …`;
+4. keep the UI responsive; frame submission and governor sampling stop;
+5. repeated loss signals deduplicate (one generation bump per physical
+   loss event) and the terminal state does not unlatch.
 
-Use a monotonically increasing renderer generation ID so late async callbacks from an older generation cannot mutate current state.
+Rationale for NOT auto-re-initializing: `SharedPost` and the shared services
+hold `readonly` renderer references, so a mid-session renderer swap cannot
+be performed without either a wide refactor or invisible state corruption;
+an automatic recovery that half-succeeds is worse for a scientific renderer
+than an explicit, explained stop. The reload path re-enters the fully
+validated boot sequence. This satisfies the "documented product recovery
+strategy is explicitly 'reload required' and the UI says so" contract.
+
+Use a monotonically increasing renderer generation ID so late async callbacks
+from an older generation cannot mutate current state; the test-only
+`simulateDeviceLoss()` hook fires this exact production path for the
+device-loss suite (`tests/browser/device-loss.spec.ts`).
 
 ## 6. Shader/pipeline errors
 
