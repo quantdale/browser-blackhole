@@ -97,6 +97,20 @@ At minimum preserve:
 
 Do not keep all channels as permanent full-resolution MRTs unless profiling shows acceptable cost. Generate on demand in Debug mode or selected-pixel probe.
 
+### 8.1 Per-ray classification views (M11)
+
+Two URL-gated full-frame classification views exist for debugging and the
+device/numerical suites (both render the production shader, never a fake
+path):
+
+- `?lutdebug` — Schwarzschild LUT pass per-pixel terminal class: LUT-escaped
+  cyan, LUT-captured black, numerical-resolved orange, failure magenta.
+- `?kerrstatus` — Kerr pass per-pixel terminal class (M11): escaped cyan,
+  captured black, max-steps orange, non-finite split by reason
+  (theta-wrap red, pole-passage yellow, other magenta),
+  invalid-initial-state dim magenta. The pole-passage class is the
+  documented ADR §1.19 f32 honesty gate, not a defect.
+
 ## 9. Selected-pixel probe report
 
 Example:

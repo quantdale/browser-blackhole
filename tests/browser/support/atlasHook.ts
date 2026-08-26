@@ -27,6 +27,7 @@ interface AtlasStateView {
 interface InventoryView {
   liveScopeCount: number;
   totalEstimatedGpuBytes: number;
+  totalResourceCounts: { texture: number };
   pendingPrepares: number;
   /** Present when a backend engaged; null during boot or before first frame. */
   backend: { api: string; adapterName: string } | null;
@@ -61,6 +62,8 @@ interface AtlasHook {
       setBloom(enabled: boolean, strength: number): void;
       setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void;
     };
+    /** Canonical experience mode (scientific | cinematic | debug). */
+    readonly experienceMode: string;
     /** Destination timeline transport (deterministic pause/scrub for specs). */
     time: {
       pause(): void;

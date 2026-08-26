@@ -70,9 +70,7 @@ async function scopes(page: Page): Promise<ScopeView> {
 }
 
 test.describe('M11-04 lifecycle/resource-leak torture', () => {
-  test('repeated cross-destination cycles return to the resource baseline', async ({
-    page
-  }) => {
+  test('repeated cross-destination cycles return to the resource baseline', async ({ page }) => {
     const errors = collectErrors(page);
     await page.goto('/atlas/black-hole');
     await waitArrived(page, 'black-hole');
@@ -129,13 +127,14 @@ test.describe('M11-04 lifecycle/resource-leak torture', () => {
     await page.goto('/atlas/black-hole');
     await waitArrived(page, 'black-hole');
     const baseline = await scopes(page);
-    for (const [w, h] of [
+    const flips: [number, number][] = [
       [500, 700],
       [900, 500],
       [1280, 800],
       [390, 844],
       [1280, 800]
-    ]) {
+    ];
+    for (const [w, h] of flips) {
       await page.setViewportSize({ width: w, height: h });
       await page.waitForTimeout(120);
     }

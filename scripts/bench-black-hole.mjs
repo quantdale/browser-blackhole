@@ -72,18 +72,9 @@ const observerBeta = Number(arg('observer-beta', '0.6'));
 const observerImpact = Number(arg('observer-impact', '8'));
 const observerRelease = Number(arg('observer-release', '14'));
 
-const OBSERVER_MODES = new Set([
-  '',
-  'camera',
-  'static',
-  'circular',
-  'flyby',
-  'freefall'
-]);
+const OBSERVER_MODES = new Set(['', 'camera', 'static', 'circular', 'flyby', 'freefall']);
 if (!OBSERVER_MODES.has(observer)) {
-  console.error(
-    `[bench] invalid --observer=${observer} (camera|static|circular|flyby|freefall)`
-  );
+  console.error(`[bench] invalid --observer=${observer} (camera|static|circular|flyby|freefall)`);
   process.exit(2);
 }
 

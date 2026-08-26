@@ -1,5 +1,12 @@
 # Deployment, compatibility, and runtime policy
 
+> M11 note: the operative release artifacts are [`docs/DEPLOYMENT.md`](DEPLOYMENT.md)
+> (provider-neutral deployment contract) and
+> [`docs/COMPATIBILITY_MATRIX.md`](COMPATIBILITY_MATRIX.md) (evidence table).
+> This document remains the underlying policy statement; where wording
+> differs, the two linked documents win (e.g. device loss is now the locked
+> terminal reload-required contract, see `docs/FAILURE_RECOVERY.md` §5).
+
 ## 1. Hosting model
 
 The core application should be deployable as static assets over HTTPS. Avoid requiring a backend for rendering. This keeps GPU work local, makes deployment simple, and preserves an offline-capable architecture if a service worker is added later.
