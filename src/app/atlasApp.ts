@@ -42,6 +42,7 @@ import {
   QUALITY_MODE_VALUES,
   parseFromUrl
 } from '../atlas/atlasState.js';
+import { INVALIDATION_REASON } from '../atlas/types.js';
 import type { ExperienceMode } from '../atlas/types.js';
 import { CosmicAtlasHost, type CosmicAtlasHostOptions } from '../atlas/host.js';
 import { DEBUG_DESTINATION_ID, productionDestinationIds } from '../atlas/launchCatalog.js';
@@ -814,7 +815,16 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       { label: 'Backend', value: backend ? `${backend.api} ${backend.adapterName}` : '—' },
       { label: 'Quality tier', value: host.governor.currentTier },
       { label: 'Render scale', value: host.governor.renderScale.toFixed(2) },
-      { label: 'FPS (smoothed)', value: host.governor.smoothedFps.toFixed(0) },
+      {
+        label: 'FPS (smoothed)',
+        // WS1: the governor only samples endFrame() on frames the host
+        // actually rendered — while idle-skipped this reads the last live
+        // value, not a live measurement, so say so (measurement-honesty
+        // invariant, MASTER_PLAN §3.4) instead of implying a fresh number.
+        value: host.lastFrameRendered
+          ? host.governor.smoothedFps.toFixed(0)
+          : `${host.governor.smoothedFps.toFixed(0)} (idle)`
+      },
       { label: 'Activity', value: host.governor.activityMode },
       { label: 'Destination', value: host.state.atlas.activeDestination },
       { label: 'Preset', value: host.state.atlas.activePreset || '(default)' },
@@ -980,6 +990,25 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   };
   rafId = requestAnimationFrame(tick);
 
+  // --- page visibility (WS3, whole-atlas performance campaign) -------------
+  // Browsers already suspend rAF callbacks for hidden tabs, so `tick` simply
+  // stops firing while hidden — the shared timeline and every ctx.time.dt-
+  // driven destination freeze exactly where they were (no wall-clock reads
+  // anywhere in this codebase makes that safe: TimeController's documented
+  // hidden-time semantics are "does not advance while hidden; resumes from
+  // the same coordinate with a normal per-frame dt, never a catch-up jump").
+  // Two things still need an explicit handler on resume: `lastMs` must not
+  // be left pointing at the pre-hide timestamp (that would present as one
+  // artificially-maxed-out MAX_FRAME_DT_SECONDS frame instead of a normal
+  // one), and WS1's on-demand skip needs a one-shot nudge in case a resize or
+  // other externally-driven change happened while no frames were rendering.
+  const onVisibilityChange = (): void => {
+    if (document.hidden) return;
+    lastMs = performance.now();
+    host.invalidate(INVALIDATION_REASON.FORCED_CAPTURE);
+  };
+  document.addEventListener('visibilitychange', onVisibilityChange);
+
   const unsubscribeStatus = host.status.subscribe((snapshot) => {
     if (snapshot.failed) {
       status.textContent = `Atlas error [${snapshot.errorCode ?? 'UNKNOWN'}]: ${snapshot.message}`;
@@ -1003,7 +1032,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   const captureFrame = (): string[] | null => {
     const rect = viewport.getBoundingClientRect();
     if (rect.width <= 0 || rect.height <= 0) return null;
-    host.frame(1 / 60); // one deterministic frame, same-task readback
+    // force: true — WS1 frame invalidation (src/atlas/host.ts) skips
+    // rendering when nothing changed and the timeline is paused; this test
+    // hook must always produce a fresh same-task readback regardless.
+    host.frame(1 / 60, { force: true });
     const cw = canvas.width;
     const ch = canvas.height;
     if (cw <= 0 || ch <= 0) return null;
@@ -1042,6 +1074,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       unsubscribeStatus();
       unsubscribeFatal();
       delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];

@@ -32,6 +32,26 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 2. Frame invalidation / on-demand rendering
 
+> **2026-08-28 status:** implementation landed (uncommitted at session end) —
+> `INVALIDATION_REASON` bitset in `src/atlas/types.ts`, `TimeController.
+> consumeDirty()`, `CameraRig.update()` boolean return, gating wired into
+> `CosmicAtlasHost.frame()`, `forceFrame`-equivalent (`frame(dt,{force:true})`
+> + `forceContinuousRenderForTest`), `tests/browser/frame-invalidation.spec.ts`
+> + 16 new unit tests (all passing). NOT certified: this session's machine has
+> no WebGPU adapter in headless Chromium and showed highly unstable browser
+> timing (see project memory `local-env-no-webgpu`), so boxes below stay
+> unchecked. One SPECIFIC, moderately-reproducible failure (2 of 3 direct
+> observations, not generic flakiness) needs root-causing before this section
+> can be marked done: `tests/browser/black-hole-merger.spec.ts` "data-derived
+> phases appear in order while scrubbing" consistently misses the LAST
+> expected phase (`remnant`); the compact-merger analog missed `merger` once.
+> Code review of `blackHoleMergerModule.ts`'s `update()` shows phase is purely
+> derived from `ctx.services.time.snapshot()` each call (not an accumulator),
+> so the mechanism is NOT yet identified — do not assume it is fixed by
+> re-running goldens elsewhere without investigating first. §0/§1 baseline
+> below were never established before this landed; do that retroactively
+> against this code before further §2 claims.
+
 - [ ] Define invalidation reason bitset in atlas types.
 - [ ] Add host revision/invalidation state.
 - [ ] Wire TimeController changes.
@@ -51,6 +71,16 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Confirm all goldens pass.
 
 ## 3. Visibility lifecycle
+
+> **2026-08-28 status:** partial — `visibilitychange` listener + resume nudge
+> added to `src/app/atlasApp.ts` (uncommitted at session end). NOT certified
+> for the same environment reasons as §2. The dedicated browser test for this
+> (`frame-invalidation.spec.ts` "a visibilitychange resume wakes exactly one
+> frame") failed once deterministically in total isolation then passed 5/5 on
+> repeat with no code change — genuine unresolved flakiness, root cause
+> unknown; the leading hypothesis (`document.hidden` already true in headless
+> Chromium) was directly measured and refuted. "Stop nonessential polling
+> while hidden" and explicit hidden-time semantics below were NOT touched.
 
 - [ ] Add document visibilitychange policy.
 - [ ] Stop nonessential atlas polling/work while hidden.

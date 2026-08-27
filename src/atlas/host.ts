@@ -69,6 +69,7 @@ import type {
   FrameTimeInfo,
   HostServices,
   IParticleService,
+  InvalidationReasonMask,
   ISharedPost,
   PresetDisplayState,
   PreparedPhenomenon,
@@ -79,6 +80,7 @@ import type {
   ResourceScope,
   VersionedDestinationState
 } from './types.js';
+import { INVALIDATION_REASON } from './types.js';
 import { DestinationRegistry } from './registry.js';
 
 // ---------------------------------------------------------------------------
@@ -280,6 +282,15 @@ export class CosmicAtlasHost {
   /** True while the §13 interaction throttle has bloom suspended. */
   private bloomThrottleActive = false;
 
+  // -- WS1 frame invalidation (whole-atlas performance campaign) -------------
+  /** Reasons accumulated by `invalidate()` since the last consumed frame. */
+  private pendingInvalidationMask: InvalidationReasonMask = 0;
+  /** TEST-ONLY: forces every frame to render (benchmark steady-state sampling). */
+  private forceContinuousRenderValue = false;
+  /** Whether the most recent `frame()` call actually rendered (debug/diagnostics). */
+  private lastFrameRenderedValue = true;
+  private unsubscribeTierChanged: (() => void) | null = null;
+
   /** Stable per-frame destination closures (no per-frame allocation). */
   private readonly frameDestination = {
     update: (ctx: FrameContext): void => {
@@ -363,6 +374,13 @@ export class CosmicAtlasHost {
     // UI/host requests -> director (latest-wins inside the director).
     this.navigation.onIntent((intent) => {
       this.requestTransition(intent);
+    });
+
+    // WS1: a tier change is a real render-resolution change even while the
+    // scene is otherwise static (paused, camera settled) — it must wake the
+    // frame loop for at least one frame.
+    this.unsubscribeTierChanged = this.governor.onTierChanged(() => {
+      this.invalidate(INVALIDATION_REASON.QUALITY_CHANGED);
     });
 
     this.unsubscribeDeviceLost = this.kernel.onDeviceLost(() => {
@@ -505,8 +523,18 @@ export class CosmicAtlasHost {
    * Advance one frame: deterministic clock → rig → director envelopes →
    * orchestrated kernel render (which brackets governor begin/end itself and
    * composites the transition overlay over the destination scene).
+   *
+   * WS1 frame invalidation (openspec/changes/whole-atlas-performance-
+   * optimization): the clock/rig/director state machines always advance —
+   * required simulation/transition/camera-ease progress must never stall —
+   * but the expensive destination update/render + post-present only run when
+   * a render REASON exists (`INVALIDATION_REASON`) or the shared timeline is
+   * currently playing (several destinations key continuous internal
+   * integration to `!TimeController.paused` rather than the mapped UI phase
+   * moving; see the type's doc comment). `opts.force` is the test-only
+   * escape hatch backing `AtlasAppWindowHook.captureFrame()`.
    */
-  frame(dtSeconds: number): void {
+  frame(dtSeconds: number, opts?: { force?: boolean }): void {
     if (this.disposed || !this.status.ready) return;
     const dt = Number.isFinite(dtSeconds)
       ? Math.min(Math.max(dtSeconds, 0), MAX_FRAME_DT_SECONDS)
@@ -514,10 +542,24 @@ export class CosmicAtlasHost {
     this.lastFrameDt = dt;
     this.elapsedSeconds += dt;
 
+    let reasons: InvalidationReasonMask = this.pendingInvalidationMask;
+    this.pendingInvalidationMask = 0;
+    if (opts?.force === true || this.forceContinuousRenderValue) {
+      reasons |= INVALIDATION_REASON.FORCED_CAPTURE;
+    }
+
     this.time.update(dt);
-    this.cameraRig.update(dt);
+    if (this.time.consumeDirty()) reasons |= INVALIDATION_REASON.TIME_ADVANCED;
+
+    if (this.cameraRig.update(dt)) reasons |= INVALIDATION_REASON.CAMERA_CHANGED;
+
     this.director.update(dt);
-    this.applyBloomInteractionThrottle();
+    if (this.applyBloomInteractionThrottle()) reasons |= INVALIDATION_REASON.POST_CHANGED;
+    if (this.director.getPublicState().active) reasons |= INVALIDATION_REASON.TRANSITION_CHANGED;
+
+    const shouldRender = reasons !== 0 || !this.time.paused;
+    this.lastFrameRenderedValue = shouldRender;
+    if (!shouldRender) return;
 
     const overlay = this.director.getOverlay();
     const plan: FramePlan = {
@@ -527,6 +569,32 @@ export class CosmicAtlasHost {
       transitionOpacity: overlay.opacity
     };
     this.kernel.renderFrame(plan);
+  }
+
+  /**
+   * Accumulate a render reason from anywhere in the host's public API
+   * (control/resize/quality/visual/destination setters below). Consumed and
+   * cleared by the next `frame()` call; safe to call between frames.
+   */
+  invalidate(reason: InvalidationReasonMask): void {
+    this.pendingInvalidationMask |= reason;
+  }
+
+  /**
+   * TEST-ONLY: forces every subsequent `frame()` call to render regardless of
+   * invalidation state. Benchmark harnesses (scripts/bench-*.mjs) pin a
+   * stationary, paused scene and sample many rAF deltas to measure steady-
+   * state per-frame cost; WS1's on-demand skip would otherwise make that
+   * measurement measure "nothing happened" instead of render cost. Not
+   * reachable from production UI.
+   */
+  forceContinuousRenderForTest(enabled: boolean): void {
+    this.forceContinuousRenderValue = enabled === true;
+  }
+
+  /** Whether the most recent `frame()` call actually rendered (diagnostics). */
+  get lastFrameRendered(): boolean {
+    return this.lastFrameRenderedValue;
   }
 
   // -------------------------------------------------------------------------
@@ -566,6 +634,7 @@ export class CosmicAtlasHost {
   handleResize(cssWidth: number, cssHeight: number): void {
     if (this.disposed) return;
     if (!Number.isFinite(cssWidth) || !Number.isFinite(cssHeight)) return;
+    this.invalidate(INVALIDATION_REASON.RESIZE);
     const scale = this.effectiveRenderScale();
     this.kernel.handleResize(cssWidth, cssHeight, scale);
 
@@ -592,14 +661,14 @@ export class CosmicAtlasHost {
    * interaction, bloom is temporarily suspended and restored once the camera
    * settles. Purely display-side; never touches destination state.
    */
-  private applyBloomInteractionThrottle(): void {
-    if (!this.bloomEnabledValue) return;
+  private applyBloomInteractionThrottle(): boolean {
+    if (!this.bloomEnabledValue) return false;
     const throttled =
       this.governor.currentTier === 'low' && this.governor.activityMode === 'interaction';
-    if (throttled !== this.bloomThrottleActive) {
-      this.bloomThrottleActive = throttled;
-      this.post.setBloom(!throttled, throttled ? 0 : this.bloomStrengthValue);
-    }
+    if (throttled === this.bloomThrottleActive) return false;
+    this.bloomThrottleActive = throttled;
+    this.post.setBloom(!throttled, throttled ? 0 : this.bloomStrengthValue);
+    return true;
   }
 
   /** Reduced-motion preference forwarded to director + rig (CA-ADR-005). */
@@ -641,10 +710,12 @@ export class CosmicAtlasHost {
 
   setDiagnostics(enabled: boolean): void {
     this.diagnosticsEnabledValue = enabled === true;
+    this.invalidate(INVALIDATION_REASON.DEBUG_CHANGED);
   }
 
   /** Apply display-domain values (clamped) through the shared post. */
   setVisual(partial: PresetDisplayState): void {
+    this.invalidate(INVALIDATION_REASON.POST_CHANGED);
     if (partial.exposure !== undefined) {
       const exposure = clampRange(
         Number(partial.exposure),
@@ -727,6 +798,7 @@ export class CosmicAtlasHost {
     )
       ? preference
       : 'auto';
+    this.invalidate(INVALIDATION_REASON.CONTROL_CHANGED);
   }
 
   get trajectoryBackend(): TrajectoryBackendPreference {
@@ -757,6 +829,7 @@ export class CosmicAtlasHost {
     if (typeof active.applyControlState !== 'function') return;
     active.applyControlState(partial);
     this.cacheDestinationState(active);
+    this.invalidate(INVALIDATION_REASON.CONTROL_CHANGED);
   }
 
   /**
@@ -877,6 +950,8 @@ export class CosmicAtlasHost {
 
     this.unsubscribeDeviceLost?.();
     this.unsubscribeDeviceLost = null;
+    this.unsubscribeTierChanged?.();
+    this.unsubscribeTierChanged = null;
     this.fatalCallbacks.clear();
 
     try {
@@ -1021,6 +1096,7 @@ export class CosmicAtlasHost {
       prepared.preset.camera,
       reducedMotion ? 0 : ARRIVAL_ANIMATE_SECONDS
     );
+    this.invalidate(INVALIDATION_REASON.DESTINATION_CHANGED);
   }
 
   private async exitActive(freezeForTransition: boolean): Promise<void> {
@@ -1033,6 +1109,7 @@ export class CosmicAtlasHost {
     const active = this.activePrepared;
     this.activePrepared = null;
     if (active === null) return;
+    this.invalidate(INVALIDATION_REASON.DESTINATION_CHANGED);
     this.governor.setActiveDestination(null);
     // Surface failures to the director (it wraps this call in try/catch), but
     // always attempt both halves of the teardown.

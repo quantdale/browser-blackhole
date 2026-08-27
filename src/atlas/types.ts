@@ -415,7 +415,8 @@ export interface ICameraRig {
   setFov(fovDeg: number): void;
   setControlsEnabled(enabled: boolean): void;
   setReducedMotion(reduced: boolean): void;
-  update(dtSeconds: number): void;
+  /** Returns true when this call changed the camera transform (CAMERA_CHANGED signal). */
+  update(dtSeconds: number): boolean;
   dispose(): void;
 }
 
@@ -446,6 +447,45 @@ export interface IPerformanceGovernor {
   onTierChanged(cb: (tier: QualityTier) => void): () => void;
   dispose(): void;
 }
+
+// ---------------------------------------------------------------------------
+// Frame invalidation (whole-atlas performance campaign WS1)
+// ---------------------------------------------------------------------------
+
+/**
+ * Host-owned render-reason bitset (openspec/changes/whole-atlas-performance-
+ * optimization MASTER_PLAN.md §6.2). The host is the single authority that
+ * decides whether a frame's destination update/render/post-present is worth
+ * doing; a reason bit means "something a viewer could see changed since the
+ * last presented frame." `CosmicAtlasHost.frame()` renders when any bit is
+ * set OR the shared timeline is not paused (several destinations advance
+ * physically-meaningful internal state — moving-observer proper time,
+ * auto-orbit, particle/spin integration — keyed to `!TimeController.paused`
+ * rather than to the mapped UI phase actually moving; skipping presentation
+ * while playing would let that state drift invisibly, so "paused" is a
+ * required precondition for skipping, matching MASTER_PLAN §6.3/§6.5
+ * verbatim). FORCED_CAPTURE is the "render this frame regardless" escape
+ * hatch: `CosmicAtlasHost.frame(dt, { force: true })` and
+ * `forceContinuousRenderForTest` use it for deterministic golden/benchmark
+ * capture; the WS3 page-visibility resume handler (src/app/atlasApp.ts) uses
+ * the same bit via `host.invalidate()` for its one-shot "wake on resume"
+ * nudge, since nothing else about the scene necessarily changed while hidden.
+ */
+export const INVALIDATION_REASON = {
+  TIME_ADVANCED: 1 << 0,
+  CAMERA_CHANGED: 1 << 1,
+  CONTROL_CHANGED: 1 << 2,
+  DESTINATION_CHANGED: 1 << 3,
+  RESIZE: 1 << 4,
+  QUALITY_CHANGED: 1 << 5,
+  TRANSITION_CHANGED: 1 << 6,
+  POST_CHANGED: 1 << 7,
+  DEBUG_CHANGED: 1 << 8,
+  FORCED_CAPTURE: 1 << 9
+} as const;
+
+export type InvalidationReasonName = keyof typeof INVALIDATION_REASON;
+export type InvalidationReasonMask = number;
 
 export interface ISharedPost {
   ensureSize(widthPx: number, heightPx: number, renderScale: number): void;

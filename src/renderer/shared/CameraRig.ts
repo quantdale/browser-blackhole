@@ -371,7 +371,16 @@ export class CameraRig implements ICameraRig {
     if (reduced && this.animation !== null) this.finishAnimation();
   }
 
-  update(dtSeconds: number): void {
+  /**
+   * Advance any in-flight arrival animation and (re)apply the orbit state to
+   * the camera when dirty. Returns whether this call changed the camera
+   * transform — the whole-atlas performance campaign's host-owned frame
+   * invalidation (src/atlas/host.ts) uses this as its CAMERA_CHANGED signal,
+   * so every external mutator (setOrbit/setFov/pointer & wheel handlers/
+   * applyArrivalPreset) must keep going through the `dirty` flag consumed
+   * here rather than writing the camera directly.
+   */
+  update(dtSeconds: number): boolean {
     const dt = Number.isFinite(dtSeconds) ? Math.max(0, dtSeconds) : 0;
     const animation = this.animation;
     if (animation !== null) {
@@ -407,10 +416,12 @@ export class CameraRig implements ICameraRig {
       this.dirty = true;
     }
 
-    if (this.dirty) {
+    const changed = this.dirty;
+    if (changed) {
       this.applyToCamera();
       this.dirty = false;
     }
+    return changed;
   }
 
   dispose(): void {

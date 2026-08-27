@@ -11,6 +11,99 @@ Do not interpret older "no active campaign" / "certified production-ready" histo
 
 ---
 
+## 2026-08-28 session — WS1 (frame invalidation) + partial WS3 (visibility) implemented, NOT certified
+
+Scope note: a research-scoped subagent (asked to map the frame-loop
+architecture only) implemented production code beyond its instructions —
+disclosed here for full transparency, not hidden. The code itself was
+independently reviewed (diff read in full) and is reasonably well-designed;
+the concern is process (no checkpoint before landing), not quality.
+
+**What changed (uncommitted at end of session unless a follow-up session
+committed it — check `git log`/`git status` before assuming either way):**
+
+- `src/atlas/types.ts`: `INVALIDATION_REASON` bitset (TIME_ADVANCED,
+  CAMERA_CHANGED, CONTROL_CHANGED, DESTINATION_CHANGED, RESIZE,
+  QUALITY_CHANGED, TRANSITION_CHANGED, POST_CHANGED, DEBUG_CHANGED,
+  FORCED_CAPTURE) + `ICameraRig.update()` now returns `boolean`.
+- `src/atlas/TimeController.ts`: sticky `consumeDirty()` flag, set whenever
+  `internalTime` actually moves (scrub/update/reset), survives a scrub that
+  happens between two `frame()` ticks.
+- `src/renderer/shared/CameraRig.ts`: `update()` returns whether it changed
+  the camera transform this tick.
+- `src/atlas/host.ts`: `CosmicAtlasHost.frame()` accumulates a reason mask
+  each tick (time/camera/control/resize/quality/transition/post/debug) plus
+  `!time.paused` as an unconditional render trigger (several destinations key
+  continuous integration to playing-vs-paused, not to the mapped UI phase
+  moving); skips `destination.update()`/`render()`/`kernel.renderFrame()`
+  when the mask is empty AND the timeline is paused. New public API:
+  `invalidate(reason)`, `forceContinuousRenderForTest(enabled)`,
+  `lastFrameRendered` getter. `frame(dt, {force:true})` is the new
+  `forceFrame`-equivalent escape hatch (used by `captureFrame()` and the
+  visibility-resume nudge). `TransitionDirector.ts` was NOT touched — WS2
+  (transition occlusion) is still fully unimplemented.
+- `src/app/atlasApp.ts`: `visibilitychange` listener (WS3, partial) — on
+  resume (`!document.hidden`), resets the frame-loop's `lastMs` baseline and
+  calls `host.invalidate(FORCED_CAPTURE)` as a one-shot wake. "Stop
+  nonessential polling while hidden" and explicit documented hidden-time
+  semantics (tasks.md §3) were NOT done.
+- New tests: `tests/browser/frame-invalidation.spec.ts` (7 browser tests),
+  `tests/unit/timeController.test.ts` (10 tests), `tests/unit/cameraRig.test.ts`
+  (6 tests) — all 16 new unit tests pass; `npm run typecheck`/`lint`/
+  `format:check`/`build` all clean on the full tree.
+- Separately (correctly scoped, general-purpose subagent): all 9
+  `scripts/bench-*.mjs` harnesses gained `--force-backend=webgpu|webgl2`
+  (wired to the existing `?backend=` URL override) and real
+  `flushGpuTimestamps()` GPU-timestamp capture where missing. Format/lint
+  clean, smoke-tested. This part is clean and safe to treat as complete
+  independent of the WS1/WS3 status below.
+
+**Why this is NOT certified — environment, not (only) code:**
+
+This session's machine has no WebGPU adapter reachable from headless
+Playwright Chromium (`No available adapters`; confirmed by direct probe) —
+every browser run here is WebGL2 fallback, unlike the `amd rdna-2` hardware-
+WebGPU machine all prior campaign numbers were recorded on. Timing here is
+also unstable independent of backend: the same route arrived in ~5s in one
+Playwright run and never arrived in 120s in a hand-rolled probe against the
+identical build; unrelated pure-CPU vitest tests timed out purely from
+concurrent load with a browser suite. Full detail: project memory
+`local-env-no-webgpu` / `whole-atlas-perf-campaign`.
+
+**Known suspected regression (NOT dismissed as flakiness):**
+`tests/browser/black-hole-merger.spec.ts` "data-derived phases appear in
+order while scrubbing" failed 2 of 3 direct observations (original 10-worker
+run + an isolated `--workers=3` rerun; passed once at `--workers=1` per the
+implementing subagent), always missing the LAST expected phase (`remnant`).
+The `compact-merger.spec.ts` analog missed `merger` once. Code review of
+`blackHoleMergerModule.ts`'s `update()` shows the phase readout is purely
+`phaseAt(clampedT, ds)` — a pure function of current time, not an
+accumulator — so skipping `update()` on idle frames should not lose state;
+the actual mechanism causing the last-phase miss is UNKNOWN. Do not mark
+tasks.md §2 done, and do not assume this is fixed, until root-caused on a
+capable-hardware runner.
+
+**Also unresolved (no clear evidence either way):** `frame-invalidation.
+spec.ts` "resize wakes exactly the frames needed" and "a paused, settled
+scene issues zero further orchestrated frames" (both failed once in the
+original full run, passed on every isolated rerun); `resource-leak.spec.ts`
+"repeated cross-destination cycles return to the resource baseline" (60s
+timeout stuck on `transitioning` in the original run, passed once isolated).
+4 Firefox failures in the original run are CONFIRMED pure environment
+(`Executable doesn't exist at ...firefox-1538\firefox\firefox.exe` — a local
+Playwright browser-install version gap, fix with `npx playwright install
+firefox`), not a regression.
+
+**Next steps for whoever picks this up:** root-cause the black-hole-merger
+last-phase miss first (it's the only failure with a consistent, non-random
+pattern); then do §0/§1 (baseline + telemetry) retroactively against this
+already-landed §2/§3 code on a capable-hardware (real WebGPU) runner before
+claiming any of tasks.md §2/§3 checkboxes; §4 onward (startup splitting,
+black-hole active-pass lifecycle, Schwarzschild/Kerr optimization,
+destination-specific work, final certification) has not been started.
+
+---
+
 # Durable project state
 
 Last update: 2026-08-27 — **FINAL PRODUCTION-READINESS CERTIFIED** (`openspec/changes/final-production-readiness`)

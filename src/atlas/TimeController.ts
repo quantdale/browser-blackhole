@@ -109,10 +109,37 @@ export class TimeController {
   private rateValue: number;
   private pausedValue: boolean;
 
+  /**
+   * Sticky "coordinate changed since last consumed" flag (whole-atlas
+   * performance campaign WS1, `.agent`/`openspec` invalidation model). Set
+   * whenever `internalTime` actually moves (scrub/reset/update); cleared only
+   * by {@link consumeDirty}. Mirrors CameraRig's `dirty` field so an external
+   * mutation between frames (e.g. a slider's `scrubTo` call) is never missed
+   * by a same-tick before/after comparison.
+   */
+  private dirtyValue = true;
+
   constructor(options: TimeControllerOptions = {}) {
     this.rateValue = sanitizeRate(options.playbackRate ?? 1, 1);
     this.pausedValue = options.paused ?? false;
     this.setPhaseFromUi(typeof options.initialPhase === 'number' ? options.initialPhase : 0);
+  }
+
+  /** Marks dirty when `internalTime` actually differs from `before`. */
+  private markDirtyIfChanged(before: number): void {
+    if (this.internalTime !== before) this.dirtyValue = true;
+  }
+
+  /**
+   * Consume (and clear) the pending-change flag. Host invalidation wiring
+   * calls this once per frame right after {@link update}; a `true` result
+   * means the internal coordinate moved since the last call (scrub, reset or
+   * a genuine playback advance) and a frame is required to present it.
+   */
+  consumeDirty(): boolean {
+    const dirty = this.dirtyValue;
+    this.dirtyValue = false;
+    return dirty;
   }
 
   // --- Mapping registry ----------------------------------------------------
@@ -172,7 +199,9 @@ export class TimeController {
     this.internalMax = Math.max(lo, hi);
     this.activeMapping = mapping;
     this.usingDefaultMapping = mapping === IDENTITY_MAPPING;
+    const before = this.internalTime;
     this.internalTime = clamp(this.internalTime, this.internalMin, this.internalMax);
+    this.markDirtyIfChanged(before);
     this.refreshDerived();
   }
 
@@ -205,11 +234,13 @@ export class TimeController {
     if (this.pausedValue) return;
     const dt = finiteOrNull(dtSeconds) ?? 0;
     if (dt === 0 || this.rateValue === 0) return;
+    const before = this.internalTime;
     this.internalTime = clamp(
       this.internalTime + this.rateValue * dt,
       this.internalMin,
       this.internalMax
     );
+    this.markDirtyIfChanged(before);
     this.refreshDerived();
   }
 
@@ -236,7 +267,9 @@ export class TimeController {
 
   private setPhaseFromUi(phase01: number): void {
     const ui = clamp(finiteOrNull(phase01) ?? 0, 0, 1);
+    const before = this.internalTime;
     this.internalTime = clamp(this.activeMapping.forward(ui), this.internalMin, this.internalMax);
+    this.markDirtyIfChanged(before);
     this.refreshDerived();
   }
 
