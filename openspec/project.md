@@ -16,7 +16,7 @@ Production Cosmic Atlas destinations at the 2026-08-26 audit base:
 - Quasar / AGN
 - Black-Hole Merger
 
-Galaxy Collision (CA9) is the next planned destination but is not production yet.
+Galaxy Collision (CA9) is now production (DATA_DRIVEN restricted three-body bridge/tail, source-locked to Toomre & Toomre 1972 via NASA GISS/NTRS, offline GC1 artifact + CPU/GPU interpolation).
 
 ## Technical stack
 
