@@ -8,6 +8,8 @@ Canonical requirements/tasks: `openspec/changes/*`
 
 **Status (2026-08-27):** **CAMPAIGN COMPLETE** — Phase A `m12-neutron-star-surface-lensing` (**COMPLETE** `a827563`), Phase B `m12-repository-integrity` (**COMPLETE** `5e01bbb`), Phase C `ca9-galaxy-collision` (**COMPLETE** `5680044` + `0b63ce9` checklist). All gates evidenced and pushed to `origin/main`.
 
+**Superseded update (2026-08-27):** the "campaign complete" claim above predated hosted `main` CI going green — CI was red on every push at the time. A follow-on certification change, `openspec/changes/final-production-readiness`, found and fixed the root cause (hosted GPU-less runners cannot stably run the full browser suite; fixed by scoping hosted CI to `quality` + a cheap `browser-smoke`, with the full suite/goldens/Firefox as a documented local capable-runner gate) and independently re-verified every hard gate. See `docs/RELEASE_CERTIFICATION.md` for the authoritative current status — do not treat this file's Phase A/B/C status line alone as proof of hosted-CI-green release readiness.
+
 ## Mission
 
 Execute the next Browser Blackhole campaign from the current repository state. Do not redo completed M0–M11 work. Do not treat the old roadmap order as more important than a proven production defect.

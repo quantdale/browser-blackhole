@@ -1,42 +1,50 @@
-# START HERE — active next campaign
+# START HERE — repository status
 
-Updated: 2026-08-26
+Updated: 2026-08-27
 
-The historical M0–M11 campaign is complete. **Do not restart M0, M1, or any completed historical packet.**
+The historical M0–M11 campaign, M12-NS, M12-RI, CA9 (Galaxy Collision), and the
+**final-production-readiness** certification pass are all complete. **Do not
+restart any completed historical packet.**
 
-`.agent/STATE.md` contains durable evidence/history and may still contain a historical “no active planner prompt” snapshot from immediately before this planning commit. The active instruction source is now:
+The repository is certified production-ready. Authoritative evidence:
 
-1. `.agent/EXECUTION_PROMPT.md`
-2. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`
-3. `openspec/AGENTS.md`
-4. `openspec/project.md`
-5. the current ordered OpenSpec change folder
-6. `.agent/QUALITY_GATES.md`
+1. `docs/RELEASE_CERTIFICATION.md` — full certification report (defects, CI
+   green-run list, gates, fidelity, compatibility, verdict).
+2. `.agent/STATE.md` — durable evidence/history, most recent closure record
+   first.
+3. `openspec/changes/final-production-readiness/` — the certification change
+   (proposal, design, tasks, spec, defect ledger).
+4. `openspec/AGENTS.md` / `openspec/project.md` — repository-wide OpenSpec
+   context.
+5. `.agent/QUALITY_GATES.md` — cumulative gates.
 
-## Ordered changes
+## CI topology (important — read before touching CI or browser tests)
 
-Execute these in order and treat each gate as a dependency barrier:
+Hosted GitHub Actions CI runs only:
 
-1. ~~`openspec/changes/m12-neutron-star-surface-lensing/`~~ — **COMPLETE** (2026-08-26, commit `a827563`; direct Schwarzschild surface ray tracing implemented and validated).
-2. ~~`openspec/changes/m12-repository-integrity/`~~ — **COMPLETE** (2026-08-26, commit `5e01bbb`; pins/CI/flake/benchmark discoverability hardened).
-3. ~~`openspec/changes/ca9-galaxy-collision/`~~ — **COMPLETE** (2026-08-27, commit `5680044`; source-locked restricted three-body bridge/tail, GC1 artifact + interpolation, browser suite + goldens).
+- `quality` — format/lint/typecheck/unit/build (deterministic, no GPU).
+- `browser-smoke` — the cheap, backend-agnostic M0 smoke
+  (`tests/browser/smoke.spec.ts`) on Chromium under the WebGL2 fallback.
 
-Why this order: the deep audit found a HIGH scientific-fidelity mismatch in the already-production Neutron Star destination. Its documentation/spec requires direct Schwarzschild backward ray tracing to the material surface, while current implementation comments explicitly say photon paths remain straight and that surface ray tracing is not implemented. Close that production defect before adding CA9.
-
-## First commands
-
-From repository root, after reading the current campaign state (now complete — see `.agent/STATE.md`; no active OpenSpec change):
+The full behavioral+parity suite, the 43 visual goldens (hardware-WebGPU
+baselines), and the Firefox second-engine matrix are a **documented local
+capable-runner gate** — hosted runners have no GPU and cannot stably render
+the heavy lensing/Kerr shaders or the hyperspace transition (runner speed
+varies too much for any fixed timeout). Run them on a WebGPU-capable machine:
 
 ```bash
-git status --short
-git rev-parse HEAD
-node --version
-npm --version
-npm ci
-npm run check
+npm run e2e                                                      # full suite incl. goldens
+npx playwright install firefox && npx playwright test --project=firefox   # second engine
 ```
 
-Then execute the change-specific baseline and tasks.
+See `docs/CI_CD.md` §2/§16 for the full rationale and evidence requirement —
+record local-gate results, never claim them as hosted-CI PASS.
+
+## Starting a new campaign
+
+If picking up new work, read `docs/RELEASE_CERTIFICATION.md` and
+`.agent/STATE.md` first to confirm current state, then follow the OpenSpec
+workflow (`openspec/AGENTS.md`) to propose the next change.
 
 ## Non-negotiable rules
 
@@ -46,7 +54,6 @@ Then execute the change-specific baseline and tasks.
 - Never change black-hole stable ray codes/parity as collateral damage without an independently proven need.
 - Never call an environment-deferred gate PASS without running it.
 - Never commit downloaded third-party paper PDFs/raw datasets without explicit redistribution rights.
+- Never claim hosted-CI coverage for a suite that only ran locally.
 - Prefer deterministic state/event assertions over fixed sleeps.
 - Keep docs/fidelity labels synchronized with what the code actually does.
-
-Read `.agent/EXECUTION_PROMPT.md` completely before implementation.

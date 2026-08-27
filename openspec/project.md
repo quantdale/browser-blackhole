@@ -6,17 +6,28 @@
 
 ## Current production surface
 
-Production Cosmic Atlas destinations at the 2026-08-26 audit base:
+Certified production-ready as of 2026-08-27 (`docs/RELEASE_CERTIFICATION.md`).
+Eight production Cosmic Atlas destinations:
 
-- Black Hole
+- Black Hole (incl. Kerr presets)
 - Neutron Star
 - Stellar Explosion
 - Compact Merger
 - Tidal Disruption Event
 - Quasar / AGN
 - Black-Hole Merger
+- Galaxy Collision (CA9 — DATA_DRIVEN restricted three-body bridge/tail, source-locked to Toomre & Toomre 1972 via NASA GISS/NTRS, offline GC1 artifact + CPU/GPU interpolation)
 
-Galaxy Collision (CA9) is now production (DATA_DRIVEN restricted three-body bridge/tail, source-locked to Toomre & Toomre 1972 via NASA GISS/NTRS, offline GC1 artifact + CPU/GPU interpolation).
+## CI topology
+
+Hosted GitHub Actions CI runs `quality` (format/lint/typecheck/unit/build) and
+a cheap backend-agnostic `browser-smoke` only. Hosted runners have no GPU and
+cannot stably render the full lensing/Kerr/hyperspace suite (runner-speed
+variance defeats any fixed timeout). The full behavioral+parity suite, the
+visual goldens (hardware-WebGPU baselines), and the Firefox second-engine
+matrix are a documented **local capable-runner gate** (`docs/CI_CD.md` §2/§16)
+— run with `npm run e2e` / `--project=firefox` on a WebGPU-capable machine and
+record results as evidence, never claim them as hosted-CI PASS.
 
 ## Technical stack
 

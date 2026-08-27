@@ -1,13 +1,60 @@
 # Durable project state
 
-Last update: 2026-08-27 — **CAMPAIGN COMPLETE: M12-NS, M12-RI, CA9 (Galaxy Collision) all closed**
-(OpenSpec campaign runs M12-NS → M12-RI → CA9 in strict order).
+Last update: 2026-08-27 — **FINAL PRODUCTION-READINESS CERTIFIED** (`openspec/changes/final-production-readiness`).
+(OpenSpec campaign order: M12-NS → M12-RI → CA9 → final-production-readiness.)
 
 ## Current phase
 
-**Campaign complete.** All three ordered changes are closed and pushed. The
-repository now hosts eight production destinations (adding Galaxy Collision).
-See the three closure records below for exact evidence.
+**Certified production-ready.** All prior campaign work (M12-NS, M12-RI, CA9)
+plus a final certification pass are closed and pushed. The repository hosts
+eight production destinations. See `docs/RELEASE_CERTIFICATION.md` for the
+full evidence report and the closure record below for what changed in this
+pass.
+
+### final-production-readiness closure record (2026-08-27)
+
+The prior "campaign complete" state was written while hosted `main` CI was red
+on every push — a real repository/CI/release-state disagreement. This pass
+found and fixed the root cause with local measurement (not assumption), then
+re-verified every hard gate independently.
+
+- **CI root cause (F-01/F-01a/F-01b):** hosted CI ran the FULL GPU/TSL browser
+  suite (`npx playwright test`, all projects) on GPU-less runners. Firefox was
+  never installed (F-01a: instant launch failures). The `default` Chromium
+  project starved under 2 workers on software WebGL2 and, even after
+  `workers=1` + a 180s arrival ceiling, hosted runner speed variance was too
+  severe for a stable gate (a black-hole arrival measured 18s in one hosted
+  run, >180s in another) — investigation showed heavy shader compile + the
+  hyperspace transition under software WebGL2 has no fixed timeout that
+  survives that variance.
+- **Resolution (owner-approved architecture change):** hosted CI now runs only
+  `quality` (format/lint/typecheck/unit/build) + `browser-smoke` (the cheap,
+  backend-agnostic M0 smoke: boot to ready/fallback/unsupported, forced-WebGL2
+  diagnostic render, safe interaction/resize — the root route renders the
+  cheap diagnostic gradient, never the heavy lensing/Kerr passes). The full
+  behavioral+parity suite, the 43 visual goldens (hardware-WebGPU baselines),
+  and the Firefox second-engine matrix (headless Firefox has no GL context on
+  a GPU-less host) are now a DOCUMENTED local capable-runner gate
+  (`docs/CI_CD.md` §2/§16) — explicit environment routing with recorded
+  evidence, not silent coverage reduction. They already pass there: 131/131
+  non-golden browser tests, 43/43 goldens twice-stable, 4/4 Firefox.
+- **F-03 cross-platform `npm run check`:** `.gitattributes` (`* text=auto
+  eol=lf`) fixes a Windows-checkout CRLF/Prettier mismatch invisible to Linux
+  CI; one-time renormalize touched only 4 already-JSON-parsed data files
+  (whitespace-only, verified).
+- **F-05:** corrected a stale "TEMPORARY placeholder... lands with CA4"
+  docstring in `stellar-explosion/presets.ts` (CA4 rendering has long landed).
+- **Evidence:** `npm run check` local pass (515/515 unit, lint/typecheck/build
+  clean); full non-golden Playwright suite 131/131; goldens 43/43 twice-stable;
+  `npm audit` 0 vulnerabilities; hosted CI green — see
+  `docs/RELEASE_CERTIFICATION.md` for the consecutive-green-run list.
+- **Defect ledger:** `openspec/changes/final-production-readiness/ledger.md` —
+  P0=0, P1=0 at closure.
+- **Known limitation (documented, not a defect):** hosted CI cannot run the
+  GPU-heavy suite (no GPU on hosted runners); it is a local capable-runner gate
+  by design, matching the repository's own pre-existing CI philosophy
+  (`docs/CI_CD.md` §16, historical note about local-runner golden/parity
+  evidence).
 
 
 ### CA9 closure record (2026-08-27)

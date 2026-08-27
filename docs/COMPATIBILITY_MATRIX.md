@@ -18,12 +18,19 @@ with the reason. User-agent emulation alone never certifies a backend.
 
 ## Evidence table
 
+Hosted-CI note (2026-08-27): the GPU-less hosted runner runs only the `quality`
+gate and the cheap backend-agnostic `browser-smoke` (`smoke.spec.ts`). Every row
+below marked "local capable runner" is exercised on a WebGPU-capable machine
+(`npm run e2e`, `--project=firefox`), not hosted CI — hosted runners cannot
+stably render the heavy scenes (see `docs/CI_CD.md` §2/§16). Results here are
+that local evidence.
+
 | Engine / backend | Status | What is exercised | Evidence | Date |
 | --- | --- | --- | --- | --- |
-| Chromium-family (msedge 151) + hardware WebGPU (amd rdna-2, Windows 11) | SUPPORTED — primary path | Full app: all destinations, observer modes, parity corpora, goldens | `npm run check` (476/476 unit), `npm run e2e` (146/146 @ workers=2), goldens 40/40 twice-stable | 2026-08-26 |
-| Chromium-family (msedge 151) + forced WebGL2 | SUPPORTED — fallback | Black-hole, neutron-star, diagnostic deep links boot on webgl2 with truthful backend reporting, live frames, clean console; shadow not failure-magenta; stellar-explosion webgl2 variants | `tests/browser/atlas-webgl2.spec.ts`, `smoke.spec.ts` (forced webgl2), `stellar-explosion.spec.ts` (+webgl2 variants) | 2026-08-26 |
-| Chromium-family + unsupported backend override | SUPPORTED — terminal UX | `?backend=unsupported` reaches the terminal unsupported state with visible explained status (never a blank canvas) | `smoke.spec.ts` "forced unsupported shows terminal unsupported UX" | 2026-08-26 |
-| Firefox 153 (Playwright, headless, software WebGL2) | SUPPORTED — fallback logic verified | Root experience boots READY on the WebGL2 fallback with live frames; atlas shell boots, arrives (slow under software rendering — correctness asserted, never speed), reload restores a valid state; console/page channels clean | `npx playwright test --project=firefox` (4/4) | 2026-08-26 |
+| Chromium-family (msedge) + hardware WebGPU (amd rdna-2, Windows 11) — local capable runner | SUPPORTED — primary path | Full app: all 8 destinations, observer modes, parity corpora, goldens | `npm run check` (515/515 unit), full non-golden Playwright suite 131/131, goldens 43/43 twice-stable | 2026-08-27 |
+| Chromium-family + forced WebGL2 (hosted CI + local) | SUPPORTED — fallback | Root/diagnostic boot on webgl2 with truthful backend reporting, live diagnostic frame, clean console; unsupported terminal UX; (local) black-hole/neutron-star/stellar webgl2 variants, shadow not failure-magenta | Hosted `browser-smoke` (`smoke.spec.ts` forced-webgl2 + unsupported); local `atlas-webgl2.spec.ts`, `stellar-explosion.spec.ts` | 2026-08-27 |
+| Chromium-family + unsupported backend override (hosted CI + local) | SUPPORTED — terminal UX | `?backend=unsupported` reaches the terminal unsupported state with visible explained status (never a blank canvas) | `smoke.spec.ts` "forced unsupported shows terminal unsupported UX" (hosted `browser-smoke`) | 2026-08-27 |
+| Firefox (Playwright, headless) — local capable runner | SUPPORTED — fallback logic verified (local) | Root experience boots READY on the WebGL2 fallback with live frames; atlas shell boots/arrives; reload restores a valid state; console/page channels clean. NOTE: headless Firefox on a GPU-less host (e.g. hosted CI) has no usable GL context and correctly reaches the terminal no-backend state — so this row is verified on a machine with a real GL stack, never hosted CI. | `npx playwright test --project=firefox` (4/4) on a capable local machine | 2026-08-27 |
 | WebKit | DEFERRED_ENVIRONMENT | Playwright does not ship WebKit builds for Windows; no local or CI WebKit available | — | 2026-08-26 |
 | Real mobile devices (touch GPUs, mobile browsers) | DEFERRED_ENVIRONMENT | No device farm available. Emulated viewport/touch/DPR coverage exists (`tests/browser/mobile-touch.spec.ts`, M11-02) but it executes on the desktop GPU stack and makes NO mobile performance claim | — | 2026-08-26 |
 | Hidden/background tab throttling | COVERED (desktop) | Hidden/resume does not duplicate the frame loop | lifecycle/torture suites (M6+) | 2026-08-26 |
