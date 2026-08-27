@@ -29,6 +29,14 @@ matrix are a documented **local capable-runner gate** (`docs/CI_CD.md` §2/§16)
 — run with `npm run e2e` / `--project=firefox` on a WebGPU-capable machine and
 record results as evidence, never claim them as hosted-CI PASS.
 
+## Active campaign — 2026-08-28
+
+The selected next phase is **whole-atlas performance hardening**:
+
+`openspec/changes/whole-atlas-performance-optimization/`
+
+The pre-optimization product remains production-certified, but the optimization task checklist is active and must be executed with matched benchmark evidence. Read `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md` and the active change's `EXECUTION_PROMPT.md` before modifying runtime code.
+
 ## Technical stack
 
 - TypeScript
