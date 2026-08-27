@@ -68,8 +68,8 @@
 
 ## 9. Closure
 
-- [ ] 9.1 Update `.agent/STATE.md` current phase and evidence with M12-NS + M12-RI results.
-- [ ] 9.2 Update backlog/roadmap status so CA9 is the next change only if all prerequisites are met.
-- [ ] 9.3 Mark OpenSpec tasks from observed evidence and leave environment/source-blocked items unchecked with reasons.
-- [ ] 9.4 Commit a detailed integrity-pass report covering each mismatch, exact remediation, commands/gates and remaining limitations.
-- [ ] 9.5 Push when authorized and only then allow CA9 source-lock/runtime work to proceed.
+- [x] 9.1 Update `.agent/STATE.md` current phase and evidence with M12-NS + M12-RI results. (STATE.md updated with M12-NS + M12-RI records)
+- [x] 9.2 Update backlog/roadmap status so CA9 is the next change only if all prerequisites are met. (STATE.md and launchCatalog confirm CA9 is next; no backlog drift)
+- [x] 9.3 Mark OpenSpec tasks from observed evidence and leave environment/source-blocked items unchecked with reasons. (all evidence-backed tasks checked)
+- [x] 9.4 Commit a detailed integrity-pass report covering each mismatch, exact remediation, commands/gates and remaining limitations. (commit 5e01bbb)
+- [x] 9.5 Push when authorized and only then allow CA9 source-lock/runtime work to proceed. (pushed to origin/main)

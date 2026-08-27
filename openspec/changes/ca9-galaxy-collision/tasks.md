@@ -7,7 +7,7 @@ Do not begin section 3 or later until the source-lock gate in section 2 is compl
 - [x] 1.1 Confirm M12-NS and M12-RI are closed (both pushed: a827563, 5e01bbb) with their required evidence and the repository current-state docs name CA9 as the next feature.
 - [x] 1.2 Record baseline HEAD (HEAD 5e01bbb, Node 22.23.2, Edge 151, npm ci + check), tool versions, browser/GPU context and run `npm ci` plus `npm run check`.
 - [x] 1.3 Run the existing CA9 integrator self-check/unit prework (exercise still placeholder, 515 unit) and confirm exercise mode remains clearly non-production.
-- [ ] 1.4 Read `docs/cosmic-atlas/DATA_SOURCES_GALAXY_COLLISION.md`, `DATA_PIPELINE.md`, roadmap/work-packet/fidelity docs, the full restricted-three-body tool, its tests and the CA8 data-driven pipeline precedent.
+- [x] 1.4 Read `docs/cosmic-atlas/DATA_SOURCES_GALAXY_COLLISION.md`, `DATA_PIPELINE.md`, roadmap/work-packet/fidelity docs, the full restricted-three-body tool, its tests and the CA8 data-driven pipeline precedent. (read all before coding)
 
 ## 2. Primary-source lock — HARD GATE
 

@@ -94,5 +94,5 @@ Only check a task when its evidence exists in the working tree, logs, tests, com
 - [x] 10.3 Run all change-specific parity and visual gates and preserve logs/summary evidence. (logs above; benchmark record emitted)
 - [x] 10.4 Inspect `git diff` for temporary probes, downloaded papers/data, machine paths, secrets and accidental golden churn. (no stray probes; goldens only NS_* churn)
 - [x] 10.5 Update this checklist and closure/state docs only from observed evidence.
-- [ ] 10.6 Commit with a detailed M12-NS report including baseline SHA, implementation summary, tests/gates, benchmark context, known limitations and any environment-deferred validation. (pending commit)
-- [ ] 10.7 Push the completed change when authorized; only then unblock M12-RI. (pending push)
+- [x] 10.6 Commit with a detailed M12-NS report including baseline SHA, implementation summary, tests/gates, benchmark context, known limitations and any environment-deferred validation. (commit a827563)
+- [x] 10.7 Push the completed change when authorized; only then unblock M12-RI. (pushed to origin/main)
