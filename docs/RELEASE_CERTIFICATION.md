@@ -10,7 +10,7 @@ supersedes any earlier "campaign complete" claim that predated a green hosted CI
 
 - Branch: `main`
 - CI-fix-complete commit: `79b2da9` (architecture: hosted `quality` + `browser-smoke`)
-- Certification/doc-closure commit: `<FINAL_SHA>` (this commit)
+- Certification/doc-closure commit: `983f55e`
 - Working tree: clean at certification
 - Runtime: Node 22 (CI) / v24.3.0 (local dev); npm 11.4.2
 - Dependencies: exact-pinned in `package.json` + `package-lock.json`; `npm ci` reproduces the lockfile; `npm audit` 0 vulnerabilities (dev + prod)
@@ -103,4 +103,4 @@ The full behavioral suite (navigation, presets, timeline, observer modes, resize
 - Defects: P0 = 0, P1 = 0 (ledger: `openspec/changes/final-production-readiness/ledger.md`).
 - Local capable-runner evidence: 515/515 unit, 131/131 non-golden browser, 43/43 goldens twice-stable, 4/4 Firefox, `npm audit` 0 vulnerabilities.
 - Every environment-limited gate (full GPU suite, goldens, Firefox, WebKit, real mobile devices) is recorded as local-capable-runner evidence or DEFERRED_ENVIRONMENT — never claimed as hosted-CI PASS.
-- Repository/OpenSpec/README/`.agent` state agree with this report as of commit `<FINAL_SHA>`.
+- Repository/OpenSpec/README/`.agent` state agree with this report as of commit `983f55e`.
