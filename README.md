@@ -29,6 +29,7 @@ npm run build   # production build to dist/
 npm run preview # serve the production build locally
 ```
 
+- **Landing:** opening the root URL takes you straight into the Cosmic Atlas at the flagship Black Hole (`/` redirects to `/atlas/black-hole`). Any `/atlas/<route>` is directly deep-linkable. (A developer-only diagnostic harness lives at `/?legacy=1`.)
 - **Supported browsers:** a WebGPU-capable browser gives the full path — Chrome/Edge 113+ or a recent Firefox/Safari, served over HTTPS or `localhost` (WebGPU requires a secure context). Where WebGPU is unavailable the app degrades to a truthful WebGL2 fallback, and where neither exists it shows an explicit unsupported state rather than a blank canvas.
 - **Getting around:** the top bar switches destinations (deep-linkable at `/atlas/<route>`); the Experience-mode selector separates **Scientific**, **Cinematic** and **Debug** controls; each destination exposes its own scientific/observer/timeline controls with presets.
 - **Scientific-fidelity disclaimer:** every destination is labeled with a fidelity class (`DIRECT`, `DATA_DRIVEN`, `PROCEDURAL_SCIENTIFIC`, `CINEMATIC`) in the table above and in `docs/cosmic-atlas/SCIENTIFIC_FIDELITY.md`. Reduced/procedural models are not live NR/MHD/hydrodynamics simulations; numerical failure is shown explicitly and never painted as physical output.

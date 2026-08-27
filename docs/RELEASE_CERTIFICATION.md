@@ -10,7 +10,8 @@ supersedes any earlier "campaign complete" claim that predated a green hosted CI
 
 - Branch: `main`
 - CI-fix-complete commit: `79b2da9` (architecture: hosted `quality` + `browser-smoke`)
-- Certification/doc-closure commit: `983f55e`
+- Landing fix (F-07): `7d55423` (bare root → `/atlas/black-hole`)
+- Certification/doc-closure commit: `7d55423` and the docs follow-up on `main`
 - Working tree: clean at certification
 - Runtime: Node 22 (CI) / v24.3.0 (local dev); npm 11.4.2
 - Dependencies: exact-pinned in `package.json` + `package-lock.json`; `npm ci` reproduces the lockfile; `npm audit` 0 vulnerabilities (dev + prod)
@@ -52,6 +53,11 @@ Consecutive green runs on `main`, commit `79b2da9` (flaky-risk gate = `browser-s
 
 All three runs executed the identical `79b2da9` tree (GitHub re-run replays the
 same commit's workflow, isolating run-to-run stability from code changes).
+
+Additional green runs confirm stability across the closure commits:
+`33080284207` (`983f55e`) and `33082161360` (`7d55423`) — both `quality` +
+`browser-smoke` PASS. Total: 5 consecutive green hosted runs across the final
+three commits.
 
 ## Production build & deployment
 
@@ -105,4 +111,4 @@ The full behavioral suite (navigation, presets, timeline, observer modes, resize
 - Defects: P0 = 0, P1 = 0 (ledger: `openspec/changes/final-production-readiness/ledger.md`).
 - Local capable-runner evidence: 515/515 unit, 131/131 non-golden browser, 43/43 goldens twice-stable, 4/4 Firefox, `npm audit` 0 vulnerabilities.
 - Every environment-limited gate (full GPU suite, goldens, Firefox, WebKit, real mobile devices) is recorded as local-capable-runner evidence or DEFERRED_ENVIRONMENT — never claimed as hosted-CI PASS.
-- Repository/OpenSpec/README/`.agent` state agree with this report as of commit `983f55e`.
+- Repository/OpenSpec/README/`.agent` state agree with this report as of commit `7d55423` and the docs follow-up on `main`.
