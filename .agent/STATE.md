@@ -1,6 +1,7 @@
 # Durable project state
 
-Last update: 2026-08-27 — **FINAL PRODUCTION-READINESS CERTIFIED** (`openspec/changes/final-production-readiness`).
+Last update: 2026-08-27 — **FINAL PRODUCTION-READINESS CERTIFIED** (`openspec/changes/final-production-readiness`)
++ a standalone post-certification perf fix (LUT backend-conditional load, below).
 (OpenSpec campaign order: M12-NS → M12-RI → CA9 → final-production-readiness.)
 
 ## Current phase
@@ -10,6 +11,33 @@ plus a final certification pass are closed and pushed. The repository hosts
 eight production destinations. See `docs/RELEASE_CERTIFICATION.md` for the
 full evidence report and the closure record below for what changed in this
 pass.
+
+### Post-certification perf fix — LUT backend-conditional load (2026-08-27)
+
+Requested scope: "optimize the entire thing." The repository is certified
+and its own rules block reopening prior optimization decisions without new
+evidence (`docs/PERFORMANCE_BUDGETS.md` §20 stop rule; the named M11-rejected
+list). A repo sweep (fresh `npm run build` bundle check, `docs/BACKLOG.md`,
+`.agent/STATE.md` Next Actions) found no bundle/frame-time regression and no
+open item except one explicitly pre-approved, never-rejected footnote in
+`docs/LUT_BACKEND_ADR.md` §12: the Schwarzschild LUT family (~2.1 MiB GPU
+textures + 3 network fetches) loaded unconditionally in
+`BlackHoleModule.prepare()` even when the selected backend could never use
+it. User confirmed this narrow, scoped item over a full re-open. Fixed: the
+load is now skipped when `metric === 'kerr'` (LUT is architecturally
+inapplicable to Kerr, ADR §1.21) or an explicit `?trajectory=numerical`
+override is pinned (wins all precedence for the page lifetime, M8-09); the
+Kerr `render()` path now reports `lut-inapplicable-while-kerr-active`
+unconditionally so the COMPATIBILITY_MATRIX.md "locked" contract stays
+truthful regardless of whether the family object happens to be loaded. Full
+detail/evidence: `docs/LUT_BACKEND_ADR.md` §12. Gates: `npm run check` PASS
+(515/515 unit, build); `trajectory-backend.spec.ts`/`kerr-integration.spec.ts`/
+`observer-modes.spec.ts`/`integrator-parity.spec.ts`/`ray-parity.spec.ts`/
+`resource-leak.spec.ts`/`smoke.spec.ts` PASS; visual goldens 43/43
+twice-stable (zero pixel drift, expected — load-order-only change). Verified
+directly with a network-request probe (0 `/luts/*` requests on a Kerr preset
+and on `?trajectory=numerical`; unchanged 4 requests on the default
+Schwarzschild preset).
 
 ### final-production-readiness closure record (2026-08-27)
 

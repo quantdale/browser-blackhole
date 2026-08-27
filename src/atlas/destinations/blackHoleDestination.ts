@@ -507,21 +507,36 @@ export class BlackHoleModule implements PhenomenonModule {
 
     // --- LUT family load (M8-06): best-effort, never blocks the numerical
     // paths. Any failure records a truthful reason and continues numerical.
+    //
+    // Backend-conditional load (LUT_BACKEND_ADR.md §12 "future optimization"
+    // footnote): skip the ~2.1 MiB GPU textures + 3 network fetches when this
+    // prepare() can already PROVE the LUT choice will never be selected for
+    // the module's whole lifetime — the Kerr metric never consults it
+    // (ADR §1.21) and an explicit `?trajectory=numerical` override pins
+    // numerical for the entire page load (M8-09 precedence, captured once at
+    // construction). A later LIVE metric/preference change away from these
+    // cases still resolves through the existing, already-tested
+    // `lut-assets-unavailable` fallback — the same honest path already
+    // exercised whenever the network fetch itself fails.
+    const lutCouldBeSelected =
+      this.controls.metric !== 'kerr' && this.urlTrajectoryOverride !== 'numerical';
     ctx.reportProgress(0.2, 'Loading Schwarzschild LUT family');
-    try {
-      const lut = await loadShippedLutFamily();
-      if (lut !== null) {
-        this.lut = lut;
-        ctx.scope.track(
-          'texture',
-          lut.resources,
-          () => lut.resources.dispose(),
-          lut.resources.byteEstimate
-        );
+    if (lutCouldBeSelected) {
+      try {
+        const lut = await loadShippedLutFamily();
+        if (lut !== null) {
+          this.lut = lut;
+          ctx.scope.track(
+            'texture',
+            lut.resources,
+            () => lut.resources.dispose(),
+            lut.resources.byteEstimate
+          );
+        }
+      } catch (error) {
+        console.warn('[BlackHoleModule] LUT family load failed:', error);
+        this.lut = null;
       }
-    } catch (error) {
-      console.warn('[BlackHoleModule] LUT family load failed:', error);
-      this.lut = null;
     }
 
     try {
@@ -673,10 +688,13 @@ export class BlackHoleModule implements PhenomenonModule {
         selected = kerr;
         kind = 'kerr';
         // Backend policy truth (ADR §1.21): Kerr runs numerical Kerr; the
-        // Schwarzschild trajectory preference/LUT policy is INAPPLICABLE.
+        // Schwarzschild trajectory preference/LUT policy is INAPPLICABLE —
+        // true regardless of whether a LUT family happens to be loaded (it
+        // is intentionally skipped while Kerr is the entry metric; see the
+        // backend-conditional load note in prepare()).
         this.lastRequestedBackend = 'auto';
         this.lastEffectiveTrajectoryBackend = 'numerical';
-        this.lastFallbackReason = this.lut === null ? null : 'lut-inapplicable-while-kerr-active';
+        this.lastFallbackReason = 'lut-inapplicable-while-kerr-active';
       } else {
         const resolution = resolveTrajectoryBackend({
           preference: this.frameTrajectoryBackend,

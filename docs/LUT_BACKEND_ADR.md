@@ -248,9 +248,30 @@ explicitly selectable (canonical preference + `?trajectory=` override) and
 all fallback paths stay truthful.
 
 Memory: the LUT family costs ~2.1 MiB GPU textures (R16F 1024² + RGBA16F
-1024×1) inside the destination scope whenever the black hole prepares —
-independent of the selected backend today (assets load eagerly); making the
-load backend-conditional is future optimization, not required by the gate.
+1024×1) inside the destination scope whenever the black hole prepares.
+
+**Resolved (2026-08-27, post-certification perf fix):** the load is now
+backend-conditional. `BlackHoleModule.prepare()` skips the fetch/decode/GPU
+upload entirely when it can prove, for the module's whole lifetime, that LUT
+will never be selected — `metric === 'kerr'` (LUT is architecturally
+inapplicable to Kerr, ADR §1.21) or an explicit `?trajectory=numerical`
+override (pinned once at construction, wins all precedence, M8-09). Verified
+with a network-request probe: the default Schwarzschild preset still issues
+the 4 expected `/luts/*` requests; a Kerr preset and a `?trajectory=numerical`
+session issue 0. The Kerr `render()` path now reports
+`lut-inapplicable-while-kerr-active` unconditionally (previously gated on
+`this.lut !== null`, which this change would otherwise have made
+inconsistent) so the COMPATIBILITY_MATRIX.md §"Backend capability semantics
+(locked)" contract stays truthful. A live in-session `metric: 'kerr' ->
+'schwarzschild'` toggle after entering on a Kerr preset resolves through the
+pre-existing, already-tested `lut-assets-unavailable` fallback for the rest
+of that session — no new code path, only a new (rare) trigger for one that
+was already covered by `trajectory-backend.spec.ts`. Evidence: full
+`npm run check` PASS (515/515 unit); `trajectory-backend.spec.ts` (7/7),
+`kerr-integration.spec.ts` (7/7), `observer-modes.spec.ts` (7/7),
+`integrator-parity.spec.ts` + `ray-parity.spec.ts` PASS; visual goldens
+43/43 twice-stable (zero pixel drift, as expected for a load-order-only
+change).
 
 ### M8 validation-debt closure — GPU-path defects found and FIXED
 
