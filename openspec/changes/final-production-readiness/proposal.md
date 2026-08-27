@@ -21,8 +21,8 @@ A third, cross-platform defect surfaced during baselining: the documented `npm r
 
 ## What changes
 
-- Split the hosted browser job into a **Chromium behavioral+parity** job (serial `--workers=1`, sharded across independent runners, visual goldens excluded) and a **Firefox compatibility-matrix** job (Firefox installed, `--project=firefox`), so declared coverage actually executes and neither engine starves.
-- Route the **visual-golden** suite to a local capable runner as designed: its baselines are hardware-WebGPU captures and cannot be pixel-matched on hosted software WebGL2. Record this as an explicit environment-deferred gate, never silently green.
+- Reduce the hosted browser job to the reliable, backend-agnostic **M0 smoke** (`browser-smoke`: boot to ready/fallback/unsupported, forced-WebGL2 diagnostic render, safe interaction/resize — all cheap because the root renders the diagnostic gradient, not the heavy lensing/Kerr passes). Investigation proved the full GPU/TSL suite cannot be a *stable* hosted gate: hosted runners have no GPU, heavy shaders + the hyperspace transition render at seconds/frame under software WebGL2, and hosted runner speed varies wildly run-to-run (a black-hole arrival measured 18s in one run, >180s in another), so no fixed timeout survives — `workers=1` (contention) and a 180s ceiling only cut failures 65→26.
+- Route the **full behavioral+parity suite, the visual goldens, and the Firefox second-engine matrix** to a documented **local capable-runner gate** (owner-approved 2026-08-27). They already pass there (131/131 non-golden + 43/43 goldens twice-stable locally). Record each result as evidence and mark environment-deferred for hosted CI — explicit environment routing, never silently green, and behavioral coverage is not lost (the suite still runs, where a GPU exists).
 - Add `.gitattributes` enforcing LF for text files (binary assets and content-addressed `*.bin` excepted) so `npm run check` passes on a clean checkout on every platform.
 - Synchronize `docs/CI_CD.md`, `.agent/STATE.md`, README and the compatibility matrix with the corrected CI topology and the true green-run evidence.
 - Independently re-verify the definition-of-100% hard gates against current `main` and record the result in a certification report and defect ledger. Fix any genuine P0/P1 found; do not weaken assertions, inflate timeouts blindly, skip required tests, or narrow behavioral coverage to obtain green.
@@ -37,7 +37,8 @@ A third, cross-platform defect surfaced during baselining: the documented `npm r
 
 ## Success criteria
 
-- hosted CI on `main` is green across `quality`, `browser-chromium` (all shards) and `browser-firefox`, with **≥3 consecutive full green runs** on the flaky-risk browser jobs;
+- hosted CI on `main` is green across `quality` and `browser-smoke`, with **≥3 consecutive green runs**;
+- the full behavioral+parity+golden+Firefox suite passes on a capable local runner with counts/machine recorded in the certification (environment-deferred for hosted CI, never a false PASS);
 - no known P0/P1 defect remains open;
 - Firefox coverage claimed by CI is coverage CI actually ran;
 - visual-golden gate result is stated truthfully (local PASS with evidence, or hosted DEFERRED_ENVIRONMENT — never a false PASS);

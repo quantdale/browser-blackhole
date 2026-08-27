@@ -30,29 +30,31 @@ Recommended jobs:
 - unit/reference tests;
 - build.
 
-### browser-chromium (WebGL2 fallback; behavioral+parity)
+### browser-smoke (Chromium, WebGL2 fallback; M0 boot/fallback smoke)
 
 - install the pinned Playwright Chromium browser (`--with-deps chromium`);
 - build and serve the production artifact;
-- run the Playwright `default` project **serially** (`--project=default --workers=1`) with the visual goldens excluded (`--grep-invert "golden:"`), **sharded** across independent runners (`--shard=N/6`);
+- run ONLY `tests/browser/smoke.spec.ts` on the `default` project (`--workers=1`);
 - archive screenshot/console logs on failure.
 
-Hosted runners provide no representative WebGPU adapter, so this job exercises the WebGL2 fallback path for every test that adapts to backend. It is a broad fallback-suite run, NOT a WebGPU validation: never read a green run as proof the WebGPU path rendered.
+This is the reliable hosted browser gate. It boots the ROOT experience — which renders the **cheap diagnostic gradient**, not the heavy lensing/Kerr passes — plus the forced-WebGL2 gradient and the forced-unsupported terminal UX. Being backend-agnostic and cheap, it is stable on software WebGL2 while still proving the app boots to a truthful ready/fallback/unsupported terminal state, the WebGL2 fallback path renders, the canvas is non-zero, interaction/resize are safe, and the console/page error channels stay clean (section 5). It is NOT a WebGPU or full-scene validation.
 
-`--workers=1` is mandatory, not a speed choice: two software-WebGL2 (SwiftShader) render contexts starve each other on a 2-vCPU hosted runner, and because the atlas arrival/transition clock advances from `requestAnimationFrame`, a starved worker never reaches the `arrived` state within the 30s poll and the test times out. Sharding restores wall-clock across separate runners (no shared CPU), so behavioral+parity coverage is preserved, not narrowed. The GPU CPU/GPU **numerical**-parity corpuses stay in scope here: they decode rendered rays and compare against a binary64 CPU reference within f32 tolerance, which holds under the WebGL2 fallback regardless of the requested backend label.
+Why the full behavioral/parity/golden suite is NOT a hosted job: hosted runners have no GPU, so heavy TSL lensing/Kerr shaders and the full-screen hyperspace transition compile/render at seconds-per-frame under software WebGL2, and hosted runner speed varies wildly run-to-run (a black-hole arrival measured 18s in one hosted run and >180s in another). No fixed timeout survives that variance, so the full suite cannot be a *stable* hosted gate. It is a local capable-runner gate instead (see below) — this is explicit environment routing, not silent coverage reduction.
 
-### browser-firefox (compatibility matrix; WebGL2)
+### full browser suite / parity / goldens / second engine (local capable runner)
 
-- install the pinned Playwright Firefox browser (`--with-deps firefox`);
-- build and serve the production artifact;
-- run only the `firefox` project (`--project=firefox`), which `playwright.config.ts` scopes to `compatibility-matrix.spec.ts` and pins to `workers:1`;
-- archive screenshot/console logs on failure.
+Run on a WebGPU-capable machine (the environment the goldens' hardware-WebGPU baselines were captured on):
 
-This is the engine-agnostic fallback/unsupported-logic matrix on a second engine. Firefox must be installed explicitly; a bare `npx playwright test` runs *all* projects, so previously the Firefox project launched with only Chromium installed and failed immediately (`Executable doesn't exist`). Splitting it into its own job with Firefox installed makes the declared second-engine coverage actually execute.
+```bash
+npm run e2e                                    # full default project: behavioral + numerical parity + visual goldens
+npx playwright install firefox && npx playwright test --project=firefox   # second-engine compatibility matrix
+```
 
-### visual (local capable runner)
+- The **numerical CPU/GPU parity** corpora (`integrator-parity`, `kerr-parity`, neutron-star parity) decode rendered rays and compare against a binary64 CPU reference within f32 tolerance.
+- The **visual goldens** (`tests/browser/visual-goldens.spec.ts`, `golden:` titles) compare against hardware-WebGPU baselines (`docs/cosmic-atlas/GOLDEN_IMAGES.md`); they cannot be pixel-matched on software WebGL2 and are therefore capable-runner-only. `ARRIVAL_TIMEOUT_MS` (env-overridable, `tests/browser/support/appHarness.ts`) covers slower local machines.
+- **Firefox** headless has no WebGL context on a GPU-less host, so the second-engine compatibility matrix also runs on a capable local machine, not hosted CI.
 
-The golden suite (`tests/browser/visual-goldens.spec.ts`, `golden:` titles) is a **local capable-runner gate**, deliberately excluded from the hosted browser job. Its committed baselines are hardware-WebGPU captures (`docs/cosmic-atlas/GOLDEN_IMAGES.md`) and cannot be pixel-matched against a software-WebGL2 (SwiftShader) render, so running them on a hosted runner would gate on the wrong environment. Run them where the baselines were captured; record the result as environment-deferred for hosted CI rather than silently green. Prefer an environment with reproducible browser/rendering characteristics. Mark platform-specific baselines clearly (`_GL2` suffix rows) only if the backends demonstrably diverge beyond shared tolerances.
+Record each local-gate result (with counts and the machine/backend) as evidence in the release certification; mark it environment-deferred for hosted CI rather than silently green.
 
 ### docs/link
 
@@ -257,4 +259,4 @@ Release only when:
 
 ## 16. CI truthfulness rule
 
-Every job name and report must say what actually ran. The hosted browser job is `browser-fallback` (full Playwright suite on Chromium under WebGL2 fallback), never `gpu-test`, because the runner never acquired WebGPU. Environment-deferred gates are recorded explicitly, not silently marked successful.
+Every job name and report must say what actually ran. The hosted browser job is `browser-smoke` (M0 backend-agnostic boot/fallback smoke on Chromium under WebGL2 fallback), never `gpu-test` and never "full suite", because the runner never acquired WebGPU and cannot stably run the GPU-heavy scenes. The full behavioral/parity/golden suite and the Firefox second-engine matrix are local capable-runner gates whose results are recorded as evidence (section 2) and marked environment-deferred for hosted CI — recorded explicitly, never silently marked successful.

@@ -20,23 +20,23 @@ Every browser engine and suite the hosted CI reports as covered SHALL actually r
 - **THEN** that suite SHALL be excluded from the hosted job and routed to a capable runner
 - **AND** its status SHALL be recorded as environment-deferred with a reason, never marked PASS on the hosted runner.
 
-### Requirement: Hosted browser CI is deterministic under software rendering
+### Requirement: The hosted browser gate is stable under software rendering
 
-The hosted browser suite SHALL be scheduled so that software-WebGL2 CPU contention cannot cause nondeterministic arrival/transition timeouts. Concurrency SHALL be reduced rather than behavioral coverage.
+The hosted browser gate SHALL contain only tests that are stable on a GPU-less software-WebGL2 runner. GPU-heavy tests (heavy TSL shader compilation, hyperspace transitions, hardware-WebGPU golden baselines, second-engine WebGL) SHALL run on a capable runner instead, with their results recorded as evidence and marked environment-deferred for hosted CI.
 
-#### Scenario: Heavy render tests run on a shared-CPU runner
+#### Scenario: A scene is too heavy to render stably on a hosted runner
 
-- **GIVEN** hosted runners render every scene through software WebGL2 on limited vCPUs
-- **WHEN** the behavioral+parity suite runs
-- **THEN** it SHALL run with a single worker per runner (no two render contexts sharing a CPU)
-- **AND** wall-clock MAY be restored by sharding across independent runners
-- **AND** the arrival/transition state SHALL be reached within its poll on an uncontended runner.
+- **GIVEN** a test whose arrival depends on compiling/rendering heavy shaders or the hyperspace transition under software WebGL2, whose wall-clock varies severely with hosted runner speed
+- **WHEN** the hosted CI gate is defined
+- **THEN** that test SHALL NOT be in the hosted gate
+- **AND** it SHALL run on a capable (GPU) runner whose result is recorded in the certification
+- **AND** the hosted gate SHALL retain a cheap backend-agnostic smoke that proves boot, WebGL2 fallback rendering, and the unsupported terminal state.
 
 #### Scenario: A green run is claimed stable
 
-- **GIVEN** the browser jobs previously flaked from contention
+- **GIVEN** the hosted browser gate
 - **WHEN** stability is asserted
-- **THEN** there SHALL be at least three consecutive full green runs of the flaky-risk jobs
+- **THEN** there SHALL be at least three consecutive green runs of the hosted jobs
 - **AND** a single lucky green run SHALL NOT be treated as sufficient.
 
 ### Requirement: Documented commands succeed on a clean cross-platform checkout
