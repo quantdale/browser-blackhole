@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 
 /**
  * CA8-19/§18 — Black-Hole Merger headless browser validation.
@@ -55,7 +56,7 @@ async function waitForArrival(page: Page, destinationId: string, presetId?: stri
           },
           { dest: destinationId, preset: presetId }
         ),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 }

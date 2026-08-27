@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import './support/atlasHook.js';
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 
 /**
  * M11-04 lifecycle/resource-leak torture (Gate B/G).
@@ -40,14 +41,14 @@ async function waitArrived(page: Page, destinationId: string): Promise<void> {
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return app.host.state.atlas.activeDestination === dest ? 'arrived' : 'at-other';
         }, destinationId),
-      { timeout: 60_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
   // The destination's own prepare must have drained before counting.
   await expect
     .poll(
       async () => page.evaluate(() => window.__ATLAS_APP__!.host.debugInventory().pendingPrepares),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe(0);
 }

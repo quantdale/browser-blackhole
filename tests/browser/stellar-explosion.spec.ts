@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 import './support/atlasHook.js';
 
 /**
@@ -13,7 +14,7 @@ import './support/atlasHook.js';
  * the new heavy destination.
  */
 
-async function waitForArrival(page: Page, timeoutMs = 30_000): Promise<void> {
+async function waitForArrival(page: Page, timeoutMs = ARRIVAL_TIMEOUT_MS): Promise<void> {
   await expect
     .poll(
       async () =>
@@ -58,7 +59,7 @@ async function freezeAt(page: Page, phase01: number): Promise<void> {
  * after arrival can still be pipeline-compile black frames — dramatically so
  * on the forced-WebGL2 backend where TSL->GLSL compilation lands lazily.
  */
-async function waitForNonUniformFrame(page: Page, timeoutMs = 20_000): Promise<number> {
+async function waitForNonUniformFrame(page: Page, timeoutMs = ARRIVAL_TIMEOUT_MS): Promise<number> {
   let unique = 0;
   await expect
     .poll(
@@ -222,7 +223,7 @@ test.describe('Stellar Explosion validation', () => {
   test('extended resource stress: BH -> NS -> SN -> Diagnostic x8 stays bounded', async ({
     page
   }) => {
-    test.setTimeout(120_000);
+    test.setTimeout(process.env.CI ? 600_000 : 120_000);
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     const baseline = await page.evaluate(() => window.__ATLAS_APP__!.host.debugInventory());
@@ -251,7 +252,7 @@ test.describe('Stellar Explosion validation', () => {
             const app = window.__ATLAS_APP__!;
             return app && !app.host.state.atlas.transition.active ? 'idle' : 'busy';
           }),
-        { timeout: 60_000 }
+        { timeout: ARRIVAL_TIMEOUT_MS }
       )
       .toBe('idle');
 

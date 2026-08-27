@@ -42,10 +42,11 @@ const DESTINATION_ID = 'stellar-explosion';
 // ---------------------------------------------------------------------------
 
 /**
- * TEMPORARY placeholder factory: the rendering module (VolumeService +
- * ParticleService composition) lands with CA4 integration by the
- * integrator. The descriptor is registered up front so routing/navigation
- * metadata is testable before heavy rendering exists.
+ * Stellar Explosion module factory. The descriptor/preset metadata lives in
+ * this file (routing/navigation stays testable without the render graph); the
+ * production rendering composition (VolumeService + ParticleService, landed in
+ * CA4) lives in its own module and is created here at call time — mirroring the
+ * neutron-star co-location discipline, no init-order hazard.
  */
 export function createStellarExplosionModule(): PhenomenonModule {
   // Rendering composition lives in its own module to keep this file

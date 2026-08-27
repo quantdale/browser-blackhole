@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 import './support/atlasHook.js';
 
 /**
@@ -39,7 +40,7 @@ async function gotoAtlasBlackHole(page: Page): Promise<void> {
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return app.host.activeDestinationDebugSnapshot() === null ? 'preparing' : 'arrived';
         }),
-      { timeout: 60_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 }

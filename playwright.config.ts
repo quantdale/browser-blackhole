@@ -38,7 +38,12 @@ export default defineConfig({
   fullyParallel: true,
   forbidOnly: !!process.env.CI,
   reporter: process.env.CI ? [['list'], ['html', { open: 'never' }]] : 'list',
-  timeout: 60_000,
+  // Per-test ceiling. On hosted CI every scene renders through software WebGL2
+  // (no GPU), so a single arrival transition can take tens of seconds; the
+  // per-test budget must comfortably exceed the ARRIVAL_TIMEOUT_MS poll ceiling
+  // (180s in CI) so the poll fails with a clear message before the test-level
+  // timeout. Heavy multi-navigation/parity tests raise this further per-test.
+  timeout: process.env.CI ? 300_000 : 60_000,
   // M11-01: the default (Channel/desktop-Chrome) project runs the whole
   // suite; the firefox project runs ONLY the engine-agnostic compatibility
   // matrix (fallback/unsupported logic on a second engine). It is selected
@@ -63,7 +68,24 @@ export default defineConfig({
       use: {
         ...devices['Desktop Firefox'],
         viewport: { width: 1280, height: 800 },
-        baseURL: `http://127.0.0.1:${e2ePort}`
+        baseURL: `http://127.0.0.1:${e2ePort}`,
+        // Unlike headless Chromium (bundled SwiftShader), headless Firefox on a
+        // GPU-less CI runner exposes NO WebGL context by default — it blocklists
+        // the software Mesa/llvmpipe driver, so the app correctly fails closed
+        // with "no render backend". These prefs force the software WebGL2 path
+        // ON so the engine-agnostic fallback RENDER path is genuinely exercised
+        // on Gecko (the whole point of this second-engine job), instead of only
+        // reaching the unsupported terminal state. Correctness only, never a
+        // performance/WebGPU claim (Firefox WebGPU stays off in CI).
+        launchOptions: {
+          firefoxUserPrefs: {
+            'webgl.force-enabled': true,
+            'webgl.disabled': false,
+            'webgl.disable-fail-if-major-performance-caveat': true,
+            'gfx.webrender.software': true,
+            'gfx.webrender.all': true
+          }
+        }
       }
     }
   ],

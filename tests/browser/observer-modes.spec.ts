@@ -16,6 +16,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 
 const REAL_ERROR_FILTER = /powerPreference|readback|Failed to load resource/;
 
@@ -42,7 +43,7 @@ async function waitForArrival(page: Page): Promise<void> {
           if (app.host.state.atlas.activeDestination !== 'black-hole') return 'at-other';
           return app.host.activeDestinationDebugSnapshot() === null ? 'preparing' : 'arrived';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 }

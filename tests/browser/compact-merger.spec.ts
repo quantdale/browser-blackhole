@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 
 /**
  * CA5 Compact Merger browser validation (mission §21).
@@ -53,7 +54,7 @@ async function waitForArrival(page: Page, destinationId: string, presetId?: stri
           },
           { dest: destinationId, preset: presetId }
         ),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 }
@@ -218,7 +219,7 @@ test.describe('Compact Merger validation (CA5)', () => {
     await expect
       .poll(
         async () => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.transition.phase),
-        { timeout: 15_000, intervals: [50] }
+        { timeout: ARRIVAL_TIMEOUT_MS, intervals: [50] }
       )
       .toBe('hyperspace');
     await waitForArrival(page, 'compact-merger');
@@ -270,7 +271,7 @@ test.describe('Compact Merger validation (CA5)', () => {
     page
   }) => {
     const errors = collectErrors(page);
-    test.setTimeout(120_000);
+    test.setTimeout(process.env.CI ? 600_000 : 120_000);
     await page.goto('/atlas/black-hole');
     await waitForArrival(page, 'black-hole');
 

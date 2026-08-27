@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 import './support/atlasHook.js';
 
 /**
@@ -20,7 +21,7 @@ const DESTINATIONS = ['black-hole', 'neutron-star', 'diagnostic'] as const;
 async function waitForArrival(
   page: Page,
   destinationId: string,
-  timeoutMs = 30_000
+  timeoutMs = ARRIVAL_TIMEOUT_MS
 ): Promise<void> {
   await expect
     .poll(

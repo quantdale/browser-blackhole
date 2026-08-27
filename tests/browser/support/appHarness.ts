@@ -16,6 +16,27 @@ export interface StatusView {
   internalHeight: number | null;
 }
 
+/**
+ * Arrival/terminal-phase polling ceiling. On a hosted CI runner every scene
+ * renders through software WebGL2 (SwiftShader/llvmpipe) with no GPU, so heavy
+ * arrival transitions integrate far more slowly than on a real GPU — the app IS
+ * arriving, just at a low frame rate that stretches the (correctly dt-clamped)
+ * transition clock across many seconds. CI therefore gets a generous, honest
+ * correctness ceiling (NEVER a performance claim); local/GPU runs stay tight to
+ * keep real regressions fast to surface. This mirrors the 90s rationale already
+ * documented in compatibility-matrix.spec.ts, centralized so every arrival poll
+ * agrees. Override with ARRIVAL_TIMEOUT_MS for a specific environment.
+ */
+export const ARRIVAL_TIMEOUT_MS = ((): number => {
+  const override = Number(process.env.ARRIVAL_TIMEOUT_MS);
+  if (Number.isFinite(override) && override > 0) return override;
+  // 180s in CI: measured cold arrival on a hosted 2-vCPU software-WebGL2 runner
+  // is >10x a local GPU (the heaviest per-pixel shader, Kerr, is slowest to
+  // compile), so this leaves comfortable headroom above the real ~30-90s while
+  // still failing a genuinely stuck boot in bounded time.
+  return process.env.CI ? 180_000 : 30_000;
+})();
+
 /** Navigates and asserts the served page is THIS app before proceeding.
  * `reuseExistingServer` only checks URL reachability, so a foreign dev server
  * on the e2e port would otherwise produce confusing per-test timeouts. */
@@ -48,7 +69,10 @@ export async function readStatus(page: Page): Promise<StatusView | null> {
   return raw === null ? null : parseStatus(raw);
 }
 
-export async function waitForTerminalPhase(page: Page, timeoutMs = 30_000): Promise<StatusView> {
+export async function waitForTerminalPhase(
+  page: Page,
+  timeoutMs = ARRIVAL_TIMEOUT_MS
+): Promise<StatusView> {
   const deadline = Date.now() + timeoutMs;
   // Hooks appear only after async renderer init; tolerate their absence while
   // polling and fail with evidence if the app never exposes them.

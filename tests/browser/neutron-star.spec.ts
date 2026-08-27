@@ -5,7 +5,7 @@ import {
 } from '../../src/phenomena/neutron-star/surfaceRayReference.js';
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
+import { ARRIVAL_TIMEOUT_MS, collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
 
 /**
  * M12-NS dedicated neutron-star destination suite.
@@ -89,7 +89,7 @@ async function waitForArrival(page: Page, destId: string, presetId?: string): Pr
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return app.host.state.atlas.activeDestination === undefined ? 'waiting' : 'arrived';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
   await expect
@@ -125,7 +125,7 @@ async function waitForCameraSettled(page: Page): Promise<void> {
         }));
         return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
       },
-      { timeout: 20_000, intervals: [500] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [500] }
     )
     .toBeLessThan(1e-4);
 }
@@ -519,7 +519,7 @@ async function runParityCorpus(page: Page, backend: string): Promise<void> {
 test.describe('neutron-star surface-ray CPU/GPU parity corpus', () => {
   for (const backend of ['webgpu', 'webgl2'] as const) {
     test(`selected rays agree with the binary64 reference (${backend})`, async ({ page }) => {
-      test.setTimeout(120_000);
+      test.setTimeout(process.env.CI ? 600_000 : 120_000);
       await runParityCorpus(page, backend);
     });
   }

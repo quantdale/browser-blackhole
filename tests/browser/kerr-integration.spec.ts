@@ -1,6 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 import './support/atlasHook.js';
 
 /**
@@ -35,7 +36,7 @@ async function waitForArrival(
   page: Page,
   destinationId: string,
   presetId?: string,
-  timeoutMs = 30_000
+  timeoutMs = ARRIVAL_TIMEOUT_MS
 ): Promise<void> {
   await expect
     .poll(
@@ -229,7 +230,7 @@ test.describe('Kerr black-hole integration', () => {
 
   test('repeated atlas switching involving Kerr stays bounded and clean', async ({ page }) => {
     const errors = collectErrors(page);
-    test.setTimeout(180_000);
+    test.setTimeout(process.env.CI ? 600_000 : 180_000);
     await page.goto('/atlas/black-hole?preset=kerr-high-prograde');
     await waitForArrival(page, 'black-hole', 'kerr-high-prograde');
 

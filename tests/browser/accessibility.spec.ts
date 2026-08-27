@@ -1,5 +1,6 @@
 import { expect, test, type Page } from '@playwright/test';
 
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 import './support/atlasHook.js';
 
 /**
@@ -46,7 +47,7 @@ async function gotoAtlasBlackHole(page: Page): Promise<void> {
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return app.host.activeDestinationDebugSnapshot() === null ? 'preparing' : 'arrived';
         }),
-      { timeout: 60_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 }
@@ -76,7 +77,7 @@ test.describe('M11-05 accessibility', () => {
     await expect
       .poll(
         async () => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.activeDestination),
-        { timeout: 60_000, intervals: [250] }
+        { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
       )
       .toBe('neutron-star');
 
@@ -104,7 +105,7 @@ test.describe('M11-05 accessibility', () => {
     await expect
       .poll(
         async () => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.activeDestination),
-        { timeout: 60_000, intervals: [250] }
+        { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
       )
       .toBe('black-hole');
 
@@ -180,7 +181,7 @@ test.describe('M11-05 accessibility', () => {
     await expect
       .poll(
         async () => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.activeDestination),
-        { timeout: 60_000, intervals: [250] }
+        { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
       )
       .toBe('stellar-explosion');
     // After the panel rebuilds, the previously-focused node must have been

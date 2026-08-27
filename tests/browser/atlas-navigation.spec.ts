@@ -2,6 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
+import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
 
 /**
  * Atlas navigation validation (validation campaign: lifecycle, races,
@@ -18,7 +19,7 @@ const ROUTE_IDS = ['black-hole', 'neutron-star', 'diagnostic'] as const;
 async function waitForArrival(
   page: Page,
   destinationId: string,
-  timeoutMs = 25_000
+  timeoutMs = ARRIVAL_TIMEOUT_MS
 ): Promise<void> {
   await expect
     .poll(
@@ -156,7 +157,7 @@ test.describe('Atlas navigation validation', () => {
             const app = window.__ATLAS_APP__;
             return app && !app.host.state.atlas.transition.active ? 'idle' : 'busy';
           }),
-        { timeout: 40_000 }
+        { timeout: ARRIVAL_TIMEOUT_MS }
       )
       .toBe('idle');
 

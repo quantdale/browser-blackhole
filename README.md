@@ -20,13 +20,31 @@ The application is **implemented and running** — this is no longer a planning 
 
 A developer `Diagnostic` destination (Debug mode) exercises the host lifecycle.
 
+## Run it locally
+
+```bash
+npm ci          # exact lockfile install
+npm run dev     # Vite dev server; open the printed http://localhost:5173
+npm run build   # production build to dist/
+npm run preview # serve the production build locally
+```
+
+- **Supported browsers:** a WebGPU-capable browser gives the full path — Chrome/Edge 113+ or a recent Firefox/Safari, served over HTTPS or `localhost` (WebGPU requires a secure context). Where WebGPU is unavailable the app degrades to a truthful WebGL2 fallback, and where neither exists it shows an explicit unsupported state rather than a blank canvas.
+- **Getting around:** the top bar switches destinations (deep-linkable at `/atlas/<route>`); the Experience-mode selector separates **Scientific**, **Cinematic** and **Debug** controls; each destination exposes its own scientific/observer/timeline controls with presets.
+- **Scientific-fidelity disclaimer:** every destination is labeled with a fidelity class (`DIRECT`, `DATA_DRIVEN`, `PROCEDURAL_SCIENTIFIC`, `CINEMATIC`) in the table above and in `docs/cosmic-atlas/SCIENTIFIC_FIDELITY.md`. Reduced/procedural models are not live NR/MHD/hydrodynamics simulations; numerical failure is shown explicitly and never painted as physical output.
+- **Deployment:** any static host serving `dist/` over HTTPS with SPA deep-link routing works; no runtime backend, API key or secret is required. See `docs/DEPLOYMENT.md`.
+
 ## Testing
 
 ```bash
 npm ci                 # exact lockfile install
 npm run check          # format + lint + typecheck + unit tests + build
-npm run e2e            # Playwright browser suite (incl. visual goldens)
-npx playwright test --project=firefox compatibility-matrix  # cross-engine fallback row
+# Browser suite. The default (Chromium) project runs the whole behavioral +
+# numerical-parity + visual-golden suite; visual goldens need a WebGPU-capable
+# browser (their baselines are hardware-WebGPU captures).
+npx playwright install chromium && npm run e2e
+# Cross-engine fallback matrix on Gecko (installs Firefox first):
+npx playwright install firefox && npx playwright test --project=firefox
 npm run lut:validate -- public/luts/schwarzschild-v1-415dea94
 npm run bench:black-hole        # numerical-vs-LUT frame-time harness
 npm run bench:black-hole -- --observer=circular   # M10 moving-observer benchmark rows

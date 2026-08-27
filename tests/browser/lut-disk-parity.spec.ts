@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { collectErrors } from './support/appHarness.js';
+import { ARRIVAL_TIMEOUT_MS, collectErrors } from './support/appHarness.js';
 
 /**
  * M8 cross-backend disk-image + g-factor browser corpus (validation-debt
@@ -53,7 +53,7 @@ async function waitForCameraSettled(page: Page): Promise<void> {
         const b = await page.evaluate(() => ({ ...window.__ATLAS_APP__!.host.camera.position }));
         return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
       },
-      { timeout: 20_000, intervals: [500] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [500] }
     )
     .toBeLessThan(1e-4);
 }
@@ -78,7 +78,7 @@ async function captureWithPath(page: Page, trajectory: 'numerical' | 'lut'): Pro
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return app.host.state.atlas.activeDestination === 'black-hole' ? 'arrived' : 'waiting';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 
@@ -181,7 +181,7 @@ test.describe('cross-backend disk image + g-factor ordering (M8)', () => {
   test('LUT disk rendering matches numerical within tolerance with consistent g-chain luminance', async ({
     page
   }) => {
-    test.setTimeout(180_000);
+    test.setTimeout(process.env.CI ? 600_000 : 180_000);
 
     await page.setViewportSize(VIEWPORT);
     const numerical = await captureWithPath(page, 'numerical');

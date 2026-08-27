@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { integratePhoton } from '../../src/phenomena/black-hole/cpuReference.js';
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
+import { ARRIVAL_TIMEOUT_MS, collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
 
 /**
  * M2/Gate-C CPU-vs-GPU integrator parity corpus (docs/TESTING.md §5,
@@ -157,7 +157,7 @@ async function waitForCameraSettled(page: Page): Promise<void> {
         }));
         return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
       },
-      { timeout: 20_000, intervals: [500] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [500] }
     )
     .toBeLessThan(1e-4);
 }
@@ -181,7 +181,7 @@ async function runParityCorpus(page: Page, backend: string, trajectory: string):
             ? 'arrived'
             : 'waiting';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 
@@ -330,7 +330,7 @@ test.describe('Schwarzschild integrator CPU/GPU parity corpus', () => {
       test(`selected rays agree with the binary64 reference (${backend}, ${trajectory})`, async ({
         page
       }) => {
-        test.setTimeout(120_000);
+        test.setTimeout(process.env.CI ? 600_000 : 120_000);
         await runParityCorpus(page, backend, trajectory);
       });
     }

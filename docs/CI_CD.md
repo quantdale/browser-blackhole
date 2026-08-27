@@ -34,7 +34,7 @@ Recommended jobs:
 
 - install the pinned Playwright Chromium browser (`--with-deps chromium`);
 - build and serve the production artifact;
-- run the Playwright `default` project **serially** (`--project=default --workers=1`) with the visual goldens excluded (`--grep-invert "golden:"`), **sharded** across independent runners (`--shard=N/4`);
+- run the Playwright `default` project **serially** (`--project=default --workers=1`) with the visual goldens excluded (`--grep-invert "golden:"`), **sharded** across independent runners (`--shard=N/6`);
 - archive screenshot/console logs on failure.
 
 Hosted runners provide no representative WebGPU adapter, so this job exercises the WebGL2 fallback path for every test that adapts to backend. It is a broad fallback-suite run, NOT a WebGPU validation: never read a green run as proof the WebGPU path rendered.

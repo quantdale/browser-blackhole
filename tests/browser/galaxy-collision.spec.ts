@@ -1,7 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import './support/atlasHook.js';
-import { collectErrors } from './support/appHarness.js';
+import { ARRIVAL_TIMEOUT_MS, collectErrors } from './support/appHarness.js';
 
 /**
  * CA9 — Galaxy Collision destination suite.
@@ -32,7 +32,7 @@ async function waitForArrival(page: Page, destId: string, presetId?: string): Pr
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return app.host.state.atlas.activeDestination === undefined ? 'waiting' : 'arrived';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
   await expect

@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { integrateKerrPhoton, type Vec3 } from '../../src/phenomena/black-hole/kerr/reference.js';
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
+import { ARRIVAL_TIMEOUT_MS, collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
 
 /**
  * M9-09 / BH-205 — Kerr selected-ray GPU/reference parity corpus
@@ -141,7 +141,7 @@ async function waitForCameraSettled(page: Page): Promise<void> {
         }));
         return Math.hypot(a.x - b.x, a.y - b.y, a.z - b.z);
       },
-      { timeout: 20_000, intervals: [500] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [500] }
     )
     .toBeLessThan(1e-4);
 }
@@ -162,7 +162,7 @@ async function runKerrCorpus(page: Page, backend: string): Promise<void> {
             ? 'arrived'
             : 'waiting';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
     )
     .toBe('arrived');
 
@@ -320,7 +320,7 @@ async function runKerrCorpus(page: Page, backend: string): Promise<void> {
 test.describe('Kerr integrator CPU/GPU parity corpus', () => {
   for (const backend of ['webgpu', 'webgl2'] as const) {
     test(`selected rays agree with the binary64 Kerr reference (${backend})`, async ({ page }) => {
-      test.setTimeout(180_000);
+      test.setTimeout(process.env.CI ? 600_000 : 180_000);
       await runKerrCorpus(page, backend);
     });
   }
