@@ -30,18 +30,29 @@ Recommended jobs:
 - unit/reference tests;
 - build.
 
-### browser (Chromium, full suite; WebGL2 fallback)
+### browser-chromium (WebGL2 fallback; behavioral+parity)
 
-- install pinned Playwright browser;
-- serve built artifact;
-- run the FULL Playwright `default` project (`npx playwright test`), not a curated smoke subset;
+- install the pinned Playwright Chromium browser (`--with-deps chromium`);
+- build and serve the production artifact;
+- run the Playwright `default` project **serially** (`--project=default --workers=1`) with the visual goldens excluded (`--grep-invert "golden:"`), **sharded** across independent runners (`--shard=N/4`);
 - archive screenshot/console logs on failure.
 
-Hosted runners provide no representative WebGPU adapter, so this job exercises the WebGL2 fallback path for every test that adapts to backend. It is a broad fallback-suite run, NOT a WebGPU validation: never read a green run as proof the WebGPU path rendered. Full WebGPU/parity/golden evidence is produced by local capable runners (see `.agent/STATE.md`). Coverage is deliberately NOT narrowed to shorten CI.
+Hosted runners provide no representative WebGPU adapter, so this job exercises the WebGL2 fallback path for every test that adapts to backend. It is a broad fallback-suite run, NOT a WebGPU validation: never read a green run as proof the WebGPU path rendered.
 
-### visual
+`--workers=1` is mandatory, not a speed choice: two software-WebGL2 (SwiftShader) render contexts starve each other on a 2-vCPU hosted runner, and because the atlas arrival/transition clock advances from `requestAnimationFrame`, a starved worker never reaches the `arrived` state within the 30s poll and the test times out. Sharding restores wall-clock across separate runners (no shared CPU), so behavioral+parity coverage is preserved, not narrowed. The GPU CPU/GPU **numerical**-parity corpuses stay in scope here: they decode rendered rays and compare against a binary64 CPU reference within f32 tolerance, which holds under the WebGL2 fallback regardless of the requested backend label.
 
-Add after deterministic golden infrastructure exists. Prefer an environment with reproducible browser/rendering characteristics. Mark platform-specific baselines clearly.
+### browser-firefox (compatibility matrix; WebGL2)
+
+- install the pinned Playwright Firefox browser (`--with-deps firefox`);
+- build and serve the production artifact;
+- run only the `firefox` project (`--project=firefox`), which `playwright.config.ts` scopes to `compatibility-matrix.spec.ts` and pins to `workers:1`;
+- archive screenshot/console logs on failure.
+
+This is the engine-agnostic fallback/unsupported-logic matrix on a second engine. Firefox must be installed explicitly; a bare `npx playwright test` runs *all* projects, so previously the Firefox project launched with only Chromium installed and failed immediately (`Executable doesn't exist`). Splitting it into its own job with Firefox installed makes the declared second-engine coverage actually execute.
+
+### visual (local capable runner)
+
+The golden suite (`tests/browser/visual-goldens.spec.ts`, `golden:` titles) is a **local capable-runner gate**, deliberately excluded from the hosted browser job. Its committed baselines are hardware-WebGPU captures (`docs/cosmic-atlas/GOLDEN_IMAGES.md`) and cannot be pixel-matched against a software-WebGL2 (SwiftShader) render, so running them on a hosted runner would gate on the wrong environment. Run them where the baselines were captured; record the result as environment-deferred for hosted CI rather than silently green. Prefer an environment with reproducible browser/rendering characteristics. Mark platform-specific baselines clearly (`_GL2` suffix rows) only if the backends demonstrably diverge beyond shared tolerances.
 
 ### docs/link
 

@@ -1,0 +1,12 @@
+# Normalize text files to LF in the repository and on checkout so the documented
+# `npm run check` (Prettier `endOfLine: "lf"`) passes identically on Linux CI and
+# on Windows/macOS working trees. Without this, a Windows checkout under
+# core.autocrlf=true produces CRLF working-tree files that Prettier flags as
+# unformatted even though the committed blobs are LF.
+* text=auto eol=lf
+
+# Binary assets must never be line-ending normalized. The *.bin data artifacts
+# are content-addressed (SHA-256 verified at load); normalizing them would
+# corrupt the checksum and trip the fail-closed loader.
+*.png binary
+*.bin binary

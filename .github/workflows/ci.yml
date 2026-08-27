@@ -25,14 +25,67 @@ jobs:
       - run: npm run test
       - run: npm run build
 
-  browser-fallback:
-    # Hosted runners provide no representative WebGPU adapter. This job runs
-    # the FULL Playwright `default` project on Chromium; tests that require
-    # WebGPU adapt to the WebGL2 fallback path (they are not skipped). It is
-    # therefore a broad fallback-suite run, NOT a curated smoke subset, and it
-    # must never be read as a WebGPU validation. Full WebGPU/parity/golden
-    # evidence is produced by local capable runners (docs/CI_CD.md §16).
-    name: browser (Chromium, full suite; WebGL2 fallback)
+  browser-chromium:
+    # Behavioral + numerical-parity Playwright suite on Chromium under the
+    # WebGL2 fallback path (hosted runners provide no representative WebGPU
+    # adapter). This is a broad fallback-suite run, NOT a WebGPU validation and
+    # never proof the WebGPU path rendered (docs/CI_CD.md section 16).
+    #
+    # SERIAL (--workers=1): two software-WebGL2 (SwiftShader) render contexts
+    # starve each other on a 2-vCPU hosted runner. The atlas arrival/transition
+    # clock advances from requestAnimationFrame, so a CPU-starved worker never
+    # reaches the "arrived" state within the 30s poll and the test times out.
+    # Historically ~half the default suite failed this way, nondeterministically
+    # (tests that got a clean slot passed). workers=1 removes the contention;
+    # sharding restores wall-clock across INDEPENDENT runners (no shared CPU),
+    # so coverage is preserved rather than narrowed.
+    #
+    # Visual goldens are EXCLUDED here (--grep-invert 'golden:'). Their committed
+    # baselines are hardware-WebGPU captures (docs/cosmic-atlas/GOLDEN_IMAGES.md)
+    # and cannot be pixel-matched on software WebGL2; they are a local
+    # capable-runner gate (docs/CI_CD.md sections 7 and 16), not narrowed for
+    # speed. The GPU-parity corpuses stay IN scope: they compare rendered rays
+    # against a binary64 CPU reference numerically and pass under the WebGL2
+    # fallback regardless of the requested backend label.
+    name: browser-chromium (WebGL2 fallback; behavioral+parity)
+    needs: quality
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - name: Install pinned Playwright browser (Chromium)
+        run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - name: Playwright (default project, serial, goldens excluded)
+        run: npx playwright test --project=default --workers=1 --grep-invert "golden:" --shard=${{ matrix.shard }}/4
+      - name: Upload failure artifacts
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-chromium-shard-${{ matrix.shard }}
+          path: |
+            test-results/
+            playwright-report/
+          if-no-files-found: ignore
+
+  browser-firefox:
+    # Second-engine compatibility matrix (engine-agnostic fallback/unsupported
+    # logic) on Firefox under software WebGL2. The `firefox` Playwright project
+    # is testMatch-scoped to compatibility-matrix.spec.ts and already pinned to
+    # workers:1 in playwright.config.ts. Firefox MUST be installed explicitly:
+    # the previous single `npx playwright test` command implicitly ran this
+    # project with only Chromium installed, so every Firefox test failed at
+    # browser launch ("Executable doesn't exist"). This job makes the declared
+    # Firefox compatibility coverage actually execute.
+    name: browser-firefox (compatibility matrix; WebGL2)
     needs: quality
     runs-on: ubuntu-latest
     steps:
@@ -42,15 +95,16 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Install pinned Playwright browser
-        run: npx playwright install --with-deps chromium
+      - name: Install pinned Playwright browser (Firefox)
+        run: npx playwright install --with-deps firefox
       - run: npm run build
-      - run: npx playwright test
+      - name: Playwright (firefox compatibility matrix)
+        run: npx playwright test --project=firefox
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4
         with:
-          name: playwright-artifacts
+          name: playwright-firefox
           path: |
             test-results/
             playwright-report/
