@@ -1,59 +1,54 @@
-# START HERE — repository status
+# START HERE — active campaign
 
-Updated: 2026-08-27
+Updated: 2026-08-28
+Audit base: `main@02d129fe29d3f4fa383c3ed5760d70b7381a0191`
 
-The historical M0–M11 campaign, M12-NS, M12-RI, CA9 (Galaxy Collision), and the
-**final-production-readiness** certification pass are all complete. **Do not
-restart any completed historical packet.**
+The feature-completion and final-production-readiness campaigns are complete. **Do not restart M0–M12, CA9, or final-production-readiness.**
 
-The repository is certified production-ready. Authoritative evidence:
+## Active work
 
-1. `docs/RELEASE_CERTIFICATION.md` — full certification report (defects, CI
-   green-run list, gates, fidelity, compatibility, verdict).
-2. `.agent/STATE.md` — durable evidence/history, most recent closure record
-   first.
-3. `openspec/changes/final-production-readiness/` — the certification change
-   (proposal, design, tasks, spec, defect ledger).
-4. `openspec/AGENTS.md` / `openspec/project.md` — repository-wide OpenSpec
-   context.
-5. `.agent/QUALITY_GATES.md` — cumulative gates.
+The active campaign is:
 
-## CI topology (important — read before touching CI or browser tests)
+`openspec/changes/whole-atlas-performance-optimization/`
 
-Hosted GitHub Actions CI runs only:
+Start with:
 
-- `quality` — format/lint/typecheck/unit/build (deterministic, no GPU).
-- `browser-smoke` — the cheap, backend-agnostic M0 smoke
-  (`tests/browser/smoke.spec.ts`) on Chromium under the WebGL2 fallback.
+1. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
+2. `openspec/changes/whole-atlas-performance-optimization/EXECUTION_PROMPT.md`
+3. `openspec/changes/whole-atlas-performance-optimization/MASTER_PLAN.md`
+4. `openspec/changes/whole-atlas-performance-optimization/tasks.md`
+5. `.agent/QUALITY_GATES.md`
 
-The full behavioral+parity suite, the 43 visual goldens (hardware-WebGPU
-baselines), and the Firefox second-engine matrix are a **documented local
-capable-runner gate** — hosted runners have no GPU and cannot stably render
-the heavy lensing/Kerr shaders or the hyperspace transition (runner speed
-varies too much for any fixed timeout). Run them on a WebGPU-capable machine:
+Mission: execute the performance-hardening campaign across all eight production destinations and shared runtime. Eliminate unnecessary CPU/GPU work before reducing fidelity. Preserve visual goldens, scientific parity, deterministic behavior, WebGPU/WebGL2 compatibility, and resource-lifecycle guarantees.
+
+## Mandatory start gate
+
+Before changing runtime behavior:
 
 ```bash
-npm run e2e                                                      # full suite incl. goldens
-npx playwright install firefox && npx playwright test --project=firefox   # second engine
+git status --short
+git rev-parse HEAD
+node --version
+npm --version
+npm ci
+npm run check
 ```
 
-See `docs/CI_CD.md` §2/§16 for the full rationale and evidence requirement —
-record local-gate results, never claim them as hosted-CI PASS.
+Then establish the benchmark/telemetry baseline required by the active OpenSpec. Do not claim a performance win without matched before/after evidence.
 
-## Starting a new campaign
+## Autonomous-session rule
 
-If picking up new work, read `docs/RELEASE_CERTIFICATION.md` and
-`.agent/STATE.md` first to confirm current state, then follow the OpenSpec
-workflow (`openspec/AGENTS.md`) to propose the next change.
+Continue through dependency-ordered workstreams without stopping after the first improvement. Repair regressions immediately. If implementation work completes, continue into performance regression hunting, compatibility/resource verification, and final performance certification. Do not manufacture low-value work merely to consume time.
+
+## Existing release evidence
+
+`docs/RELEASE_CERTIFICATION.md` remains authoritative for the certified pre-optimization product baseline. Hosted CI proves deterministic quality + cheap browser smoke; the GPU-heavy full suite/goldens/Firefox remain capable-runner gates.
 
 ## Non-negotiable rules
 
-- Never invent scientific parameters or silently promote exercise/example values to production.
-- Never use the weak-field thin-lens helper as proof of compact-object strong-field surface ray tracing.
-- Never auto-update visual goldens to hide an unexplained physics/rendering difference.
-- Never change black-hole stable ray codes/parity as collateral damage without an independently proven need.
-- Never call an environment-deferred gate PASS without running it.
-- Never commit downloaded third-party paper PDFs/raw datasets without explicit redistribution rights.
-- Never claim hosted-CI coverage for a suite that only ran locally.
-- Prefer deterministic state/event assertions over fixed sleeps.
-- Keep docs/fidelity labels synchronized with what the code actually does.
+- Never weaken scientific/reference/parity tolerances to obtain speed.
+- Never auto-update goldens to hide an optimization-induced visual change.
+- Never conflate CPU/rAF timing with GPU timestamp timing.
+- Never silently drop WebGL2 fallback.
+- Never introduce unbounded resource/program growth.
+- Never mark an environment-deferred gate PASS.
