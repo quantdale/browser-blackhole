@@ -12,7 +12,7 @@
  *        [--preset=...] [--quality=low|medium|high|ultra]
  *        [--width=1280] [--height=800] [--render-scale=1|0]
  *        [--frames=400] [--warmup-ms=9000] [--channel=msedge]
- *        [--label=run] [--port=4187]
+ *        [--label=run] [--port=4187] [--force-backend=webgpu|webgl2]
  */
 
 import { preview } from 'vite';
@@ -40,6 +40,7 @@ const warmupMs = Number(arg('warmup-ms', '9000'));
 const channel = String(arg('channel', 'msedge'));
 const label = String(arg('label', 'run'));
 const port = Number(arg('port', '4187'));
+const forceBackend = String(arg('force-backend', ''));
 
 if (!QUALITIES.has(quality)) {
   console.error(`[bench-agn] invalid --quality=${quality}`);
@@ -47,6 +48,12 @@ if (!QUALITIES.has(quality)) {
 }
 if (!ZONES.has(zone)) {
   console.error(`[bench-agn] invalid --zone=${zone}`);
+  process.exit(2);
+}
+
+const FORCE_BACKENDS = new Set(['', 'webgpu', 'webgl2']);
+if (!FORCE_BACKENDS.has(forceBackend)) {
+  console.error(`[bench-agn] invalid --force-backend=${forceBackend} (webgpu|webgl2)`);
   process.exit(2);
 }
 
@@ -72,7 +79,10 @@ page.on('console', (m) => {
   consoleErrors += 1;
 });
 
-await page.goto(`http://127.0.0.1:${port}/atlas/quasar-agn?preset=${encodeURIComponent(preset)}`);
+const backendSuffix = forceBackend === '' ? '' : `&backend=${forceBackend}`;
+await page.goto(
+  `http://127.0.0.1:${port}/atlas/quasar-agn?preset=${encodeURIComponent(preset)}${backendSuffix}`
+);
 await page.waitForFunction(
   () =>
     window.__ATLAS_APP__ &&
@@ -161,6 +171,17 @@ const samples = await page.evaluate(
   frames
 );
 
+// BH-121: resolve the GPU timestamp pool after sampling (null when unsupported).
+const gpuFrameMs = await page.evaluate(async () => {
+  const app = window.__ATLAS_APP__;
+  if (!app || typeof app.host.flushGpuTimestamps !== 'function') return null;
+  try {
+    return await app.host.flushGpuTimestamps();
+  } catch {
+    return null;
+  }
+});
+
 const sorted = [...samples].sort((a, b) => a - b);
 const pick = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
@@ -182,6 +203,7 @@ const record = {
   platform: info.platform,
   adapter: { name: info.adapterName },
   backend: info.backendApi,
+  forcedBackend: forceBackend === '' ? null : forceBackend,
   timestampQueryAvailable: info.timestampQuery,
   viewportCss: [width, height],
   devicePixelRatio: info.devicePixelRatio,
@@ -200,9 +222,17 @@ const record = {
     mean: round2(mean),
     stdev: round2(Math.sqrt(variance))
   },
-  // Honest limitation: no GPU timestamp queries wired; CPU-side deltas only.
-  frameGpuMs: null,
-  gpuTimingNote: 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps',
+  // BH-121: real GPU timestamp reading when the backend exposes timestamp
+  // queries; otherwise honestly null — never inferred from CPU rAF deltas.
+  // The value is the LAST resolved frame's summed render-pass time.
+  frameGpuMs:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? null
+      : { lastResolvedFrame: round2(gpuFrameMs) },
+  gpuTimingNote:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps'
+      : 'GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame',
   memory: {
     estimatedGpuBytesTotal: info.totalEstimatedGpuBytes,
     textureCount: info.totalTextures
@@ -217,4 +247,10 @@ console.log(JSON.stringify(record, null, 1));
 
 await browser.close();
 await server.close();
+
+if (forceBackend !== '' && info.backendApi !== forceBackend) {
+  console.error(
+    `[bench-agn] WARNING: requested backend ${forceBackend}, effective ${info.backendApi}`
+  );
+}
 process.exit(0);

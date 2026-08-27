@@ -14,7 +14,7 @@
  *        [--preset=default] [--quality=medium|low|high|ultra|auto]
  *        [--width=1280] [--height=800] [--render-scale=1|0]
  *        [--frames=600] [--warmup-ms=9000] [--channel=msedge|chrome|chromium]
- *        [--label=run] [--port=4183]
+ *        [--label=run] [--port=4183] [--force-backend=webgpu|webgl2]
  *        [--observer=camera|static|circular|flyby|freefall]
  *        [--observer-radius=12] [--observer-sense=1]
  *        [--observer-beta=0.6] [--observer-impact=8] [--observer-release=14]
@@ -65,6 +65,7 @@ const warmupMs = Number(arg('warmup-ms', '9000'));
 const channel = String(arg('channel', 'msedge'));
 const label = String(arg('label', 'run'));
 const port = Number(arg('port', '4183'));
+const forceBackend = String(arg('force-backend', ''));
 const observer = String(arg('observer', ''));
 const observerRadius = Number(arg('observer-radius', '12'));
 const observerSense = Number(arg('observer-sense', '1'));
@@ -84,6 +85,12 @@ if (!BACKENDS.has(backend)) {
 }
 if (!QUALITIES.has(quality)) {
   console.error(`[bench] invalid --quality=${quality} (auto|low|medium|high|ultra)`);
+  process.exit(2);
+}
+
+const FORCE_BACKENDS = new Set(['', 'webgpu', 'webgl2']);
+if (!FORCE_BACKENDS.has(forceBackend)) {
+  console.error(`[bench] invalid --force-backend=${forceBackend} (webgpu|webgl2)`);
   process.exit(2);
 }
 
@@ -115,7 +122,10 @@ page.on('console', (m) => {
   consoleErrors.push(text.slice(0, 200));
 });
 
-await page.goto(`http://127.0.0.1:${port}/atlas/black-hole?preset=${encodeURIComponent(preset)}`);
+const backendSuffix = forceBackend === '' ? '' : `&backend=${forceBackend}`;
+await page.goto(
+  `http://127.0.0.1:${port}/atlas/black-hole?preset=${encodeURIComponent(preset)}${backendSuffix}`
+);
 await page.waitForFunction(
   () => window.__ATLAS_APP__ && window.__ATLAS_APP__.host.state.atlas.transition.active === false,
   null,
@@ -314,6 +324,7 @@ const record = {
   platform: info.platform,
   adapter: { name: info.adapterName },
   backend: info.backendApi,
+  forcedBackend: forceBackend === '' ? null : forceBackend,
   timestampQueryAvailable: info.timestampQuery,
   viewportCss: [width, height],
   devicePixelRatio: info.devicePixelRatio,
@@ -372,9 +383,14 @@ const observerMismatch =
   observer !== '' && info.observerMode !== observer
     ? `[bench] WARNING: requested observer ${observer}, effective ${info.observerMode}`
     : null;
+const forcedBackendMismatch =
+  forceBackend !== '' && info.backendApi !== forceBackend
+    ? `[bench] WARNING: requested backend ${forceBackend}, effective ${info.backendApi}`
+    : null;
 if (qualityMismatch !== null) {
   console.error(`[bench] WARNING: quality tier mismatch ${qualityMismatch}`);
 }
 if (backendMismatch !== null) console.error(backendMismatch);
 if (observerMismatch !== null) console.error(observerMismatch);
+if (forcedBackendMismatch !== null) console.error(forcedBackendMismatch);
 process.exit(0);

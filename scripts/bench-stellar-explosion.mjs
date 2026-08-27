@@ -9,6 +9,7 @@
  *   node scripts/bench-stellar-explosion.mjs [--preset=core-collapse]
  *        [--phase=0.55] [--frames=600] [--warmupMs=9000] [--port=4185]
  *        [--quality=low|medium|high|ultra|auto] [--label=sn-baseline]
+ *        [--force-backend=webgpu|webgl2]
  *
  * Prints one JSON record (stdout) matching the campaign benchmark schema;
  * machine-specific runs are NOT committed by default.
@@ -29,6 +30,13 @@ const label = String(arg('label', 'run'));
 const preset = String(arg('preset', 'core-collapse'));
 const phase = Math.min(Math.max(Number(arg('phase', '0.55')), 0), 1);
 const quality = String(arg('quality', 'medium'));
+const forceBackend = String(arg('force-backend', ''));
+
+const FORCE_BACKENDS = new Set(['', 'webgpu', 'webgl2']);
+if (!FORCE_BACKENDS.has(forceBackend)) {
+  console.error(`[bench] invalid --force-backend=${forceBackend} (webgpu|webgl2)`);
+  process.exit(2);
+}
 
 const server = await preview({ preview: { port, host: '127.0.0.1' } });
 const browser = await chromium.launch({ channel: 'msedge' });
@@ -41,8 +49,9 @@ page.on('console', (m) => {
   }
 });
 
+const backendSuffix = forceBackend === '' ? '' : `&backend=${forceBackend}`;
 await page.goto(
-  `http://127.0.0.1:${port}/atlas/stellar-explosion?preset=${encodeURIComponent(preset)}`
+  `http://127.0.0.1:${port}/atlas/stellar-explosion?preset=${encodeURIComponent(preset)}${backendSuffix}`
 );
 await page.waitForFunction(
   () => window.__ATLAS_APP__ && window.__ATLAS_APP__.host.state.atlas.transition.active === false,
@@ -115,8 +124,20 @@ const samples = await page.evaluate(
   frames
 );
 
+// BH-121: resolve the GPU timestamp pool after sampling (null when unsupported).
+const gpuFrameMs = await page.evaluate(async () => {
+  const app = window.__ATLAS_APP__;
+  if (!app || typeof app.host.flushGpuTimestamps !== 'function') return null;
+  try {
+    return await app.host.flushGpuTimestamps();
+  } catch {
+    return null;
+  }
+});
+
 const sorted = [...samples].sort((a, b) => a - b);
 const pick = (q) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))].toFixed(2);
+const round2 = (v) => +v.toFixed(2);
 
 const adapter = await page.evaluate(
   () => window.__ATLAS_APP__.host.debugInventory().backend.adapterName
@@ -133,6 +154,7 @@ const record = {
   browser: `Edge ${info.browserVersion}`,
   adapter,
   backend: backendApi,
+  forcedBackend: forceBackend === '' ? null : forceBackend,
   scene: `STELLAR_EXPLOSION_${String(preset).toUpperCase().replace(/-/g, '_')}`,
   viewport: [1280, 800],
   internal: info.internal,
@@ -145,10 +167,25 @@ const record = {
   p95Ms: pick(0.95),
   p99Ms: pick(0.99),
   samples: sorted.length,
+  // BH-121: real GPU timestamp reading when the backend exposes timestamp
+  // queries; otherwise honestly null — never inferred from CPU rAF deltas.
+  // The value is the LAST resolved frame's summed render-pass time.
+  frameGpuMs:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? null
+      : { lastResolvedFrame: round2(gpuFrameMs) },
+  gpuTimingNote:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps'
+      : 'GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame',
   consoleErrors: consoleErrors.length
 };
 console.log(JSON.stringify(record, null, 1));
 
 await browser.close();
 await server.close();
+
+if (forceBackend !== '' && backendApi !== forceBackend) {
+  console.error(`[bench] WARNING: requested backend ${forceBackend}, effective ${backendApi}`);
+}
 process.exit(0);

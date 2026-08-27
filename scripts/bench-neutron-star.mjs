@@ -12,7 +12,7 @@
  *   node scripts/bench-neutron-star.mjs [--preset=surface|pulsar|magnetar]
  *        [--quality=medium|low|high|ultra|auto] [--width=1280] [--height=800]
  *        [--frames=480] [--warmup-ms=9000] [--channel=msedge|chrome|chromium]
- *        [--label=ns-run] [--port=4184]
+ *        [--label=ns-run] [--port=4184] [--force-backend=webgpu|webgl2]
  */
 
 import { preview } from 'vite';
@@ -34,10 +34,17 @@ const warmupMs = Number(arg('warmup-ms', '9000'));
 const channel = String(arg('channel', 'msedge'));
 const label = String(arg('label', 'ns-run'));
 const port = Number(arg('port', '4184'));
+const forceBackend = String(arg('force-backend', ''));
 
 const QUALITIES = new Set(['auto', 'low', 'medium', 'high', 'ultra']);
 if (!QUALITIES.has(quality)) {
   console.error(`[bench] invalid --quality=${quality} (auto|low|medium|high|ultra)`);
+  process.exit(2);
+}
+
+const FORCE_BACKENDS = new Set(['', 'webgpu', 'webgl2']);
+if (!FORCE_BACKENDS.has(forceBackend)) {
+  console.error(`[bench] invalid --force-backend=${forceBackend} (webgpu|webgl2)`);
   process.exit(2);
 }
 
@@ -68,7 +75,10 @@ page.on('console', (m) => {
   consoleErrors.push(text.slice(0, 200));
 });
 
-await page.goto(`http://127.0.0.1:${port}/atlas/neutron-star?preset=${encodeURIComponent(preset)}`);
+const backendSuffix = forceBackend === '' ? '' : `&backend=${forceBackend}`;
+await page.goto(
+  `http://127.0.0.1:${port}/atlas/neutron-star?preset=${encodeURIComponent(preset)}${backendSuffix}`
+);
 await page.waitForFunction(
   () => window.__ATLAS_APP__ && window.__ATLAS_APP__.host.state.atlas.transition.active === false,
   null,
@@ -179,6 +189,7 @@ const record = {
   platform: info.platform,
   adapter: { name: info.adapterName },
   backend: info.backendApi,
+  forcedBackend: forceBackend === '' ? null : forceBackend,
   timestampQueryAvailable: info.timestampQuery,
   viewportCss: [width, height],
   devicePixelRatio: info.devicePixelRatio,
@@ -220,4 +231,8 @@ console.log(JSON.stringify(record, null, 2));
 
 await browser.close();
 await server.close();
+
+if (forceBackend !== '' && info.backendApi !== forceBackend) {
+  console.error(`[bench] WARNING: requested backend ${forceBackend}, effective ${info.backendApi}`);
+}
 process.exit(0);

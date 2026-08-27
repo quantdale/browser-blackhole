@@ -18,6 +18,10 @@
  * visibility, particle population, angular gate) so phase-aware activation
  * can be verified empirically: approach/deformation must NOT pay for
  * debris systems; only the shock phase pays for the volume march.
+ *
+ * Other flags: [--quality=medium|low|high|ultra|auto] [--width=1280]
+ * [--height=800] [--frames=480] [--warmup-ms=9000] [--channel=msedge]
+ * [--label=tde-run] [--port=4187] [--force-backend=webgpu|webgl2]
  */
 
 import { preview } from 'vite';
@@ -40,6 +44,13 @@ const warmupMs = Number(arg('warmup-ms', '9000'));
 const channel = String(arg('channel', 'msedge'));
 const label = String(arg('label', 'tde-run'));
 const port = Number(arg('port', '4187'));
+const forceBackend = String(arg('force-backend', ''));
+
+const FORCE_BACKENDS = new Set(['', 'webgpu', 'webgl2']);
+if (!FORCE_BACKENDS.has(forceBackend)) {
+  console.error(`[bench] invalid --force-backend=${forceBackend} (webgpu|webgl2)`);
+  process.exit(2);
+}
 
 function currentCommit() {
   if (process.env.BENCH_COMMIT) return process.env.BENCH_COMMIT;
@@ -63,8 +74,9 @@ page.on('console', (m) => {
   }
 });
 
+const backendSuffix = forceBackend === '' ? '' : `&backend=${forceBackend}`;
 await page.goto(
-  `http://127.0.0.1:${port}/atlas/tidal-disruption?preset=${encodeURIComponent(preset)}`
+  `http://127.0.0.1:${port}/atlas/tidal-disruption?preset=${encodeURIComponent(preset)}${backendSuffix}`
 );
 await page.waitForFunction(
   () => window.__ATLAS_APP__ && window.__ATLAS_APP__.host.state.atlas.transition.active === false,
@@ -140,6 +152,17 @@ const samples = await page.evaluate(
   frames
 );
 
+// BH-121: resolve the GPU timestamp pool after sampling (null when unsupported).
+const gpuFrameMs = await page.evaluate(async () => {
+  const app = window.__ATLAS_APP__;
+  if (!app || typeof app.host.flushGpuTimestamps !== 'function') return null;
+  try {
+    return await app.host.flushGpuTimestamps();
+  } catch {
+    return null;
+  }
+});
+
 const sorted = [...samples].sort((a, b) => a - b);
 const pick = (q) => sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))];
 const mean = samples.reduce((a, b) => a + b, 0) / samples.length;
@@ -162,6 +185,7 @@ const record = {
   platform: info.platform,
   adapter: { name: info.adapterName },
   backend: info.backendApi,
+  forcedBackend: forceBackend === '' ? null : forceBackend,
   viewportCss: [width, height],
   devicePixelRatio: info.devicePixelRatio,
   effectiveRenderSize: info.internal,
@@ -180,8 +204,17 @@ const record = {
     mean: round2(mean),
     stdev: round2(Math.sqrt(variance))
   },
-  frameGpuMs: null,
-  gpuTimingNote: 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps',
+  // BH-121: real GPU timestamp reading when the backend exposes timestamp
+  // queries; otherwise honestly null — never inferred from CPU rAF deltas.
+  // The value is the LAST resolved frame's summed render-pass time.
+  frameGpuMs:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? null
+      : { lastResolvedFrame: round2(gpuFrameMs) },
+  gpuTimingNote:
+    gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
+      ? 'not available: rAF frame deltas are CPU-side measurements, not GPU timestamps'
+      : 'GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame',
   phaseResources: {
     streamBoundVisible: info.streamBoundVisible,
     spineBoundPoints: info.spineBoundPoints,
@@ -202,4 +235,8 @@ console.log(JSON.stringify(record, null, 2));
 
 await browser.close();
 await server.close();
+
+if (forceBackend !== '' && info.backendApi !== forceBackend) {
+  console.error(`[bench] WARNING: requested backend ${forceBackend}, effective ${info.backendApi}`);
+}
 process.exit(0);
