@@ -2,7 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 import { integrateKerrPhoton, type Vec3 } from '../../src/phenomena/black-hole/kerr/reference.js';
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS, collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  collectErrors,
+  sampleColorsAtNdc,
+  type NdcPoint
+} from './support/appHarness.js';
 
 /**
  * M9-09 / BH-205 — Kerr selected-ray GPU/reference parity corpus

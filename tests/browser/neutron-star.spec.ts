@@ -5,7 +5,12 @@ import {
 } from '../../src/phenomena/neutron-star/surfaceRayReference.js';
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS, collectErrors, sampleColorsAtNdc, type NdcPoint } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  collectErrors,
+  sampleColorsAtNdc,
+  type NdcPoint
+} from './support/appHarness.js';
 
 /**
  * M12-NS dedicated neutron-star destination suite.
