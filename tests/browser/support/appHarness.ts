@@ -37,11 +37,17 @@ export const ARRIVAL_TIMEOUT_MS = ((): number => {
   return process.env.CI ? 180_000 : 30_000;
 })();
 
-/** Navigates and asserts the served page is THIS app before proceeding.
- * `reuseExistingServer` only checks URL reachability, so a foreign dev server
- * on the e2e port would otherwise produce confusing per-test timeouts. */
+/** Navigates to the legacy M0 diagnostic app and asserts the served page is
+ * THIS app before proceeding. The bare root now redirects to the atlas product
+ * (`main.ts`), so this harness pins `?legacy=1` to keep exercising the cheap,
+ * backend-agnostic legacy boot/fallback/unsupported surface (the hosted-CI
+ * smoke target). `reuseExistingServer` only checks URL reachability, so a
+ * foreign dev server on the e2e port would otherwise produce confusing
+ * per-test timeouts. */
 export async function gotoApp(page: Page, query = ''): Promise<void> {
-  await page.goto(`/${query}`);
+  const params = new URLSearchParams(query.replace(/^\?/, ''));
+  params.set('legacy', '1');
+  await page.goto(`/?${params.toString()}`);
   await expect(
     page.locator('#scene'),
     'served page has no #scene — a foreign server is answering on the e2e port (set E2E_PORT)'

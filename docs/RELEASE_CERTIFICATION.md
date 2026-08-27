@@ -93,7 +93,9 @@ Root MIT `LICENSE`; no committed third-party paper PDFs or raw datasets; only co
 
 ## User acceptance
 
-The full behavioral suite (navigation, presets, timeline, observer modes, resize, device-loss, accessibility, mobile/touch, resource-leak torture across all eight destinations) passes on the capable runner; goldens confirm the rendered output. No developer-only junk is shown by default (debug controls gated behind Debug mode).
+Manual acceptance (headed WebGPU browser) found and fixed one P1 landing defect after the first automated "ready" pass: opening the bare site root landed on the legacy M0 diagnostic gradient with no way into the product (F-07). `main.ts` now redirects the bare root to `/atlas/black-hole`; verified that `/` renders the lensed black hole with the full 8-destination atlas navigation and controls, backend WebGPU, "Atlas ready". This is why real-user acceptance is a required gate distinct from the automated suite (the smoke had asserted the gradient as expected).
+
+The full behavioral suite (navigation, presets, timeline, observer modes, resize, device-loss, accessibility, mobile/touch, resource-leak torture across all eight destinations) passes on the capable runner; goldens confirm the rendered output. No developer-only junk is shown by default (debug controls gated behind Debug mode; the legacy diagnostic harness is dev-only behind `?legacy=1`).
 
 ## Release verdict
 
