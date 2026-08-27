@@ -588,6 +588,29 @@ Use:
 - no time-scrub explosion of allocations;
 - morphology goldens at known phases.
 
+### Implementation status (CA9, 2026-08-26)
+
+Implemented **DATA_DRIVEN** reduced restricted-three-body bridge/tail model from
+Toomre & Toomre (1972) via NASA GISS (`GCL1` artifact, DOI 10.1086/151823).
+The *method* (two galaxies, parabolic encounter, test-particle disks orbiting
+central point masses — no self-gravity/gas) is source-locked; the *specific
+numeric scenario* is a repository-derived default within that framework
+(equal-mass 1:1, q = 4 disk radii, 60° inclination, window -50..70
+model-time, 800 tracers/galaxy, 241 keyframes dtK = 0.5) disclosed in
+`DATA_SOURCES_GALAXY_COLLISION_SOURCE_LOCK.md` (§4) and marked
+`source-locked-framework-repository-scenario` — not a transcription of a
+named system's figure caption. Runtime interpolates the validated GC1 binary
+(`public/data/galaxy-collision/gc1.bin`, ~4.6 MB float32, sha256 in
+`gc1.manifest.json`) with linear keyframe lerp; `src/phenomena/galaxy-collision/dataset.ts`
+(`decodeGc1`, `interpolateTracers`/`interpolateCenters`, `phaseToModelTime`)
+and `loader.ts` (manifest shape, byte-length, SHA-256 fail-closed) are the
+contracts. Presets (`encounter`/`bridge-tail`/`post-encounter`) are
+scenario-consistent epochs, not aesthetic variants. Validated by
+`tests/unit/galaxyCollisionInterp.test.ts` (decode, uniform times, manifest
+sha, exact-keyframe and midpoint interpolation, clamp, fail-closed) and
+`tests/browser/galaxy-collision.spec.ts` (boot, scrub-driven motion,
+determinism, WebGL2 fallback, leave/re-enter) plus `GC_ENCOUNTER`/`GC_BRIDGE_TAIL`/`GC_POST_ENCOUNTER` goldens.
+
 ---
 
 ## 9. Stellar Merger — expansion

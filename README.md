@@ -16,6 +16,7 @@ The application is **implemented and running** — this is no longer a planning 
 | Tidal Disruption | `/atlas/tidal-disruption` | Star–black-hole encounter: closed-form parabolic Kepler orbit (Barker timing — DIRECT reduced model), tidal-tensor deformation proxy, energy-spread debris family on Newtonian Kepler orbits (bound/unbound split, differential winding), circularization shock ring, procedural nascent-disk transition. PROCEDURAL_SCIENTIFIC; not SPH/GRMHD/NR, no GR apsidal precession; stellar disc rendered at a disclosed exaggerated radius. |
 | Quasar / AGN | `/atlas/quasar-agn` | Scale-zone architecture (INNER direct reuse of the validated lensing backend with exclusive-visibility cost guard; NUCLEAR/GALACTIC procedural disk/torus/jets/host), blazar orientation model. Mixed fidelity, disclosed per zone. |
 | Black-Hole Merger | `/atlas/black-hole-merger` | DATA_DRIVEN reference-event destination over a pinned SXS numerical-relativity simulation (SXS:BBH:0001, CC-BY-4.0): reduced coordinate-path inspiral playback (gauge-dependence labeled), merger/ringdown/remnant phases anchored on data-derived amplitude thresholds, synchronized h22 waveform panel, remnant rendered with the validated Kerr backend using source-derived mass/spin. Live lensing visuals are labeled illustrative — not dynamical-spacetime ray tracing (`docs/cosmic-atlas/DATA_SOURCES_BBH_MERGER.md`). |
+| Galaxy Collision | `/atlas/galaxy-collision` | DATA_DRIVEN reduced restricted-three-body reconstruction from the source-locked Toomre & Toomre (1972) model (NASA GISS/NTRS): equal-mass parabolic encounter, test-particle disks (no self-gravity/gas). Offline artifact (`public/data/galaxy-collision/gc1.bin`) + CPU/GPU interpolation; tidal bridge/tail morphology. Validated by decode/artifact/interpolation unit tests and browser probe suite; goldens `GC_*` at three epochs. (`docs/cosmic-atlas/DATA_SOURCES_GALAXY_COLLISION_SOURCE_LOCK.md`). |
 
 A developer `Diagnostic` destination (Debug mode) exercises the host lifecycle.
 
@@ -33,6 +34,7 @@ npm run bench:neutron-star      # direct Schwarzschild surface-ray harness (--pr
 npm run bench:compact-merger    # phase-aware merger harness (--phase=...)
 npm run bench:tidal-disruption  # phase-aware TDE harness (--phase=...)
 npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)
+npm run bench:galaxy-collision # data-driven merger harness (--preset=bridge-tail, --phase=0.5)
 ```
 
 Unit/reference tests: Vitest (`npm run test`). Browser/E2E/goldens: Playwright (`npm run e2e`). Visual goldens live in `tests/browser/goldens/` and are NEVER regenerated merely to go green (`docs/cosmic-atlas/GOLDEN_IMAGES.md`).
@@ -41,7 +43,7 @@ Frame-time benchmarks report CPU-side rAF frame deltas and, when the WebGPU back
 
 ## Current development continuation point
 
-The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **M12-NS (neutron-star direct surface ray tracing) COMPLETE** and **M12-RI (repository integrity) ACTIVE** (see `.agent/STATE.md` for exact evidence). M11 production hardening & release candidate is closed (compatibility matrix, mobile/touch, device-loss terminal state, resource-leak torture, accessibility, license audit, deployment contract, matched moving-observer benchmarks; M10 relativistic observer modes complete).
+The durable milestone state, evidence, and next actions live in **[`.agent/STATE.md`](.agent/STATE.md)** — currently: **M12-NS (neutron-star direct surface ray tracing) COMPLETE**, **M12-RI (repository integrity) COMPLETE**, and **CA9 (Galaxy Collision) COMPLETE** (see `.agent/STATE.md` for exact evidence). M11 production hardening & release candidate is closed (compatibility matrix, mobile/touch, device-loss terminal state, resource-leak torture, accessibility, license audit, deployment contract, matched moving-observer benchmarks; M10 relativistic observer modes complete).
 
 ## Autonomous agent quick start
 
@@ -137,4 +139,4 @@ Dependency versions are pinned exactly in `package.json` + lockfile.
 
 ## Current status
 
-**Implemented.** Cosmic Atlas host + seven production destinations; M8 closed with a measured LUT auto-default policy; CA5–CA8 complete; **M9 Kerr spacetime complete**; **M10 relativistic observer modes complete** (physical static/circular/flyby/freefall observers with comoving-tetrad aberration/Doppler, deterministic proper-time playback, truthful near-horizon stop band); **M11 production hardening release candidate COMPLETE**; **M12-NS neutron-star direct surface ray tracing COMPLETE** (direct Schwarzschild surface pass, CPU/GPU parity, regenerated NS goldens); **M12-RI repository integrity ACTIVE** — see `.agent/STATE.md` for exact evidence.
+**Implemented.** Cosmic Atlas host + eight production destinations; M8 closed with a measured LUT auto-default policy; CA5–CA8 complete; **M9 Kerr spacetime complete**; **M10 relativistic observer modes complete** (physical static/circular/flyby/freefall observers with comoving-tetrad aberration/Doppler, deterministic proper-time playback, truthful near-horizon stop band); **M11 production hardening release candidate COMPLETE**; **M12-NS neutron-star direct surface ray tracing COMPLETE** (direct Schwarzschild surface pass, CPU/GPU parity, regenerated NS goldens); **M12-RI repository integrity COMPLETE**; **CA9 Galaxy Collision COMPLETE** (DATA_DRIVEN restricted three-body, NASA GISS/NTRS source-lock, offline GC1 artifact + interpolation, browser suite + goldens). See `.agent/STATE.md` for exact evidence.

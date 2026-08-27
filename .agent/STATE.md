@@ -1,15 +1,52 @@
 # Durable project state
 
-Last update: 2026-08-26 — **M12-NS COMPLETE; M12-RI (repository integrity) COMPLETE; CA9 pending source-lock**
+Last update: 2026-08-27 — **CAMPAIGN COMPLETE: M12-NS, M12-RI, CA9 (Galaxy Collision) all closed**
 (OpenSpec campaign runs M12-NS → M12-RI → CA9 in strict order).
 
 ## Current phase
 
-**M12-NS done (Phase A).** Direct Schwarzschild surface ray tracing for Neutron
-Star is implemented and validated (Architecture B destination wrapper, confirmed
-by `openspec/changes/m12-neutron-star-surface-lensing/implementation-notes.md`).
-M12-RI (repository integrity) and CA9 (galaxy collision, source-locked to Toomre
-& Toomre 1972 via NASA GISS/NTRS) follow once M12-NS is committed/pushed.
+**Campaign complete.** All three ordered changes are closed and pushed. The
+repository now hosts eight production destinations (adding Galaxy Collision).
+See the three closure records below for exact evidence.
+
+
+### CA9 closure record (2026-08-27)
+
+Galaxy Collision — DATA_DRIVEN reduced restricted-three-body reconstruction
+from Toomre & Toomre (1972) via NASA GISS/NTRS source-lock.
+
+- **Source-lock (CA9-03):** GISS `to03000u.pdf` (image-only scan, not committed)
+  + NTRS 19730032576, DOI 10.1086/151823; model facts source-locked (parabolic,
+  two galaxies, test-particle disks, no self-gravity/gas); numeric scenario is
+  a repository-derived default within that framework (equal-mass 1:1, q=4,
+  60° inclination, window -50..70, 800 tracers/galaxy, 241 keyframes dtK=0.5)
+  disclosed as `source-locked-framework-repository-scenario` in
+  `docs/cosmic-atlas/DATA_SOURCES_GALAXY_COLLISION_SOURCE_LOCK.md`.
+- **Offline pipeline (CA9-04..05):** `restricted_three_body.py` now has a
+  fail-closed production path (`--emit-artifact`) requiring source-locked
+  status; exercise config remains placeholder and cannot produce a runtime
+  artifact. The committed GC1 binary (`public/data/galaxy-collision/gc1.bin`
+  ~4.6 MB float32, magic GCL1 schema 1, sha256 92d446c61e807e3090ee497820bf1d6915bee1beb080e2d4954bedf7564b0da2 + manifest)
+  was generated deterministically from PROD_* constants; re-emit yields identical
+  sha256. `DATA_PIPELINE.md` generation command + schema recorded.
+- **Runtime (CA9-06..07):** `src/phenomena/galaxy-collision/` dataset
+  (decodeGc1, interpolateTracers/Centers, phaseToModelTime) + loader
+  (manifest shape, byte-length, SHA-256 fail-closed) +
+  `galaxyCollisionModule.ts` (Points via BufferGeometry/PointsNodeMaterial,
+  atlas lifecycle, deterministic timeline phase handling, debug probe). Presets
+  `encounter`/`bridge-tail`/`post-encounter` (0.0/0.5/0.9). Registered in
+  `host.ts` + `launchCatalog.ts` (eight production destinations).
+- **Validation (CA9-08):** `tests/unit/galaxyCollisionInterp.test.ts` 11/11
+  (decode counts/times, manifest sha, exact-keyframe + midpoint lerp, clamp,
+  fail-closed bad-magic/schema/byte-length); `tests/browser/galaxy-collision.spec.ts`
+  5/5 (boot, scrub-driven motion, determinism, WebGL2 fallback, leave/re-enter).
+  Goldens `GC_ENCOUNTER`/`GC_BRIDGE_TAIL`/`GC_POST_ENCOUNTER` added to
+  `goldenHarness.ts` and generated via UPDATE_GOLDENS=1; full golden suite
+  43/43 twice-stable on E2E_PORT=4219.
+- **Perf (CA9-09):** `scripts/bench-galaxy-collision.mjs` + `bench:galaxy-collision`;
+  smoke run bridge-tail phase 0.5 low: median 7 ms (60 frames, 576x480 internal,
+  webgpu amd rdna-2, 0 console errors). Same schema as other destinations;
+  resource-scoped geometry/material, bounded reuse.
 
 ### M12-RI closure record (2026-08-26)
 
@@ -210,7 +247,7 @@ matched moving-observer benchmarks recorded.
   + a WebGL2-fallback smoke job; hosted runners provide no representative
   WebGPU, so the full browser/golden evidence is local-run (recorded
   honestly; not silently claimed as CI-passed).
-- Carried debts unchanged: CA9 Toomre & Toomre transcription blocked on the
+- Carried debts: CA9 source-lock is now complete (see CA9 closure record); remaining debts are CA8 remnant perf note and Kerr perf headroom. Previous debt was CA9 transcription blocked on the
   paper source; CA8 remnant perf note; Kerr perf headroom.
 
 ## Critical/High defects remaining
@@ -246,9 +283,9 @@ the deep-audit doc notes).
 ## Next actions
 
 1. ~~Commit Phase A (M12-NS) with detailed evidence; push to `origin/main`.~~ DONE (commit `a827563`).
-2. ~~Begin Phase B `m12-repository-integrity` ...~~ DONE this session; commit + push pending.
-3. Phase C `ca9-galaxy-collision`: source-lock Toomre & Toomre 1972 via
+2. ~~Begin Phase B `m12-repository-integrity` ...~~ DONE (commit `5e01bbb`).
+3. ~~Phase C `ca9-galaxy-collision`: source-lock Toomre & Toomre 1972 via
    NASA GISS/NTRS (now publicly reachable as scanned PDF), offline artifact pipeline,
-   runtime interpolation. Starts only after this Phase B commit is pushed.
+   runtime interpolation.~~ DONE this session (see CA9 closure record above).
 4. If a deployment target is chosen, verify the DEPLOYMENT.md checklist on
     the real host (HTTPS/WebGPU secure context, SPA fallback, cache headers).

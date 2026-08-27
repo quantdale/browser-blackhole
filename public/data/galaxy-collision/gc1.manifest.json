@@ -1,0 +1,91 @@
+{
+  "schemaVersion": 1,
+  "id": "gc1-nequal",
+  "phenomenon": "galaxy-collision",
+  "sourceLock": {
+    "referenceExperiment": "Toomre & Toomre (1972), ApJ 178, 623",
+    "doi": "10.1086/151823",
+    "decisionAdr": "CA-ADR-022",
+    "parametersStatus": "source-locked-framework-repository-scenario",
+    "scenario": {
+      "massRatio": {
+        "value": 1.0,
+        "classification": "source-consistent-default",
+        "note": "equal-mass symmetric two-tailed case (Antennae-like)"
+      },
+      "eccentricity": {
+        "value": 1.0,
+        "classification": "source-fact",
+        "note": "abstract: roughly parabolic"
+      },
+      "pericenterQ": {
+        "value": 4.0,
+        "classification": "repository-derived-default",
+        "note": "pericenter separation / disk radius; not transcribed from a figure"
+      },
+      "inclinationDeg": {
+        "value": 60.0,
+        "classification": "repository-derived-default"
+      },
+      "argumentPericenterDeg": {
+        "value": 0.0,
+        "classification": "repository-derived-default"
+      },
+      "longitudeNodeDeg": {
+        "value": 0.0,
+        "classification": "repository-derived-default"
+      },
+      "diskRin": {
+        "value": 0.5,
+        "classification": "repository-derived-default"
+      },
+      "diskRout": {
+        "value": 2.5,
+        "classification": "repository-derived-default"
+      },
+      "tracersPerGalaxy": {
+        "value": 800,
+        "classification": "repository-derived-default"
+      },
+      "tSpan": {
+        "value": [
+          -50.0,
+          70.0
+        ],
+        "classification": "repository-derived-default"
+      },
+      "dt": {
+        "value": 0.01,
+        "classification": "repository-derived-default"
+      },
+      "keyframeEvery": {
+        "value": 50,
+        "classification": "repository-derived-default"
+      }
+    }
+  },
+  "runtime": {
+    "encoding": "gc1",
+    "schemaVersion": 1,
+    "filename": "gc1.bin",
+    "tracerCount": 1600,
+    "keyframeCount": 241,
+    "bytes": 4633024,
+    "checksumSha256": "92d446c61e807e3090ee497820bf1d6915bee1beb080e2d4954bedf7564b0da2",
+    "byteOrder": "little",
+    "positionPrecision": "float32"
+  },
+  "units": {
+    "gravitationalConstant": 1.0,
+    "totalPairMass": 1.0,
+    "lengthUnitDiskRadius": 1.0,
+    "timeUnit": "sqrt(R^3/(G M))"
+  },
+  "timeline": {
+    "tStart": -50.0,
+    "tEnd": 69.99999999999753
+  },
+  "initialConditionsSha256": "828b8eea208ff0ecbf197a0b3061b2a807d6c85c3cb4f9355601e0d3881eadd8",
+  "toolVersion": "ca9-03.1",
+  "generationCommand": "python tools/cosmic-data/restricted_three_body.py --emit-artifact <dir>"
+}

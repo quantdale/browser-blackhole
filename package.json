@@ -36,7 +36,8 @@
     "bench:quasar-agn": "node scripts/bench-quasar-agn.mjs",
     "bench:black-hole-merger": "node scripts/bench-black-hole-merger.mjs",
     "bench:neutron-star": "node scripts/bench-neutron-star.mjs",
-    "bench:stellar-explosion": "node scripts/bench-stellar-explosion.mjs"
+    "bench:stellar-explosion": "node scripts/bench-stellar-explosion.mjs",
+    "bench:galaxy-collision": "node scripts/bench-galaxy-collision.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

@@ -35,7 +35,8 @@ export const LAUNCH_CATALOG: readonly LaunchCatalogEntry[] = [
   { id: 'compact-merger' },
   { id: 'tidal-disruption' },
   { id: 'quasar-agn' },
-  { id: 'black-hole-merger' }
+  { id: 'black-hole-merger' },
+  { id: 'galaxy-collision' }
 ];
 
 /** Production-visible ids (order preserved), for chips and deep-link UX. */

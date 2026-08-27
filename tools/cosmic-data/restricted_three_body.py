@@ -42,6 +42,7 @@ import argparse
 import hashlib
 import json
 import math
+import struct
 import sys
 from pathlib import Path
 
@@ -88,6 +89,53 @@ DISK_R_IN = 0.5
 DISK_R_OUT = 2.5
 DISK_PROFILE_ALPHA = 1.0  # surface density ~ r^-alpha -> sampling law below
 SAMPLE_SEED = 1972  # publication year of the pinned experiment; arbitrary but fixed
+
+# ---------------------------------------------------------------------------
+# Source-locked production scenario (CA9-03 source-lock)
+# ---------------------------------------------------------------------------
+# Classification per DATA_SOURCES_GALAXY_COLLISION_SOURCE_LOCK.md. The MODEL
+# (restricted three-body, parabolic, test-particle disks) is source-locked.
+# The specific numeric scenario is a repository-derived default within that
+# framework (the scanned PDF has no OCR text layer here, so per-figure
+# numbers could not be transcribed). Production generation REFUSES the
+# exercise config and requires this source-locked block.
+
+PROD_TRACERS_PER_GALAXY = 800
+PROD_DISK_R_IN = 0.5
+PROD_DISK_R_OUT = 2.5
+PROD_DISK_PROFILE_ALPHA = 1.0
+PROD_MASS_RATIO = 1.0
+PROD_PERICENTER_Q = 4.0
+PROD_INCLINATION_DEG = 60.0
+PROD_OMEGA_DEG = 0.0
+PROD_NODE_DEG = 0.0
+PROD_T_SPAN = (-50.0, 70.0)
+PROD_DT = 0.01
+PROD_KEYFRAME_EVERY = 50
+PROD_SAMPLE_SEED = 1972
+
+SOURCE_LOCK_STATUS = "source-locked-framework-repository-scenario"
+
+SOURCE_LOCK_SCENARIO = {
+    "massRatio": {"value": 1.0, "classification": "source-consistent-default",
+                  "note": "equal-mass symmetric two-tailed case (Antennae-like)"},
+    "eccentricity": {"value": 1.0, "classification": "source-fact",
+                     "note": "abstract: roughly parabolic"},
+    "pericenterQ": {"value": 4.0, "classification": "repository-derived-default",
+                    "note": "pericenter separation / disk radius; not transcribed from a figure"},
+    "inclinationDeg": {"value": 60.0, "classification": "repository-derived-default"},
+    "argumentPericenterDeg": {"value": 0.0, "classification": "repository-derived-default"},
+    "longitudeNodeDeg": {"value": 0.0, "classification": "repository-derived-default"},
+    "diskRin": {"value": 0.5, "classification": "repository-derived-default"},
+    "diskRout": {"value": 2.5, "classification": "repository-derived-default"},
+    "tracersPerGalaxy": {"value": 800, "classification": "repository-derived-default"},
+    "tSpan": {"value": [-50.0, 70.0], "classification": "repository-derived-default"},
+    "dt": {"value": 0.01, "classification": "repository-derived-default"},
+    "keyframeEvery": {"value": 50, "classification": "repository-derived-default"},
+}
+
+GC1_MAGIC = b"GCL1"
+GC1_SCHEMA = 1
 
 
 # ---------------------------------------------------------------------------
@@ -219,13 +267,16 @@ def sample_disk_tracers(
     count: int,
     host_mass: float,
     prograde: bool,
+    r_in: float = DISK_R_IN,
+    r_out: float = DISK_R_OUT,
+    alpha: float = DISK_PROFILE_ALPHA,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Sample thin-disk tracers with circular host-frame velocities.
 
     Radius law: surface density Sigma ~ r^-alpha sampled exactly by inverse
     CDF over [R_IN, R_OUT] (alpha != 1 branch uses the power-law form).
     """
-    alpha = DISK_PROFILE_ALPHA
+    alpha = alpha
     u = rng.random(count)
     if abs(alpha - 1.0) < 1e-12:
         # Sigma ~ 1/r  =>  p(r) ~ const  =>  uniform in r
@@ -251,15 +302,21 @@ def sample_disk_tracers(
 
 
 def sample_all_tracers(
-    seed: int, enc: Encounter, t0: float = 0.0
+    seed: int,
+    enc: Encounter,
+    t0: float = 0.0,
+    count: int = TRACERS_PER_GALAXY,
+    r_in: float = DISK_R_IN,
+    r_out: float = DISK_R_OUT,
+    alpha: float = DISK_PROFILE_ALPHA,
 ) -> tuple[np.ndarray, np.ndarray]:
     """Deterministic full tracer state (both disks), COM frame at t=t0.
 
     Disks are sampled around each nucleus's position/velocity EVALUATED AT
     THE WINDOW START so the initial state is dynamically coherent."""
     rng = np.random.default_rng(seed)
-    x_a, v_a = sample_disk_tracers(rng, TRACERS_PER_GALAXY, enc.m1, True)
-    x_b, v_b = sample_disk_tracers(rng, TRACERS_PER_GALAXY, enc.m2, False)
+    x_a, v_a = sample_disk_tracers(rng, count, enc.m1, True, r_in, r_out, alpha)
+    x_b, v_b = sample_disk_tracers(rng, count, enc.m2, False, r_in, r_out, alpha)
     x1, x2 = enc.states(np.array([t0]))
     v1, v2 = enc.nucleus_velocities(t0)
     x_a = x_a + x1[0]
@@ -693,6 +750,103 @@ def build_report(write_npz_scratch: Path | None) -> dict[str, object]:
     return report
 
 
+def emit_artifact(out_dir: Path, scratch_npz: Path | None = None) -> dict[str, object]:
+    """Emit the versioned GC1 runtime artifact + manifest (production path).
+
+    Fail-closed: only the source-locked scenario may produce a runtime asset.
+    The exercise configuration is rejected here so it can never masquerade as
+    published Toomre & Toomre parameters.
+    """
+    if SOURCE_LOCK_STATUS != "source-locked-framework-repository-scenario":
+        raise RuntimeError("refusing to emit production artifact: not source-locked")
+
+    enc = Encounter(
+        PROD_MASS_RATIO, PROD_PERICENTER_Q, PROD_OMEGA_DEG,
+        PROD_INCLINATION_DEG, PROD_NODE_DEG,
+    )
+    x, v = sample_all_tracers(
+        PROD_SAMPLE_SEED, enc, PROD_T_SPAN[0],
+        count=PROD_TRACERS_PER_GALAXY, r_in=PROD_DISK_R_IN, r_out=PROD_DISK_R_OUT,
+        alpha=PROD_DISK_PROFILE_ALPHA,
+    )
+    ic_sha = hashlib.sha256(np.ascontiguousarray(x).tobytes()).hexdigest()
+    out = integrate(enc, x, v, PROD_T_SPAN, PROD_DT, PROD_KEYFRAME_EVERY)
+    times = np.asarray(out["times"])
+    positions = np.ascontiguousarray(out["positions"])  # (K, N, 3)
+    n_key = int(positions.shape[0])
+    n_tracers = int(positions.shape[1])
+    x1, x2 = enc.states(times)
+    centers = np.stack([x1, x2], axis=1).astype(np.float32)  # (K, 2, 3)
+
+    buf = bytearray()
+    buf += GC1_MAGIC
+    buf += struct.pack("<I", GC1_SCHEMA)
+    buf += struct.pack("<I", n_tracers)
+    buf += struct.pack("<I", n_key)
+    buf += struct.pack("<d", float(times[0]))
+    buf += struct.pack("<d", float(times[-1]))
+    buf += struct.pack("<d", float(LENGTH_UNIT_DISK_RADIUS))
+    buf += centers.tobytes()
+    buf += positions.astype(np.float32).tobytes()
+    blob = bytes(buf)
+
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    bin_path = out_dir / "gc1.bin"
+    bin_path.write_bytes(blob)
+    sha = hashlib.sha256(blob).hexdigest()
+
+    manifest = {
+        "schemaVersion": 1,
+        "id": "gc1-nequal",
+        "phenomenon": "galaxy-collision",
+        "sourceLock": {
+            "referenceExperiment": "Toomre & Toomre (1972), ApJ 178, 623",
+            "doi": "10.1086/151823",
+            "decisionAdr": "CA-ADR-022",
+            "parametersStatus": SOURCE_LOCK_STATUS,
+            "scenario": SOURCE_LOCK_SCENARIO,
+        },
+        "runtime": {
+            "encoding": "gc1",
+            "schemaVersion": GC1_SCHEMA,
+            "filename": "gc1.bin",
+            "tracerCount": n_tracers,
+            "keyframeCount": n_key,
+            "bytes": len(blob),
+            "checksumSha256": sha,
+            "byteOrder": "little",
+            "positionPrecision": "float32",
+        },
+        "units": {
+            "gravitationalConstant": G,
+            "totalPairMass": TOTAL_MASS,
+            "lengthUnitDiskRadius": LENGTH_UNIT_DISK_RADIUS,
+            "timeUnit": "sqrt(R^3/(G M))",
+        },
+        "timeline": {"tStart": float(times[0]), "tEnd": float(times[-1])},
+        "initialConditionsSha256": ic_sha,
+        "toolVersion": TOOL_VERSION,
+        "generationCommand": (
+            "python tools/cosmic-data/restricted_three_body.py --emit-artifact <dir>"
+        ),
+    }
+    manifest_path = out_dir / "gc1.manifest.json"
+    manifest_path.write_text(json.dumps(manifest, indent=2, sort_keys=False) + "\n")
+
+    if scratch_npz is not None:
+        scratch_npz.parent.mkdir(parents=True, exist_ok=True)
+        np.savez_compressed(
+            scratch_npz, times=times, positions=positions, centers=centers
+        )
+    return {
+        "bin": str(bin_path),
+        "manifest": str(manifest_path),
+        "sha256": sha,
+        "byteSize": len(blob),
+    }
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument(
@@ -701,7 +855,20 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="optionally dump trajectory keyframes to an .npz scratch file",
     )
+    parser.add_argument(
+        "--emit-artifact",
+        type=Path,
+        default=None,
+        help="emit the versioned GC1 runtime artifact + manifest to <dir> "
+        "(production, fail-closed; requires the source-locked scenario)",
+    )
     args = parser.parse_args(argv)
+
+    if args.emit_artifact is not None:
+        result = emit_artifact(args.emit_artifact, args.scratch_npz)
+        print(f"CA9 artifact emitted: {result['bin']}")
+        print(f"  sha256={result['sha256']} bytes={result['byteSize']}")
+        return 0
 
     report = build_report(args.scratch_npz)
     REPORT_PATH.parent.mkdir(parents=True, exist_ok=True)

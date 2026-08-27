@@ -763,5 +763,34 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
     notes:
       'Kerr a* = +0.6 prograde circular observer at r = 8 r_g, epoch-frozen: frame dragging composed with comoving aberration through the full Kerr tetrad chain. Catches Kerr/moving-observer composition and double-counting regressions.'
+  },
+  // --- Galaxy Collision goldens (CA9) ---------------------------------------
+  // DATA_DRIVEN restricted three-body bridge/tail morphology at three epochs.
+  {
+    name: 'GC_ENCOUNTER',
+    url: '/atlas/galaxy-collision?preset=encounter',
+    scrubPhase: 0.0,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    notes:
+      'Galaxy collision encounter setup (t ~ -50): two pre-pericenter disks approaching. Catches missing disks, trajectory-load and preset-boot regressions.'
+  },
+  {
+    name: 'GC_BRIDGE_TAIL',
+    url: '/atlas/galaxy-collision?preset=bridge-tail',
+    scrubPhase: 0.5,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Bridge/tail formation near pericenter (t ~ 10): tidal bridge and counter-tail from the restricted three-body model. Catches lost tidal features and interpolation regressions.'
+  },
+  {
+    name: 'GC_POST_ENCOUNTER',
+    url: '/atlas/galaxy-collision?preset=post-encounter',
+    scrubPhase: 0.9,
+    pinTier: 'low',
+    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    notes:
+      'Post-encounter extended tails (t ~ 50): long tidal tails after nuclei have separated. Catches late-phase morphology and resource-retirement regressions.'
   }
 ];

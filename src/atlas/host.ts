@@ -448,7 +448,8 @@ export class CosmicAtlasHost {
       compactMerger,
       tidalDisruption,
       quasarAgn,
-      blackHoleMerger
+      blackHoleMerger,
+      galaxyCollision
     ] = await Promise.all([
       import('./destinations/diagnosticDestination.js'),
       import('./destinations/blackHoleDestination.js'),
@@ -457,7 +458,8 @@ export class CosmicAtlasHost {
       import('../phenomena/compact-merger/presets.js'),
       import('../phenomena/tidal-disruption/presets.js'),
       import('../phenomena/quasar-agn/presets.js'),
-      import('../phenomena/black-hole-merger/presets.js')
+      import('../phenomena/black-hole-merger/presets.js'),
+      import('../phenomena/galaxy-collision/presets.js')
     ]);
     this.registry.register(diagnostic.diagnosticDescriptor, diagnostic.DIAGNOSTIC_PRESETS);
     this.registry.register(blackHole.blackHoleDescriptor, blackHole.BLACK_HOLE_PRESETS);
@@ -478,6 +480,10 @@ export class CosmicAtlasHost {
     this.registry.register(
       blackHoleMerger.BLACK_HOLE_MERGER_DESCRIPTOR,
       blackHoleMerger.BLACK_HOLE_MERGER_PRESETS
+    );
+    this.registry.register(
+      galaxyCollision.GALAXY_COLLISION_DESCRIPTOR,
+      galaxyCollision.GALAXY_COLLISION_PRESETS
     );
   }
 
