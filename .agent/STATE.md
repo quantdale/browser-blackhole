@@ -1,3 +1,16 @@
+# ACTIVE CAMPAIGN OVERRIDE — 2026-08-28
+
+The repository remains production-certified for the pre-optimization product baseline, but a new active hardening campaign is now selected:
+
+`openspec/changes/whole-atlas-performance-optimization/`
+
+Canonical fast audit: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`.
+Canonical execution instructions: `.agent/START_HERE.md` → `.agent/EXECUTION_PROMPT.md` → active OpenSpec `EXECUTION_PROMPT.md`.
+
+Do not interpret older "no active campaign" / "certified production-ready" historical lines below as meaning there is no current work. They remain historical release evidence; the active performance-hardening checklist is currently unexecuted.
+
+---
+
 # Durable project state
 
 Last update: 2026-08-27 — **FINAL PRODUCTION-READINESS CERTIFIED** (`openspec/changes/final-production-readiness`).
