@@ -6,9 +6,7 @@ Mode: autonomous implementation with evidence-driven gates
 Canonical audit: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`
 Canonical requirements/tasks: `openspec/changes/*`
 
-**Status (2026-08-26):** Phase A — `m12-neutron-star-surface-lensing` — is **COMPLETE**
-(commit `a827563`, pushed to `origin/main`). Phase B — `m12-repository-integrity` — is the
-**ACTIVE** phase. Phase C — `ca9-galaxy-collision` — remains blocked until Phase B gates pass.
+**Status (2026-08-27):** **CAMPAIGN COMPLETE** — Phase A `m12-neutron-star-surface-lensing` (**COMPLETE** `a827563`), Phase B `m12-repository-integrity` (**COMPLETE** `5e01bbb`), Phase C `ca9-galaxy-collision` (**COMPLETE** `5680044` + `0b63ce9` checklist). All gates evidenced and pushed to `origin/main`.
 
 ## Mission
 
@@ -240,4 +238,4 @@ Stop the dependent workstream and record evidence rather than improvising when:
 
 The campaign is complete when every unblocked OpenSpec change is implemented, validated, documented, committed and pushed; all completed task checkboxes reflect evidence; durable state/backlog identify the true next work; and no production scientific claim exceeds the model actually running in the browser.
 
-Begin with `m12-repository-integrity` now (Phase A is closed).
+Campaign is complete — no active OpenSpec change. See `.agent/STATE.md` for durable evidence and next actions (deployment verification if a target is chosen).
