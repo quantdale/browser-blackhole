@@ -753,3 +753,110 @@ the deep-audit doc notes).
    runtime interpolation.~~ DONE this session (see CA9 closure record above).
 4. If a deployment target is chosen, verify the DEPLOYMENT.md checklist on
     the real host (HTTPS/WebGPU secure context, SPA fallback, cache headers).
+
+## 2026-08-28 session — WS2 transition occlusion implementation
+
+Implemented the smallest WS2 vertical slice from
+`openspec/changes/whole-atlas-performance-optimization`:
+
+- `TransitionDirector.getPublicState()` now exposes derived
+  `destinationOccluded`, true only during the runtime `hyperspace` phase.
+- `FramePlan.destinationDrawSuppressed` carries that decision from
+  `CosmicAtlasHost` to `SharedRendererKernel`.
+- The kernel still calls destination `update()` and shared post presentation,
+  but skips only `destination.render()` while the destination is guaranteed
+  hidden. This preserves simulation/transition advancement and overlay output.
+- Public-state normalization derives occlusion from `active && phase`, never
+  trusting a persisted free-standing flag; defaults/share parsing remain
+  explicit and safe.
+- Added unit coverage for default, valid hyperspace, inactive hyperspace, and
+  inconsistent arriving-state normalization.
+- Added browser regression coverage that intercepts the actual FramePlan and
+  asserts `destinationUpdated=true`, `destinationDrawn=false`, and
+  `postPresented=true` during opaque hyperspace.
+- Updated `docs/cosmic-atlas/ARCHITECTURE.md` and the active OpenSpec task
+  checklist with the frame-plan contract and evidence status.
+
+Validation evidence:
+
+- `npm run format:check` PASS.
+- `npm run lint` PASS.
+- `npm run typecheck` PASS.
+- `npm run build` PASS.
+- Focused unit tests: 23/23 PASS (`atlasState`, `frameTelemetry`).
+- Full unit suite: 539/540 PASS; the sole observed failure is
+  `tests/unit/launchCatalog.test.ts` descriptor-import timeout (5s). It is
+  unrelated to the changed WS2 files, but was not independently bisected in
+  this session and remains an unresolved suite blocker.
+- Browser WS2 gate: **CERTIFIED 2026-08-29.** The earlier
+  "Playwright-managed Chromium absent / `__ATLAS_APP__` never published"
+  reading was the broken-Windows-npm-install blocker, not a runtime defect.
+  After `npm ci`, `tests/browser/frame-invalidation.spec.ts` runs 10/10 PASS
+  at `--workers=1` (19.6 min wall), including
+  `frame-invalidation.spec.ts:346` "opaque transition updates but does not
+  draw the hidden destination" — the required
+  `destinationUpdated=true / destinationDrawn=false / postPresented=true`
+  observation. The WS1 on-demand-rendering set (idle quiescence, control /
+  resize / quality-pin / visibilitychange wakes, `captureFrame()` force,
+  host-vs-`renderFrame` telemetry agreement, `renderer.info` live counts,
+  active-timeline continuous rendering) passed in the same run.
+- The `tests/unit/launchCatalog.test.ts` descriptor-import timeout no longer
+  reproduces: full unit suite 540/540 PASS. Same root cause (broken install).
+
+Next action: the performance campaign is **PAUSED mid-flight** as of
+2026-08-29 by explicit user redirect — the seven non-black-hole destinations
+are reported as visually static or non-functional and take priority over
+further optimization. Resume `whole-atlas-performance-optimization` at
+tasks.md §4 (startup/code splitting) once the phenomena-animation campaign
+lands.
+
+## 2026-08-28 session (later) — the "environment blocker" was a broken npm install
+
+**Correction to the entry above.** The preceding entry recorded that
+Playwright/Chrome "hangs during `host.init()` before publishing
+`__ATLAS_APP__`", and the active OpenSpec `tasks.md` repeated that claim in
+§1 and §4. **That diagnosis was wrong and both records have been repaired.**
+
+Measured root cause: `node_modules/.bin` contained its 16 extensionless POSIX
+scripts and **zero Windows `.cmd` shims**. On Windows that makes `tsc`, `vite`,
+`vitest` and `playwright` unresolvable from PowerShell/cmd. The observable
+signature was:
+
+```
+'vite' is not recognized as an internal or external command
+Error: Process from config.webServer was not able to start. Exit code: 1
+```
+
+There was never a dev server for the browser to talk to, so "the app hung" was
+an artifact of no app at all. `npm config get bin-links` is `true` and no
+`.npmrc` exists in the repo or the user profile, so this was a corrupted
+install state rather than configuration. `npm ci` restored all 16 `.cmd`
+shims.
+
+Consequences for previously recorded evidence:
+
+- Every `DEFERRED_ENVIRONMENT` note attributed to an `host.init()` hang is
+  void. Re-measure before trusting one.
+- The recorded `tests/unit/launchCatalog.test.ts` descriptor-import timeout
+  ("unresolved suite blocker") **does not reproduce**: the full unit suite is
+  **540/540 PASS across 38 files** after the repair.
+- Gate A commands re-run for real on the repaired toolchain:
+  `format:check` PASS, `lint` PASS, `typecheck` PASS, `test` 540/540 PASS.
+
+**Second environment fact, measured this session.** Arrival-heavy Playwright
+specs need `--workers=1` on this machine. Run under default parallelism,
+10 of the `frame-invalidation.spec.ts` tests time out waiting for
+`'arrived'` (stuck in `'transitioning'` past the 180 s poll ceiling); the
+identical single test passes serially in ~1.9 min, both with and without the
+WS2 working-tree changes. This is GPU starvation across parallel workers, not
+a product regression — an initial "WS2 causes a transition deadlock" reading
+was produced by comparing a 1-worker clean-tree run against a many-worker
+dirty-tree run, and was refuted by re-running the matched pair. Browser gates
+on this host must be run `CI=1 ... --workers=1`, and any parallel-run failure
+must be re-checked serially before it is recorded as a defect.
+
+Verification command to run before believing any future environment claim:
+
+```powershell
+(Get-ChildItem node_modules/.bin -Filter *.cmd | Measure-Object).Count  # expect 16
+```

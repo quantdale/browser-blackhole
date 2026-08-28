@@ -334,6 +334,14 @@ transition composite if active
 telemetry
 ```
 
+During the director-owned opaque `hyperspace` phase, the frame plan carries a
+`destinationDrawSuppressed` decision. The kernel still runs the active
+`destination`'s `update()` and the shared post/transition presentation, but
+skips only `destination.render()`. This preserves required simulation and
+transition state advancement without spending draw work on pixels guaranteed
+to be hidden. The suppression decision is derived from the runtime transition
+phase; persisted/public state cannot independently force occlusion.
+
 ## 8. Time model
 
 Astrophysical destinations span milliseconds to billions of years.

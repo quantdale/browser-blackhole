@@ -314,7 +314,11 @@ export class TransitionDirector {
     return {
       active: this.phase !== 'idle',
       phase: this.phase === 'idle' ? null : this.phase,
-      progress: this.getProgress()
+      progress: this.getProgress(),
+      // The whole hyperspace phase uses the opaque envelope. Keep this
+      // semantic state owned by the director instead of making the renderer
+      // infer occlusion from an artistic opacity threshold.
+      destinationOccluded: this.phase === 'hyperspace'
     };
   }
 

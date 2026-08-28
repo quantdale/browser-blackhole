@@ -16,7 +16,12 @@ interface AtlasStateView {
   atlas: {
     activeDestination: string;
     activePreset: string;
-    transition: { active: boolean; phase: string | null; progress: number };
+    transition: {
+      active: boolean;
+      phase: string | null;
+      progress: number;
+      destinationOccluded: boolean;
+    };
   };
   /** Atlas rendering domain (quality/trajectory-backend preferences). */
   rendering: { trajectoryBackend?: 'auto' | 'numerical' | 'lut' } & Record<string, unknown>;

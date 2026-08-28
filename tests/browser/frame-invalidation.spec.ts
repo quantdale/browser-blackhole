@@ -343,6 +343,88 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     });
   });
 
+  test('opaque transition updates but does not draw the hidden destination', async ({ page }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+
+    await page.evaluate(() => {
+      const app = window.__ATLAS_APP__!;
+      const kernel = (app.host as unknown as RenderFrameCounterSurface['host'])
+        .kernel as unknown as {
+        renderFrame(plan: unknown): boolean;
+        lastFrameWork: {
+          destinationUpdated: boolean;
+          destinationDrawn: boolean;
+          postPresented: boolean;
+        };
+      };
+      const original = kernel.renderFrame.bind(kernel);
+      const runtime = window as unknown as {
+        __transitionOcclusionObservations?: Array<{
+          destinationDrawSuppressed: boolean;
+          destinationOccluded: boolean;
+          destinationUpdated: boolean;
+          destinationDrawn: boolean;
+          postPresented: boolean;
+        }>;
+      };
+      runtime.__transitionOcclusionObservations = [];
+      kernel.renderFrame = (plan: unknown): boolean => {
+        const result = original(plan);
+        const candidate = plan as {
+          destinationDrawSuppressed?: boolean;
+          transitionOpacity?: number;
+        };
+        if (candidate.destinationDrawSuppressed === true) {
+          runtime.__transitionOcclusionObservations!.push({
+            destinationDrawSuppressed: true,
+            destinationOccluded: app.host.state.atlas.transition.destinationOccluded,
+            ...kernel.lastFrameWork
+          });
+        }
+        return result;
+      };
+      app.navigate('neutron-star');
+    });
+
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            () =>
+              (
+                window as unknown as {
+                  __transitionOcclusionObservations?: unknown[];
+                }
+              ).__transitionOcclusionObservations?.length ?? 0
+          ),
+        { timeout: ARRIVAL_TIMEOUT_MS, intervals: [50] }
+      )
+      .toBeGreaterThan(0);
+
+    const observations = await page.evaluate(
+      () =>
+        (
+          window as unknown as {
+            __transitionOcclusionObservations?: Array<{
+              destinationDrawSuppressed: boolean;
+              destinationOccluded: boolean;
+              destinationUpdated: boolean;
+              destinationDrawn: boolean;
+              postPresented: boolean;
+            }>;
+          }
+        ).__transitionOcclusionObservations ?? []
+    );
+    expect(observations[0]).toEqual({
+      destinationDrawSuppressed: true,
+      destinationOccluded: true,
+      destinationUpdated: true,
+      destinationDrawn: false,
+      postPresented: true
+    });
+  });
+
   test('renderer.info telemetry reports live counts once a scene is drawn', async ({ page }) => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);

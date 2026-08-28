@@ -613,6 +613,8 @@ export interface TransitionPublicState {
   active: boolean;
   phase: TransitionPhase | null;
   progress: number;
+  /** True only while the hyperspace envelope is mathematically opaque. */
+  destinationOccluded: boolean;
 }
 
 export interface AtlasCameraPublicState {
@@ -802,6 +804,8 @@ export interface FramePlan {
     render(ctx: RenderContext): void;
   } | null;
   scene: THREE.Scene | null;
+  /** Skip only the hidden destination draw; update remains allowed. */
+  destinationDrawSuppressed: boolean;
   transitionOverlay: THREE.Texture | null;
   transitionOpacity: number;
 }

@@ -538,24 +538,26 @@ export class SharedRendererKernel implements IRendererKernel {
         destination.update(this.assembleFrameContext());
         destinationUpdated = true;
 
-        const hdrTexture = this.options.post.getHdrTarget();
-        const hdrTarget = this.resolveHdrTargetOrDegraded(hdrTexture);
+        if (!plan.destinationDrawSuppressed) {
+          const hdrTexture = this.options.post.getHdrTarget();
+          const hdrTarget = this.resolveHdrTargetOrDegraded(hdrTexture);
 
-        // The union RendererLike spans WebGPURenderer (accepts base RenderTarget)
-        // and WebGLRenderer (whose d.ts narrows to WebGLRenderTarget); at runtime
-        // both accept the shared HDR target produced by post.
-        renderer.setRenderTarget(hdrTarget as THREE.WebGLRenderTarget | null);
-        try {
-          const renderContext: RenderContext = {
-            renderer,
-            camera: this.requireCamera(),
-            scene: plan.scene,
-            hdrTarget: hdrTexture
-          };
-          destination.render(renderContext);
-          destinationDrawn = true;
-        } finally {
-          renderer.setRenderTarget(null);
+          // The union RendererLike spans WebGPURenderer (accepts base RenderTarget)
+          // and WebGLRenderer (whose d.ts narrows to WebGLRenderTarget); at runtime
+          // both accept the shared HDR target produced by post.
+          renderer.setRenderTarget(hdrTarget as THREE.WebGLRenderTarget | null);
+          try {
+            const renderContext: RenderContext = {
+              renderer,
+              camera: this.requireCamera(),
+              scene: plan.scene,
+              hdrTarget: hdrTexture
+            };
+            destination.render(renderContext);
+            destinationDrawn = true;
+          } finally {
+            renderer.setRenderTarget(null);
+          }
         }
       }
 

@@ -33,6 +33,33 @@ describe('M5 experience/debug state domains', () => {
     expect(state.debug.diagnosticsEnabled).toBe(false);
     expect(state.rendering.dynamicResolution).toBe(true);
     expect(state.rendering.renderScaleOverride).toBeNull();
+    expect(state.atlas.transition.destinationOccluded).toBe(false);
+  });
+
+  it('accepts transition occlusion only for the hyperspace phase', () => {
+    const valid = validateAtlasState({
+      schemaVersion: 1,
+      atlas: {
+        transition: { active: true, phase: 'hyperspace' }
+      }
+    });
+    expect(valid.atlas.transition.destinationOccluded).toBe(true);
+
+    const inactive = validateAtlasState({
+      schemaVersion: 1,
+      atlas: {
+        transition: { active: false, phase: 'hyperspace' }
+      }
+    });
+    expect(inactive.atlas.transition.destinationOccluded).toBe(false);
+
+    const inconsistent = validateAtlasState({
+      schemaVersion: 1,
+      atlas: {
+        transition: { active: true, phase: 'arriving', destinationOccluded: true }
+      }
+    });
+    expect(inconsistent.atlas.transition.destinationOccluded).toBe(false);
   });
 
   it('normalizes invalid mode values back to scientific', () => {

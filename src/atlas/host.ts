@@ -604,9 +604,15 @@ export class CosmicAtlasHost {
     if (!shouldRender) return;
 
     const overlay = this.director.getOverlay();
+    const transition = this.director.getPublicState();
     const plan: FramePlan = {
       destination: this.activePrepared !== null ? this.frameDestination : null,
       scene: this.activePrepared?.scene ?? null,
+      // During the mathematically opaque hyperspace phase the destination may
+      // still update for lifecycle/timeline correctness, but its pixels cannot
+      // affect the presented image. The director owns this semantic decision;
+      // the kernel only enforces it.
+      destinationDrawSuppressed: transition.destinationOccluded,
       transitionOverlay: overlay.texture,
       transitionOpacity: overlay.opacity
     };

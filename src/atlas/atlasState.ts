@@ -159,7 +159,7 @@ export function createDefaultAtlasState(
       activePreset: DEFAULT_ACTIVE_PRESET,
       targetDestination: null,
       targetPreset: null,
-      transition: { active: false, phase: null, progress: 0 }
+      transition: { active: false, phase: null, progress: 0, destinationOccluded: false }
     },
     sharedVisual: {
       exposure: 1,
@@ -274,10 +274,14 @@ export function validateAtlasState(
     (TRANSITION_PHASE_VALUES as readonly string[]).includes(rawTransitionPhase)
       ? (rawTransitionPhase as TransitionPhase)
       : null;
+  const transitionActive = boolOr(transitionRaw['active'], false);
   const transition: TransitionPublicState = {
-    active: boolOr(transitionRaw['active'], false),
+    active: transitionActive,
     phase: transitionPhase,
-    progress: clampFinite(transitionRaw['progress'], 0, 1, 0)
+    progress: clampFinite(transitionRaw['progress'], 0, 1, 0),
+    // Occlusion is a derived transition semantic, never a free-standing
+    // persisted flag. The runtime director is the sole source of truth.
+    destinationOccluded: transitionActive && transitionPhase === 'hyperspace'
   };
 
   // --- sharedVisual ----------------------------------------------------------
@@ -515,7 +519,7 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
       activePreset: preset ?? DEFAULT_ACTIVE_PRESET,
       targetDestination: null,
       targetPreset: null,
-      transition: { active: false, phase: null, progress: 0 }
+      transition: { active: false, phase: null, progress: 0, destinationOccluded: false }
     };
   }
 

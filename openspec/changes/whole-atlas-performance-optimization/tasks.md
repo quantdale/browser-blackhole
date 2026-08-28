@@ -86,8 +86,10 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Add particle active/drawn/simulation telemetry.
 - [ ] Add active lensing pass/max-step telemetry.
 - [ ] Add transition phase/occlusion telemetry.
-      Transition phase is already in atlas state; the OCCLUSION half is WS2
-      and unimplemented, so this stays unchecked.
+      Implementation exists: `TransitionDirector.getPublicState()` exposes the
+      derived `destinationOccluded` semantic and host frame plans carry it to
+      the renderer. Browser execution evidence remains blocked by the current
+      `host.init()` environment hang, so this stays uncertified.
 - [ ] Add async nonblocking GPU timestamp attribution where supported.
       A bounded-cadence whole-frame resolve already exists (`gpuFrameMs`,
       BH-121); PER-PASS attribution does not.
@@ -173,10 +175,20 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 4. Transition occlusion and compile warmup
 
-- [ ] Expose fully-occluded state from TransitionDirector.
-- [ ] Add kernel destination-draw suppression while fully occluded.
-- [ ] Ensure required simulation state can still advance.
+- [x] Expose fully-occluded state from TransitionDirector.
+      `destinationOccluded` is true only for the director-owned hyperspace
+      phase; it is derived and never trusted from persisted state.
+- [x] Add kernel destination-draw suppression while fully occluded.
+      `FramePlan.destinationDrawSuppressed` skips only the destination render;
+      the destination update and shared post presentation still execute.
+- [x] Ensure required simulation state can still advance.
+      Kernel ordering keeps `destination.update()` outside the suppression gate.
 - [ ] Add draw-count assertion for occluded interval.
+      Regression coverage is implemented in
+      `tests/browser/frame-invalidation.spec.ts` and typechecks, but acceptance
+      remains blocked: on this machine Chromium/system Chrome hangs during
+      `host.init()` before publishing `__ATLAS_APP__` (reproduced on the new
+      test plus independent Atlas navigation/WebGL2 suites).
 - [ ] Integrate compileAsync for incoming visible subgraph.
 - [ ] Ensure stale/cancelled prepare compile cannot activate.
 - [ ] Benchmark transition CPU/GPU before/after.
