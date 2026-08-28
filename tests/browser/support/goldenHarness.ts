@@ -397,7 +397,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
   {
     name: 'ATLAS_DIAGNOSTIC',
     url: '/atlas/diagnostic',
-    tolerance: { meanAbsDelta: 2, pctPixelsBeyond: 0.5, perChannelThreshold: 24 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Deterministic camera-ray gradient pattern; catches boot/compositing regressions of the atlas shell itself. Tight tolerance: fully static scene.'
   },
@@ -504,7 +510,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/compact-merger?preset=equal-mass-nsns',
     scrubPhase: 0.05,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Binary inspiral mid-window: two compact surfaces + closed-form orbit trails on dark sky. Catches star/trail loss, orbit-phase regressions, sky breakage.'
   },
@@ -513,7 +525,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/compact-merger?preset=equal-mass-nsns',
     scrubPhase: 0.37,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Merger flash + early ejecta ignition. Catches flash-envelope and volume-ignition regressions; bloom-carrying frame needs moderate tolerance.'
   },
@@ -522,7 +540,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/compact-merger?preset=equal-mass-nsns',
     scrubPhase: 0.7,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Kilonova light-curve peak: warm expanding shell + remnant. Catches emission/temperature-trend and shell-radius regressions.'
   },
@@ -531,7 +555,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/compact-merger?preset=short-grb-on-axis',
     scrubPhase: 0.54,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Short-GRB bipolar jet viewed on-axis (response saturated). Catches lost-jet and viewing-response regressions on-axis.'
   },
@@ -540,7 +570,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/compact-merger?preset=short-grb-off-axis',
     scrubPhase: 0.54,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Identical engine viewed 68 deg off-axis — bipolar diamond geometry must differ from CM_GRB_ON; catches flat-multiplier response regressions.'
   },
@@ -549,7 +585,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/compact-merger?preset=kilonova-focus',
     scrubPhase: 0.9,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Afterglow with prompt-BH remnant scenario (faint accretion glow, fading ejecta). Catches remnant-scenario and late-timeline resource regressions.'
   },
@@ -564,7 +606,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     scrubPhase: 0.16,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Boot frame: tidally deformed star close-up on inbound corridor, BH marker near frame edge. Catches star-loss, deformation-graph, and arrival-framing regressions.'
   },
@@ -573,7 +621,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     scrubPhase: 0.26,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Strong pre-disruption elongation (stretch well above 1). Catches deformation ordering/cap regressions and axis-orientation breaks.'
   },
@@ -582,7 +636,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     scrubPhase: 0.36,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Young debris: star faded, compact bound (warm) + unbound (cool) stream arcs near periapsis + accent particles. Catches stream-loss, handoff-fade and spine-crop regressions.'
   },
@@ -685,7 +745,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     name: 'BHM_INSPIRAL',
     url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral',
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Late NR inspiral (~4 orbits before the h22 peak): two horizon-scaled markers with illustrative ring/glow accents on reduced coordinate paths + trails. Catches marker/trail loss and orbit-phase regressions.'
   },
@@ -694,7 +760,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral',
     scrubPhase: 0.56,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Final approach just before the merger anchor: converged separation from the source trajectories. Catches late-inspiral sampling and convergence regressions.'
   },
@@ -703,7 +775,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-merger',
     scrubPhase: 0.615,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 10, pctPixelsBeyond: 6, perChannelThreshold: 56 },
+    // SPARSE-CONTENT tolerance. The subject occupies only a few percent of
+    // this frame, so a family-standard tolerance is satisfied by a change that
+    // alters the SUBJECT completely: a measured false pass on 2026-08-29 let a
+    // capture whose stars had gone from pale discs to clipped white compare
+    // clean, and another let two fully-formed galaxies match an almost empty
+    // baseline. Tolerance has to be comparable to the content fraction.
+    tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
     notes:
       'Merger anchor window: CINEMATIC flash envelope over the DATA_DRIVEN timing (t=0 at the h22 amplitude peak). Catches flash-envelope and anchor-alignment regressions.'
   },
@@ -790,7 +868,8 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/galaxy-collision?preset=bridge-tail',
     scrubPhase: 0.5,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    // Sparse-content tolerance; see GC_ENCOUNTER.
+    tolerance: { meanAbsDelta: 2, pctPixelsBeyond: 1, perChannelThreshold: 40 },
     notes:
       'Bridge/tail formation near pericenter (t ~ 10): tidal bridge and counter-tail from the restricted three-body model. Catches lost tidal features and interpolation regressions.'
   },
@@ -799,7 +878,8 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/galaxy-collision?preset=post-encounter',
     scrubPhase: 0.9,
     pinTier: 'low',
-    tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    // Sparse-content tolerance; see GC_ENCOUNTER.
+    tolerance: { meanAbsDelta: 2, pctPixelsBeyond: 1, perChannelThreshold: 40 },
     notes:
       'Post-encounter extended tails (t ~ 50): long tidal tails after nuclei have separated. Catches late-phase morphology and resource-retirement regressions.'
   }

@@ -133,6 +133,29 @@ now") and is the one destination the user called acceptable.
   and their committed baselines showed two inspiralling holes. The Kerr swap
   they exist to guard was never being compared.
 
+### Golden-gate weakness found by inspecting the regenerated baselines
+
+Two MEASURED FALSE PASSES in the visual-golden gate, both from the
+family-standard tolerance (`meanAbsDelta: 8`, `pctPixelsBeyond: 4`) being far
+looser than the frame fraction the subject occupies:
+
+- `GC_POST_ENCOUNTER` compared a capture of two fully-formed post-encounter
+  galaxies against a baseline that showed almost NOTHING, and passed.
+- `CM_INSPIRAL` compared a capture whose neutron stars had gone from pale discs
+  to clipped white against the pale-disc baseline, and passed.
+
+Both were found by LOOKING at the regenerated images, not by any assertion.
+Sparse-on-black rows (GC x3 at 2 / 1%; CM x6, TDE approach/deformation/debris,
+SN_PROGENITOR, BHM x3 at 3 / 1.5%) now carry a tolerance comparable to their
+content fraction, with the rationale recorded at the first row of each family.
+Full suite verified twice at the tightened tolerances: 43/43 both runs.
+
+Also worth knowing when reading these baselines: the harness forces exposure 1,
+bloom OFF and LINEAR tone mapping, so the goldens are weak evidence for
+HDR-radiance changes — a linear-clamped white disc looks the same at 1x and 4x
+radiance. The presented-motion tests do not check brightness either. A future
+change that only alters radiance should add its own probe.
+
 ### Known limitations recorded, not hidden
 
 - **Kerr polar band.** Escaped rays that graze within `sin(theta) < 0.04` of the
@@ -147,6 +170,11 @@ now") and is the one destination the user called acceptable.
   structure evolves over Myr, which a 400-day timeline cannot show. No motion is
   faked there; the debug snapshot's `zoneMotion` field states this per zone.
 - **Black hole** remains untouched per the user directive.
+- **WS1 re-certified after this campaign**: `frame-invalidation.spec.ts` 10/10
+  PASS at `--workers=1` (39 s). Necessary because five destinations now arrive
+  unpaused, two timelines dirty `consumeDirty()` forever instead of saturating,
+  and `AutoFramer` writes `setOrbit` per frame (TDE/SN now report
+  `TIME_ADVANCED+CAMERA_CHANGED`), all of which is that suite's subject matter.
 
 Next action: the phenomena work is complete for all seven destinations. Either
 resume `whole-atlas-performance-optimization` at tasks.md §4, or open a scoped

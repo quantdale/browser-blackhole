@@ -28,6 +28,20 @@
 import type { PhenomenonDescriptor, PresetDescriptor } from '../../atlas/types.js';
 import type { StellarExplosionPublicState } from './types.js';
 
+/**
+ * User-visible presentation disclosure (repo convention: presentation
+ * departures belong in `fidelityNote`, not only in code comments).
+ *
+ * The modelled peak-normalized luminosity declines as t^-1.1 from the flash and
+ * is physically right; presented unchanged it fades to black well before the
+ * nebular stage, so the PRESENTED emission gain carries a floor. The modelled
+ * value is reported unfloored in the debug snapshot as `emissionGainModel`.
+ */
+const PRESENTATION_DISCLOSURE =
+  'Presentation: the displayed brightness carries a floor so the late nebular ' +
+  'stage stays visible; the modelled luminosity decline is reported unchanged ' +
+  'in diagnostics.';
+
 /** Shared destination id. */
 const DESTINATION_ID = 'stellar-explosion';
 
@@ -158,7 +172,8 @@ const CORE_COLLAPSE_PRESET: PresetDescriptor = {
   fidelityNote:
     'PROCEDURAL_SCIENTIFIC reduced model: blended free-expansion/Sedov-inspired kinematic shell, ' +
     'procedural clumping noise, empirical temperature/luminosity envelopes. No hydrodynamics, no ' +
-    'radiation transport, no stellar-evolution simulation.',
+    'radiation transport, no stellar-evolution simulation. ' +
+    PRESENTATION_DISCLOSURE,
   state: { ...CORE_COLLAPSE_STATE },
   // polar 65deg, azimuth 40deg, d=170 units:
   // dir = (sin65*sin40, cos65, sin65*cos40) = (0.589, 0.423, 0.702)
@@ -174,7 +189,8 @@ const STRIPPED_ENVELOPE_PRESET: PresetDescriptor = {
   stateSchemaVersion: 1,
   fidelityNote:
     'PROCEDURAL_SCIENTIFIC reduced model, compact helium-star-like progenitor: same disclosed ' +
-    'kinematic/procedural machinery as core collapse with faster, more asymmetric ejecta.',
+    'kinematic/procedural machinery as core collapse with faster, more asymmetric ejecta. ' +
+    PRESENTATION_DISCLOSURE,
   state: { ...STRIPPED_ENVELOPE_STATE },
   // polar 75deg, azimuth -60deg, d=90 units:
   // dir = (sin75*sin(-60), cos75, sin75*cos(-60)) = (-0.837, 0.259, 0.483)
@@ -191,7 +207,9 @@ const HYPERNOVA_PRESET: PresetDescriptor = {
   fidelityNote:
     'PROCEDURAL_SCIENTIFIC, structurally distinct scenario: >2x expansion velocity scale, strong ' +
     'unipolar asymmetry, central-engine morphology proxy. ILLUSTRATIVE — not fitted to any ' +
-    'observed event; still no hydrodynamic claim.',
+    'observed event; still no hydrodynamic claim.' +
+    ' ' +
+    PRESENTATION_DISCLOSURE,
   state: { ...HYPERNOVA_STATE },
   // polar 80deg, azimuth 140deg, d=260 units:
   // dir = (sin80*sin140, cos80, sin80*cos140) = (0.633, 0.174, -0.754)
@@ -207,7 +225,9 @@ const GRB_ON_AXIS_PRESET: PresetDescriptor = {
   stateSchemaVersion: 1,
   fidelityNote:
     'Long-GRB / collapsar scenario, observer 4 deg from the jet axis: bipolar narrow jet with ' +
-    'beaming-INSPIRED (clamped delta^3) viewing response. Kinematic pattern, NOT relativistic MHD.',
+    'beaming-INSPIRED (clamped delta^3) viewing response. Kinematic pattern, NOT relativistic MHD.' +
+    ' ' +
+    PRESENTATION_DISCLOSURE,
   state: { ...GRB_ENGINE_STATE },
   // polar 8deg (near jet axis), azimuth 15deg, d=420 units:
   // dir = (sin8*sin15, cos8, sin8*cos15) = (0.036, 0.990, 0.135)
@@ -223,7 +243,9 @@ const GRB_OFF_AXIS_PRESET: PresetDescriptor = {
   stateSchemaVersion: 1,
   fidelityNote:
     'Identical physical/engine state to long-grb-on-axis; observer 68 deg off the jet axis so the ' +
-    'on/off-axis difference is purely GEOMETRIC (cone solid angle + response factor).',
+    'on/off-axis difference is purely GEOMETRIC (cone solid angle + response factor).' +
+    ' ' +
+    PRESENTATION_DISCLOSURE,
   state: { ...GRB_OFF_AXIS_STATE },
   // polar 68deg (68 deg from the jet axis), azimuth 30deg, d=420 units:
   // dir = (sin68*sin30, cos68, sin68*cos30) = (0.464, 0.375, 0.803)
