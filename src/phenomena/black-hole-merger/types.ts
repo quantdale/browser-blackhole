@@ -81,11 +81,22 @@ export function normalizeBlackHoleMergerState(
 // ---------------------------------------------------------------------------
 
 /** Kerr numerical pass step budget per tier (active in RINGDOWN/REMNANT). */
+/**
+ * Kerr integration step budget per tier for the REMNANT pass.
+ *
+ * These now match the budgets the black-hole destination runs the same
+ * integrator with (256/512/1024/2048). The previous 140-380 was 2-5x too small
+ * for this configuration: rays that exhaust the budget terminate as
+ * RAY_MAX_STEPS, which the product path paints NUMERICAL_FAILURE magenta ("a
+ * failure must never masquerade as the shadow"), so the remnant view rendered
+ * as a large purple field with the shadow inside it — most of the frame was
+ * literally an error color.
+ */
 export const TIER_KERR_STEPS: Record<QualityTier, number> = {
-  low: 140,
-  medium: 200,
-  high: 280,
-  ultra: 380
+  low: 256,
+  medium: 512,
+  high: 1024,
+  ultra: 2048
 };
 
 /** Trail ribbon samples per tier (bounded; compact-merger precedent). */

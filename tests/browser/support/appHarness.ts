@@ -261,6 +261,37 @@ export async function awaitDestinationTimeApplied(
   );
 }
 
+/**
+ * Wait until the ACTIVE DESTINATION's own time readout agrees with the shared
+ * timeline coordinate.
+ *
+ * Prefer this over {@link awaitDestinationTimeApplied} whenever the timeline may
+ * have been PLAYING just before the mutation. "Wait until the readout differs
+ * from the previous value" is satisfied by ordinary playback advancing one
+ * frame, so it can return before the scrub/reset has been applied at all —
+ * every destination now arrives playing, which made that postcondition racy.
+ * Agreement with `time.snapshot().physicalTime` is a true postcondition.
+ */
+export async function awaitDestinationTimeSynced(
+  page: Page,
+  timeField: string,
+  timeoutMs = ARRIVAL_TIMEOUT_MS
+): Promise<void> {
+  await page.waitForFunction(
+    ({ field, epsilon }) => {
+      const app = window.__ATLAS_APP__;
+      if (!app) return false;
+      const snapshot = app.host.time.snapshot();
+      const physical = snapshot.physicalTime;
+      if (physical === null) return true;
+      const value = (app.host.activeDestinationDebugSnapshot() ?? {})[field];
+      return typeof value === 'number' && Math.abs(value - physical) <= epsilon;
+    },
+    { field: timeField, epsilon: 1e-9 },
+    { timeout: timeoutMs, polling: 50 }
+  );
+}
+
 /** Pause + scrub, then await the destination consuming the new coordinate. */
 export async function scrubAndAwaitDestination(
   page: Page,

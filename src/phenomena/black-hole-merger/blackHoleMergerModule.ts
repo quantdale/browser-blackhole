@@ -283,19 +283,23 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
 
     trailA = ctx.services.ribbons.createRibbon({
       segments: TIER_TRAIL_SAMPLES[ctx.quality],
-      widthStart: 0.055,
-      widthEnd: 0.012,
-      colorStart: [0.72, 0.78, 1.0],
-      colorEnd: [0.16, 0.2, 0.42],
+      // Wider and brighter than the original 0.055/0.012 hairline: the orbital
+      // trails are the only thing that makes the inspiral READ as an orbit
+      // rather than two dots, and at a 30 M standoff the old width was under a
+      // pixel.
+      widthStart: 0.26,
+      widthEnd: 0.05,
+      colorStart: [1.15, 1.25, 1.6],
+      colorEnd: [0.24, 0.3, 0.62],
       additive: true,
       taper: 'linear'
     });
     trailB = ctx.services.ribbons.createRibbon({
       segments: TIER_TRAIL_SAMPLES[ctx.quality],
-      widthStart: 0.055,
-      widthEnd: 0.012,
-      colorStart: [1.0, 0.8, 0.62],
-      colorEnd: [0.42, 0.22, 0.14],
+      widthStart: 0.26,
+      widthEnd: 0.05,
+      colorStart: [1.6, 1.28, 1.0],
+      colorEnd: [0.62, 0.33, 0.2],
       additive: true,
       taper: 'linear'
     });
@@ -344,8 +348,11 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     const ds = requireDataset();
     ctx.services.time.registerPhaseMapping('bbm-timeline', makeBbmPhaseMapping(ds));
     ctx.services.time.setPhaseMapping('bbm-timeline');
-    ctx.services.time.pause();
     ctx.services.time.scrubTo(ctx.preset.timelineInitialPhase);
+    // Arrive PLAYING: arriving paused meant the merger never happened unless
+    // the viewer found the transport. Specs pause explicitly where they need
+    // determinism.
+    ctx.services.time.play();
   }
 
   function updateTrails(t: number, ds: BbmDataset): void {
@@ -462,7 +469,11 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       diskInnerRg: 4,
       diskOuterRg: 14,
       maxSteps: TIER_KERR_STEPS[lastTier],
-      escapeRadiusRg: 60,
+      // 32 M is the escape radius the black-hole destination and both Kerr
+      // parity corpora use. At 60 M rays spend the step budget climbing to a
+      // background they reach identically at 32 M, which pushed a large
+      // fraction of the frame into the max-steps failure class.
+      escapeRadiusRg: 32,
       backgroundIntensity: 1
     });
   }

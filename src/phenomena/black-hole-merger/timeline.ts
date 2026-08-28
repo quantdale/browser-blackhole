@@ -27,6 +27,13 @@ import type { PhaseMapping } from '../../atlas/types.js';
 import type { BbmDataset } from './dataset.js';
 import type { BbmPhase } from './types.js';
 
+/**
+ * Wall-clock seconds for one full traverse at 1x. The stage weights below
+ * decide the split: ~19 s of inspiral, ~4 s through the merger, ~3.5 s of
+ * ringdown and ~8 s of remnant.
+ */
+export const TIMELINE_PLAYBACK_SECONDS = 35;
+
 /** Presentation tail after ringdownEndM that holds the remnant state. */
 export const REMNANT_TAIL_M = 160;
 
@@ -133,7 +140,19 @@ export function makeBbmPhaseMapping(dataset: BbmDataset): PhaseMapping {
     label: 'NR timeline (M units)',
     forward: (phase01) => uiPhaseToTimeM(phase01, dataset),
     inverse: (internal) => timeMToUiPhase(internal, dataset),
-    formatDisplay: (internal) => `${formatBbmTime(internal)} · ${phaseAt(internal, dataset)}`
+    formatDisplay: (internal) => `${formatBbmTime(internal)} · ${phaseAt(internal, dataset)}`,
+    // Phase-paced (the mapping is piecewise-linear in DATA anchors, and the
+    // weights above deliberately give the inspiral 55% of the axis and the
+    // merger+ringdown 22%), looping, one traverse per TIMELINE_PLAYBACK_SECONDS.
+    //
+    // A real 60 Msun merger's NR window is ~0.6 s of physical time, so nothing
+    // here plays at "real speed" in any case — slowed playback is the norm for
+    // waveform visualisations. Before this, playback advanced the internal
+    // coordinate at 1 M per wall second, i.e. ~35 MINUTES for one traverse, so
+    // the destination was frozen for any viewer.
+    playbackSeconds: TIMELINE_PLAYBACK_SECONDS,
+    pacing: 'phase',
+    loop: true
   };
 }
 

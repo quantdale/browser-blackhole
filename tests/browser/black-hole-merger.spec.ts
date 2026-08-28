@@ -4,8 +4,9 @@ import { expect, test, type Page } from '@playwright/test';
 import './support/atlasHook.js';
 import {
   ARRIVAL_TIMEOUT_MS,
-  awaitDestinationTimeApplied,
-  readDestinationTime,
+  awaitDestinationTimeSynced,
+  expectPresentedMotion,
+  measurePresentedMotion,
   scrubAndAwaitDestination
 } from './support/appHarness.js';
 
@@ -211,14 +212,16 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
     const readAtReset = async (): Promise<BbmSnapshot> => {
       // Postcondition wait, not a sleep: reading before the destination has
       // applied the reset returns the still-playing state and compares two
-      // unrelated instants.
-      const previous = await readDestinationTime(page, 'timeM');
+      // unrelated instants. The postcondition is AGREEMENT with the shared
+      // coordinate, not "the readout changed" — this destination now arrives
+      // playing, so a mere change is satisfied by one frame of ordinary
+      // playback before the reset has been applied.
       await page.evaluate(() => {
         const h = window.__ATLAS_APP__!.host;
         h.time.pause();
         h.time.reset();
       });
-      await awaitDestinationTimeApplied(page, 'timeM', previous);
+      await awaitDestinationTimeSynced(page, 'timeM');
       return bbmSnapshot(page);
     };
 
@@ -327,6 +330,82 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
       // Bounded growth: no monotonic accumulation across revisits.
       expect(inv.gpu).toBeLessThan(firstGpuBytes * 2 + 1024);
     }
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * Phenomena-animation campaign. This destination arrived PAUSED and advanced
+ * its internal coordinate at 1 M per wall second — about 35 minutes for one
+ * traverse — so the merger never happened on screen. Its REMNANT view was also
+ * rendering most of the frame in NUMERICAL_FAILURE magenta because the Kerr
+ * pass ran with a step budget 2-5x below what the same integrator needs
+ * (140-380 vs the black-hole destination's 256-2048) at a 60 M escape radius.
+ */
+test.describe('Black-Hole Merger plays on its own (phenomena-animation)', () => {
+  test('arrives playing, phase-paced and looping', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/black-hole-merger');
+    await waitForArrival(page, 'black-hole-merger');
+
+    const snap = await page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot());
+    expect(snap.paused, 'destination must arrive playing').toBe(false);
+    expect(snap.loop).toBe(true);
+    expect(snap.basePlaybackRate).toBeGreaterThan(0);
+    expect(snap.basePlaybackRate).toBeLessThan(0.2); // phase units per second
+
+    const before = snap.simulationPhase;
+    await expect
+      .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+        timeout: 15_000,
+        intervals: [200]
+      })
+      .toBeGreaterThan(before + 0.03);
+    expect(errors).toEqual([]);
+  });
+
+  test('the inspiral visibly evolves while running', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/black-hole-merger');
+    await waitForArrival(page, 'black-hole-merger');
+
+    const motion = await measurePresentedMotion(page, { captures: 4, framesBetween: 30 });
+    expectPresentedMotion(motion, { label: 'black-hole-merger' });
+    expect(errors).toEqual([]);
+  });
+
+  test('the remnant Kerr view is not dominated by failure magenta', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/black-hole-merger');
+    await waitForArrival(page, 'black-hole-merger');
+
+    // Park in the remnant stage deterministically.
+    await page.evaluate(() => {
+      const h = window.__ATLAS_APP__!.host;
+      h.time.pause();
+      h.time.scrubTo(0.9);
+    });
+    await expect
+      .poll(async () => (await bbmSnapshot(page)).phase, { timeout: 15_000, intervals: [200] })
+      .toBe('remnant');
+
+    const grid = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
+    expect(grid).not.toBeNull();
+    // NUMERICAL_FAILURE_RGB is linear (0.08, 0, 0.08): after tone mapping it
+    // reads as a purple with a near-zero green channel and matched red/blue.
+    // A residual population is expected — escaped rays that grazed within
+    // sin(theta) < 0.04 of the spin axis are reclassified as failures by the
+    // integrator's pole policy, which draws a thin band through the poles and
+    // is a KNOWN Kerr-backend limitation shared with the black-hole
+    // destination's Kerr presets. What must never come back is the failure
+    // color covering the frame.
+    const failure = (grid as string[]).filter((cell) => {
+      const [r, g, b] = cell.split(',').map(Number);
+      return (g ?? 0) <= 12 && (r ?? 0) >= 12 && Math.abs((r ?? 0) - (b ?? 0)) <= 14;
+    }).length;
+    expect(failure, `failure-colored cells: ${failure}/${(grid as string[]).length}`).toBeLessThan(
+      (grid as string[]).length * 0.2
+    );
     expect(errors).toEqual([]);
   });
 });

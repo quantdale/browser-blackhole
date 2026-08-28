@@ -58,6 +58,8 @@ const DISTANCE_DEFAULT_MAX = 500;
  * authored floor at close range.
  */
 const CLIP_FAR_DISTANCE_FACTOR = 8;
+/** Authored default far plane; the clip range never goes below this. */
+const CLIP_FAR_DEFAULT = 5000;
 const CLIP_NEAR_DISTANCE_FACTOR = 1e-4;
 const CLIP_NEAR_FLOOR = 0.05;
 
@@ -509,7 +511,11 @@ export class CameraRig implements ICameraRig {
     // plane rendered empty. The far plane only ever grows (never below the
     // authored default), and the near plane only grows with distance, so no
     // currently-visible near content starts clipping.
-    const far = Math.max(camera.far, this.distance * CLIP_FAR_DISTANCE_FACTOR);
+    // Compare against the CONSTANT default, never the live camera: reading
+    // camera.far would make this a ratchet that only ever grows, so one visit
+    // to a large-scale destination would leave every later destination with a
+    // vastly oversized depth range for the rest of the session.
+    const far = Math.max(CLIP_FAR_DEFAULT, this.distance * CLIP_FAR_DISTANCE_FACTOR);
     const near = Math.max(CLIP_NEAR_FLOOR, this.distance * CLIP_NEAR_DISTANCE_FACTOR);
     if (far !== camera.far || near !== camera.near) {
       camera.far = far;
