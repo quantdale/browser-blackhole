@@ -249,6 +249,19 @@ exercise, and §11 needs the tier ladder - those four cannot claim a
 percentage against this artifact. What is recorded is sound for steady-state
 per-frame cost, which is what §12-§15 and §22 need.
 
+### Session-closing validation (at `786d52b`)
+
+| Gate | Result |
+| --- | --- |
+| `npm run check` | PASS - prettier, eslint, tsc clean; **539/539** unit tests (38 files) |
+| Browser suite `--workers=2` | **206/206** including all 40 visual goldens, the new startup-graph and Kerr-census gates |
+| Firefox project | **4/4** |
+| Backend | hardware WebGPU, adapter `intel gen-12lp`, timestamp queries available |
+
+Zero known Critical/High regressions. The one known intermittent
+(`accessibility.spec.ts`, diagnosed above) did not recur in the closing run
+and is recorded with its mechanism rather than left as folklore.
+
 ### Still open
 
 §0 baseline and §1 telemetry remain unexecuted and are still the declared
