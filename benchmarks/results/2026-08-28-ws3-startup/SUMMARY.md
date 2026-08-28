@@ -91,6 +91,17 @@ Fix: `CosmicAtlasHost.abandonPendingTransition()`, called from `beforeunload`
 the in-flight prepare and silences transition-error REPORTING for the rest of
 that document's life. Verified 12/12 Firefox.
 
+The guard is deliberately not a latch: `beforeunload` fires when a navigation
+starts, not when it commits, so `requestTransition()` clears it. Pinned by
+`startup-graph.spec.ts` "a page that fires beforeunload and then stays still
+reports failures" (verified to fail without the clear).
+
+bfcache was measured, not assumed: with and without the `beforeunload`
+listener, headless Firefox and Chromium both report
+`pageshow.persisted === false` on a back-navigation, so this app is already
+bfcache-ineligible in that environment and the listener is not the deciding
+factor. Real-browser eligibility is UNVERIFIED.
+
 A genuine chunk failure is deliberately NOT silenced — pinned by
 `startup-graph.spec.ts` "a genuine implementation-chunk failure is still
 reported truthfully", which aborts the chunk request while the page stays put

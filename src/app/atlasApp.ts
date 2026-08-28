@@ -1020,6 +1020,13 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // `pagehide` is kept as the belt-and-braces signal for paths that skip it.
   // `persisted` true means the page went to the bfcache and may come back, so
   // that case is deliberately left alone.
+  //
+  // bfcache note: a `beforeunload` listener has historically cost bfcache
+  // eligibility in some engines. Measured here with and without the listener,
+  // headless Firefox and Chromium both reported `pageshow.persisted === false`
+  // on a back-navigation either way — this app is already ineligible in that
+  // environment (it holds a live GPU context), so the listener is not the
+  // deciding factor. Real-browser eligibility is UNVERIFIED.
   const onTeardown = (): void => {
     host.abandonPendingTransition();
   };

@@ -283,7 +283,11 @@ export class CosmicAtlasHost {
   private bloomThrottleActive = false;
 
   // -- WS1 frame invalidation (whole-atlas performance campaign) -------------
-  /** Set once the document is unloading; silences teardown-caused errors. */
+  /**
+   * Set while the document appears to be unloading; silences teardown-caused
+   * transition errors. Cleared by the next transition request — see
+   * {@link requestTransition} for why it must not latch.
+   */
   private tearingDown = false;
 
   /** Reasons accumulated by `invalidate()` since the last consumed frame. */
@@ -1161,6 +1165,16 @@ export class CosmicAtlasHost {
   }
 
   private requestTransition(intent: NavigationIntent): void {
+    // `beforeunload` fires when a navigation STARTS, not when it commits, so
+    // a page can fire it and then stay (cancelled navigation, a link that
+    // resolves to a download). Leaving `tearingDown` latched would silence
+    // every later transition error — including fatal ones — for the rest of
+    // the session, while the director still drove the UI error path: an
+    // error visible on screen and absent from the console. A new transition
+    // request proves the document is alive, and the abandoned prepare's
+    // rejection has already been delivered by this point, so clearing here
+    // restores truthful reporting without reopening the teardown race.
+    this.tearingDown = false;
     this.director.requestTransition({
       destinationId: intent.destinationId,
       presetId: intent.presetId

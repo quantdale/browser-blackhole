@@ -104,6 +104,31 @@ test.describe('startup module graph (WS3)', () => {
     expect(consoleErrors.join(' | ')).toContain("Preparation of 'black-hole' failed");
   });
 
+  test('a page that fires beforeunload and then stays still reports failures', async ({ page }) => {
+    // `beforeunload` fires when a navigation STARTS, not when it commits, so
+    // a page can fire it and then survive (cancelled navigation, a link that
+    // turns into a download). The teardown guard must not latch: a latched
+    // session would show error states in the UI while the console stayed
+    // silent, which is the combination that makes a report unreproducible.
+    const consoleErrors: string[] = [];
+    page.on('console', (message) => {
+      if (message.type() === 'error') consoleErrors.push(message.text());
+    });
+    await page.goto('/atlas/galaxy-collision');
+    await waitForArrival(page, 'galaxy-collision');
+
+    await page.evaluate(() => window.dispatchEvent(new Event('beforeunload')));
+    await page.route(/blackHoleDestination.*\.js/, (route) => route.abort('failed'));
+    await page.evaluate(() => window.__ATLAS_APP__!.navigate('black-hole'));
+
+    await expect
+      .poll(() => consoleErrors.filter((text) => /transition error/.test(text)), {
+        timeout: ARRIVAL_TIMEOUT_MS,
+        intervals: [250]
+      })
+      .not.toEqual([]);
+  });
+
   test('startup JavaScript weight is recorded for the campaign baseline', async ({ page }) => {
     const requested = recordScriptRequests(page);
     await page.goto('/atlas/galaxy-collision');

@@ -106,6 +106,22 @@ restores are untouched. It cancels the in-flight prepare and suppresses
 transition-error REPORTING for the remainder of that document's life.
 Verified 12/12 Firefox.
 
+The guard must NOT latch. `beforeunload` fires when a navigation starts, not
+when it commits, so a page can fire it and then survive (cancelled
+navigation, a link that resolves to a download). A latched flag would silence
+every later transition error — fatal ones included — while the director still
+drove the UI error path: an error visible on screen and absent from the
+console. `requestTransition()` therefore clears it, and
+`startup-graph.spec.ts` "a page that fires beforeunload and then stays still
+reports failures" pins it (verified to FAIL without the clear and pass with).
+
+bfcache, measured rather than assumed: with and without the `beforeunload`
+listener, headless Firefox and Chromium both reported
+`pageshow.persisted === false` on a back-navigation. This app is already
+bfcache-ineligible in that environment (it holds a live GPU context), so the
+listener is not the deciding factor here. Real-browser eligibility is
+UNVERIFIED and is recorded as such rather than claimed either way.
+
 **New failure mode this workstream creates, and how it is contained:** a
 destination chunk can now be missing (stale deploy) or unreachable (offline)
 at navigation time, which was impossible when every implementation was
