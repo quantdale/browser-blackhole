@@ -104,13 +104,54 @@ full-screen shaders on this adapter** — kerr 93 vs 192 ms, neutron star 26 vs
 CPU and GPU columns agree on this independently, so it is unlikely to be a
 timestamp-semantics artifact between backends.
 
-This is a single integrated adapter and one browser, so it is a lead, not a
-conclusion. But it is a large, reproducible, backend-attributable gap on the
-exact code paths the campaign is about, and it should be characterized before
-any Kerr shader micro-optimization is attempted: if the WebGPU pipeline is
-leaving a 2x on the table for structural reasons, that is a bigger win than
-the integrator work, and optimizing the shader first would be optimizing the
-wrong layer.
+**The obvious alternative explanation was tested and refuted.** A backend
+timing gap on a ray-marched shader has two readings, and only one is a
+performance finding: either WebGPU codegen is genuinely worse, or the WebGL2
+path is simply executing FEWER loop iterations (different dynamic-loop bound,
+earlier MAX_STEPS termination) - a fidelity difference wearing a performance
+costume, which START_HERE explicitly forbids accepting as a win.
+
+Three pieces of evidence say it is the former:
+
+- **This table contains its own control.** All three strong-field rows run at
+  778x581, medium tier, 0.8 scale, with identical draw-call and program
+  counts. Kerr and neutron star move together (2.07x, 1.92x) but the
+  numerical Schwarzschild black hole moves the OTHER way (0.89x, 20.12 vs
+  22.57 ms). Generic WebGPU full-screen-pass overhead would move all three.
+- **The terminal-class census is identical.** Counting the `?kerrstatus`
+  per-pixel classification over the whole frame at pinned medium tier:
+  captured 27.570% on both backends, max-steps 0.001% on both, theta-wrap
+  0.124%, pole-passage 0.139%, other-non-finite 0.182% - agreeing to three
+  decimal places. Same rays, same terminations, same step budget, half the
+  time. Now a permanent gate: `tests/browser/kerr-backend-census.spec.ts`.
+- Ray parity passes on both backends, though that alone would NOT have
+  settled it: parity samples specific rays against the CPU oracle, while a
+  step-budget difference shows up only in the aggregate.
+
+So the gap is real and attributable to the WebGPU path for these two shaders
+specifically. This is still one integrated adapter and one browser. But it
+should be characterized before Kerr shader micro-optimization: if the WebGPU
+pipeline is structurally leaving 2x on the table at identical numerical
+output, the integrator is the wrong layer to start with.
+
+## Scope limit - read this before treating §0 as "baseline established"
+
+Every row above is a STATIONARY, PAUSED scene at the harness default tier.
+MASTER_PLAN §5.3 defines the matrix more broadly: cold navigation, warm
+navigation, stationary, active timeline, camera interaction, settling,
+transition in/out, and a low/medium/high/ultra ladder.
+
+That matters because several later workstreams optimize work this baseline
+cannot see:
+
+- §7 (volume active-step) and §8 (particle simulation) are ACTIVE-TIMELINE
+  costs; a paused scene does not exercise them.
+- §4 (transition occlusion) needs the transition in/out rows.
+- §11 (WorkBudget tier mapping) needs the tier ladder.
+
+Those three cannot claim a percentage improvement against this artifact. What
+is here is sound for steady-state per-frame cost, which is what §12-§15 and
+§22 need.
 
 ## Not recorded here (explicitly, rather than silently)
 

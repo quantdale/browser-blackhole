@@ -14,9 +14,19 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > nine rows; neutron star is the unexpected second-heaviest at 51 ms, ahead
 > of the full numerical Schwarzschild black hole at 20 ms; and WebGL2 runs
 > the two heaviest full-screen shaders roughly TWICE AS FAST as WebGPU on
-> this adapter (kerr 93 vs 192, NS 26 vs 51), corroborated independently by
-> the CPU and GPU columns. That last one should be characterized before any
-> Kerr shader micro-optimization, or §14 risks optimizing the wrong layer.
+> this adapter (kerr 93 vs 192, NS 26 vs 51). The "WebGL2 is just doing less
+> work" reading was REFUTED: the numerical Schwarzschild row moves the other
+> way (0.89x) at identical resolution/tier/draw-calls, and the `?kerrstatus`
+> terminal-class census agrees to three decimal places across backends
+> (max-steps 0.001% on both) - now gated by
+> `tests/browser/kerr-backend-census.spec.ts`. So characterize the WebGPU
+> path before §14 shader micro-optimization.
+>
+> **Scope limit:** every row is stationary + paused at the default tier.
+> MASTER_PLAN §5.3 also asks for cold/warm navigation, active timeline,
+> camera interaction, settling, transition in/out and a tier ladder - so §4,
+> §7, §8 and §11 CANNOT claim a percentage against this artifact. See the
+> unchecked scenario row below.
 
 - [x] Record start SHA and dirty-state check.
 - [x] Record Node/npm/Three.js/Vite/Playwright versions.
@@ -33,6 +43,11 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       Available everywhere: `timestampQuery: true` on this adapter.
 - [ ] Record cold navigation and warm navigation for every destination.
       Not implemented in the harnesses.
+- [ ] Record the non-stationary scenario rows MASTER_PLAN §5.3 requires:
+      active timeline, camera interaction, settling, transition in/out, and a
+      low/medium/high/ultra ladder. Every recorded row is stationary+paused at
+      the default tier, so §4, §7, §8 and §11 have no baseline to claim
+      against yet.
 - [ ] Record startup bundle/chunk sizes and first-interactive timing.
       Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive
       timing is not, so this stays unchecked rather than half-claimed.

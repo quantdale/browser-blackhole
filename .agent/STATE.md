@@ -221,11 +221,33 @@ Three findings that should steer the rest of the campaign:
    as WebGPU on this adapter** (kerr 93 vs 192 ms, neutron star 26 vs 51 ms),
    while cheap destinations are within noise. The CPU and GPU columns agree
    independently, so it is unlikely to be a cross-backend timestamp artifact.
-   One integrated adapter, so a lead rather than a conclusion — but it is a
-   large, reproducible, backend-attributable gap on exactly the code paths
-   §14 is about, and it should be characterized BEFORE Kerr shader
-   micro-optimization. If the WebGPU pipeline is structurally leaving 2x on
-   the table, the integrator work is the wrong layer to start with.
+   The alternative reading - that WebGL2 is simply doing LESS WORK (different
+   dynamic-loop bound, earlier MAX_STEPS termination), which START_HERE
+   forbids accepting as a win - was tested and REFUTED two ways. First, the
+   table contains its own control: all three strong-field rows share
+   resolution, tier, scale, draw calls and program count, and while kerr and
+   NS move together (2.07x, 1.92x) the numerical Schwarzschild black hole
+   moves the OTHER way (0.89x), which generic WebGPU pass overhead could not
+   produce. Second, the `?kerrstatus` terminal-class census over the whole
+   frame is identical to three decimal places on both backends - captured
+   27.570%, max-steps 0.001%, theta-wrap 0.124%, pole 0.139%, other 0.182%.
+   Same rays, same terminations, half the time. That census is now a
+   permanent gate: `tests/browser/kerr-backend-census.spec.ts`. (Ray parity
+   passing on both backends would NOT have settled this - it samples specific
+   rays, while a step-budget difference only shows in the aggregate.)
+
+   So: characterize the WebGPU path before Kerr shader micro-optimization. At
+   identical numerical output, a structural 2x is a bigger win than the
+   integrator work and the shader would be the wrong layer to start with.
+
+**§0 scope limit, recorded where the next session will look:** every baseline
+row is a STATIONARY, PAUSED scene at the harness default tier. MASTER_PLAN
+§5.3 also asks for cold/warm navigation, active timeline, camera interaction,
+settling, transition in/out and a tier ladder. §7 (volume active-step), §8
+(particles) and §4 (transition occlusion) optimize work a paused scene cannot
+exercise, and §11 needs the tier ladder - those four cannot claim a
+percentage against this artifact. What is recorded is sound for steady-state
+per-frame cost, which is what §12-§15 and §22 need.
 
 ### Still open
 
