@@ -18,16 +18,42 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 1. Shared telemetry
 
-- [ ] Extend performance snapshot schema.
-- [ ] Add render reason/invalidation counters.
-- [ ] Add destination update/draw/post executed flags.
-- [ ] Add renderer.info frameCalls/drawCalls/primitives.
-- [ ] Add renderer.info memory/program/target/storage metrics.
+> **2026-08-28: host-level telemetry landed; service-level rows still open.**
+> The five checked rows are the ones §6-§21 depend on, and they are asserted
+> two ways: unit tests for mask decoding/transport
+> (`tests/unit/frameTelemetry.test.ts`) and a browser test that cross-checks
+> the host's own counters against an INDEPENDENT count taken by patching
+> `kernel.renderFrame` (`frame-invalidation.spec.ts` "host frame telemetry
+> agrees with the independent renderFrame counter"). Counters are cumulative
+> and resettable, so a measurement window is a difference of two reads — no
+> timing involved, which means the numbers mean the same thing on every
+> machine.
+
+- [x] Extend performance snapshot schema.
+      `DebugInventoryView.frame` + `.rendererInfo`; types
+      `FrameInvalidationTelemetry`, `FrameWorkTelemetry`,
+      `RendererInfoTelemetry` in `src/atlas/types.ts`.
+- [x] Add render reason/invalidation counters.
+      `host.frameTelemetry()` / `host.resetFrameTelemetry()`: last reason
+      mask + decoded names, frames observed/rendered/skipped, per-reason
+      frame counts.
+- [x] Add destination update/draw/post executed flags.
+      `SharedRendererKernel.lastFrameWork` records the three stages of the
+      orchestrated frame; reset to all-false on a skipped/short-circuited
+      frame so a caller can difference reads without special-casing boot.
+- [x] Add renderer.info frameCalls/drawCalls/primitives.
+- [x] Add renderer.info memory/program/target/storage metrics.
+      Both via `SharedRendererKernel.readRendererInfo()`, read straight from
+      `renderer.info` rather than re-derived so they cannot drift.
 - [ ] Add volume active-step/internal-size telemetry.
 - [ ] Add particle active/drawn/simulation telemetry.
 - [ ] Add active lensing pass/max-step telemetry.
 - [ ] Add transition phase/occlusion telemetry.
+      Transition phase is already in atlas state; the OCCLUSION half is WS2
+      and unimplemented, so this stays unchecked.
 - [ ] Add async nonblocking GPU timestamp attribution where supported.
+      A bounded-cadence whole-frame resolve already exists (`gpuFrameMs`,
+      BH-121); PER-PASS attribution does not.
 - [ ] Update benchmark JSON schema and scripts.
 
 ## 2. Frame invalidation / on-demand rendering

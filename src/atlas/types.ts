@@ -487,6 +487,85 @@ export const INVALIDATION_REASON = {
 export type InvalidationReasonName = keyof typeof INVALIDATION_REASON;
 export type InvalidationReasonMask = number;
 
+/** Every reason name, in bit order — the canonical iteration order. */
+export const INVALIDATION_REASON_NAMES = Object.keys(
+  INVALIDATION_REASON
+) as readonly InvalidationReasonName[];
+
+/**
+ * Decode a reason mask into its set reason names (WS0/tasks.md §1 telemetry).
+ * Order matches {@link INVALIDATION_REASON_NAMES}, so the output is stable and
+ * safe to assert on; an empty array means "no reason — this frame was
+ * skippable".
+ */
+export function describeInvalidationReasons(
+  mask: InvalidationReasonMask
+): InvalidationReasonName[] {
+  return INVALIDATION_REASON_NAMES.filter((name) => (mask & INVALIDATION_REASON[name]) !== 0);
+}
+
+/**
+ * Per-frame work-execution telemetry (WS0/tasks.md §1): which stages of the
+ * orchestrated frame actually ran. The whole point of WS1/WS2 is to make these
+ * false when the work is provably unnecessary, so they are the primary
+ * regression signal for every later workstream.
+ */
+export interface FrameWorkTelemetry {
+  /** `destination.update()` ran. */
+  readonly destinationUpdated: boolean;
+  /** `destination.render()` ran (a real draw into the HDR target). */
+  readonly destinationDrawn: boolean;
+  /** `SharedPost.present()` ran (the composite/present pass). */
+  readonly postPresented: boolean;
+}
+
+/** Renderer.info mirror (WS0/tasks.md §1). Null fields = backend not reporting. */
+export interface RendererInfoTelemetry {
+  readonly render: {
+    readonly frameCalls: number;
+    readonly drawCalls: number;
+    readonly triangles: number;
+    readonly points: number;
+    readonly lines: number;
+  };
+  readonly compute: { readonly frameCalls: number };
+  readonly memory: {
+    readonly geometries: number;
+    readonly textures: number;
+    readonly programs: number;
+    readonly renderTargets: number;
+    readonly storageAttributes: number;
+    readonly uniformBuffers: number;
+    readonly totalBytes: number;
+  };
+}
+
+/**
+ * Host frame-invalidation telemetry (WS0/tasks.md §1).
+ *
+ * Counters are cumulative since boot (or since the last explicit reset) so a
+ * benchmark or test can take two snapshots and difference them; `last*`
+ * fields describe only the most recent `frame()` call.
+ */
+export interface FrameInvalidationTelemetry {
+  /** Reason mask of the most recent frame (0 = nothing required a frame). */
+  readonly lastReasons: InvalidationReasonMask;
+  /** Decoded names of {@link lastReasons}. */
+  readonly lastReasonNames: readonly InvalidationReasonName[];
+  /** Whether the most recent frame rendered rather than being skipped. */
+  readonly lastFrameRendered: boolean;
+  /** Stage flags of the most recent orchestrated frame. */
+  readonly lastFrameWork: FrameWorkTelemetry;
+  /** `frame()` calls observed. */
+  readonly framesObserved: number;
+  /** Of those, frames that rendered. */
+  readonly framesRendered: number;
+  /** Of those, frames skipped because no reason existed and time was paused. */
+  readonly framesSkipped: number;
+  /** How many frames each reason contributed to, keyed by reason name. */
+  readonly reasonCounts: Readonly<Record<InvalidationReasonName, number>>;
+}
+
 export interface ISharedPost {
   ensureSize(widthPx: number, heightPx: number, renderScale: number): void;
   getHdrTarget(): THREE.Texture | null;
@@ -735,6 +814,21 @@ export interface IRendererKernel {
   handleResize(cssWidth: number, cssHeight: number, renderScale: number): void;
   /** Execute one orchestrated frame; returns false if skipped by governor. */
   renderFrame(plan: FramePlan): boolean;
+  /**
+   * Which stages the most recent {@link renderFrame} actually executed
+   * (WS0/tasks.md §1). All false before the first frame and whenever the
+   * kernel itself bails (disposed, device lost, no renderer).
+   *
+   * The kernel cannot describe a frame it was never asked to run: when the
+   * HOST skips a frame it does not call `renderFrame` at all, so these flags
+   * would still describe the last frame that did render. The host owns that
+   * case and reports all-false itself — read stage flags through
+   * `CosmicAtlasHost.frameTelemetry()`, not from here, unless you know the
+   * kernel was invoked.
+   */
+  readonly lastFrameWork: FrameWorkTelemetry;
+  /** Renderer.info mirror, or null when no renderer is live. */
+  readRendererInfo(): RendererInfoTelemetry | null;
   capabilities(): CapabilityRequirement[] & { satisfied(id: CapabilityId): boolean };
   /**
    * BH-121: GPU milliseconds per orchestrated frame from the most recent

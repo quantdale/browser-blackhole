@@ -17,6 +17,11 @@ import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
  * visual/post, destination change) must wake at least one frame afterward.
  */
 
+/** Host frame telemetry as this spec reads it (mirrors FrameInvalidationTelemetry). */
+type FrameTelemetryView = ReturnType<
+  NonNullable<Window['__ATLAS_APP__']>['host']['frameTelemetry']
+>;
+
 interface RenderFrameCounterSurface {
   host: {
     kernel: { renderFrame(plan: unknown): boolean };
@@ -255,6 +260,99 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await resetRenderFrameCalls(page);
     await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
+  });
+
+  test('host frame telemetry agrees with the independent renderFrame counter', async ({ page }) => {
+    // WS0/tasks.md §1. The counters exist so later workstreams can prove work
+    // elimination WITHOUT a timing measurement, which means they are only
+    // worth having if they agree with reality. `__renderFrameCalls` is
+    // collected by patching the kernel entry point, so it is independent of
+    // the host bookkeeping under test here.
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+    await pauseAndSettle(page);
+    await page.evaluate(() => window.__ATLAS_APP__!.host.resetFrameTelemetry());
+
+    await waitForAnimationFrames(page, IDLE_FRAMES);
+    const idle = await page.evaluate(() => window.__ATLAS_APP__!.host.frameTelemetry());
+    expect(await renderFrameCalls(page)).toBe(0);
+    expect(idle.framesRendered).toBe(0);
+    expect(idle.framesObserved).toBeGreaterThan(0);
+    expect(idle.framesSkipped).toBe(idle.framesObserved);
+    expect(idle.lastReasonNames).toEqual([]);
+    expect(idle.lastFrameRendered).toBe(false);
+    // A skipped frame must report no work. The kernel is not even invoked on
+    // one, so reporting its previous flags here would claim the destination
+    // was updated and drawn on a frame that never ran.
+    expect(idle.lastFrameWork).toEqual({
+      destinationUpdated: false,
+      destinationDrawn: false,
+      postPresented: false
+    });
+
+    // Sample ON the rendered frame, not after it. A control change wakes
+    // exactly ONE frame and the loop goes straight back to sleep, so a read
+    // taken a few ticks later correctly describes a SKIPPED frame — the
+    // stage flags would be all-false and asserting them true here would be
+    // asserting the optimization does not work.
+    const wake = await page.evaluate(
+      (budget) =>
+        new Promise<FrameTelemetryView | null>((resolve) => {
+          const host = window.__ATLAS_APP__!.host;
+          host.setDestinationControl('black-hole', { orbit: false });
+          let remaining = budget;
+          const step = (): void => {
+            const telemetry = host.frameTelemetry();
+            if (telemetry.lastFrameRendered) {
+              resolve(telemetry);
+              return;
+            }
+            remaining -= 1;
+            if (remaining <= 0) {
+              resolve(null);
+              return;
+            }
+            requestAnimationFrame(step);
+          };
+          requestAnimationFrame(step);
+        }),
+      WAKE_FRAMES * 4
+    );
+
+    expect(wake, 'a control change must wake at least one rendered frame').not.toBeNull();
+    // The woken frame really executed the expensive stages, not just a present.
+    expect(wake!.lastFrameWork).toEqual({
+      destinationUpdated: true,
+      destinationDrawn: true,
+      postPresented: true
+    });
+    expect(wake!.lastReasonNames).toContain('CONTROL_CHANGED');
+
+    await waitForAnimationFrames(page, WAKE_FRAMES);
+    const settled = await page.evaluate(() => window.__ATLAS_APP__!.host.frameTelemetry());
+    expect(settled.framesRendered).toBe(await renderFrameCalls(page));
+    expect(settled.framesRendered).toBeGreaterThan(0);
+    expect(settled.reasonCounts['CONTROL_CHANGED']).toBeGreaterThan(0);
+    // Back asleep, and the stage flags follow the skip rather than lingering
+    // on the last frame that did work.
+    expect(settled.lastFrameRendered).toBe(false);
+    expect(settled.lastFrameWork).toEqual({
+      destinationUpdated: false,
+      destinationDrawn: false,
+      postPresented: false
+    });
+  });
+
+  test('renderer.info telemetry reports live counts once a scene is drawn', async ({ page }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+    const info = await page.evaluate(
+      () => window.__ATLAS_APP__!.host.debugInventory().rendererInfo
+    );
+    expect(info, 'renderer.info mirror must be wired once a renderer is live').not.toBeNull();
+    // Live totals, not per-frame counters: a booted atlas always holds these.
+    expect(info!.memory.textures).toBeGreaterThan(0);
+    expect(info!.memory.totalBytes).toBeGreaterThan(0);
   });
 
   test('an active (unpaused) timeline keeps rendering every tick', async ({ page }) => {

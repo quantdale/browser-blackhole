@@ -15,10 +15,12 @@
 
 import type {
   BackendInfo,
+  FrameInvalidationTelemetry,
   DestinationId,
   GovernorActivityMode,
   IPerformanceGovernor,
   QualityTier,
+  RendererInfoTelemetry,
   ResourceScopeCounters
 } from './types';
 import type { ScopeInventory } from './ResourceManager';
@@ -62,6 +64,10 @@ export interface DebugInventoryHostPieces {
   backend: BackendInfo | null;
   /** BH-121 GPU frame ms of the last resolved frame (null = unavailable). */
   gpuFrameMs: number | null;
+  /** WS0/tasks.md §1 frame-invalidation telemetry (null before the host wires it). */
+  frame: FrameInvalidationTelemetry | null;
+  /** WS0/tasks.md §1 renderer.info mirror (null when no renderer is live). */
+  rendererInfo: RendererInfoTelemetry | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -80,6 +86,16 @@ export interface DebugInventoryView {
   backend: BackendInfo | null;
   /** BH-121 GPU frame ms of the last resolved frame (null = unavailable). */
   gpuFrameMs: number | null;
+  /**
+   * WS0/tasks.md §1 frame-invalidation telemetry: which reasons woke recent
+   * frames, how many frames were skipped, and which stages the last
+   * orchestrated frame executed. This is the work-elimination evidence every
+   * later workstream is measured against, and unlike a timing delta it means
+   * the same thing on every machine.
+   */
+  frame: FrameInvalidationTelemetry | null;
+  /** WS0/tasks.md §1 renderer.info mirror (null when no renderer is live). */
+  rendererInfo: RendererInfoTelemetry | null;
   /** Per-scope entries exactly as reported by the ResourceManager. */
   resourceScopes: readonly ResourceScopeInventoryEntry[];
   /** True when `debugInventory()` was reachable and returned without throwing. */
@@ -184,6 +200,8 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
           },
     backend: pieces.backend,
     gpuFrameMs: pieces.gpuFrameMs,
+    frame: pieces.frame,
+    rendererInfo: pieces.rendererInfo,
     resourceScopes: scopes,
     resourceInventoryAvailable,
     resourceInventoryError,

@@ -26,6 +26,8 @@
 
 import type * as THREE from 'three';
 import type {
+  FrameWorkTelemetry,
+  RendererInfoTelemetry,
   BackendInfo,
   CapabilityId,
   CapabilityRequirement,
@@ -186,6 +188,18 @@ export class SharedRendererKernel implements IRendererKernel {
   private static readonly GPU_RESOLVE_INTERVAL_FRAMES = 90;
   private gpuResolveInFlight = false;
   private gpuFramesSinceResolve = 0;
+
+  /**
+   * Stage-execution flags of the most recent renderFrame (WS0/tasks.md §1).
+   * These are the primary regression signal for WS1/WS2: the optimization
+   * IS making these false when the work is provably unnecessary, so a
+   * benchmark or test asserts on them rather than on a timing delta.
+   */
+  private lastFrameWorkValue: FrameWorkTelemetry = {
+    destinationUpdated: false,
+    destinationDrawn: false,
+    postPresented: false
+  };
   /** Render-pass GPU ms of the most recently resolved frame. */
   private lastGpuFrameMs: number | null = null;
 
@@ -505,15 +519,24 @@ export class SharedRendererKernel implements IRendererKernel {
   renderFrame(plan: FramePlan): boolean {
     const renderer = this.rendererValue;
     if (this.disposed || this.deviceLost || renderer === null || this.backendValue === null) {
+      this.lastFrameWorkValue = {
+        destinationUpdated: false,
+        destinationDrawn: false,
+        postPresented: false
+      };
       return false;
     }
 
+    let destinationUpdated = false;
+    let destinationDrawn = false;
+    let postPresented = false;
     const governor = this.options.governor;
     governor.beginFrame();
     try {
       const destination = plan.destination;
       if (destination !== null && plan.scene !== null) {
         destination.update(this.assembleFrameContext());
+        destinationUpdated = true;
 
         const hdrTexture = this.options.post.getHdrTarget();
         const hdrTarget = this.resolveHdrTargetOrDegraded(hdrTexture);
@@ -530,6 +553,7 @@ export class SharedRendererKernel implements IRendererKernel {
             hdrTarget: hdrTexture
           };
           destination.render(renderContext);
+          destinationDrawn = true;
         } finally {
           renderer.setRenderTarget(null);
         }
@@ -538,6 +562,7 @@ export class SharedRendererKernel implements IRendererKernel {
       // Present even without an active destination so transition overlays
       // composite over the frozen/black state during travel.
       this.options.post.present(plan.transitionOverlay, plan.transitionOpacity);
+      postPresented = true;
 
       // BH-121: advance the bounded-cadence timestamp resolve so the shared
       // query pool cannot exhaust (~1024 contexts) and GPU frame times stay
@@ -551,8 +576,58 @@ export class SharedRendererKernel implements IRendererKernel {
       }
     } finally {
       governor.endFrame();
+      this.lastFrameWorkValue = { destinationUpdated, destinationDrawn, postPresented };
     }
     return true;
+  }
+
+  /**
+   * Stage flags of the most recent {@link renderFrame} (WS0/tasks.md §1).
+   * Describes only frames the kernel was actually asked to run; a frame the
+   * HOST skipped never reaches here, so read stage flags through
+   * `CosmicAtlasHost.frameTelemetry()` when that distinction matters.
+   */
+  get lastFrameWork(): FrameWorkTelemetry {
+    return this.lastFrameWorkValue;
+  }
+
+  /**
+   * Mirror of `renderer.info` (WS0/tasks.md §1). Returns null when no
+   * renderer is live. `render.*` counters are per-frame (three resets them
+   * each render), `memory.*` are live totals; both are read straight from the
+   * renderer rather than re-derived, so they cannot drift from the truth.
+   */
+  readRendererInfo(): RendererInfoTelemetry | null {
+    const renderer = this.rendererValue;
+    if (renderer === null) return null;
+    const info = renderer.info as unknown as {
+      render?: Record<string, number>;
+      compute?: Record<string, number>;
+      memory?: Record<string, number>;
+    };
+    const render = info.render ?? {};
+    const compute = info.compute ?? {};
+    const memory = info.memory ?? {};
+    const num = (value: number | undefined): number => (typeof value === 'number' ? value : 0);
+    return {
+      render: {
+        frameCalls: num(render['frameCalls']),
+        drawCalls: num(render['drawCalls']),
+        triangles: num(render['triangles']),
+        points: num(render['points']),
+        lines: num(render['lines'])
+      },
+      compute: { frameCalls: num(compute['frameCalls']) },
+      memory: {
+        geometries: num(memory['geometries']),
+        textures: num(memory['textures']),
+        programs: num(memory['programs']),
+        renderTargets: num(memory['renderTargets']),
+        storageAttributes: num(memory['storageAttributes']),
+        uniformBuffers: num(memory['uniformBuffers']),
+        totalBytes: num(memory['total'])
+      }
+    };
   }
 
   private assembleFrameContext(): FrameContext {

@@ -43,6 +43,37 @@ interface RuntimeDiagnostics {
 }
 ```
 
+### 2.1 Frame-invalidation and renderer telemetry (WS0)
+
+`CosmicAtlasHost.debugInventory()` — the live runtime snapshot, reachable in
+specs and benchmarks through `window.__ATLAS_APP__.host` — carries two further
+sections added by the whole-atlas performance campaign
+(`openspec/changes/whole-atlas-performance-optimization`, tasks.md §1):
+
+- **`frame`** (`FrameInvalidationTelemetry`, also available directly as
+  `host.frameTelemetry()`): the reason mask that woke the most recent frame
+  and its decoded names, whether that frame rendered, which stages it
+  executed (`lastFrameWork`: `destinationUpdated` / `destinationDrawn` /
+  `postPresented`), and cumulative `framesObserved` / `framesRendered` /
+  `framesSkipped` plus a per-reason frame count. `host.resetFrameTelemetry()`
+  zeroes the cumulative counters so a measurement window is the difference of
+  two reads.
+- **`rendererInfo`** (`RendererInfoTelemetry`): a straight mirror of
+  `renderer.info` — per-frame `render.frameCalls` / `drawCalls` / primitives,
+  `compute.frameCalls`, and live `memory` totals (geometries, textures,
+  programs, render targets, storage attributes, uniform buffers, total bytes).
+  Null when no renderer is live.
+
+Both are counts, not timings, and that is the point: they say how much work
+was eliminated in a form that means the same thing on every machine, so a
+work-elimination claim does not depend on this repository's documented
+caveats about cross-machine timing comparisons (§7, `docs/PERFORMANCE.md`).
+
+`lastFrameWork` reports all-false for a frame the host skipped. The kernel is
+not invoked on such a frame, so its own `lastFrameWork` still describes the
+last frame that ran; read stage flags through `host.frameTelemetry()`, which
+owns that distinction.
+
 ## 3. Logging levels
 
 - `debug`: state revisions, quality decisions, probe details;

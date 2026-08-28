@@ -35,6 +35,12 @@ interface InventoryView {
   rendererGeneration: number;
   /** Quality governor view (tier + live dynamic-resolution scale). */
   governor: { tier: string; renderScale: number };
+  /** WS0/tasks.md §1 renderer.info mirror; null when no renderer is live. */
+  rendererInfo: {
+    render: { frameCalls: number; drawCalls: number; triangles: number };
+    compute: { frameCalls: number };
+    memory: { textures: number; programs: number; renderTargets: number; totalBytes: number };
+  } | null;
 }
 
 /**
@@ -91,6 +97,23 @@ interface AtlasHook {
     setDestinationControl(destinationId: string, partial: Record<string, unknown>): void;
     /** Debug snapshot of the active destination module (null when none). */
     activeDestinationDebugSnapshot(): Record<string, unknown> | null;
+    /** WS0/tasks.md §1 frame-invalidation telemetry. */
+    frameTelemetry(): {
+      lastReasons: number;
+      lastReasonNames: string[];
+      lastFrameRendered: boolean;
+      lastFrameWork: {
+        destinationUpdated: boolean;
+        destinationDrawn: boolean;
+        postPresented: boolean;
+      };
+      framesObserved: number;
+      framesRendered: number;
+      framesSkipped: number;
+      reasonCounts: Record<string, number>;
+    };
+    /** Resets the cumulative frame counters (measurement window). */
+    resetFrameTelemetry(): void;
     /** Manual render-scale override (null = governor-managed). */
     renderScaleOverride: number | null;
     /** True once the rendering device was lost (terminal for the session). */

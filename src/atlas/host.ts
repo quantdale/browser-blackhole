@@ -69,7 +69,10 @@ import type {
   FrameTimeInfo,
   HostServices,
   IParticleService,
+  FrameInvalidationTelemetry,
+  FrameWorkTelemetry,
   InvalidationReasonMask,
+  InvalidationReasonName,
   ISharedPost,
   PresetDisplayState,
   PreparedPhenomenon,
@@ -80,7 +83,11 @@ import type {
   ResourceScope,
   VersionedDestinationState
 } from './types.js';
-import { INVALIDATION_REASON } from './types.js';
+import {
+  describeInvalidationReasons,
+  INVALIDATION_REASON,
+  INVALIDATION_REASON_NAMES
+} from './types.js';
 import { DestinationRegistry } from './registry.js';
 
 // ---------------------------------------------------------------------------
@@ -214,6 +221,13 @@ export interface CosmicAtlasHostOptions {
   forcedBackend?: 'webgpu' | 'webgl2';
 }
 
+/** Stage flags for a frame that never reached the kernel. */
+const NO_FRAME_WORK: FrameWorkTelemetry = {
+  destinationUpdated: false,
+  destinationDrawn: false,
+  postPresented: false
+};
+
 export class CosmicAtlasHost {
   readonly canvas: HTMLCanvasElement;
   readonly status = new InitStatusTracker();
@@ -289,6 +303,18 @@ export class CosmicAtlasHost {
    * {@link requestTransition} for why it must not latch.
    */
   private tearingDown = false;
+
+  /**
+   * WS0/tasks.md §1 frame-invalidation telemetry. Counters are cumulative so
+   * a benchmark or test can difference two snapshots; they are the evidence
+   * that WS1's work elimination is real, independent of any timing measurement.
+   */
+  private framesObservedValue = 0;
+  private framesRenderedValue = 0;
+  private lastReasonsValue: InvalidationReasonMask = 0;
+  private readonly reasonCountsValue: Record<InvalidationReasonName, number> = Object.fromEntries(
+    INVALIDATION_REASON_NAMES.map((name) => [name, 0])
+  ) as Record<InvalidationReasonName, number>;
 
   /** Reasons accumulated by `invalidate()` since the last consumed frame. */
   private pendingInvalidationMask: InvalidationReasonMask = 0;
@@ -570,6 +596,11 @@ export class CosmicAtlasHost {
 
     const shouldRender = reasons !== 0 || !this.time.paused;
     this.lastFrameRenderedValue = shouldRender;
+    this.lastReasonsValue = reasons;
+    this.framesObservedValue += 1;
+    for (const name of INVALIDATION_REASON_NAMES) {
+      if ((reasons & INVALIDATION_REASON[name]) !== 0) this.reasonCountsValue[name] += 1;
+    }
     if (!shouldRender) return;
 
     const overlay = this.director.getOverlay();
@@ -579,7 +610,10 @@ export class CosmicAtlasHost {
       transitionOverlay: overlay.texture,
       transitionOpacity: overlay.opacity
     };
-    this.kernel.renderFrame(plan);
+    // Count RENDERS, not dispatches: the kernel returns false when it is
+    // disposed, the device is lost, or no renderer exists, and a counter that
+    // silently included those would overstate the work actually done.
+    if (this.kernel.renderFrame(plan)) this.framesRenderedValue += 1;
   }
 
   /**
@@ -606,6 +640,37 @@ export class CosmicAtlasHost {
   /** Whether the most recent `frame()` call actually rendered (diagnostics). */
   get lastFrameRendered(): boolean {
     return this.lastFrameRenderedValue;
+  }
+
+  /**
+   * WS0/tasks.md §1 frame-invalidation telemetry. Cumulative counters plus a
+   * description of the most recent frame. Difference two reads to measure how
+   * much work an interaction actually cost — no timing is involved, so the
+   * number means the same thing on every machine.
+   */
+  frameTelemetry(): FrameInvalidationTelemetry {
+    return {
+      lastReasons: this.lastReasonsValue,
+      lastReasonNames: describeInvalidationReasons(this.lastReasonsValue),
+      lastFrameRendered: this.lastFrameRenderedValue,
+      // The kernel is never INVOKED on a host-skipped frame, so its flags
+      // would still describe the last frame that did render — a snapshot
+      // reporting `lastFrameRendered: false` alongside three true stage flags
+      // contradicts itself, and this is exactly the field later workstreams
+      // use as their work-elimination evidence.
+      lastFrameWork: this.lastFrameRenderedValue ? this.kernel.lastFrameWork : NO_FRAME_WORK,
+      framesObserved: this.framesObservedValue,
+      framesRendered: this.framesRenderedValue,
+      framesSkipped: this.framesObservedValue - this.framesRenderedValue,
+      reasonCounts: { ...this.reasonCountsValue }
+    };
+  }
+
+  /** Reset the cumulative frame counters (benchmark/test measurement window). */
+  resetFrameTelemetry(): void {
+    this.framesObservedValue = 0;
+    this.framesRenderedValue = 0;
+    for (const name of INVALIDATION_REASON_NAMES) this.reasonCountsValue[name] = 0;
   }
 
   // -------------------------------------------------------------------------
@@ -968,7 +1033,9 @@ export class CosmicAtlasHost {
       pendingPrepares: this.pendingPrepares,
       governor: this.governor,
       backend: this.kernel.backend,
-      gpuFrameMs: this.kernel.gpuFrameMs
+      gpuFrameMs: this.kernel.gpuFrameMs,
+      frame: this.frameTelemetry(),
+      rendererInfo: this.kernel.readRendererInfo()
     });
   }
 
