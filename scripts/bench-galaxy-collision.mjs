@@ -71,6 +71,14 @@ await page.evaluate(
     }
     host.handleResize(width, height);
     host.time.pause();
+    // WS1 (frame invalidation, openspec whole-atlas-performance-optimization)
+    // landed AFTER this harness was written: a paused, stationary scene now
+    // legitimately renders NOTHING, so sampling rAF deltas here would time an
+    // empty loop and report a plausible-looking millisecond number for work
+    // that never happened. Pin continuous rendering for the measurement
+    // window — that escape hatch exists for exactly this — and let
+    // `renderTelemetry` in the record prove it took effect.
+    host.forceContinuousRenderForTest(true);
   },
   { q: quality, width: 1280 - 320, height: 800 }
 );
@@ -104,6 +112,13 @@ if (!info.paused) {
 
 // Steady-state sampling inside the page: rAF deltas over `frames` frames while
 // PAUSED (rendering continues; simulation time is frozen).
+// Zero the frame counters so `renderTelemetry` in the record describes THIS
+// measurement window and nothing before it.
+await page.evaluate(() => {
+  const host = window.__ATLAS_APP__.host;
+  if (typeof host.resetFrameTelemetry === 'function') host.resetFrameTelemetry();
+});
+
 const samples = await page.evaluate(
   (frameCount) =>
     new Promise((resolve) => {
@@ -134,6 +149,22 @@ const gpuFrameMs = await page.evaluate(async () => {
     return null;
   }
 });
+
+// WS0/§1 self-check. A harness that is not actually rendering reports
+// framesRendered 0 and all-false stage flags, so a broken measurement can no
+// longer emit a plausible millisecond number alongside it.
+const renderTelemetry = await page.evaluate(() => {
+  const host = window.__ATLAS_APP__.host;
+  return typeof host.frameTelemetry === 'function' ? host.frameTelemetry() : null;
+});
+if (renderTelemetry !== null && renderTelemetry.framesRendered === 0) {
+  console.error(
+    '[bench] REFUSING TO REPORT: the sampled window rendered 0 frames, so the ' +
+      'timings below would describe an idle loop, not this scene. Check that ' +
+      'forceContinuousRenderForTest(true) is still reaching the host.'
+  );
+  process.exitCode = 1;
+}
 
 const sorted = [...samples].sort((a, b) => a - b);
 const pick = (q) => +sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))].toFixed(2);
@@ -170,6 +201,18 @@ const record = {
   // BH-121: real GPU timestamp reading when the backend exposes timestamp
   // queries; otherwise honestly null — never inferred from CPU rAF deltas.
   // The value is the LAST resolved frame's summed render-pass time.
+  // WS0/§1: work actually executed during the sampled window. Counts, not
+  // timings, so they mean the same thing on every machine — and they are what
+  // makes the timings above trustworthy rather than merely plausible.
+  renderTelemetry:
+    renderTelemetry === null
+      ? null
+      : {
+          framesObserved: renderTelemetry.framesObserved,
+          framesRendered: renderTelemetry.framesRendered,
+          framesSkipped: renderTelemetry.framesSkipped,
+          lastFrameWork: renderTelemetry.lastFrameWork
+        },
   frameGpuMs:
     gpuFrameMs === null || !Number.isFinite(gpuFrameMs)
       ? null

@@ -129,6 +129,41 @@ fetched at boot. That case is deliberately NOT silenced and is pinned by
 `startup-graph.spec.ts` "a genuine implementation-chunk failure is still
 reported truthfully".
 
+### Benchmark harnesses were silently measuring nothing (found and fixed)
+
+WS1 landed in `acdd8e6`; the nine `scripts/bench-*.mjs` harnesses landed in
+`b320a6d`, BEFORE it, and nothing reconciled them. Every harness pauses the
+timeline and then samples rAF deltas — which, after WS1, is a scene that
+legitimately renders nothing. So the §0 baseline that every later
+percentage claim was going to rest on would have been measuring an idle
+loop.
+
+This is demonstrated, not argued. With the fix removed, `bench-galaxy-
+collision` reports `framesRendered: 0`, `framesSkipped: 601`,
+`destinationDrawn: false` — and still prints `medianMs: 6.1`, the SAME value
+as the correct run. A reader could not have distinguished the two records.
+
+Fixed two ways:
+
+1. Each harness pins `host.forceContinuousRenderForTest(true)` alongside its
+   `time.pause()` — the escape hatch WS1 added for exactly this.
+2. Record `schemaVersion` bumped to 2 with a `renderTelemetry` block
+   (framesObserved / framesRendered / framesSkipped / lastFrameWork) for the
+   sampled window, and the harness exits non-zero with an explicit refusal
+   message when `framesRendered === 0`. A broken harness can no longer emit a
+   plausible millisecond number quietly.
+
+Verified: `bench-galaxy-collision` now reports 601/601 frames rendered, all
+stage flags true, with real GPU timestamps (`frameGpuMs.lastResolvedFrame`
+1.38 ms — timestamp queries work on this adapter).
+
+**Methodological consequence worth carrying into §0:** `medianMs` was 6.1 ms
+whether or not anything rendered, i.e. the CPU rAF delta is dominated by
+frame scheduling rather than render cost on this host. Lead the baseline
+with GPU timestamps and the machine-independent COUNTS (`renderTelemetry`,
+`renderer.info`, ResourceManager totals), and treat rAF deltas as the weakest
+evidence in the record rather than the headline.
+
 ### Known intermittent full-suite failure (diagnosed, NOT fixed, NOT hidden)
 
 `accessibility.spec.ts` failed once in each of the last two full-suite runs at

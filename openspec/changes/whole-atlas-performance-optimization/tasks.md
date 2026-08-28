@@ -54,7 +54,17 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Add async nonblocking GPU timestamp attribution where supported.
       A bounded-cadence whole-frame resolve already exists (`gpuFrameMs`,
       BH-121); PER-PASS attribution does not.
-- [ ] Update benchmark JSON schema and scripts.
+- [x] Update benchmark JSON schema and scripts.
+      Record `schemaVersion` 2 adds `renderTelemetry`
+      (framesObserved/Rendered/Skipped + lastFrameWork) for the sampled
+      window, and all nine harnesses now pin `forceContinuousRenderForTest`.
+      This was not cosmetic: WS1 landed AFTER the harnesses, so a paused
+      stationary scene legitimately renders nothing and every steady-state
+      row was timing an idle loop. Demonstrated directly — with the pin
+      removed the harness reports `framesRendered: 0`, `framesSkipped: 601`,
+      `destinationDrawn: false` and STILL prints `medianMs: 6.1`, the same
+      number as the real measurement. The record could not be told apart from
+      a valid one without this field.
 
 ## 2. Frame invalidation / on-demand rendering
 
