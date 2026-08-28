@@ -9,6 +9,119 @@ Canonical execution instructions: `.agent/START_HERE.md` → `.agent/EXECUTION_P
 
 Do not interpret older "no active campaign" / "certified production-ready" historical lines below as meaning there is no current work. They remain historical release evidence; the active performance-hardening checklist is currently unexecuted.
 
+## 2026-08-28 session — WS1 failures root-caused; WS3/§5 startup splitting landed
+
+Backend note first, because it changes what this machine can certify: headless
+Playwright Chromium here now reports **hardware WebGPU** —
+`debugInventory().backend = { api: 'webgpu', adapterName: 'intel gen-12lp',
+timestampQuery: true, storageBuffers: true, floatRenderTargets: true }`. The
+previous session's "no WebGPU adapter / WebGL2 fallback everywhere" finding
+did not reproduce. GPU timestamp queries ARE available. The adapter is still
+NOT the `amd rdna-2` one every committed benchmark number was recorded on, so
+absolute cross-machine comparisons remain invalid; within-session A/B is fine.
+
+### The three "unresolved" WS1/WS3 items were test defects, not regressions
+
+All three were root-caused with direct measurement, not re-runs.
+
+1. **`black-hole-merger.spec.ts` "data-derived phases appear in order while
+   scrubbing" missing the final `remnant`.** Bisect: 4/5 FAIL at `acdd8e6^`
+   (pre-WS1), 1/3 at the WS1 tip — so WS1 did not cause it and it is not new.
+   An in-page probe caught the mechanism: the spec's fixed 250 ms sleeps were
+   treated as postconditions, but entering `ringdown` makes the Kerr remnant
+   subgraph visible for the FIRST time and that pipeline compile stalls the
+   frame loop past the sleep. The probe recorded the destination's `timeM`
+   frozen at the 0.68 value across both the 0.75 and 0.95 scrubs while the
+   host's `physicalTime` was already correct — the final scrub was read before
+   it had ever been applied.
+2. **`frame-invalidation.spec.ts` idle/resize/visibilitychange one-offs.**
+   Mirror image of the same mistake: the idle windows were wall-clock. Under
+   parallel-worker load this host's rAF cadence itself drops below a 300 ms
+   window, so "no orchestrated frames in 300 ms" was satisfiable while the
+   loop simply had no opportunity to render. The previously unexplained
+   "failed once in isolation then passed 5/5" visibility result is this.
+3. The `pauseAndSettle` helper settled on a camera-displacement heuristic
+   looser than `CameraRig`'s own dirty criterion, so it reported "settled"
+   while the ease still had frames to issue.
+
+Fixes (`c465a89`, tests only): `readDestinationTime` /
+`awaitDestinationTimeApplied` / `scrubAndAwaitDestination` in
+`tests/browser/support/appHarness.ts` wait until the ACTIVE DESTINATION has
+consumed the coordinate; `frame-invalidation.spec.ts` counts rAF ticks
+(`waitForAnimationFrames`) and settles on real render quiescence (20 quiet
+ticks on the independent `kernel.renderFrame` counter), failing loudly if a
+paused untouched scene never goes quiet. Evidence: phase sweep 6/6; the three
+affected specs 30/30 at `--workers=4`; frame-invalidation 21/21 at
+`--workers=4 --repeat-each=3`.
+
+**Standing rule for this repo's browser suites:** never treat a fixed sleep as
+a postcondition, and never measure "the loop stayed idle" in milliseconds.
+
+### WS3 / tasks.md §5 — startup module graph (landed, measured)
+
+§5 asked to split black-hole + neutron-star and *verify* the other
+descriptors were already lightweight. **The verification failed.** Only
+galaxy-collision was: five more `presets.ts` modules statically imported
+their own render module to build a one-line factory wrapper, so registry
+setup pulled EVERY destination's implementation into EVERY boot. The scope
+was therefore two modules as planned plus six more that the verify step
+found — deliberate, not scope creep.
+
+Landed: `src/atlas/destinations/blackHoleDescriptor.ts` and
+`src/phenomena/neutron-star/descriptor.ts` (data only); all eight `load`
+thunks are now real dynamic imports; dead factory wrappers removed; both
+implementation modules import their descriptor back (static edge in that
+direction only, no cycle).
+
+Measured, network-observed (NOT from the bundler chunk table — the fusion was
+invisible there), `c465a89` -> split tip, same machine/session:
+
+| | Before | After | Delta |
+| --- | ---: | ---: | ---: |
+| Destination code in a boot graph | 164,588 B | 37,315 B | **-77.3%** |
+| Total boot JS (decoded) | 1,448,619 B | 1,320,931 B | -8.8% |
+| Routes fetching a foreign implementation | 8 of 8 | 0 of 8 | — |
+
+Full artifact: `benchmarks/results/2026-08-28-ws3-startup/SUMMARY.md`.
+Harness: `tests/browser/startup-graph.spec.ts` (committed).
+`Compare registry-init and first-interactive timing` stays
+DEFERRED_ENVIRONMENT: byte counts are deterministic here, browser timing is
+not.
+
+### Regression introduced by that split, found and fixed
+
+Moving the implementation import into the arrival transition made a
+Firefox-only console error reachable on reload: `Preparation of 'black-hole'
+failed: error loading dynamically imported module`. Bisect 12/12 pass
+pre-split, 3/3 fail after — genuinely ours. A network probe showed the chunk
+returning HTTP 200 with the module load still failing ~266 ms later, and the
+next load's request ending `NS_BINDING_ABORTED`: the engine cancelling its
+own in-flight module load as the navigation starts. Calling that a
+preparation failure is untrue.
+
+Fix: `CosmicAtlasHost.abandonPendingTransition()` invoked from `beforeunload`
+(fires at navigation start, ahead of the abort — `pagehide` alone loses the
+race) and from `pagehide` with `persisted === false` only, so bfcache
+restores are untouched. It cancels the in-flight prepare and suppresses
+transition-error REPORTING for the remainder of that document's life.
+Verified 12/12 Firefox.
+
+**New failure mode this workstream creates, and how it is contained:** a
+destination chunk can now be missing (stale deploy) or unreachable (offline)
+at navigation time, which was impossible when every implementation was
+fetched at boot. That case is deliberately NOT silenced and is pinned by
+`startup-graph.spec.ts` "a genuine implementation-chunk failure is still
+reported truthfully".
+
+### Still open
+
+§0 baseline and §1 telemetry remain unexecuted and are still the declared
+prerequisite for §6-§21. With WebGPU + `timestampQuery` available here, §0 is
+now genuinely attemptable on this machine for the first time — with the
+adapter caveat recorded in the SUMMARY above.
+
+---
+
 ## 2026-08-28 session — repository branch consolidation
 
 - Fetched and pruned `origin`, then audited every local and remote branch.

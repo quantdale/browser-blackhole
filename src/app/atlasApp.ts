@@ -1009,6 +1009,26 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
 
+  // --- page teardown (WS3, whole-atlas performance campaign) ---------------
+  // Destination implementations are lazy chunks, so a reload can interrupt a
+  // module fetch mid-flight. Abandon the attempt rather than let the
+  // browser's cancelled request be reported as a preparation failure on a
+  // page that is already unloading. `persisted` true means the page went to
+  // the bfcache and may come back, so that case is deliberately left alone.
+  // `beforeunload` fires at navigation START, before the engine aborts the
+  // in-flight module fetch, so it is the one that actually wins the race;
+  // `pagehide` is kept as the belt-and-braces signal for paths that skip it.
+  // `persisted` true means the page went to the bfcache and may come back, so
+  // that case is deliberately left alone.
+  const onTeardown = (): void => {
+    host.abandonPendingTransition();
+  };
+  const onPageHide = (event: PageTransitionEvent): void => {
+    if (!event.persisted) onTeardown();
+  };
+  window.addEventListener('beforeunload', onTeardown);
+  window.addEventListener('pagehide', onPageHide);
+
   const unsubscribeStatus = host.status.subscribe((snapshot) => {
     if (snapshot.failed) {
       status.textContent = `Atlas error [${snapshot.errorCode ?? 'UNKNOWN'}]: ${snapshot.message}`;
@@ -1075,6 +1095,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
       document.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('beforeunload', onTeardown);
+      window.removeEventListener('pagehide', onPageHide);
       unsubscribeStatus();
       unsubscribeFatal();
       delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];

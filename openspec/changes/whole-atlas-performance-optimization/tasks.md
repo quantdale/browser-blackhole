@@ -32,25 +32,33 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 2. Frame invalidation / on-demand rendering
 
-> **2026-08-28 status:** implementation landed (uncommitted at session end) —
-> `INVALIDATION_REASON` bitset in `src/atlas/types.ts`, `TimeController.
-> consumeDirty()`, `CameraRig.update()` boolean return, gating wired into
-> `CosmicAtlasHost.frame()`, `forceFrame`-equivalent (`frame(dt,{force:true})`
-> + `forceContinuousRenderForTest`), `tests/browser/frame-invalidation.spec.ts`
-> + 16 new unit tests (all passing). NOT certified: this session's machine has
-> no WebGPU adapter in headless Chromium and showed highly unstable browser
-> timing (see project memory `local-env-no-webgpu`), so boxes below stay
-> unchecked. One SPECIFIC, moderately-reproducible failure (2 of 3 direct
-> observations, not generic flakiness) needs root-causing before this section
-> can be marked done: `tests/browser/black-hole-merger.spec.ts` "data-derived
-> phases appear in order while scrubbing" consistently misses the LAST
-> expected phase (`remnant`); the compact-merger analog missed `merger` once.
-> Code review of `blackHoleMergerModule.ts`'s `update()` shows phase is purely
-> derived from `ctx.services.time.snapshot()` each call (not an accumulator),
-> so the mechanism is NOT yet identified — do not assume it is fixed by
-> re-running goldens elsewhere without investigating first. §0/§1 baseline
-> below were never established before this landed; do that retroactively
-> against this code before further §2 claims.
+> **2026-08-28 status (updated):** implementation landed in `acdd8e6`
+> (`INVALIDATION_REASON` bitset in `src/atlas/types.ts`,
+> `TimeController.consumeDirty()`, `CameraRig.update()` boolean return, gating
+> in `CosmicAtlasHost.frame()`, `frame(dt,{force:true})` +
+> `forceContinuousRenderForTest`, `tests/browser/frame-invalidation.spec.ts`
+> + 16 unit tests).
+>
+> **The suspected WS1 regression is resolved and was never a regression.**
+> Bisect: `black-hole-merger.spec.ts` "data-derived phases appear in order
+> while scrubbing" fails 4/5 at `acdd8e6^` (pre-WS1) with the identical
+> signature and 1/3 at the WS1 tip. Root cause, measured with an in-page
+> probe: the spec used fixed 250 ms sleeps as if they were postconditions,
+> and the first Kerr-remnant pipeline compile (triggered by entering
+> `ringdown`) stalls the frame loop past that sleep — the probe caught the
+> destination's `timeM` frozen at the 0.68 value while the host had already
+> advanced to 0.95, so the final scrub was read before it was ever applied.
+> The frame-invalidation idle assertions had the mirror-image bug: wall-clock
+> idle windows can be SHORTER than this host's rAF cadence under
+> parallel-worker load, so "no frames in 300 ms" was satisfiable while the
+> loop had no opportunity to render. Both classes are fixed in `c465a89`
+> (`scrubAndAwaitDestination` / `awaitDestinationTimeApplied` postcondition
+> waits; rAF-counted idle windows and render-quiescence settling). Evidence:
+> phase sweep 6/6 (was failing 1/3), the three affected specs 30/30 at
+> `--workers=4`, frame-invalidation 21/21 at `--workers=4 --repeat-each=3`.
+>
+> Boxes below still require the §0/§1 baseline + telemetry evidence this
+> campaign demands; the code is no longer suspect, but it is not yet measured.
 
 - [ ] Define invalidation reason bitset in atlas types.
 - [ ] Add host revision/invalidation state.
@@ -72,15 +80,16 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 3. Visibility lifecycle
 
-> **2026-08-28 status:** partial — `visibilitychange` listener + resume nudge
-> added to `src/app/atlasApp.ts` (uncommitted at session end). NOT certified
-> for the same environment reasons as §2. The dedicated browser test for this
-> (`frame-invalidation.spec.ts` "a visibilitychange resume wakes exactly one
-> frame") failed once deterministically in total isolation then passed 5/5 on
-> repeat with no code change — genuine unresolved flakiness, root cause
-> unknown; the leading hypothesis (`document.hidden` already true in headless
-> Chromium) was directly measured and refuted. "Stop nonessential polling
-> while hidden" and explicit hidden-time semantics below were NOT touched.
+> **2026-08-28 status (updated):** partial — `visibilitychange` listener +
+> resume nudge in `src/app/atlasApp.ts` (landed in `acdd8e6`). The
+> "genuine unresolved flakiness" recorded here previously is explained: the
+> `frame-invalidation.spec.ts` visibility test measured its idle window in
+> wall time, which under load can be shorter than a single rAF interval on
+> this host. It now counts rAF ticks and passes 3/3 under `--workers=4`.
+> Page teardown is additionally handled as of the WS3 work below
+> (`beforeunload`/`pagehide` -> `host.abandonPendingTransition()`).
+> "Stop nonessential polling while hidden" and explicit documented
+> hidden-time semantics are still NOT done.
 
 - [ ] Add document visibilitychange policy.
 - [ ] Stop nonessential atlas polling/work while hidden.
@@ -104,15 +113,39 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 5. Startup/code splitting
 
-- [ ] Split lightweight black-hole descriptor/presets from implementation.
-- [ ] descriptor.load dynamically imports black-hole implementation.
-- [ ] Split lightweight neutron-star descriptor/presets from implementation.
-- [ ] descriptor.load dynamically imports neutron-star implementation.
-- [ ] Verify other destination descriptors remain lightweight.
-- [ ] Compare initial chunks before/after.
+> **2026-08-28: done except timing.** Evidence:
+> `benchmarks/results/2026-08-28-ws3-startup/SUMMARY.md`; harness
+> `tests/browser/startup-graph.spec.ts`. The "verify others are lightweight"
+> step FAILED verification — five more `presets.ts` modules statically
+> imported their own render module, so every boot fetched every
+> destination's implementation. All eight were converted, not just the two
+> this section named.
+
+- [x] Split lightweight black-hole descriptor/presets from implementation.
+      `src/atlas/destinations/blackHoleDescriptor.ts` (data only).
+- [x] descriptor.load dynamically imports black-hole implementation.
+- [x] Split lightweight neutron-star descriptor/presets from implementation.
+      `src/phenomena/neutron-star/descriptor.ts` (data only).
+- [x] descriptor.load dynamically imports neutron-star implementation.
+- [x] Verify other destination descriptors remain lightweight.
+      They did not: stellar-explosion, compact-merger, tidal-disruption,
+      quasar-agn and black-hole-merger each statically imported their own
+      implementation to build a one-line factory wrapper. All five converted
+      to real dynamic imports; the dead wrappers removed.
+- [x] Compare initial chunks before/after.
+      Network-observed, not from the chunk table (the fusion was invisible
+      there): destination code in a boot graph 164,588 -> 37,315 decoded
+      bytes (-77.3%); total boot JS 1,448,619 -> 1,320,931 (-8.8%). 8/8
+      routes now fetch no other destination's implementation.
 - [ ] Compare registry-init and first-interactive timing.
-- [ ] Add route/deep-link tests after split.
+      DEFERRED_ENVIRONMENT — byte counts here are deterministic, browser
+      timing on this machine is not (see the SUMMARY's environment note).
+- [x] Add route/deep-link tests after split.
+      `tests/browser/startup-graph.spec.ts` (8 per-route isolation tests +
+      a truthful-failure test); the existing per-preset deep-link suites all
+      pass on the split build.
 - [ ] Optional idle prefetch experiment with connection/data-saver guard.
+      Not attempted.
 
 ## 6. Black-hole active pass lifecycle
 

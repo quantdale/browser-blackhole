@@ -283,6 +283,9 @@ export class CosmicAtlasHost {
   private bloomThrottleActive = false;
 
   // -- WS1 frame invalidation (whole-atlas performance campaign) -------------
+  /** Set once the document is unloading; silences teardown-caused errors. */
+  private tearingDown = false;
+
   /** Reasons accumulated by `invalidate()` since the last consumed frame. */
   private pendingInvalidationMask: InvalidationReasonMask = 0;
   /** TEST-ONLY: forces every frame to render (benchmark steady-state sampling). */
@@ -366,6 +369,10 @@ export class CosmicAtlasHost {
       }
     });
     this.director.onError((event) => {
+      // A page that is unloading cancels its own in-flight module fetches;
+      // reporting that as a preparation failure would be untrue (see
+      // abandonPendingTransition).
+      if (this.tearingDown) return;
       console.error(
         `[CosmicAtlasHost] transition error${event.fatal ? ' (fatal)' : ''}: ${event.message}`
       );
@@ -604,6 +611,32 @@ export class CosmicAtlasHost {
   /** Request travel; delegates to NavigationController → director. */
   navigate(destinationId: string, presetId?: string): NavigationIntent | null {
     return this.navigation.navigate(destinationId, presetId);
+  }
+
+  /**
+   * Abandon any in-flight destination preparation.
+   *
+   * Called when the page itself is going away (`pagehide`). WS3 made every
+   * destination implementation a lazily imported chunk, so a reload can now
+   * interrupt a module fetch that is still in flight. Without this the
+   * director reports the browser's cancelled request as "Preparation of 'x'
+   * failed", which is not true — the preparation was abandoned, not broken —
+   * and it leaves a spurious error in the console of a page that is already
+   * unloading. Cancelling bumps the director's generation so the existing
+   * silent stale-attempt path handles the rejection.
+   *
+   * `cancel()` alone is not sufficient: Firefox aborts the module load as
+   * part of starting the navigation, and the rejection can reach the catch
+   * before the generation bump does. The `tearingDown` flag therefore also
+   * silences error REPORTING for the rest of this document's life.
+   *
+   * A GENUINE chunk-load failure (bad deploy, offline) is untouched: nothing
+   * sets this flag while the page is staying, so it still surfaces as a real
+   * transition error.
+   */
+  abandonPendingTransition(): void {
+    this.tearingDown = true;
+    this.director.cancel();
   }
 
   /** True once the rendering device has been lost (terminal for the session). */
