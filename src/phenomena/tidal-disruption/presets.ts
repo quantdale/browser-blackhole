@@ -19,13 +19,7 @@
  * construction (the reduced model itself has no viewing-angle physics).
  */
 
-import { createTidalDisruptionModule as createRenderingModule } from './tidalDisruptionModule.js';
-
-import type {
-  PhenomenonDescriptor,
-  PhenomenonModule,
-  PresetDescriptor
-} from '../../atlas/types.js';
+import type { PhenomenonDescriptor, PresetDescriptor } from '../../atlas/types.js';
 import type {
   PenetrationScenarioId,
   StellarPresetId,
@@ -33,11 +27,6 @@ import type {
 } from './types.js';
 
 const DESTINATION_ID = 'tidal-disruption';
-
-/** Cross-import factory (call-time access, mirrors the SN co-location rule). */
-export function createTidalDisruptionModule(): PhenomenonModule {
-  return createRenderingModule();
-}
 
 /** GPU memory estimates (MB): volume targets + particle buffers dominate. */
 export const TIDAL_DISRUPTION_DESCRIPTOR: PhenomenonDescriptor = {
@@ -49,7 +38,13 @@ export const TIDAL_DISRUPTION_DESCRIPTOR: PhenomenonDescriptor = {
   defaultPreset: 'solar-canonical',
   requiredCapabilities: [],
   estimatedGpuMemoryMB: { low: 18, medium: 40, high: 80, ultra: 160 },
-  load: async () => createTidalDisruptionModule
+  /**
+   * WS3/tasks.md §5: dynamic import, so registry setup fetches only this
+   * lightweight preset/metadata module at boot. A static import here would
+   * pull the whole render graph into the startup chunk for every boot,
+   * including boots that route elsewhere.
+   */
+  load: async () => (await import('./tidalDisruptionModule.js')).createTidalDisruptionModule
 };
 
 // ---------------------------------------------------------------------------

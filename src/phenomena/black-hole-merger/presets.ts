@@ -14,20 +14,10 @@
  * the loaded source supports exactly one physical configuration.
  */
 
-import type {
-  PhenomenonDescriptor,
-  PhenomenonModule,
-  PresetDescriptor
-} from '../../atlas/types.js';
+import type { PhenomenonDescriptor, PresetDescriptor } from '../../atlas/types.js';
 import type { BlackHoleMergerPublicState } from './types.js';
-import { createBlackHoleMergerModule } from './blackHoleMergerModule.js';
 
 const DESTINATION_ID = 'black-hole-merger';
-
-/** Cross-import factory (call-time access, mirrors the SN co-location rule). */
-export function createBlackHoleMergerModuleTyped(): PhenomenonModule {
-  return createBlackHoleMergerModule();
-}
 
 export const BLACK_HOLE_MERGER_DESCRIPTOR: PhenomenonDescriptor = {
   id: DESTINATION_ID,
@@ -41,7 +31,13 @@ export const BLACK_HOLE_MERGER_DESCRIPTOR: PhenomenonDescriptor = {
   defaultPreset: 'sxs-bbh-0001-inspiral',
   requiredCapabilities: [],
   estimatedGpuMemoryMB: { low: 10, medium: 24, high: 52, ultra: 110 },
-  load: async () => createBlackHoleMergerModule
+  /**
+   * WS3/tasks.md §5: dynamic import, so registry setup fetches only this
+   * lightweight preset/metadata module at boot. A static import here would
+   * pull the whole render graph into the startup chunk for every boot,
+   * including boots that route elsewhere.
+   */
+  load: async () => (await import('./blackHoleMergerModule.js')).createBlackHoleMergerModule
 };
 
 const BASE_STATE: BlackHoleMergerPublicState = {

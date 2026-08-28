@@ -78,11 +78,11 @@ import {
   nsQualityTierStepBudget,
   type NeutronStarSurfaceMaterial
 } from './surfaceLensingGpu.js';
+import { NEUTRON_STAR_DESCRIPTOR } from './descriptor.js';
 import type {
   EnterContext,
   ExitContext,
   FrameContext,
-  PhenomenonDescriptor,
   PhenomenonModule,
   PrepareContext,
   PreparedPhenomenon,
@@ -418,32 +418,6 @@ function estimateLineBytes(lineCount: number, pointsPerLine: number): number {
 // ---------------------------------------------------------------------------
 // Descriptor
 // ---------------------------------------------------------------------------
-
-/**
- * GPU memory estimates (MB, conservative): the surface pass is a fullscreen
- * triangle (<0.001 MB geometry) whose cost lives in the compiled pipeline,
- * dipole lines ~0.15 MB, materials/uniform buffers <0.05 MB; the remainder
- * is driver/headroom margin. Shared HDR targets and post chains are
- * host-owned and intentionally excluded.
- */
-export const NEUTRON_STAR_DESCRIPTOR: PhenomenonDescriptor = {
-  id: 'neutron-star',
-  title: 'Neutron Star',
-  group: 'compact',
-  fidelity: 'DIRECT',
-  route: 'neutron-star',
-  defaultPreset: 'surface',
-  requiredCapabilities: [],
-  estimatedGpuMemoryMB: { low: 0.5, medium: 0.75, high: 1, ultra: 2 },
-  /**
-   * Deliberate deviation from the registry's usual lazy dynamic-import
-   * pattern: the descriptor is co-located with its factory in this heavy
-   * file (TASK F file ownership), so a self dynamic-import would be
-   * circular. Laziness is preserved by the registry importing THIS module
-   * dynamically; `load` resolves the factory directly.
-   */
-  load: () => Promise.resolve(createNeutronStarModule)
-};
 
 // ---------------------------------------------------------------------------
 // Module factory

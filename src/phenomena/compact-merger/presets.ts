@@ -18,21 +18,10 @@
  * control and the model's viewing response stay coherent by construction.
  */
 
-import { createCompactMergerModule as createRenderingModule } from './compactMergerModule.js';
-
-import type {
-  PhenomenonDescriptor,
-  PhenomenonModule,
-  PresetDescriptor
-} from '../../atlas/types.js';
+import type { PhenomenonDescriptor, PresetDescriptor } from '../../atlas/types.js';
 import type { CompactMergerPublicState } from './types.js';
 
 const DESTINATION_ID = 'compact-merger';
-
-/** Cross-import factory (call-time access, mirrors the SN co-location rule). */
-export function createCompactMergerModule(): PhenomenonModule {
-  return createRenderingModule();
-}
 
 /**
  * GPU memory estimates (MB): volume internal targets + particle buffers
@@ -48,7 +37,13 @@ export const COMPACT_MERGER_DESCRIPTOR: PhenomenonDescriptor = {
   defaultPreset: 'equal-mass-nsns',
   requiredCapabilities: [],
   estimatedGpuMemoryMB: { low: 20, medium: 44, high: 88, ultra: 176 },
-  load: async () => createCompactMergerModule
+  /**
+   * WS3/tasks.md §5: dynamic import, so registry setup fetches only this
+   * lightweight preset/metadata module at boot. A static import here would
+   * pull the whole render graph into the startup chunk for every boot,
+   * including boots that route elsewhere.
+   */
+  load: async () => (await import('./compactMergerModule.js')).createCompactMergerModule
 };
 
 // ---------------------------------------------------------------------------

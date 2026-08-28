@@ -25,13 +25,7 @@
  * `fidelityNote` — the destination claims no hydrodynamics.
  */
 
-import { createStellarExplosionModule as createRenderingModule } from './stellarExplosionModule.js';
-
-import type {
-  PhenomenonDescriptor,
-  PhenomenonModule,
-  PresetDescriptor
-} from '../../atlas/types.js';
+import type { PhenomenonDescriptor, PresetDescriptor } from '../../atlas/types.js';
 import type { StellarExplosionPublicState } from './types.js';
 
 /** Shared destination id. */
@@ -40,20 +34,6 @@ const DESTINATION_ID = 'stellar-explosion';
 // ---------------------------------------------------------------------------
 // Descriptor
 // ---------------------------------------------------------------------------
-
-/**
- * Stellar Explosion module factory. The descriptor/preset metadata lives in
- * this file (routing/navigation stays testable without the render graph); the
- * production rendering composition (VolumeService + ParticleService, landed in
- * CA4) lives in its own module and is created here at call time — mirroring the
- * neutron-star co-location discipline, no init-order hazard.
- */
-export function createStellarExplosionModule(): PhenomenonModule {
-  // Rendering composition lives in its own module to keep this file
-  // preset/metadata-only; the cross-import mirrors the neutron-star
-  // co-location discipline (call-time access, no init-order hazard).
-  return createRenderingModule();
-}
 
 /**
  * GPU memory estimates (MB): half-res volume internal targets + particle
@@ -70,7 +50,13 @@ export const STELLAR_EXPLOSION_DESCRIPTOR: PhenomenonDescriptor = {
   defaultPreset: 'core-collapse',
   requiredCapabilities: [],
   estimatedGpuMemoryMB: { low: 24, medium: 48, high: 96, ultra: 192 },
-  load: async () => createStellarExplosionModule
+  /**
+   * WS3/tasks.md §5: dynamic import, so registry setup fetches only this
+   * lightweight preset/metadata module at boot. A static import here would
+   * pull the whole render graph into the startup chunk for every boot,
+   * including boots that route elsewhere.
+   */
+  load: async () => (await import('./stellarExplosionModule.js')).createStellarExplosionModule
 };
 
 // ---------------------------------------------------------------------------

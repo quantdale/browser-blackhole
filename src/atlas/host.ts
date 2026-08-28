@@ -470,8 +470,8 @@ export class CosmicAtlasHost {
       galaxyCollision
     ] = await Promise.all([
       import('./destinations/diagnosticDestination.js'),
-      import('./destinations/blackHoleDestination.js'),
-      import('../phenomena/neutron-star/neutronStarModule.js'),
+      import('./destinations/blackHoleDescriptor.js'),
+      import('../phenomena/neutron-star/descriptor.js'),
       import('../phenomena/stellar-explosion/presets.js'),
       import('../phenomena/compact-merger/presets.js'),
       import('../phenomena/tidal-disruption/presets.js'),

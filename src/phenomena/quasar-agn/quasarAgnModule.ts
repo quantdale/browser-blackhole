@@ -584,3 +584,12 @@ export class QuasarAgnModule implements PhenomenonModule {
     return mesh;
   }
 }
+
+/**
+ * Factory handed out through `QUASAR_AGN_DESCRIPTOR.load()` — keeps every
+ * destination's lazy `load` the same shape (resolve a named factory) instead
+ * of this one alone returning a fresh closure.
+ */
+export function createQuasarAgnModule(): PhenomenonModule {
+  return new QuasarAgnModule();
+}

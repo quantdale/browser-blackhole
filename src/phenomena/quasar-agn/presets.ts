@@ -15,20 +15,10 @@
  * navigation stay coherent by construction.
  */
 
-import { QuasarAgnModule } from './quasarAgnModule.js';
-import type {
-  PhenomenonDescriptor,
-  PhenomenonModule,
-  PresetDescriptor
-} from '../../atlas/types.js';
+import type { PhenomenonDescriptor, PresetDescriptor } from '../../atlas/types.js';
 import type { AgnScenarioId, QuasarAgnPublicState } from './types.js';
 
 const DESTINATION_ID = 'quasar-agn';
-
-/** Cross-import factory (call-time access, mirrors the CA4/CA5/CA6 rule). */
-export function createQuasarAgnModule(): PhenomenonModule {
-  return new QuasarAgnModule();
-}
 
 /** GPU memory estimates (MB): volumes + particle buffers + lensing pass. */
 export const QUASAR_AGN_DESCRIPTOR: PhenomenonDescriptor = {
@@ -40,7 +30,13 @@ export const QUASAR_AGN_DESCRIPTOR: PhenomenonDescriptor = {
   defaultPreset: 'quasar-reference',
   requiredCapabilities: [],
   estimatedGpuMemoryMB: { low: 40, medium: 90, high: 180, ultra: 360 },
-  load: async () => createQuasarAgnModule
+  /**
+   * WS3/tasks.md §5: dynamic import, so registry setup fetches only this
+   * lightweight preset/metadata module at boot. A static import here would
+   * pull the whole render graph into the startup chunk for every boot,
+   * including boots that route elsewhere.
+   */
+  load: async () => (await import('./quasarAgnModule.js')).createQuasarAgnModule
 };
 
 // ---------------------------------------------------------------------------
