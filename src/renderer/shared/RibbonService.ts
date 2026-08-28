@@ -132,6 +132,8 @@ class RibbonHandleImpl implements RibbonHandle {
   private readonly lateral = new THREE.Vector3();
   private readonly onRelease: () => void;
   private released = false;
+  /** Live multiplier on the configured widths (see RibbonHandle.setWidthScale). */
+  private widthScale = 1;
 
   constructor(config: RibbonConfig, onRelease: () => void) {
     this.cfg = {
@@ -169,6 +171,10 @@ class RibbonHandleImpl implements RibbonHandle {
     this.mesh.frustumCulled = false;
   }
 
+  setWidthScale(scale: number): void {
+    this.widthScale = Number.isFinite(scale) && scale > 0 ? scale : 1;
+  }
+
   setSpine(points: THREE.Vector3[]): void {
     if (this.released) {
       return;
@@ -196,7 +202,10 @@ class RibbonHandleImpl implements RibbonHandle {
       const s = i * inv;
       const taper = taperFactor(cfg.taper, s);
       const halfWidth =
-        0.5 * Math.max(0, THREE.MathUtils.lerp(cfg.widthStart, cfg.widthEnd, s)) * taper;
+        0.5 *
+        Math.max(0, THREE.MathUtils.lerp(cfg.widthStart, cfg.widthEnd, s)) *
+        taper *
+        this.widthScale;
 
       const p = spine[i]!;
       const lx = this.lateral.x * halfWidth;

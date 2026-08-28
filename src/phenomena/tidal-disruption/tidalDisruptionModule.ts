@@ -37,13 +37,17 @@
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
 import {
+  atan,
+  clamp,
   dot,
   float,
   length,
   max,
   mix,
+  mx_fractal_noise_float,
   normalize,
   positionLocal,
+  sin,
   smoothstep,
   uniform,
   vec2,
@@ -97,8 +101,17 @@ import { TIDAL_DISRUPTION_DESCRIPTOR } from './presets.js';
 // Presentation constants (disclosed)
 // ---------------------------------------------------------------------------
 
+/**
+ * Total optical depth aimed for along a sight line crossing the shock torus.
+ * ~1.5 reads as a bright but see-through glowing region; >5 saturates into a
+ * solid shape (see the density comment in the volume config).
+ */
+const SHOCK_TARGET_OPTICAL_DEPTH = 1.5;
+
 /** Star photosphere tint proxy (linear RGB), presentation-level. */
 const STAR_TINT_LINEAR = [1.0, 0.86, 0.72] as const;
+/** Linear-HDR radiance multiplier for the photosphere (presentation). */
+const STAR_RADIANCE = 4.5;
 /**
  * Debris handoff fade half-window around periapsis (seconds): the star's
  * presented gain ramps 1 -> 0 across +/- this window when the encounter
@@ -116,11 +129,77 @@ const ACCENT_ANGULAR_GATE_FULL = 0.06;
 /** BH marker ring gain (cinematic site marker, NOT a lensing render). */
 const BH_MARKER_GAIN = 0.5;
 /**
+ * On-screen size floor for the site marker, as a fraction of the framing
+ * distance. The ring is authored at the horizon/photon-sphere scale, which is
+ * ~1e-3 of the frame once the view pulls back to follow the debris — i.e. the
+ * black hole's position became invisible exactly when the viewer most needed
+ * it. The marker is already a DISCLOSED cinematic affordance and never a
+ * lensing render, so it is allowed to keep a minimum angular size; the debug
+ * snapshot reports the physical radii separately so nothing is misread as the
+ * horizon.
+ */
+const BH_MARKER_MIN_FRACTION_OF_DISTANCE = 0.035;
+/**
  * DISCLOSED presentation crop for stream ribbons: only the family's near-BH
- * portion (r <= STREAM_RADIAL_CAP x periapsis) is rendered; the distant
- * stream continues far beyond any presented frame by construction.
+ * portion is rendered; the distant stream continues far beyond any presented
+ * frame by construction.
+ *
+ * The cap is `max(STREAM_RADIAL_CAP x periapsis, STREAM_VIEW_CAP_FACTOR x the
+ * current framing distance)`, i.e. it follows what is actually ON SCREEN. With
+ * the old fixed 12 x periapsis cap the ribbons emptied completely a few hours
+ * after disruption — every bound element is out near apoapsis until it returns
+ * at the fallback time, so the destination drew NOTHING at all across the
+ * debris and winding stages, which is most of its timeline.
  */
 const STREAM_RADIAL_CAP = 12;
+const STREAM_VIEW_CAP_FACTOR = 3;
+
+/**
+ * Auto-framing (DISCLOSED presentation behaviour). The scene's meaningful
+ * extent grows by orders of magnitude across the timeline — from a star at a
+ * few hundred scene units to debris arcs thousands out — so a fixed camera
+ * distance shows an empty frame for most of the encounter. The module eases the
+ * ORBIT DISTANCE toward the current extent and stops doing so permanently as
+ * soon as the viewer changes the distance themselves (detected by comparing the
+ * live orbit against the last value this module wrote). Azimuth and polar are
+ * never touched: they stay user-owned.
+ */
+/**
+ * Distance = margin x extent. The pre-disruption stages have exactly one
+ * subject — the star on its way in — and it is physically small next to its own
+ * orbital radius, so those stages frame tighter; the post-disruption stages have
+ * to hold a whole stream and use the looser margin.
+ */
+const AUTO_FRAME_MARGIN = 2.2;
+const AUTO_FRAME_MARGIN_STAR_ONLY = 1.05;
+const AUTO_FRAME_MIN_UNITS = 140;
+/**
+ * Framing ceiling. The debris family arcs out to ~1e5 scene units, but at that
+ * zoom the orbits are so eccentric that the stream is just a straight streak
+ * and the black hole is a single pixel — following it all the way out shows
+ * LESS, not more. The frame therefore stops at the near-BH region where the
+ * winding return, the self-intersection shock and the nascent disc actually
+ * happen, and the excursion is allowed to leave the frame (the stage weights
+ * keep that stretch short).
+ */
+const AUTO_FRAME_MAX_UNITS = 3500;
+/** Ease constant (per second) for the distance approach. */
+const AUTO_FRAME_LERP_PER_SECOND = 3.2;
+/** Relative orbit-distance change that counts as "the viewer took over". */
+const AUTO_FRAME_USER_EPSILON = 0.05;
+/**
+ * Grace period after `enter()` before the takeover check arms. The rig runs its
+ * own arrival ease for the first second or so, and its writes would otherwise
+ * be misread as the viewer grabbing the camera — which disabled auto-framing on
+ * the second frame of every arrival.
+ */
+const AUTO_FRAME_ARM_DELAY_SECONDS = 1.5;
+/**
+ * Ribbon width is baked in world units, so it is scaled with the framing
+ * distance to keep a roughly constant on-screen thickness (the widths in
+ * `createRibbon` are authored for AUTO_FRAME_REFERENCE_UNITS).
+ */
+const AUTO_FRAME_REFERENCE_UNITS = 350;
 
 /** Phases during which the stream ribbons carry the morphology. */
 const STREAM_PHASES: ReadonlySet<string> = new Set(['disruption', 'debris', 'winding', 'shock']);
@@ -149,6 +228,14 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   const uShockGain = uniform(0);
   const uShockRadius = uniform(1);
   const uDiskGain = uniform(0);
+  /**
+   * Accumulated ORBITAL phase (radians) of gas circularizing at the shock
+   * radius, integrated from the local Keplerian rate. Drives the azimuthal
+   * brightness pattern of the shock region and the nascent disc so both
+   * visibly ROTATE instead of sitting as static shapes — the returning debris
+   * is on orbits, and that is the motion the late stages are about.
+   */
+  const uOrbitPhase = uniform(0);
 
   // Scratch spine buffers (allocated once per ribbon capacity).
   let boundScratch: ReturnType<typeof createSpineScratch> | null = null;
@@ -213,7 +300,15 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       .mul(uStarTransverse)
       .add(uStarAxis.mul(along.mul(uStarStretch.sub(uStarTransverse))));
     starMaterial.positionNode = deformed;
-    starMaterial.colorNode = vec4(vec3(...STAR_TINT_LINEAR).mul(uStarGain), 1);
+    // Linear-HDR radiance well above 1 so the photosphere blooms: the star is
+    // the only luminous body in frame before disruption, and at unit radiance it
+    // read as a dull pale ellipse in a black void.
+    starMaterial.colorNode = vec4(
+      vec3(...STAR_TINT_LINEAR)
+        .mul(uStarGain)
+        .mul(float(STAR_RADIANCE)),
+      1
+    );
     star = new THREE.Mesh(starGeometry, starMaterial);
     star.name = 'tde-star';
     // DISCLOSED display exaggeration (see types.visualStarRadius): the
@@ -237,7 +332,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     markerGeometry.rotateX(-Math.PI / 2); // lie flat in the orbital (XZ) plane
     const markerMaterial = new MeshBasicNodeMaterial();
     markerMaterial.name = 'tde-bh-marker';
-    markerMaterial.colorNode = vec4(vec3(0.9, 0.75, 0.55).mul(BH_MARKER_GAIN), 1);
+    markerMaterial.colorNode = vec4(vec3(0.9, 0.75, 0.55).mul(BH_MARKER_GAIN * 2.2), 1);
     bhMarker = new THREE.Mesh(markerGeometry, markerMaterial);
     bhMarker.name = 'tde-bh-marker';
     destinationScene.add(bhMarker);
@@ -262,9 +357,55 @@ export function createTidalDisruptionModule(): PhenomenonModule {
         const tubeDist = length(vec2(radial.sub(uShockRadius), p.y));
         const minor = uShockRadius.mul(0.18).max(0.5);
         const profile = smoothstep(minor.mul(0.45), minor.mul(1.6), tubeDist).oneMinus();
-        return max(profile, float(0));
+        // Orbiting clumpy structure. A uniform unit-density torus integrated to
+        // saturation and read as a flat opaque pill; the returning stream is
+        // neither smooth nor stationary, so the density carries azimuthal
+        // clumping that ROTATES at the local Keplerian rate (uOrbitPhase).
+        const azimuth = atan(p.z, p.x);
+        const swirl = sin(azimuth.mul(float(3)).sub(uOrbitPhase))
+          .mul(float(0.25))
+          .add(float(0.75));
+        const clumps = mx_fractal_noise_float(
+          vec3(
+            azimuth.mul(float(2.2)).sub(uOrbitPhase.mul(float(0.5))),
+            p.y.div(minor),
+            radial.div(uShockRadius)
+          ),
+          3,
+          2.0,
+          0.5
+        )
+          .mul(float(0.5))
+          .add(float(0.5));
+        const texture = clamp(
+          swirl.mul(clumps.mul(float(1.4)).add(float(0.25))),
+          float(0),
+          float(1)
+        );
+        // OPTICAL DEPTH, not "opacity". VolumeService integrates
+        // alpha = 1 - exp(-density * ABSORPTION_SCALE * dt) with dt in SCENE
+        // UNITS, so a density near 1 saturates a single sample whenever the
+        // volume is tens of units across — which is why this torus rendered as
+        // a flat opaque pill. Normalising by the tube crossing length gives a
+        // total optical depth of about SHOCK_TARGET_OPTICAL_DEPTH through the
+        // tube regardless of the encounter's physical scale.
+        const crossing = minor.mul(float(2)).max(float(1e-3));
+        const kappa = float(SHOCK_TARGET_OPTICAL_DEPTH).div(crossing);
+        return max(profile.mul(texture).mul(kappa), float(0));
       },
-      emission: () => vec3(1.0, 0.62, 0.38).mul(uShockGain.mul(0.22)),
+      emission: ({ pos }) => {
+        // Shock heating rises toward the intersection radius; the inner edge is
+        // hotter and whiter than the outer skirt.
+        const p = vec3(pos as never);
+        const radial = length(p.xz);
+        const inner = clamp(
+          float(1).sub(radial.div(uShockRadius.max(float(1e-3)))),
+          float(0),
+          float(1)
+        );
+        const color = mix(vec3(1.0, 0.62, 0.38), vec3(1.0, 0.88, 0.72), inner);
+        return color.mul(uShockGain.mul(1.1));
+      },
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       halfResolution: true,
       earlyAlphaTermination: true,
@@ -327,8 +468,11 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     unboundScratch = createSpineScratch(samples + 2);
     boundRibbon = ctx.services.ribbons.createRibbon({
       segments: samples,
-      widthStart: Math.max(visualStarRadius(res) * 0.35, 0.8),
-      widthEnd: Math.max(visualStarRadius(res) * 0.08, 0.2),
+      // Authored for AUTO_FRAME_REFERENCE_UNITS and scaled per frame with the
+      // framing distance (setWidthScale); the previous widths were a 1-2 px
+      // thread as soon as the view pulled back at all.
+      widthStart: Math.max(visualStarRadius(res) * 0.9, 2.5),
+      widthEnd: Math.max(visualStarRadius(res) * 0.22, 0.7),
       colorStart: [1.0, 0.78, 0.52],
       colorEnd: [0.85, 0.42, 0.28],
       additive: true,
@@ -336,8 +480,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     });
     unboundRibbon = ctx.services.ribbons.createRibbon({
       segments: samples,
-      widthStart: Math.max(visualStarRadius(res) * 0.28, 0.6),
-      widthEnd: Math.max(visualStarRadius(res) * 0.05, 0.15),
+      widthStart: Math.max(visualStarRadius(res) * 0.7, 2.0),
+      widthEnd: Math.max(visualStarRadius(res) * 0.14, 0.5),
       colorStart: [0.75, 0.82, 1.0],
       colorEnd: [0.35, 0.42, 0.7],
       additive: true,
@@ -371,9 +515,24 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // WGSL contract: constant rising edges (low < high).
     const rLocal = length(positionLocal);
     const radial = smoothstep(uDiskInner, uDiskOuter, rLocal);
+    // Differential rotation: the pattern is carried at the local Keplerian
+    // rate, which falls as r^-3/2, so the inner annulus laps the outer one and
+    // the disc reads as ORBITING gas rather than a painted ring. uOrbitPhase is
+    // integrated at the shock radius, so the exponent is applied relative to it.
+    const rRel = clamp(rLocal.div(uShockRadius.max(float(1e-3))), float(0.05), float(20));
+    const localPhase = uOrbitPhase.mul(rRel.pow(float(-1.5)));
+    const azimuth = atan(positionLocal.z, positionLocal.x);
+    const arms = sin(azimuth.mul(float(2)).sub(localPhase))
+      .mul(float(0.18))
+      .add(float(0.9));
+    const fine = sin(azimuth.mul(float(7)).sub(localPhase.mul(float(1.3))))
+      .mul(float(0.07))
+      .add(float(1));
+    const hot = mix(vec3(1.0, 0.88, 0.72), vec3(1.0, 0.62, 0.36), radial);
     diskMaterial.colorNode = vec4(
-      vec3(1.0, 0.72, 0.45)
-        .mul(mix(float(1.1), float(0.3), radial))
+      hot
+        .mul(mix(float(1.4), float(0.28), radial))
+        .mul(arms.mul(fine))
         .mul(uDiskGain),
       1
     );
@@ -417,10 +576,48 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     ctx.services.time.setPhaseMapping('tidal-disruption-timeline');
     const deepLinkPhase =
       ready.state.timeSeconds !== 0 ? secondsToUiPhase(ready.state.timeSeconds, ready.resolved) : 0;
-    ctx.services.time.pause();
     ctx.services.time.scrubTo(
       deepLinkPhase !== 0 ? deepLinkPhase : ctx.preset.timelineInitialPhase
     );
+    // Arrive PLAYING. Arriving paused (the previous behaviour) meant the
+    // encounter never advanced unless the viewer found the transport, so the
+    // destination presented a single frozen frame of a star on approach.
+    // Specs that need determinism call `time.pause()` themselves.
+    ctx.services.time.play();
+    autoFrameEnabled = true;
+    autoFrameDistance = Number.NaN;
+    autoFrameAgeSeconds = 0;
+    lastPhysicalTime = Number.NaN;
+    uOrbitPhase.value = 0;
+    // The rig's default ceiling is 500 scene units, which silently clamped
+    // both the auto-framing and the viewer's own zoom while the debris arcs
+    // reach thousands. Declare the range this destination actually spans.
+    ctx.services.cameraRig.setDistanceLimits(20, AUTO_FRAME_MAX_UNITS * 6);
+  }
+
+  /**
+   * Scene extent worth framing at the current instant, in scene units. Uses
+   * whatever is actually being drawn in this stage rather than a single global
+   * scale (which cannot describe a scene spanning three orders of magnitude).
+   */
+  function frameExtentUnits(
+    res: ResolvedTdeEncounter,
+    phase: TdePhase,
+    starDistanceUnits: number,
+    starVisible: boolean,
+    streamExtent: number,
+    shockVisible: boolean
+  ): number {
+    let extent = Math.max(res.rtUnits * 1.6, res.rpUnits * 2);
+    if (starVisible) extent = Math.max(extent, starDistanceUnits * 1.05);
+    // Follow the MODELLED stream extent, not the cropped one: the debris family
+    // arcs out to ~1e5 scene units before the most-bound elements return at the
+    // fallback time, and following it is what makes the excursion and the
+    // winding return visible instead of an empty frame.
+    if (streamExtent > 0) extent = Math.max(extent, streamExtent);
+    if (shockVisible) extent = Math.max(extent, shockRadiusUnits(res) * 1.05);
+    if (phase === 'nascent-disk') extent = Math.max(res.rtUnits * 3, res.rpUnits * 4);
+    return extent;
   }
 
   /**
@@ -429,18 +626,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
    */
   function populationFractionFor(phase: TdePhase): number {
     switch (phase) {
+      // The accent cloud is emitted from a FIXED sphere-shell at periapsis, so
+      // it only tells the truth while the star is actually there being shredded.
+      // Leaving it on afterwards (0.55/0.45/0.3 previously) parked a permanent
+      // bright ball at periapsis long after the gas had left on its orbits —
+      // which, with the ribbons cropped out of existence, was the ONLY thing on
+      // screen for most of the timeline and made the scene look frozen. The
+      // debris morphology after periapsis is carried by the stream ribbons, the
+      // shock volume and the nascent disk, all of which are time-dependent.
       case 'disruption':
-        return 0.25;
-      case 'debris':
         return 0.55;
-      case 'winding':
-        return 0.45;
-      case 'shock':
-        return 0.3;
-      case 'nascent-disk':
-        return 0; // accents retire with the disk stage (CA6-11)
       default:
-        return 0; // approach/deformation keep debris systems OFF
+        return 0;
     }
   }
 
@@ -457,7 +654,24 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   /** Rebuild both stream spines from the pure model (no history). */
   let spineCount = 0;
   let unboundCount = 0;
-  function updateStreams(tSinceDisruption: number): void {
+  /** Largest radius (scene units) actually drawn on either spine this frame. */
+  let streamExtentUnits = 0;
+  /** Largest MODELLED spine radius this frame, before the presentation crop. */
+  let streamRawExtentUnits = 0;
+  /**
+   * Smallest MODELLED spine radius this frame. This is the number that says
+   * whether ANY debris has returned to the black hole yet, which is what the
+   * near-BH stages (shock, nascent disk) depend on.
+   */
+  let streamMinRadiusUnits = 0;
+  /** Auto-framing state (see AUTO_FRAME_* constants). */
+  let autoFrameEnabled = true;
+  let autoFrameDistance = Number.NaN;
+  /** Seconds since enter(); the takeover check arms after the arrival ease. */
+  let autoFrameAgeSeconds = 0;
+  /** Previous frame's physical time, for the orbital-phase integrator. */
+  let lastPhysicalTime = Number.NaN;
+  function updateStreams(tSinceDisruption: number, viewDistanceUnits: number): void {
     const ready = assertReady();
     if (
       boundScratch === null ||
@@ -479,10 +693,20 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // DISCLOSED presentation crop: ribbons render the family's near-BH
     // portion (r <= STREAM_RADIAL_CAP x periapsis); the distant stream
     // continues far beyond any presented frame by construction.
-    const rCap = STREAM_RADIAL_CAP * ready.resolved.rpUnits;
+    const rCap = Math.max(
+      STREAM_RADIAL_CAP * ready.resolved.rpUnits,
+      STREAM_VIEW_CAP_FACTOR * viewDistanceUnits
+    );
+    let extent = 0;
+    let rawExtent = 0;
+    let rawMin = Number.POSITIVE_INFINITY;
     spinePoints.length = 0;
     for (let i = nBound - 1; i >= 0; i -= 1) {
-      if (boundScratch.rs[i]! > rCap) continue;
+      const r = boundScratch.rs[i]!;
+      if (r > rawExtent) rawExtent = r;
+      if (r < rawMin) rawMin = r;
+      if (r > rCap) continue;
+      if (r > extent) extent = r;
       // Most-bound first so ribbon taper runs head -> tail along the arc.
       spinePoints.push(new THREE.Vector3(boundScratch.xs[i]!, 0, boundScratch.zs[i]!));
     }
@@ -498,11 +722,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     );
     spinePoints.length = 0;
     for (let i = 0; i < nUnbound; i += 1) {
-      if (unboundScratch.rs[i]! > rCap) continue;
+      const r = unboundScratch.rs[i]!;
+      if (r > rawExtent) rawExtent = r;
+      if (r < rawMin) rawMin = r;
+      if (r > rCap) continue;
+      if (r > extent) extent = r;
       spinePoints.push(new THREE.Vector3(unboundScratch.xs[i]!, 0, unboundScratch.zs[i]!));
     }
     if (spinePoints.length >= 2) unboundRibbon.setSpine(spinePoints);
     unboundCount = spinePoints.length;
+    streamExtentUnits = extent;
+    streamRawExtentUnits = rawExtent;
+    streamMinRadiusUnits = Number.isFinite(rawMin) ? rawMin : 0;
   }
 
   function update(ctx: FrameContext): void {
@@ -540,17 +771,29 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     if (star !== null) star.visible = starGain > 0.001;
 
     // --- streams: active through the disruption->shock stages -----------------
+    const orbit = ctx.services.cameraRig.getOrbit();
+    // Ribbon thickness is authored for AUTO_FRAME_REFERENCE_UNITS and scaled
+    // with the live framing distance so the stream keeps a usable on-screen
+    // width as the view pulls back (it is a world-space mesh, not a sprite).
+    const widthScale = Math.max(0.35, orbit.distance / AUTO_FRAME_REFERENCE_UNITS);
+    boundRibbon?.setWidthScale(widthScale);
+    unboundRibbon?.setWidthScale(widthScale);
+
     const streamVisible =
       disrupts &&
       res.energySpreadJPerKg > 0 &&
       STREAM_PHASES.has(phase) &&
       t > -HANDOFF_FADE_SECONDS;
-    if (streamVisible) updateStreams(tau);
-    boundRibbon?.setVisible(streamVisible);
-    unboundRibbon?.setVisible(streamVisible);
+    if (streamVisible) updateStreams(tau, orbit.distance);
+    else {
+      streamExtentUnits = 0;
+      streamRawExtentUnits = 0;
+      streamMinRadiusUnits = 0;
+    }
+    boundRibbon?.setVisible(streamVisible && spineCount + unboundCount >= 2);
+    unboundRibbon?.setVisible(streamVisible && unboundCount >= 2);
 
     // --- particles (phase x disruption x angular gate) -------------------------
-    const orbit = ctx.services.cameraRig.getOrbit();
     const gate = accentGate(orbit.distance);
     const popFraction = populationFractionFor(phase);
     if (particleHandle !== null) {
@@ -559,6 +802,35 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       if (pop > 0 && !snapshot.paused) {
         particleHandle.update(ctx.time.dt);
       }
+    }
+
+    // --- black-hole site marker: keep a minimum angular size ------------------
+    if (bhMarker !== null) {
+      const authored = Math.max(res.photonSphereUnits * 1.35, 1e-6);
+      const floor = orbit.distance * BH_MARKER_MIN_FRACTION_OF_DISTANCE;
+      const markerScale = Math.max(1, floor / authored);
+      bhMarker.scale.setScalar(markerScale);
+    }
+
+    // --- orbital phase of the circularizing gas -------------------------------
+    // Integrated from the LOCAL Keplerian rate at the shock radius:
+    //   Omega = sqrt(mu / r^3),  r in metres, mu in SI.
+    // Integrating (rather than evaluating a closed form in t) keeps the pattern
+    // continuous across the log-compressed stages, where dt in physical seconds
+    // jumps by orders of magnitude between frames. The visual rate is therefore
+    // the physical rate; only the timeline coordinate is nonlinear.
+    const shockRadiusMetres = shockRadiusUnits(res) * METRES_PER_SCENE_UNIT;
+    const orbitOmega =
+      shockRadiusMetres > 0
+        ? Math.sqrt(res.muSiM3S2 / (shockRadiusMetres * shockRadiusMetres * shockRadiusMetres))
+        : 0;
+    const physicalDtSeconds = Number.isFinite(lastPhysicalTime) ? t - lastPhysicalTime : 0;
+    lastPhysicalTime = t;
+    if (Number.isFinite(orbitOmega) && orbitOmega > 0 && physicalDtSeconds !== 0) {
+      // Wrap into [0, 2pi) so the accumulator stays exact over long runs.
+      const advanced = uOrbitPhase.value + orbitOmega * physicalDtSeconds;
+      const twoPi = Math.PI * 2;
+      uOrbitPhase.value = ((advanced % twoPi) + twoPi) % twoPi;
     }
 
     // --- shock volume (phase-gated; gain separated from geometric state) -------
@@ -576,6 +848,50 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       diskMesh.visible = diskGain > 0.001;
       const mat = diskMesh.material as THREE.Material & { opacity: number };
       mat.opacity = 0.55 * diskGain;
+    }
+
+    // --- auto-framing (disclosed presentation behaviour) -----------------------
+    if (autoFrameEnabled) {
+      autoFrameAgeSeconds += Math.max(ctx.time.dt, 0);
+      const armed = autoFrameAgeSeconds >= AUTO_FRAME_ARM_DELAY_SECONDS;
+      if (!armed) {
+        // The rig's arrival ease owns the camera during the grace period:
+        // neither read a baseline from it nor write to it (setOrbit would
+        // cancel that animation).
+      } else if (
+        Number.isFinite(autoFrameDistance) &&
+        Math.abs(orbit.distance - autoFrameDistance) >
+          Math.max(1e-3, AUTO_FRAME_USER_EPSILON * autoFrameDistance)
+      ) {
+        // The rig sits somewhere other than where this module last put it:
+        // the viewer moved the camera, so hand the distance back permanently.
+        autoFrameEnabled = false;
+      } else {
+        const extent = frameExtentUnits(
+          res,
+          phase,
+          enc.radiusUnits,
+          starGain > 0.001,
+          streamRawExtentUnits,
+          volumeVisible
+        );
+        const starOnly =
+          starGain > 0.001 && streamRawExtentUnits <= 0 && !volumeVisible && diskGain <= 0.001;
+        const margin = starOnly ? AUTO_FRAME_MARGIN_STAR_ONLY : AUTO_FRAME_MARGIN;
+        const desired = Math.min(
+          AUTO_FRAME_MAX_UNITS,
+          Math.max(AUTO_FRAME_MIN_UNITS, extent * margin)
+        );
+        // Ease from our own last value once we own the distance; on the first
+        // armed frame adopt whatever the arrival ease left behind.
+        const current = Number.isFinite(autoFrameDistance) ? autoFrameDistance : orbit.distance;
+        const blend = 1 - Math.exp(-AUTO_FRAME_LERP_PER_SECOND * Math.max(ctx.time.dt, 0));
+        const next = current + (desired - current) * blend;
+        autoFrameDistance = next;
+        if (Math.abs(next - orbit.distance) > 1e-4) {
+          ctx.services.cameraRig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, next);
+        }
+      }
     }
 
     // --- diagnostics snapshot ----------------------------------------------------
@@ -600,6 +916,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     debug['volumeRadiusUnits'] = shockRadiusUnits(res);
     debug['populationScale'] = particleHandle !== null ? popFraction : 0;
     debug['accentAngularGate'] = Number(gate.toFixed(3));
+    debug['streamExtentUnits'] = Number(streamExtentUnits.toFixed(2));
+    debug['streamRawExtentUnits'] = Number(streamRawExtentUnits.toFixed(2));
+    debug['streamMinRadiusUnits'] = Number(streamMinRadiusUnits.toFixed(2));
+    debug['autoFrameEnabled'] = autoFrameEnabled;
+    debug['autoFrameDistanceUnits'] = Number.isFinite(autoFrameDistance)
+      ? Number(autoFrameDistance.toFixed(2))
+      : null;
+    debug['ribbonWidthScale'] = Number(widthScale.toFixed(3));
+    debug['bhMarkerScale'] = bhMarker !== null ? Number(bhMarker.scale.x.toFixed(3)) : null;
+    debug['photonSphereUnits'] = res.photonSphereUnits;
+    debug['orbitPhaseRad'] = Number(uOrbitPhase.value.toFixed(4));
+    debug['orbitOmegaRadPerSecond'] = orbitOmega;
     debug['diskVisible'] = diskMesh !== null ? diskMesh.visible : false;
     debug['diskGain'] = diskGain;
     debug['boundFraction'] = fractions.boundFraction;

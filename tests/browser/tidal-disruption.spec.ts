@@ -2,7 +2,11 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  expectPresentedMotion,
+  measurePresentedMotion
+} from './support/appHarness.js';
 
 /**
  * CA6 Tidal Disruption browser validation.
@@ -106,13 +110,18 @@ test.describe('Tidal Disruption validation (CA6)', () => {
 
     const seen: string[] = [];
     let lastPhase = '';
-    for (const phase of [0, 0.1, 0.22, 0.32, 0.42, 0.55, 0.68, 0.82, 1]) {
+    // Sweep finely rather than at hand-picked phases: the stage weights are a
+    // presentation choice and were rebalanced during the phenomena-animation
+    // campaign, so a fixed sample list can step straight over a narrow stage
+    // (the 7%-wide `winding`) and report a false ordering violation.
+    const sweep = Array.from({ length: 41 }, (_, i) => i / 40);
+    for (const phase of sweep) {
       await page.evaluate((p) => {
         const h = window.__ATLAS_APP__!.host;
         h.time.pause();
         h.time.scrubTo(p);
       }, phase);
-      await page.waitForTimeout(250);
+      await page.waitForTimeout(140);
       const snap = await tdeSnapshot(page);
       const name = String(snap['phase']);
       if (name !== lastPhase) {
@@ -471,6 +480,109 @@ test.describe('Tidal Disruption validation (CA6)', () => {
     const inv = await page.evaluate(() => window.__ATLAS_APP__!.host.debugInventory());
     expect(inv.pendingPrepares).toBe(0);
     expect(inv.liveScopeCount).toBeLessThan(10);
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * Phenomena-animation campaign. This destination previously arrived PAUSED, so
+ * it never advanced unless the viewer found the transport; its mapping advanced
+ * uniformly in physical seconds, which needed ~173 real days for one traverse;
+ * and its stream ribbons were cropped at 12 x periapsis, which emptied them
+ * entirely once the debris left on its orbits — so the presented frame was a
+ * single static star for effectively the whole timeline.
+ */
+test.describe('Tidal Disruption plays on its own (phenomena-animation)', () => {
+  test('arrives playing, phase-paced and looping', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/tidal-disruption');
+    await waitForArrival(page, 'tidal-disruption');
+
+    const snap = await page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot());
+    expect(snap.paused, 'destination must arrive playing').toBe(false);
+    expect(snap.loop).toBe(true);
+    // Phase-paced: base rate is in PHASE units per second, so it is well below 1.
+    expect(snap.basePlaybackRate).toBeGreaterThan(0);
+    expect(snap.basePlaybackRate).toBeLessThan(0.2);
+
+    const before = snap.simulationPhase;
+    await expect
+      .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+        timeout: 15_000,
+        intervals: [200]
+      })
+      .toBeGreaterThan(before + 0.02);
+    expect(errors).toEqual([]);
+  });
+
+  test('the presented image evolves while the encounter runs', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/tidal-disruption');
+    await waitForArrival(page, 'tidal-disruption');
+
+    const motion = await measurePresentedMotion(page, { captures: 5, framesBetween: 40 });
+    expectPresentedMotion(motion, { label: 'tidal-disruption' });
+    expect(errors).toEqual([]);
+  });
+
+  test('the debris stream is actually drawn after disruption', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/tidal-disruption');
+    await waitForArrival(page, 'tidal-disruption');
+
+    // Mid-debris: both spines must carry points. The old fixed radial crop
+    // returned zero points here, so the stream existed only in the model.
+    await page.evaluate(() => {
+      const h = window.__ATLAS_APP__!.host;
+      h.time.pause();
+      h.time.scrubTo(0.4);
+    });
+    await expect
+      .poll(async () => (await tdeSnapshot(page))['phase'], { timeout: 10_000, intervals: [150] })
+      .toBe('debris');
+    const snap = await tdeSnapshot(page);
+    expect(Number(snap['spineBoundPoints'])).toBeGreaterThan(1);
+    expect(Number(snap['streamExtentUnits'])).toBeGreaterThan(0);
+    expect(snap['streamBoundVisible']).toBe(true);
+    expect(errors).toEqual([]);
+  });
+
+  test('auto-framing follows the scene scale and yields to the viewer', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/tidal-disruption');
+    await waitForArrival(page, 'tidal-disruption');
+
+    // The rig's default 500-unit ceiling used to clamp this scene; the
+    // destination declares its own range.
+    const limits = await page.evaluate(() =>
+      window.__ATLAS_APP__!.host.cameraRig.getDistanceLimits()
+    );
+    expect(limits.max).toBeGreaterThan(500);
+
+    // Wait until auto-framing has actually taken the distance: it deliberately
+    // stays hands-off during the rig's arrival ease, and a viewer change inside
+    // that window is absorbed as the new baseline rather than treated as a
+    // takeover (the rig itself is moving the camera then).
+    await expect
+      .poll(async () => (await tdeSnapshot(page))['autoFrameDistanceUnits'] !== null, {
+        timeout: 15_000,
+        intervals: [200]
+      })
+      .toBe(true);
+    expect((await tdeSnapshot(page))['autoFrameEnabled']).toBe(true);
+
+    // A viewer-driven distance change hands control back permanently.
+    await page.evaluate(() => {
+      const rig = window.__ATLAS_APP__!.host.cameraRig;
+      const orbit = rig.getOrbit();
+      rig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, orbit.distance * 2.5);
+    });
+    await expect
+      .poll(async () => (await tdeSnapshot(page))['autoFrameEnabled'], {
+        timeout: 10_000,
+        intervals: [200]
+      })
+      .toBe(false);
     expect(errors).toEqual([]);
   });
 });

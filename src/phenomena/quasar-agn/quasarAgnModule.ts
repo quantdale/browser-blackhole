@@ -50,6 +50,7 @@ import {
   float,
   length,
   max,
+  min,
   mix,
   mx_fractal_noise_float,
   positionLocal,
@@ -154,6 +155,14 @@ const C_M_PER_S = 2.99792458e8;
 
 /** Spiral-arm count of the disc brightness pattern (illustrative azimuthal m). */
 const DISK_PATTERN_ARMS = 2;
+
+/**
+ * Target total optical depth through the dusty torus. The dust IS optically
+ * thick in the equatorial plane, but a saturated single sample renders a flat
+ * silhouette with no internal structure, so the presented depth is kept in the
+ * range where the clumping and the illuminated inner rim stay visible.
+ */
+const TORUS_TARGET_OPTICAL_DEPTH = 2.2;
 
 /**
  * Keplerian angular velocity of the disc at radius `rRg`, in radians per day,
@@ -392,7 +401,14 @@ export class QuasarAgnModule implements PhenomenonModule {
           .mul(float(0.5))
           .add(float(0.5));
         const clumpGain = clamp(clumps.mul(float(1.5)).sub(float(0.28)), float(0), float(1));
-        return shell.mul(clumpGain).mul(float(0.42)) as never;
+        // OPTICAL DEPTH per scene unit, not opacity: VolumeService integrates
+        // alpha = 1 - exp(-density * dt) with dt in SCENE UNITS, and this torus
+        // is ~60 units thick, so a density of order 1 saturated a single sample
+        // and produced the flat opaque wall. Normalise by the crossing length
+        // for a target total depth through the dust.
+        const crossing = min(tube, tubeZ).mul(float(2)).max(float(1e-3));
+        const kappa = float(TORUS_TARGET_OPTICAL_DEPTH).div(crossing);
+        return shell.mul(clumpGain).mul(kappa) as never;
       },
       emission: ({ pos }) => {
         // Radial dust temperature gradient: the inner rim sits at the sublimation
@@ -523,6 +539,11 @@ export class QuasarAgnModule implements PhenomenonModule {
     this.state = normalizeQuasarAgnState(ctx.preset.state);
     this.lastZoomInput = Number.NaN; // re-drive the distance law once
     this.refreshScaleUniforms();
+    // The zone distance law reaches 2400 scene units in the GALACTIC zone,
+    // well past the rig's default 500-unit ceiling — which silently clamped
+    // both the zone jump and the viewer's zoom, so the galactic view framed
+    // the wrong scale entirely.
+    ctx.services.cameraRig.setDistanceLimits(2, 4000);
 
     // Timeline in OBSERVER-FRAME DAYS, paced and looping. Without a registered
     // mapping this destination ran the shared identity mapping, which saturated

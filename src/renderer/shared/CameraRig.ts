@@ -50,6 +50,17 @@ const FOV_DEFAULT_DEG = 60;
 const DISTANCE_DEFAULT_MIN = 0.5;
 const DISTANCE_DEFAULT_MAX = 500;
 
+/**
+ * Clip-range policy (see applyToCamera). `far` covers content out to several
+ * times the orbit distance — enough for a scene whose extent is comparable to
+ * the framing distance — and `near` scales with distance so depth precision
+ * does not collapse when the view pulls far back, while never rising above the
+ * authored floor at close range.
+ */
+const CLIP_FAR_DISTANCE_FACTOR = 8;
+const CLIP_NEAR_DISTANCE_FACTOR = 1e-4;
+const CLIP_NEAR_FLOOR = 0.05;
+
 /** Dolly used in the pristine state before any camera/preset configures the rig. */
 const DISTANCE_DEFAULT = 10;
 
@@ -152,8 +163,8 @@ function smoothstep(t: number): number {
 export class CameraRig implements ICameraRig {
   private camera: PerspectiveCamera | null = null;
   private readonly canvas: HTMLCanvasElement | null;
-  private readonly minDistance: number;
-  private readonly maxDistance: number;
+  private minDistance: number;
+  private maxDistance: number;
 
   // Orbit state (degrees / scene units).
   private azimuthDeg = 0;
@@ -325,6 +336,37 @@ export class CameraRig implements ICameraRig {
     };
   }
 
+  /**
+   * Replace the orbit-distance limits (scene units).
+   *
+   * The default range is [0.5, 500], which silently CLAMPED any destination
+   * whose scene is larger than that: the Quasar/AGN galactic zone asks for
+   * 760-2400 units and a tidal disruption's debris arcs reach thousands, so
+   * both were pinned at 500 and framed the wrong thing. A destination declares
+   * its own range in `enter()`; the limits also bound wheel zoom, so the viewer
+   * gets a range that matches the scene they are looking at.
+   *
+   * Applied immediately to the current distance. Invalid or inverted ranges are
+   * ignored rather than throwing: this is called from destination lifecycle
+   * code on every navigation.
+   */
+  setDistanceLimits(minDistance: number, maxDistance: number): void {
+    if (!Number.isFinite(minDistance) || !Number.isFinite(maxDistance)) return;
+    if (!(minDistance > 0) || !(maxDistance > minDistance)) return;
+    this.minDistance = minDistance;
+    this.maxDistance = maxDistance;
+    const clamped = clamp(this.distance, this.minDistance, this.maxDistance);
+    if (clamped !== this.distance) {
+      this.distance = clamped;
+      this.dirty = true;
+    }
+  }
+
+  /** Current orbit-distance limits (scene units). */
+  getDistanceLimits(): { min: number; max: number } {
+    return { min: this.minDistance, max: this.maxDistance };
+  }
+
   setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void {
     this.cancelAnimation();
     this.configured = true;
@@ -459,6 +501,20 @@ export class CameraRig implements ICameraRig {
     camera.up.copy(this.up);
     camera.lookAt(this.target);
     camera.fov = this.fovDeg;
+
+    // Clip range follows the orbit distance. The host creates the camera with a
+    // fixed [0.05, 5000] range, which silently BLACKED OUT any view that had to
+    // pull back further than 5000 scene units: a tidal disruption follows its
+    // debris out to tens of thousands of units, and every frame beyond the far
+    // plane rendered empty. The far plane only ever grows (never below the
+    // authored default), and the near plane only grows with distance, so no
+    // currently-visible near content starts clipping.
+    const far = Math.max(camera.far, this.distance * CLIP_FAR_DISTANCE_FACTOR);
+    const near = Math.max(CLIP_NEAR_FLOOR, this.distance * CLIP_NEAR_DISTANCE_FACTOR);
+    if (far !== camera.far || near !== camera.near) {
+      camera.far = far;
+      camera.near = near;
+    }
     camera.updateProjectionMatrix();
   }
 

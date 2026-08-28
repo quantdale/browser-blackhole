@@ -598,3 +598,35 @@ describe('phase timeline (CA6-12)', () => {
     expect(formatEncounterSeconds(Number.NaN)).toBe('+0.0 s');
   });
 });
+
+/**
+ * Phenomena-animation campaign guards. The stage weights are a presentation
+ * choice, but two properties are not negotiable: they must sum to 1 (the
+ * mapping's forward/inverse round-trip depends on it, and a stale duplicate
+ * table once broke exactly that), and the mapping must declare the pacing and
+ * looping the destination needs to actually play.
+ */
+describe('tidal disruption timeline pacing (phenomena-animation)', () => {
+  it('stage weights sum to exactly 1 across the phase axis', () => {
+    const e = encounterOf();
+    // forward(1) is the last segment's end; inverse of it must be exactly 1.
+    expect(secondsToUiPhase(uiPhaseToSeconds(1, e), e)).toBeCloseTo(1, 12);
+    // And the phase axis is covered with no gaps: 0 -> 1 monotonically.
+    let previous = -Infinity;
+    for (let i = 0; i <= 200; i += 1) {
+      const seconds = uiPhaseToSeconds(i / 200, e);
+      expect(seconds).toBeGreaterThanOrEqual(previous);
+      previous = seconds;
+    }
+  });
+
+  it('declares wall-clock pacing in PHASE space, with looping', () => {
+    const mapping = makeTdePhaseMapping(encounterOf());
+    // Physical span is ~1e7 s; pacing in internal seconds would need ~173 real
+    // days for one traverse, which is what made this destination look frozen.
+    expect(mapping.pacing).toBe('phase');
+    expect(mapping.playbackSeconds).toBeGreaterThan(10);
+    expect(mapping.playbackSeconds).toBeLessThan(240);
+    expect(mapping.loop).toBe(true);
+  });
+});

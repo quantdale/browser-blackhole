@@ -196,3 +196,91 @@ describe('TimeController: mapping-declared cinematic pacing', () => {
     expect(Number.isFinite(time.internalCoordinate)).toBe(true);
   });
 });
+
+/**
+ * Phase-space pacing. A piecewise/log mapping deliberately gives some stages a
+ * larger share of the phase axis than their physical duration would imply (the
+ * tidal disruption's minutes-long disruption versus its multi-year fallback).
+ * Advancing uniformly in PHYSICAL time throws that weighting away, so such
+ * mappings declare `pacing: 'phase'`.
+ */
+describe('TimeController: phase-space pacing for nonlinear mappings', () => {
+  /**
+   * Two-segment mapping mimicking the shape that motivated this mode: the
+   * first half of the phase axis covers 10 internal units, the second half
+   * covers 10_000.
+   */
+  const piecewise = {
+    id: 'piecewise',
+    label: 'Piecewise',
+    forward: (phase01: number) => {
+      const p = Math.min(1, Math.max(0, phase01));
+      return p <= 0.5 ? p * 2 * 10 : 10 + (p - 0.5) * 2 * 9990;
+    },
+    inverse: (internal: number) =>
+      internal <= 10 ? internal / 20 : 0.5 + (internal - 10) / (2 * 9990),
+    formatDisplay: (internal: number) => `${internal.toFixed(1)}`,
+    playbackSeconds: 20,
+    pacing: 'phase' as const,
+    loop: true
+  };
+
+  const activate = (): TimeController => {
+    const time = new TimeController({ initialPhase: 0, playbackRate: 1, paused: false });
+    time.registerPhaseMapping(piecewise.id, piecewise);
+    time.setPhaseMapping(piecewise.id);
+    return time;
+  };
+
+  it('reports phase pacing and a per-second phase rate', () => {
+    const time = activate();
+    expect(time.pacing).toBe('phase');
+    expect(time.basePlaybackRate).toBeCloseTo(1 / 20, 12);
+  });
+
+  it('spends equal wall time on each half of the phase axis', () => {
+    const time = activate();
+    for (let i = 0; i < 1000; i += 1) time.update(0.01); // 10 s = half the span
+    expect(time.simulationPhase).toBeCloseTo(0.5, 4);
+    // Physical time is still reported truthfully: half the PHASE, but only
+    // 10 of 10_000 internal units.
+    expect(time.internalCoordinate).toBeCloseTo(10, 3);
+    for (let i = 0; i < 1000; i += 1) time.update(0.01);
+    expect(time.simulationPhase).toBeCloseTo(1, 4);
+  });
+
+  it('the same mapping under internal pacing never leaves the first segment', () => {
+    // This is the defect phase pacing exists to avoid, pinned as a contrast:
+    // uniform physical-time advance spends the whole 20 s budget covering
+    // 10_000/20 = 500 units/s ... which blows through the interesting first
+    // segment in the first 0.02 s.
+    const internalPaced = { ...piecewise, pacing: 'internal' as const };
+    const time = new TimeController({ initialPhase: 0, playbackRate: 1, paused: false });
+    time.registerPhaseMapping('internal-paced', internalPaced);
+    time.setPhaseMapping('internal-paced');
+    expect(time.basePlaybackRate).toBeCloseTo(10_000 / 20, 6);
+    time.update(0.02);
+    expect(time.simulationPhase).toBeGreaterThan(0.49);
+  });
+
+  it('wraps in phase space when looping', () => {
+    const time = activate();
+    for (let i = 0; i < 2500; i += 1) time.update(0.01); // 25 s: 1.25 traverses
+    expect(time.simulationPhase).toBeCloseTo(0.25, 3);
+  });
+
+  it('reverse playback wraps backwards in phase space', () => {
+    const time = activate();
+    time.setRate(-1);
+    time.update(5); // -0.25 from 0
+    expect(time.simulationPhase).toBeCloseTo(0.75, 6);
+  });
+
+  it('keeps dirtying frames across a wrap', () => {
+    const time = activate();
+    time.update(20);
+    time.consumeDirty();
+    time.update(0.1);
+    expect(time.consumeDirty()).toBe(true);
+  });
+});

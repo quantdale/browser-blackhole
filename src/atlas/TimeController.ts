@@ -53,6 +53,12 @@ function clamp(value: number, min: number, max: number): number {
   return value < min ? min : value > max ? max : value;
 }
 
+/** Wrap a value into [0, 1) for looping phase-paced playback. */
+function wrap01(value: number): number {
+  const offset = value % 1;
+  return offset < 0 ? offset + 1 : offset;
+}
+
 function finiteOrNull(value: unknown): number | null {
   return typeof value === 'number' && Number.isFinite(value) ? value : null;
 }
@@ -119,14 +125,16 @@ export class TimeController {
   private pausedValue: boolean;
 
   /**
-   * Internal-coordinate units advanced per wall second at 1x user speed.
-   * Derived from the active mapping's `playbackSeconds` (span / seconds);
-   * 1 for mappings that do not declare one, which preserves the legacy
-   * "one internal unit per second" behavior.
+   * Units advanced per wall second at 1x user speed: internal-coordinate units
+   * under `'internal'` pacing, PHASE units under `'phase'` pacing. Derived
+   * from the active mapping's `playbackSeconds`; 1 for mappings that declare
+   * none, which preserves the legacy "one internal unit per second" behavior.
    */
   private baseRateValue = 1;
   /** Active mapping's endpoint policy: wrap (true) or hold (false). */
   private loopValue = false;
+  /** Active mapping's pacing coordinate (see PhaseMapping.pacing). */
+  private pacingValue: 'internal' | 'phase' = 'internal';
 
   /**
    * Sticky "coordinate changed since last consumed" flag (whole-atlas
@@ -222,7 +230,15 @@ export class TimeController {
     // of the user's speed control. See PhaseMapping.playbackSeconds.
     const seconds = finiteOrNull(mapping.playbackSeconds);
     const span = this.internalMax - this.internalMin;
-    this.baseRateValue = seconds !== null && seconds > 0 && span > 0 ? span / seconds : 1;
+    this.pacingValue = mapping.pacing === 'phase' ? 'phase' : 'internal';
+    if (this.pacingValue === 'phase') {
+      // Phase pacing: the base rate is in PHASE units per second, so a full
+      // 0->1 traverse takes exactly `playbackSeconds` however nonlinear the
+      // mapping is.
+      this.baseRateValue = seconds !== null && seconds > 0 ? 1 / seconds : 1;
+    } else {
+      this.baseRateValue = seconds !== null && seconds > 0 && span > 0 ? span / seconds : 1;
+    }
     this.loopValue = mapping.loop === true;
     const before = this.internalTime;
     this.internalTime = clamp(this.internalTime, this.internalMin, this.internalMax);
@@ -268,10 +284,20 @@ export class TimeController {
     const rate = this.baseRateValue * this.rateValue;
     if (dt === 0 || rate === 0) return;
     const before = this.internalTime;
-    const advanced = this.internalTime + rate * dt;
-    this.internalTime = this.loopValue
-      ? this.wrapInternal(advanced)
-      : clamp(advanced, this.internalMin, this.internalMax);
+    if (this.pacingValue === 'phase') {
+      const advancedPhase = this.simulationPhaseValue + rate * dt;
+      const phase = this.loopValue ? wrap01(advancedPhase) : clamp01(advancedPhase);
+      this.internalTime = clamp(
+        this.activeMapping.forward(phase),
+        this.internalMin,
+        this.internalMax
+      );
+    } else {
+      const advanced = this.internalTime + rate * dt;
+      this.internalTime = this.loopValue
+        ? this.wrapInternal(advanced)
+        : clamp(advanced, this.internalMin, this.internalMax);
+    }
     this.markDirtyIfChanged(before);
     this.refreshDerived();
   }
@@ -342,6 +368,11 @@ export class TimeController {
    */
   get basePlaybackRate(): number {
     return this.baseRateValue;
+  }
+
+  /** Coordinate playback advances uniformly (see `PhaseMapping.pacing`). */
+  get pacing(): 'internal' | 'phase' {
+    return this.pacingValue;
   }
 
   /** True when the active mapping wraps at its endpoints instead of holding. */

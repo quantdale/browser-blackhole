@@ -283,6 +283,18 @@ export interface RibbonConfig {
 export interface RibbonHandle {
   /** Replace the spine polyline (world space) and rebuild vertex data. */
   setSpine(points: THREE.Vector3[]): void;
+  /**
+   * Multiply the configured widths for subsequent {@link setSpine} calls.
+   *
+   * Ribbon width is baked into vertex positions in WORLD units, which is fine
+   * for a fixed-scale scene and useless for one whose scale grows by orders of
+   * magnitude: a tidal-disruption debris stream that is a comfortable ribbon at
+   * 300 scene units is a sub-pixel thread once the view has to pull back to
+   * thousands. A destination that re-spines every frame can keep the ON-SCREEN
+   * width roughly constant by scaling with its own framing distance. Clamped to
+   * a positive value; 1 restores the configured widths.
+   */
+  setWidthScale(scale: number): void;
   object3d(): THREE.Object3D;
   setVisible(visible: boolean): void;
   dispose(): void;
@@ -411,6 +423,14 @@ export interface ICameraRig {
   captureTransform(): CameraArrivalPreset;
   setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
   getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
+  /**
+   * Replace the orbit-distance limits (scene units). Destinations whose scene
+   * is larger or smaller than the default [0.5, 500] declare their own range in
+   * `enter()`; the limits also bound wheel zoom. Invalid ranges are ignored.
+   */
+  setDistanceLimits(minDistance: number, maxDistance: number): void;
+  /** Current orbit-distance limits (scene units). */
+  getDistanceLimits(): { min: number; max: number };
   setTarget(target: THREE.Vector3): void;
   setFov(fovDeg: number): void;
   setControlsEnabled(enabled: boolean): void;
@@ -628,6 +648,27 @@ export interface PhaseMapping {
    * behavior of one internal unit per wall second.
    */
   playbackSeconds?: number;
+  /**
+   * Which coordinate playback advances uniformly.
+   *
+   * - `'internal'` (default): the internal simulation coordinate advances at a
+   *   constant rate, so speed is uniform in PHYSICAL time.
+   * - `'phase'`: the normalized UI phase advances at a constant rate, so a
+   *   PIECEWISE or LOG mapping is traversed according to the segment weights
+   *   its author chose.
+   *
+   * The distinction matters whenever a mapping is nonlinear. A tidal
+   * disruption spans about -3 h to +3 yr around periapsis and the actual
+   * disruption lasts minutes, so its mapping deliberately gives the early
+   * stages a large share of the phase axis and compresses the late fallback
+   * logarithmically. Advancing uniformly in physical seconds throws that
+   * design away: the interesting minutes flash past and the viewer then waits
+   * out years of near-static fallback. Advancing uniformly in phase honours
+   * the weighting. The physical-time READOUT is unaffected either way — only
+   * the rate of advance differs, which is exactly what a nonlinear time axis
+   * means (ARCHITECTURE §8).
+   */
+  pacing?: 'internal' | 'phase';
   /**
    * When true, playback wraps at the mapping's endpoints instead of holding
    * there. Cinematic destinations (an explosion, a merger, an encounter) run

@@ -92,6 +92,12 @@ interface AtlasHook {
         loop: boolean;
       };
     };
+    /** Orbit rig; specs read limits and drive user-style camera changes. */
+    cameraRig: {
+      getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
+      setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
+      getDistanceLimits(): { min: number; max: number };
+    };
     /** Quality surface used to pin tiers in deterministic spec flows. */
     governor: {
       configure(config: { qualityMode?: 'auto' | 'low' | 'medium' | 'high' | 'ultra' }): void;

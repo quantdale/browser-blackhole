@@ -41,14 +41,24 @@ interface TimelineSegment {
 // Segment weights only: boundaries derive per scenario in segmentsFor()
 // from Barker timing (pre-disruption) and the fallback anchor (post).
 const SEGMENTS: readonly TimelineSegment[] = [
-  { phase: 'approach', weight: 0.14, log: false },
-  { phase: 'deformation', weight: 0.13, log: false },
-  { phase: 'disruption', weight: 0.08, log: false },
-  { phase: 'debris', weight: 0.18, log: true },
-  { phase: 'winding', weight: 0.17, log: true },
-  { phase: 'shock', weight: 0.18, log: true },
-  { phase: 'nascent-disk', weight: 0.12, log: true }
+  { phase: 'approach', weight: 0.1, log: false },
+  { phase: 'deformation', weight: 0.14, log: false },
+  { phase: 'disruption', weight: 0.12, log: false },
+  { phase: 'debris', weight: 0.1, log: true },
+  { phase: 'winding', weight: 0.07, log: true },
+  { phase: 'shock', weight: 0.28, log: true },
+  { phase: 'nascent-disk', weight: 0.19, log: true }
 ];
+
+/**
+ * Canonical weight lookup. `segmentsFor` used to repeat these numbers, and the
+ * duplication silently desynchronised the two tables (their sum stopped being 1
+ * and the phase mapping's forward/inverse round-trip broke at the top end).
+ * SEGMENTS is the single source of truth.
+ */
+function weightOf(phase: TdePhase): number {
+  return SEGMENTS.find((segment) => segment.phase === phase)?.weight ?? 0;
+}
 
 /**
  * Absolute (simulation-clock) segment boundaries for one scenario.
@@ -108,26 +118,63 @@ function segmentsFor(encounter: ResolvedTdeEncounter): readonly AbsoluteSegment[
   // Monotone post-disruption boundaries derived from ONE anchor S.
   const debrisEnd = Math.max(edge * 1.000001, s * 0.3);
   const windingEnd = Math.max(debrisEnd * 1.000001, s * 0.85);
+  // Stage weights = share of the PHASE axis, hence of wall-clock playback time
+  // (the mapping is phase-paced). They are a presentation choice and the
+  // physical-time readout is unaffected. Rebalanced during the
+  // phenomena-animation campaign: the debris/winding stages are a long,
+  // near-empty coast while the gas is out on its orbits, and the shock and
+  // nascent-disk stages are where the observable flare and disc assembly
+  // happen, so weight follows what there is to SEE rather than duration.
   return [
     {
       phase: 'approach',
-      weight: 0.14,
+      weight: weightOf('approach'),
       startSeconds: b.approachStartSeconds,
       endSeconds: b.deformationStartSeconds,
       log: false
     },
     {
       phase: 'deformation',
-      weight: 0.13,
+      weight: weightOf('deformation'),
       startSeconds: b.deformationStartSeconds,
       endSeconds: -edge,
       log: false
     },
-    { phase: 'disruption', weight: 0.08, startSeconds: -edge, endSeconds: edge, log: false },
-    { phase: 'debris', weight: 0.18, startSeconds: edge, endSeconds: debrisEnd, log: true },
-    { phase: 'winding', weight: 0.17, startSeconds: debrisEnd, endSeconds: windingEnd, log: true },
-    { phase: 'shock', weight: 0.18, startSeconds: windingEnd, endSeconds: s * 2.4, log: true },
-    { phase: 'nascent-disk', weight: 0.12, startSeconds: s * 2.4, endSeconds: s * 9, log: true }
+    {
+      phase: 'disruption',
+      weight: weightOf('disruption'),
+      startSeconds: -edge,
+      endSeconds: edge,
+      log: false
+    },
+    {
+      phase: 'debris',
+      weight: weightOf('debris'),
+      startSeconds: edge,
+      endSeconds: debrisEnd,
+      log: true
+    },
+    {
+      phase: 'winding',
+      weight: weightOf('winding'),
+      startSeconds: debrisEnd,
+      endSeconds: windingEnd,
+      log: true
+    },
+    {
+      phase: 'shock',
+      weight: weightOf('shock'),
+      startSeconds: windingEnd,
+      endSeconds: s * 2.4,
+      log: true
+    },
+    {
+      phase: 'nascent-disk',
+      weight: weightOf('nascent-disk'),
+      startSeconds: s * 2.4,
+      endSeconds: s * 9,
+      log: true
+    }
   ];
 }
 
@@ -213,6 +260,14 @@ export function formatEncounterSeconds(seconds: number): string {
   return `${sign}${(a / (365.25 * 86400)).toFixed(1)} yr`;
 }
 
+/**
+ * Wall-clock seconds for one full traverse of the encounter at 1x. The stage
+ * weights in `segmentsFor` then decide how much of it each stage gets: ~13% for
+ * the deformation, ~8% across periapsis, and the rest spread logarithmically
+ * over debris, winding, shock and nascent disk.
+ */
+export const TIMELINE_PLAYBACK_SECONDS = 60;
+
 /** Build the TimeController-compatible PhaseMapping for this destination. */
 export function makeTdePhaseMapping(encounter: ResolvedTdeEncounter): PhaseMapping {
   return {
@@ -221,6 +276,15 @@ export function makeTdePhaseMapping(encounter: ResolvedTdeEncounter): PhaseMappi
     forward: (phase01) => uiPhaseToSeconds(phase01, encounter),
     inverse: (internal) => secondsToUiPhase(internal, encounter),
     formatDisplay: (internal) =>
-      `${formatEncounterSeconds(internal)} · ${tdePhaseAt(internal, encounter)}`
+      `${formatEncounterSeconds(internal)} · ${tdePhaseAt(internal, encounter)}`,
+    // The encounter spans ~-3 h to ~+3 yr of physical time and the disruption
+    // itself lasts minutes, which is exactly why the segment table above
+    // weights the phase axis by STAGE rather than by duration. Pace playback in
+    // that phase coordinate so each stage gets the share of wall time it was
+    // given: advancing uniformly in seconds instead needed ~173 real DAYS for
+    // one traverse, which is why this destination looked frozen.
+    playbackSeconds: TIMELINE_PLAYBACK_SECONDS,
+    pacing: 'phase',
+    loop: true
   };
 }
