@@ -378,6 +378,15 @@ export class CameraRig implements ICameraRig {
     this.dirty = true;
   }
 
+  /**
+   * True while an arrival/preset ease is still interpolating. Consumers that
+   * want to take over the camera (see AutoFramer) must wait for this to clear:
+   * `setOrbit` cancels the in-flight animation.
+   */
+  isAnimating(): boolean {
+    return this.animation !== null;
+  }
+
   getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number } {
     return {
       azimuthDeg: this.azimuthDeg,

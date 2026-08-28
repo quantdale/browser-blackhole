@@ -1,13 +1,157 @@
-# ACTIVE CAMPAIGN OVERRIDE — 2026-08-28
+# ACTIVE CAMPAIGN OVERRIDE — 2026-08-29
 
-The repository remains production-certified for the pre-optimization product baseline, but a new active hardening campaign is now selected:
+The active work is the **phenomena-animation campaign** (see the 2026-08-29
+session entry immediately below). It was selected by explicit user redirect:
+every non-black-hole destination was reported as visually static or
+non-functional, which outranked further performance optimization.
+
+The performance campaign is **PAUSED mid-flight**, not abandoned:
 
 `openspec/changes/whole-atlas-performance-optimization/`
 
-Canonical fast audit: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`.
-Canonical execution instructions: `.agent/START_HERE.md` → `.agent/EXECUTION_PROMPT.md` → active OpenSpec `EXECUTION_PROMPT.md`.
+Resume it at `tasks.md` §4 (startup / code splitting). WS1 (frame invalidation)
+and WS2 (transition occlusion) are landed and certified; §1 telemetry is in
+place. Nothing in the phenomena campaign invalidates that work — the
+invalidation model was in fact the measurement instrument that proved the
+destinations were frozen (`framesSkipped = 0` everywhere ruled out the
+invalidation gate as the cause).
 
-Do not interpret older "no active campaign" / "certified production-ready" historical lines below as meaning there is no current work. They remain historical release evidence; the active performance-hardening checklist is currently unexecuted.
+## 2026-08-29 session — PHENOMENA ANIMATION: all seven non-black-hole destinations
+
+**Mission (user directive):** "the rest could not be [acceptable] ... They are
+either static like nothing is going on, or just not functional at all. Fix
+this. Work on one astrophysical phenomena and ensure that it is working
+correctly before proceeding to the next."
+
+### Method
+
+A measurement ledger over all eight destinations (scratchpad `ledger.mjs`)
+captured, per destination: `debugInventory().rendererInfo` draw/triangle counts,
+frame telemetry (`framesRendered` / `framesSkipped` / reason counts),
+`time.snapshot()` and the destination's own debug time at two instants, and the
+MEAN ABSOLUTE LUMINANCE DELTA of the PRESENTED frame across a window of
+animation frames. That last number is the one every pre-existing per-destination
+suite was missing: they all asserted that debug numbers moved when the timeline
+was scrubbed, which a permanently frozen scene satisfies.
+
+Baseline (2026-08-29, hardware WebGPU, intel gen-12lp): mean |Δluma| per
+interval and phase advance over the window.
+
+| destination | before | after |
+| --- | --- | --- |
+| galaxy-collision | 0.00, phase pinned 1.000 | 2.1-3.5, 0.299 -> 0.496 |
+| quasar-agn | 0.00, phase pinned 1.000 | 0.23-0.34, 0.106 -> 0.903 |
+| tidal-disruption | 0.00, 0.1601 -> 0.1606 | 9.8-18.6, 0.207 -> 0.435 |
+| black-hole-merger | 0.4-0.7, 0.080 -> 0.082 | 3.7-4.7, 0.160 -> 0.445 |
+| stellar-explosion | 0.00, 0.000 -> 0.008 | 1.1-49.8, 0.059 -> 0.465 |
+| compact-merger | saturated after ~28 s | 4.0-16.9, 0.064 -> 0.296, loops |
+| neutron-star | saturated after ~50 s | 9.4-32.9, 0.045 -> 0.322, loops |
+
+black-hole is unchanged and still reports 0.00 with phase pinned at 1.000: it
+registers no phase mapping and its visuals do not consume the timeline. That is
+OUT OF SCOPE by the same user directive ("you may skip the blackhole as of
+now") and is the one destination the user called acceptable.
+
+### Root causes (all shared-runtime defects, not per-destination polish)
+
+1. **Timeline saturation / pacing.** `TimeController` advanced the INTERNAL
+   coordinate at one unit per wall second. Internal spans across the atlas
+   differ by seven orders of magnitude, so a tidal disruption needed ~173 real
+   DAYS for one traverse and a supernova ~208 days, while destinations with no
+   registered mapping saturated the identity mapping's 0->1 span in ONE SECOND
+   and held there. `PhaseMapping` now carries `playbackSeconds` (wall-clock
+   seconds per traverse), `pacing: 'internal' | 'phase'` (phase pacing honours a
+   piecewise/log mapping's own stage weights) and `loop`.
+2. **Paused arrival.** Four destinations called `time.pause()` in `enter()`.
+   Arrival autoplay is now a policy — `resumeUnlessExplicitlyPaused()` — which
+   respects a deliberate pause (a viewer who paused before navigating, and the
+   visual-golden harness, which pauses BEFORE navigating on purpose).
+3. **Volume density units.** `VolumeService` integrates
+   `alpha = 1 - exp(-density * dt)` with dt in SCENE UNITS, so a density of
+   order 1 saturates a single sample in any volume tens of units across. The
+   AGN torus, the TDE shock torus and the supernova ejecta all rendered as flat
+   opaque shapes. Each is now normalized by its own crossing length to a
+   documented target optical depth. The validated density MODELS are untouched
+   (their CPU/GPU parity oracles compare the model, not the presented alpha).
+4. **Particle size units.** `ParticleService` left `sizeAttenuation` at the
+   PointsMaterial default of `true`, so the config's `sizePx` behaved as a
+   world size over view depth. Any population the camera approaches inflated
+   into frame-filling bokeh. `sizePx` now means pixels.
+5. **WebGPU point primitives.** Galaxy collision drew its tracers as
+   `THREE.Points`, which WebGPU renders as 1-PIXEL points with point size
+   ignored entirely; the tidal structure was a near-black pixel scatter. It now
+   uses the instanced-sprite path `ParticleService` already proved.
+6. **Camera limits.** The rig hardcoded an orbit-distance range of [0.5, 500]
+   and the host a far plane of 5000 scene units, so larger scenes were silently
+   clamped (AGN galactic zone) or rendered pure BLACK (TDE debris framing).
+   Destinations now declare `setDistanceLimits`, and the clip range follows the
+   orbit distance statelessly.
+7. **Missing camera uniforms.** The Quasar/AGN INNER zone created a
+   `createBlackHoleLensingPass` and never called `setUniformsFromState`, so the
+   advertised "DIRECT GR reuse" view was a flat purple wash with no black hole
+   in it. New shared `lensingCameraUniformState()` helper.
+8. **Kerr step budget.** The BBH remnant ran the Kerr integrator with 140-380
+   steps where the black-hole destination gets 256-2048, at a 60 M escape
+   radius instead of 32 M: most of the frame terminated as RAY_MAX_STEPS, which
+   the product path paints NUMERICAL_FAILURE magenta by policy. Aligned.
+
+### New shared capability
+
+- `src/renderer/shared/AutoFramer.ts` — disclosed camera auto-framing for
+  destinations whose scene scale changes by orders of magnitude (TDE, SN). Only
+  the orbit distance is driven; the viewer takes it back permanently on any
+  manual change; it arms on the rig's own `isAnimating()` state (a wall-clock
+  delay made paused captures nondeterministic) and SNAPS instead of easing while
+  the timeline is paused, so a scrubbed frame is a settled frame.
+- `RibbonHandle.setWidthScale` — ribbons bake width into vertex positions in
+  world units, which is useless for a scene that grows by orders of magnitude.
+- `measurePresentedMotion` / `expectPresentedMotion` in the browser harness —
+  the regression gate for this whole class of defect.
+- `awaitDestinationTimeSynced` — the postcondition that stays correct now that
+  destinations arrive PLAYING ("the readout changed" is satisfied by one frame
+  of ordinary playback before a scrub is applied).
+
+### Validation evidence (2026-08-29)
+
+- Unit suite **572/572 PASS** (24 new: pacing/loop/phase-pacing/autoplay policy,
+  camera clip range and distance limits, AGN variability surrogate, TDE stage
+  weights).
+- Per-destination browser suites, all PASS with new presented-motion tests:
+  galaxy-collision 7/7, quasar-agn 12/12, tidal-disruption 23/23,
+  black-hole-merger 14/14, stellar-explosion 15/15,
+  compact-merger + neutron-star 27/27.
+- `visual-goldens.spec.ts` **43/43 PASS**. 18 baselines were DELIBERATELY
+  regenerated (SN_FLASH/EXPANSION/HYPERNOVA/GRB_ON/GRB_OFF, TDE_APPROACH/
+  WINDING/SHOCK/NASCENT_DISK, AGN_INNER_ENGINE/NUCLEAR/RADIO_GALAXY/BLAZAR_VIEW,
+  GC_ENCOUNTER/BRIDGE_TAIL, BHM_RINGDOWN/REMNANT) for the reasons above. Every
+  black-hole-family row (BH_CLASSIC, KERR_*, OBSERVER_*, ATLAS_DIAGNOSTIC,
+  ATLAS_HYPERSPACE_BH_NS) passed UNCHANGED, which is the evidence that the
+  shared-runtime edits did not disturb the certified destination.
+- Golden-gate defect found and fixed on the way: `BHM_RINGDOWN` and
+  `BHM_REMNANT` had no explicit `scrubPhase`, and the harness's determinism step
+  scrubs to `scrubPhase ?? 0` AFTER arrival — so both rows captured the INSPIRAL
+  and their committed baselines showed two inspiralling holes. The Kerr swap
+  they exist to guard was never being compared.
+
+### Known limitations recorded, not hidden
+
+- **Kerr polar band.** Escaped rays that graze within `sin(theta) < 0.04` of the
+  spin axis are reclassified as numerical failures by the integrator's pole
+  policy and painted magenta, leaving a thin band through the poles in any Kerr
+  view near the equatorial plane (BBH remnant; the black-hole Kerr presets share
+  it). Pre-existing Kerr-backend limitation, out of this campaign's scope. The
+  `BHM_REMNANT` golden baseline and notes say so explicitly rather than hiding
+  it, and the new BBH test BOUNDS the failure population (< 20% of sampled
+  cells) instead of asserting zero.
+- **Quasar/AGN galactic zone is static by construction.** kpc-scale jet and host
+  structure evolves over Myr, which a 400-day timeline cannot show. No motion is
+  faked there; the debug snapshot's `zoneMotion` field states this per zone.
+- **Black hole** remains untouched per the user directive.
+
+Next action: the phenomena work is complete for all seven destinations. Either
+resume `whole-atlas-performance-optimization` at tasks.md §4, or open a scoped
+change for the Kerr pole-passage numerics (the only known visible artifact left
+in the atlas).
 
 ## 2026-08-28 session — WS1 failures root-caused; WS3/§5 startup splitting landed
 

@@ -574,7 +574,6 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // advanced unless the viewer found the transport.
     ctx.services.time.resumeUnlessExplicitlyPaused();
     autoFramer.reset();
-    lastPhysicalTime = Number.NaN;
     uOrbitPhase.value = 0;
     // The rig's default ceiling is 500 scene units, which silently clamped
     // both the auto-framing and the viewer's own zoom while the debris arcs
@@ -657,8 +656,6 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     minUnits: AUTO_FRAME_MIN_UNITS,
     maxUnits: AUTO_FRAME_MAX_UNITS
   });
-  /** Previous frame's physical time, for the orbital-phase integrator. */
-  let lastPhysicalTime = Number.NaN;
   function updateStreams(tSinceDisruption: number, viewDistanceUnits: number): void {
     const ready = assertReady();
     if (
@@ -812,14 +809,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       shockRadiusMetres > 0
         ? Math.sqrt(res.muSiM3S2 / (shockRadiusMetres * shockRadiusMetres * shockRadiusMetres))
         : 0;
-    const physicalDtSeconds = Number.isFinite(lastPhysicalTime) ? t - lastPhysicalTime : 0;
-    lastPhysicalTime = t;
-    if (Number.isFinite(orbitOmega) && orbitOmega > 0 && physicalDtSeconds !== 0) {
-      // Wrap into [0, 2pi) so the accumulator stays exact over long runs.
-      const advanced = uOrbitPhase.value + orbitOmega * physicalDtSeconds;
-      const twoPi = Math.PI * 2;
-      uOrbitPhase.value = ((advanced % twoPi) + twoPi) % twoPi;
-    }
+    // PURE FUNCTION of the timeline coordinate, deliberately not an integrator:
+    // accumulating `omega * dt` made the pattern depend on the scrub HISTORY, so
+    // two visits to the same coordinate rendered differently (it broke the
+    // deterministic-replay contract and the TDE_SHOCK golden was unreproducible
+    // between runs). Using the CURRENT rate times elapsed time since disruption
+    // is a disclosed presentation choice: the instantaneous angular rate is the
+    // physical one, the accumulated angle is not path-integrated.
+    const twoPi = Math.PI * 2;
+    const orbitPhaseRaw = Number.isFinite(orbitOmega) ? orbitOmega * tau : 0;
+    uOrbitPhase.value = Number.isFinite(orbitPhaseRaw)
+      ? ((orbitPhaseRaw % twoPi) + twoPi) % twoPi
+      : 0;
 
     // --- shock volume (phase-gated; gain separated from geometric state) -------
     const volumeVisible = disrupts && phase === 'shock';

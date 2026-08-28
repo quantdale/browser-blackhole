@@ -11,10 +11,14 @@
  *
  * CONTRACT
  * - Only the orbit DISTANCE is touched. Azimuth and polar stay user-owned.
- * - The rig runs its own arrival ease for the first fraction of a second after
- *   `reset()`; writing during that window would cancel it (`setOrbit` clears the
- *   in-flight animation), so the framer stays hands-off until `armDelaySeconds`
- *   has elapsed and adopts whatever the ease left behind as its baseline.
+ * - The rig runs its own arrival/preset ease after `reset()`; writing during it
+ *   would cancel that animation (`setOrbit` clears it), so the framer stays
+ *   hands-off until `rig.isAnimating()` clears and then adopts whatever the ease
+ *   left behind as its baseline. Arming on the rig's OWN state rather than a
+ *   wall-clock delay is what makes a paused capture deterministic: with a delay,
+ *   whether the framer already owned the distance depended on how long the
+ *   caller happened to wait, so two captures of the same scrubbed instant could
+ *   differ (a visual-golden row was unreproducible between runs).
  * - Once armed, the framer eases the distance toward `margin * extent` and
  *   compares the rig's live distance against the value it last wrote. Any
  *   discrepancy means the VIEWER moved the camera, and the framer disables
@@ -37,7 +41,11 @@ export interface AutoFramerOptions {
   lerpPerSecond: number;
   /** Relative distance discrepancy that counts as "the viewer took over". */
   userEpsilon: number;
-  /** Seconds after reset() before the takeover check arms. */
+  /**
+   * Fallback ceiling (seconds) after which the framer arms even if the rig still
+   * claims to be animating. Guards against a rig implementation whose animation
+   * never clears; normal arming is driven by `rig.isAnimating()`.
+   */
   armDelaySeconds: number;
 }
 
@@ -45,6 +53,8 @@ export interface AutoFramerOptions {
 export interface AutoFramerRig {
   getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
   setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
+  /** True while the rig's own arrival/preset ease is still interpolating. */
+  isAnimating(): boolean;
 }
 
 const DEFAULTS: AutoFramerOptions = {
@@ -102,7 +112,8 @@ export class AutoFramer {
     if (!this.enabledValue) return orbit.distance;
 
     this.ageSeconds += Math.max(dtSeconds, 0);
-    if (this.ageSeconds < this.options.armDelaySeconds) {
+    const easing = rig.isAnimating() && this.ageSeconds < this.options.armDelaySeconds;
+    if (easing) {
       // The rig's arrival ease owns the camera: neither read a baseline from it
       // nor write to it.
       return orbit.distance;

@@ -710,6 +710,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
   {
     name: 'BHM_RINGDOWN',
     url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-ringdown',
+    // EXPLICIT scrubPhase is required: the determinism step pauses and scrubs to
+    // `scrubPhase ?? 0` AFTER arrival, which overrides the preset's own initial
+    // phase. Without it this row captured the INSPIRAL — the committed baseline
+    // showed two inspiralling holes, so the Kerr ringdown swap this row exists
+    // to guard was never actually compared. 0.72 is inside the ringdown segment
+    // (inspiral 0.55 + merger 0.12 + ringdown 0.10).
+    scrubPhase: 0.72,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
     notes:
@@ -718,10 +725,13 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
   {
     name: 'BHM_REMNANT',
     url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-remnant',
+    // See BHM_RINGDOWN: without an explicit scrubPhase this row also captured
+    // the inspiral. 0.9 is inside the remnant segment.
+    scrubPhase: 0.9,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
     notes:
-      'Final Kerr remnant view (mass 0.9516 M, |chi| = 0.6865). Must differ geometrically from KERR presets only through the source-derived parameters; catches silent parameter drift.'
+      'Final Kerr remnant view (mass 0.9516 M, |chi| = 0.6865). Must differ geometrically from KERR presets only through the source-derived parameters; catches silent parameter drift. KNOWN LIMITATION visible in this baseline: a thin NUMERICAL_FAILURE band along the spin axis, where escaped rays that grazed within sin(theta) < 0.04 of the axis are reclassified as failures by the Kerr integrator pole policy. It is a Kerr-backend limitation shared with the black-hole Kerr presets, not a regression of this destination; the baseline shows what the app actually renders rather than hiding it.'
   },
   // --- M10 moving-observer goldens -------------------------------------------
   // The observer worldline is frozen at the deterministic epoch tau = 0

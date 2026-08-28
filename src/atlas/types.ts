@@ -423,6 +423,8 @@ export interface ICameraRig {
   captureTransform(): CameraArrivalPreset;
   setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
   getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
+  /** True while an arrival/preset ease is still interpolating. */
+  isAnimating(): boolean;
   /**
    * Replace the orbit-distance limits (scene units). Destinations whose scene
    * is larger or smaller than the default [0.5, 500] declare their own range in
