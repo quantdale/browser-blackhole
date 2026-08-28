@@ -1,0 +1,110 @@
+{
+  "schemaVersion": 2,
+  "kind": "neutron-star-benchmark",
+  "date": "2026-08-28T11:36:18.435Z",
+  "label": "ns-run",
+  "commit": "90b107ec63ebb988bb2145048383187c50ccef2f",
+  "destination": "neutron-star",
+  "preset": "surface",
+  "surfaceRayBackend": "direct-schwarzschild-material-surface",
+  "surfaceLensingWired": true,
+  "surfaceRadiusRg": 5.804742958725859,
+  "browser": {
+    "name": "msedge",
+    "version": "151.0.0.0"
+  },
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "platform": "Win32",
+  "adapter": {
+    "name": "intel gen-12lp"
+  },
+  "backend": "webgpu",
+  "forcedBackend": "webgpu",
+  "timestampQueryAvailable": true,
+  "viewportCss": [
+    1280,
+    800
+  ],
+  "devicePixelRatio": 1,
+  "effectiveRenderSize": [
+    778,
+    581
+  ],
+  "quality": {
+    "requested": "medium",
+    "effectiveTier": "medium"
+  },
+  "renderScale": 0.8,
+  "warmupMs": 9000,
+  "sampleFrames": 480,
+  "frameCpuMs": {
+    "min": 5.6,
+    "median": 54.4,
+    "p90": 102.8,
+    "p95": 103,
+    "p99": 115,
+    "max": 115.4,
+    "mean": 52.61,
+    "stdev": 30.97
+  },
+  "rendererInfo": {
+    "render": {
+      "frameCalls": 3,
+      "drawCalls": 4,
+      "triangles": 3,
+      "points": 0,
+      "lines": 3024
+    },
+    "compute": {
+      "frameCalls": 0
+    },
+    "memory": {
+      "geometries": 4,
+      "textures": 5,
+      "programs": 12,
+      "renderTargets": 2,
+      "storageAttributes": 0,
+      "uniformBuffers": 9,
+      "totalBytes": 10915115
+    }
+  },
+  "renderTelemetry": {
+    "framesObserved": 485,
+    "framesRendered": 485,
+    "framesSkipped": 0,
+    "lastFrameWork": {
+      "destinationUpdated": true,
+      "destinationDrawn": true,
+      "postPresented": true
+    }
+  },
+  "frameGpuMs": {
+    "lastResolvedFrame": 50.66
+  },
+  "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+  "memory": {
+    "estimatedGpuBytesTotal": 4541644,
+    "textureCount": 0,
+    "resourceScopes": [
+      {
+        "name": "shared-post",
+        "textures": 0,
+        "bytes": 3470760
+      },
+      {
+        "name": "transition-director",
+        "textures": 0,
+        "bytes": 921600
+      },
+      {
+        "name": "destination:neutron-star",
+        "textures": 0,
+        "bytes": 149284
+      }
+    ]
+  },
+  "consoleErrors": 0,
+  "suppressedConsoleErrors": 0,
+  "consoleErrorSamples": [],
+  "notes": "neutron-star direct Schwarzschild surface-ray pass; paused at phase 0"
+}

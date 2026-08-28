@@ -4,17 +4,39 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 0. Baseline and audit evidence
 
-- [ ] Record start SHA and dirty-state check.
-- [ ] Record Node/npm/Three.js/Vite/Playwright versions.
-- [ ] Create current per-destination WebGPU benchmark matrix.
-- [ ] Create forced-WebGL2 capable-runner matrix.
-- [ ] Record internal pixel sizes, tier, render scale and adapter for every row.
-- [ ] Record renderer.info render/compute/memory counters.
-- [ ] Record ResourceManager totals.
-- [ ] Record GPU timestamps where available.
+> **2026-08-28: baseline recorded.** Artifact:
+> `benchmarks/results/2026-08-28-ws0-baseline/SUMMARY.md` + 18 raw
+> `schemaVersion: 2` records. Every row proves it actually rendered
+> (`renderTelemetry.framesRendered == framesObserved`), which the previous
+> harness shape could not — see the §1 note on why that mattered.
+>
+> Headline findings: Kerr costs 192 ms GPU/frame against 0.4-4 ms for six of
+> nine rows; neutron star is the unexpected second-heaviest at 51 ms, ahead
+> of the full numerical Schwarzschild black hole at 20 ms; and WebGL2 runs
+> the two heaviest full-screen shaders roughly TWICE AS FAST as WebGPU on
+> this adapter (kerr 93 vs 192, NS 26 vs 51), corroborated independently by
+> the CPU and GPU columns. That last one should be characterized before any
+> Kerr shader micro-optimization, or §14 risks optimizing the wrong layer.
+
+- [x] Record start SHA and dirty-state check.
+- [x] Record Node/npm/Three.js/Vite/Playwright versions.
+- [x] Create current per-destination WebGPU benchmark matrix.
+- [x] Create forced-WebGL2 capable-runner matrix.
+      All nine harnesses run under `--force-backend=webgl2` as well.
+- [x] Record internal pixel sizes, tier, render scale and adapter for every row.
+- [x] Record renderer.info render/compute/memory counters.
+- [x] Record ResourceManager totals.
+      Present for seven of nine harnesses; the galaxy-collision and
+      stellar-explosion harnesses do not emit it and the gap is recorded as
+      `-` rather than filled in.
+- [x] Record GPU timestamps where available.
+      Available everywhere: `timestampQuery: true` on this adapter.
 - [ ] Record cold navigation and warm navigation for every destination.
+      Not implemented in the harnesses.
 - [ ] Record startup bundle/chunk sizes and first-interactive timing.
-- [ ] Archive baseline under benchmarks/results with exact SHA.
+      Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive
+      timing is not, so this stays unchecked rather than half-claimed.
+- [x] Archive baseline under benchmarks/results with exact SHA.
 
 ## 1. Shared telemetry
 

@@ -1,0 +1,117 @@
+{
+ "schemaVersion": 2,
+ "kind": "kerr-numerical-characterization",
+ "date": "2026-08-28T11:43:46.817Z",
+ "label": "run",
+ "commit": "90b107ec63ebb988bb2145048383187c50ccef2f",
+ "destination": "black-hole",
+ "preset": "kerr-high-prograde",
+ "metric": "kerr",
+ "spin": {
+  "value": 0.9,
+  "convention": "signed dimensionless a*; +Y axis; disk +Y-corotating"
+ },
+ "kerrDiskInnerRg": 2.320883041761887,
+ "trajectoryBackend": {
+  "requested": "kerr",
+  "effective": "numerical-kerr"
+ },
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": ""
+ },
+ "backend": "webgl2",
+ "forcedBackend": "webgl2",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  778,
+  581
+ ],
+ "quality": {
+  "requested": "medium",
+  "effectiveTier": "medium"
+ },
+ "renderScale": 0.8,
+ "activityMode": "stable",
+ "warmupMs": 9000,
+ "sampleFrames": 600,
+ "frameCpuMs": {
+  "min": 93.9,
+  "median": 103,
+  "p90": 109,
+  "p95": 109.1,
+  "p99": 115.1,
+  "max": 115.3,
+  "mean": 102.57,
+  "stdev": 4.11
+ },
+ "rendererInfo": {
+  "render": {
+   "frameCalls": 3,
+   "drawCalls": 3,
+   "triangles": 3,
+   "points": 0,
+   "lines": 0
+  },
+  "compute": {
+   "frameCalls": 0
+  },
+  "memory": {
+   "geometries": 3,
+   "textures": 5,
+   "programs": 10,
+   "renderTargets": 2,
+   "storageAttributes": 0,
+   "uniformBuffers": 8,
+   "totalBytes": 10798878
+  }
+ },
+ "renderTelemetry": {
+  "framesObserved": 604,
+  "framesRendered": 604,
+  "framesSkipped": 0,
+  "lastFrameWork": {
+   "destinationUpdated": true,
+   "destinationDrawn": true,
+   "postPresented": true
+  }
+ },
+ "frameGpuMs": {
+  "lastResolvedFrame": 93.11
+ },
+ "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+ "memory": {
+  "estimatedGpuBytesTotal": 4918696,
+  "textureCount": 0,
+  "resourceScopes": [
+   {
+    "name": "shared-post",
+    "textures": 0,
+    "bytes": 3470760
+   },
+   {
+    "name": "transition-director",
+    "textures": 0,
+    "bytes": 921600
+   },
+   {
+    "name": "destination:black-hole",
+    "textures": 0,
+    "bytes": 526336
+   }
+  ]
+ },
+ "consoleErrors": 0,
+ "consoleErrorSamples": [],
+ "notes": "governor-managed dynamic resolution"
+}

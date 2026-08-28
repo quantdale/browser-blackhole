@@ -1,0 +1,64 @@
+{
+ "label": "run",
+ "commit": "uncommitted",
+ "preset": "core-collapse",
+ "timelinePhase": 0.55,
+ "browser": "Edge 151.0.0.0",
+ "adapter": "",
+ "backend": "webgl2",
+ "forcedBackend": "webgl2",
+ "scene": "STELLAR_EXPLOSION_CORE_COLLAPSE",
+ "viewport": [
+  1280,
+  800
+ ],
+ "internal": [
+  768,
+  640
+ ],
+ "quality": "medium",
+ "requestedQuality": "medium",
+ "renderScale": 0.8,
+ "activityMode": "stable",
+ "medianMs": 6.1,
+ "p90Ms": 6.2,
+ "p95Ms": 6.3,
+ "p99Ms": 12.2,
+ "samples": 600,
+ "rendererInfo": {
+  "render": {
+   "frameCalls": 16,
+   "drawCalls": 17,
+   "triangles": 61966,
+   "points": 0,
+   "lines": 0
+  },
+  "compute": {
+   "frameCalls": 0
+  },
+  "memory": {
+   "geometries": 5,
+   "textures": 18,
+   "programs": 26,
+   "renderTargets": 14,
+   "storageAttributes": 2,
+   "uniformBuffers": 28,
+   "totalBytes": 16474402
+  }
+ },
+ "renderTelemetry": {
+  "framesObserved": 605,
+  "framesRendered": 605,
+  "framesSkipped": 0,
+  "lastFrameWork": {
+   "destinationUpdated": true,
+   "destinationDrawn": true,
+   "postPresented": true
+  }
+ },
+ "frameGpuMs": {
+  "lastResolvedFrame": 4
+ },
+ "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+ "consoleErrors": 0
+}

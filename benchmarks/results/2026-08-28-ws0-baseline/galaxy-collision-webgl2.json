@@ -1,0 +1,64 @@
+{
+ "label": "run",
+ "commit": "uncommitted",
+ "preset": "bridge-tail",
+ "timelinePhase": 0.5,
+ "browser": "Edge 151.0.0.0",
+ "adapter": "",
+ "backend": "webgl2",
+ "forcedBackend": "webgl2",
+ "scene": "GALAXY_COLLISION_BRIDGE_TAIL",
+ "viewport": [
+  1280,
+  800
+ ],
+ "internal": [
+  768,
+  640
+ ],
+ "quality": "medium",
+ "requestedQuality": "medium",
+ "renderScale": 0.8,
+ "activityMode": "stable",
+ "medianMs": 6.1,
+ "p90Ms": 6.2,
+ "p95Ms": 6.2,
+ "p99Ms": 6.3,
+ "samples": 600,
+ "rendererInfo": {
+  "render": {
+   "frameCalls": 15,
+   "drawCalls": 16,
+   "triangles": 14,
+   "points": 1602,
+   "lines": 0
+  },
+  "compute": {
+   "frameCalls": 0
+  },
+  "memory": {
+   "geometries": 4,
+   "textures": 16,
+   "programs": 20,
+   "renderTargets": 13,
+   "storageAttributes": 0,
+   "uniformBuffers": 24,
+   "totalBytes": 15326754
+  }
+ },
+ "renderTelemetry": {
+  "framesObserved": 602,
+  "framesRendered": 602,
+  "framesSkipped": 0,
+  "lastFrameWork": {
+   "destinationUpdated": true,
+   "destinationDrawn": true,
+   "postPresented": true
+  }
+ },
+ "frameGpuMs": {
+  "lastResolvedFrame": 2.78
+ },
+ "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+ "consoleErrors": 0
+}

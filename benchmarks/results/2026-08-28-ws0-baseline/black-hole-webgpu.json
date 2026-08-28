@@ -1,0 +1,130 @@
+{
+ "schemaVersion": 2,
+ "kind": "black-hole-backend-comparison",
+ "date": "2026-08-28T11:37:20.675Z",
+ "label": "run",
+ "commit": "90b107ec63ebb988bb2145048383187c50ccef2f",
+ "destination": "black-hole",
+ "preset": "default",
+ "trajectoryBackend": {
+  "requested": "auto",
+  "effective": "lut",
+  "fallbackReason": null
+ },
+ "observer": {
+  "requested": null,
+  "effectiveMode": "camera",
+  "readout": {
+   "valid": true,
+   "invalidReason": null,
+   "radiusRg": 16.194134740701646,
+   "betaMagnitude": 0,
+   "properTimeTau": 0
+  }
+ },
+ "lut": {
+  "familyLoaded": true,
+  "familyDir": "schwarzschild-v1-415dea94",
+  "webgl2Filterable": true
+ },
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "intel gen-12lp"
+ },
+ "backend": "webgpu",
+ "forcedBackend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  778,
+  581
+ ],
+ "quality": {
+  "requested": "medium",
+  "effectiveTier": "medium",
+  "mismatch": null
+ },
+ "renderScale": 0.8,
+ "activityMode": "stable",
+ "warmupMs": 9000,
+ "sampleFrames": 600,
+ "frameCpuMs": {
+  "min": 5.3,
+  "median": 24.3,
+  "p90": 42.5,
+  "p95": 48.5,
+  "p99": 54.5,
+  "max": 63.7,
+  "mean": 26.54,
+  "stdev": 11.49
+ },
+ "rendererInfo": {
+  "render": {
+   "frameCalls": 15,
+   "drawCalls": 15,
+   "triangles": 15,
+   "points": 0,
+   "lines": 0
+  },
+  "compute": {
+   "frameCalls": 0
+  },
+  "memory": {
+   "geometries": 3,
+   "textures": 18,
+   "programs": 20,
+   "renderTargets": 13,
+   "storageAttributes": 0,
+   "uniformBuffers": 23,
+   "totalBytes": 16249123
+  }
+ },
+ "renderTelemetry": {
+  "framesObserved": 604,
+  "framesRendered": 604,
+  "framesSkipped": 0,
+  "lastFrameWork": {
+   "destinationUpdated": true,
+   "destinationDrawn": true,
+   "postPresented": true
+  }
+ },
+ "frameGpuMs": {
+  "lastResolvedFrame": 20.12
+ },
+ "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+ "memory": {
+  "estimatedGpuBytesTotal": 7287208,
+  "textureCount": 1,
+  "resourceScopes": [
+   {
+    "name": "shared-post",
+    "textures": 0,
+    "bytes": 3470760
+   },
+   {
+    "name": "transition-director",
+    "textures": 0,
+    "bytes": 921600
+   },
+   {
+    "name": "destination:black-hole",
+    "textures": 1,
+    "bytes": 2894848
+   }
+  ]
+ },
+ "consoleErrors": 0,
+ "suppressedConsoleErrors": 0,
+ "consoleErrorSamples": [],
+ "notes": "governor-managed dynamic resolution"
+}

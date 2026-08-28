@@ -1,0 +1,97 @@
+{
+  "schemaVersion": 2,
+  "kind": "compact-merger-phase-benchmark",
+  "date": "2026-08-28T11:35:23.757Z",
+  "label": "cm-run",
+  "commit": "90b107ec63ebb988bb2145048383187c50ccef2f",
+  "destination": "compact-merger",
+  "preset": "equal-mass-nsns",
+  "timelinePhase": 0.7,
+  "resolvedPhase": "kilonova",
+  "resolvedTimeSeconds": 4420.829610323297,
+  "browser": {
+    "name": "msedge",
+    "version": "151.0.0.0"
+  },
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "platform": "Win32",
+  "adapter": {
+    "name": "intel gen-12lp"
+  },
+  "backend": "webgpu",
+  "forcedBackend": "webgpu",
+  "viewportCss": [
+    1280,
+    800
+  ],
+  "devicePixelRatio": 1,
+  "effectiveRenderSize": [
+    778,
+    581
+  ],
+  "quality": {
+    "requested": "medium",
+    "effectiveTier": "medium"
+  },
+  "renderScale": 0.8,
+  "warmupMs": 9000,
+  "sampleFrames": 480,
+  "frameCpuMs": {
+    "min": 2.6,
+    "median": 6.1,
+    "p90": 6.2,
+    "p95": 6.2,
+    "p99": 6.3,
+    "max": 12,
+    "mean": 6.06,
+    "stdev": 0.33
+  },
+  "rendererInfo": {
+    "render": {
+      "frameCalls": 16,
+      "drawCalls": 18,
+      "triangles": 12838,
+      "points": 0,
+      "lines": 0
+    },
+    "compute": {
+      "frameCalls": 0
+    },
+    "memory": {
+      "geometries": 8,
+      "textures": 18,
+      "programs": 31,
+      "renderTargets": 14,
+      "storageAttributes": 3,
+      "uniformBuffers": 41,
+      "totalBytes": 14868080
+    }
+  },
+  "renderTelemetry": {
+    "framesObserved": 482,
+    "framesRendered": 482,
+    "framesSkipped": 0,
+    "lastFrameWork": {
+      "destinationUpdated": true,
+      "destinationDrawn": true,
+      "postPresented": true
+    }
+  },
+  "frameGpuMs": {
+    "lastResolvedFrame": 2.03
+  },
+  "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+  "phaseResources": {
+    "volumeVisible": true,
+    "volumeRadiusUnits": 59.45804803132066,
+    "particlePopulationScale": 0.3,
+    "jetVisible": false,
+    "jetFrontUnits": 0,
+    "ejectaRadiusUnits": 59.45804803132066
+  },
+  "memory": {
+    "estimatedGpuBytesTotal": 7737416
+  },
+  "consoleErrors": 0,
+  "consoleErrorSamples": []
+}

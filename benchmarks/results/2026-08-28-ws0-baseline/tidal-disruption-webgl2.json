@@ -1,0 +1,100 @@
+{
+  "schemaVersion": 2,
+  "kind": "tidal-disruption-phase-benchmark",
+  "date": "2026-08-28T11:40:52.586Z",
+  "label": "tde-run",
+  "commit": "90b107ec63ebb988bb2145048383187c50ccef2f",
+  "destination": "tidal-disruption",
+  "preset": "solar-canonical",
+  "timelinePhase": 0.78,
+  "resolvedPhase": "shock",
+  "resolvedTimeSeconds": 13491891.95246509,
+  "browser": {
+    "name": "msedge",
+    "version": "151.0.0.0"
+  },
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "platform": "Win32",
+  "adapter": {
+    "name": ""
+  },
+  "backend": "webgl2",
+  "forcedBackend": "webgl2",
+  "viewportCss": [
+    1280,
+    800
+  ],
+  "devicePixelRatio": 1,
+  "effectiveRenderSize": [
+    778,
+    581
+  ],
+  "quality": {
+    "requested": "medium",
+    "effectiveTier": "medium"
+  },
+  "renderScale": 0.8,
+  "warmupMs": 9000,
+  "sampleFrames": 480,
+  "frameCpuMs": {
+    "min": 1.4,
+    "median": 6.1,
+    "p90": 6.2,
+    "p95": 6.2,
+    "p99": 6.3,
+    "max": 7.9,
+    "mean": 6.05,
+    "stdev": 0.27
+  },
+  "rendererInfo": {
+    "render": {
+      "frameCalls": 16,
+      "drawCalls": 22,
+      "triangles": 11794,
+      "points": 0,
+      "lines": 0
+    },
+    "compute": {
+      "frameCalls": 0
+    },
+    "memory": {
+      "geometries": 8,
+      "textures": 18,
+      "programs": 31,
+      "renderTargets": 14,
+      "storageAttributes": 2,
+      "uniformBuffers": 40,
+      "totalBytes": 14672367
+    }
+  },
+  "renderTelemetry": {
+    "framesObserved": 482,
+    "framesRendered": 482,
+    "framesSkipped": 0,
+    "lastFrameWork": {
+      "destinationUpdated": true,
+      "destinationDrawn": true,
+      "postPresented": true
+    }
+  },
+  "frameGpuMs": {
+    "lastResolvedFrame": 2.56
+  },
+  "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+  "phaseResources": {
+    "streamBoundVisible": true,
+    "spineBoundPoints": 0,
+    "volumeVisible": true,
+    "volumeRadiusUnits": 199.99999999999994,
+    "diskVisible": false,
+    "particlePopulationScale": 0.3,
+    "accentAngularGate": 1,
+    "starDistanceUnits": 68507.69343948088,
+    "beta": 1
+  },
+  "memory": {
+    "estimatedGpuBytesTotal": 7750152
+  },
+  "consoleErrors": 0,
+  "consoleErrorSamples": []
+}

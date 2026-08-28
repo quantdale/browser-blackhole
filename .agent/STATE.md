@@ -157,12 +157,14 @@ Verified: `bench-galaxy-collision` now reports 601/601 frames rendered, all
 stage flags true, with real GPU timestamps (`frameGpuMs.lastResolvedFrame`
 1.38 ms — timestamp queries work on this adapter).
 
-**Methodological consequence worth carrying into §0:** `medianMs` was 6.1 ms
-whether or not anything rendered, i.e. the CPU rAF delta is dominated by
-frame scheduling rather than render cost on this host. Lead the baseline
-with GPU timestamps and the machine-independent COUNTS (`renderTelemetry`,
-`renderer.info`, ResourceManager totals), and treat rAF deltas as the weakest
-evidence in the record rather than the headline.
+**Methodological consequence carried into §0:** the CPU rAF delta FLOORS at
+~6.1 ms on this host — every cheap destination reports exactly 6.1/6.2,
+which is the frame-scheduling interval, not render cost, and it reads the
+same whether or not anything rendered. Above that floor the CPU and GPU
+columns agree closely (kerr 206 vs 192, neutron star 54 vs 51, black hole 24
+vs 20), so CPU deltas are informative for expensive scenes and meaningless
+for cheap ones. The baseline records both and says which rows to read from
+which column.
 
 ### Known intermittent full-suite failure (diagnosed, NOT fixed, NOT hidden)
 
@@ -198,6 +200,32 @@ change dressed as a fix. The helper was removed rather than left as dead
 code. Note that isolated repeat-stress does not reproduce the failure at all;
 only the mixed full-suite workload does, so the next attempt needs a
 reproduction harness that mixes specs, not one that repeats a single file.
+
+### §0 baseline recorded (first time this campaign)
+
+`benchmarks/results/2026-08-28-ws0-baseline/SUMMARY.md` + 18 raw
+`schemaVersion: 2` records: all eight production destinations plus the Kerr
+characterization, each on forced WebGPU and forced WebGL2, every row carrying
+proof it actually rendered.
+
+Three findings that should steer the rest of the campaign:
+
+1. **Kerr dominates by two orders of magnitude** — 192 ms GPU/frame at medium
+   tier / 0.8 scale, against 0.4-4 ms for six of the nine rows. Confirms
+   MASTER_PLAN's ordering: §14 is the primary GPU program and nothing done to
+   the cheap destinations moves the product's worst case.
+2. **Neutron star is the unexpected second-heaviest** at 51 ms GPU — more
+   than twice the full numerical Schwarzschild black hole (20 ms). The plan
+   treats §15 as minor work; this baseline says otherwise.
+3. **WebGL2 runs the two heaviest full-screen shaders roughly TWICE AS FAST
+   as WebGPU on this adapter** (kerr 93 vs 192 ms, neutron star 26 vs 51 ms),
+   while cheap destinations are within noise. The CPU and GPU columns agree
+   independently, so it is unlikely to be a cross-backend timestamp artifact.
+   One integrated adapter, so a lead rather than a conclusion — but it is a
+   large, reproducible, backend-attributable gap on exactly the code paths
+   §14 is about, and it should be characterized BEFORE Kerr shader
+   micro-optimization. If the WebGPU pipeline is structurally leaving 2x on
+   the table, the integrator work is the wrong layer to start with.
 
 ### Still open
 

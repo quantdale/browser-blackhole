@@ -245,6 +245,16 @@ const renderTelemetry = await page.evaluate(() => {
   const host = window.__ATLAS_APP__.host;
   return typeof host.frameTelemetry === 'function' ? host.frameTelemetry() : null;
 });
+// WS0/§1: renderer.info at the end of the sampled window. `render.*` are the
+// LAST rendered frame's counters (three resets them per frame); `memory.*`
+// are live totals. Recorded alongside the ResourceManager estimate because
+// the two are independent accountings of the same GPU state.
+const rendererInfo = await page.evaluate(() => {
+  const host = window.__ATLAS_APP__.host;
+  const inv = typeof host.debugInventory === 'function' ? host.debugInventory() : null;
+  return inv && inv.rendererInfo ? inv.rendererInfo : null;
+});
+
 if (renderTelemetry !== null && renderTelemetry.framesRendered === 0) {
   console.error(
     '[bench] REFUSING TO REPORT: the sampled window rendered 0 frames, so the ' +
@@ -308,6 +318,7 @@ const record = {
   // WS0/§1: work actually executed during the sampled window. Counts, not
   // timings, so they mean the same thing on every machine — and they are what
   // makes the timings above trustworthy rather than merely plausible.
+  rendererInfo,
   renderTelemetry:
     renderTelemetry === null
       ? null

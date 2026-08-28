@@ -1,0 +1,93 @@
+{
+ "schemaVersion": 2,
+ "kind": "quasar-agn-zone-characterization",
+ "date": "2026-08-28T11:36:33.894Z",
+ "label": "run",
+ "commit": "90b107ec63ebb988bb2145048383187c50ccef2f",
+ "destination": "quasar-agn",
+ "preset": "quasar-reference",
+ "zone": {
+  "requested": "nuclear",
+  "active": "nuclear"
+ },
+ "grPassActive": false,
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "intel gen-12lp"
+ },
+ "backend": "webgpu",
+ "forcedBackend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  583,
+  436
+ ],
+ "quality": {
+  "requested": "low",
+  "effectiveTier": "low"
+ },
+ "renderScale": 0.6,
+ "warmupMs": 9000,
+ "sampleFrames": 400,
+ "frameCpuMs": {
+  "min": 2.1,
+  "median": 6.1,
+  "p90": 6.2,
+  "p95": 6.2,
+  "p99": 12.1,
+  "max": 12.2,
+  "mean": 6.14,
+  "stdev": 0.78
+ },
+ "rendererInfo": {
+  "render": {
+   "frameCalls": 16,
+   "drawCalls": 26,
+   "triangles": 902,
+   "points": 0,
+   "lines": 0
+  },
+  "compute": {
+   "frameCalls": 0
+  },
+  "memory": {
+   "geometries": 8,
+   "textures": 17,
+   "programs": 27,
+   "renderTargets": 14,
+   "storageAttributes": 0,
+   "uniformBuffers": 35,
+   "totalBytes": 7171681
+  }
+ },
+ "renderTelemetry": {
+  "framesObserved": 402,
+  "framesRendered": 402,
+  "framesSkipped": 0,
+  "lastFrameWork": {
+   "destinationUpdated": true,
+   "destinationDrawn": true,
+   "postPresented": true
+  }
+ },
+ "frameGpuMs": {
+  "lastResolvedFrame": 1.38
+ },
+ "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+ "memory": {
+  "estimatedGpuBytesTotal": 11294992,
+  "textureCount": 0
+ },
+ "consoleErrors": 0,
+ "notes": "governor-managed dynamic resolution"
+}
