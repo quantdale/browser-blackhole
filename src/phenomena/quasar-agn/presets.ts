@@ -62,7 +62,11 @@ function stateOf(
 }
 
 const NUCLEAR_STATE = stateOf('quasar-reference', 0.58, 45);
-const INNER_STATE = stateOf('quasar-reference', 0.18, 35);
+// zoom01 = 0 is the FARTHEST standoff the inner-zone distance law allows
+// (42 r_g, falling to 16 r_g at the zone's top end). The lensed disc spans
+// 18 r_g plus its higher-order images, so the previous 0.18 (27.77 r_g) cropped
+// the ring structure against the frame edges.
+const INNER_STATE = stateOf('quasar-reference', 0, 35);
 const BLAZAR_STATE = stateOf('blazar-view', 0.58, 3);
 const RADIO_LOUD_STATE = stateOf('radio-loud', 0.88, 65, { jetTracerDensity: 1 });
 
@@ -90,9 +94,15 @@ const QUASAR_REFERENCE_PRESET: PresetDescriptor = {
     ' Frames the NUCLEAR zone of a 10^8 M_sun quasar: large-scale accretion ' +
     'disk, dusty torus skirt, and bipolar jet base at ~45 deg from the jet axis.',
   state: { ...NUCLEAR_STATE },
-  // Coherence contract: d = agnCameraDistance('nuclear', 0.58) ~277.328,
-  // polar 62 deg, azimuth 0 (dir = (0, cos, sin) convention).
-  camera: { position: [0, 130.376142, 245.20186], target: [0, 0, 0], fovDeg: 55 },
+  // Coherence contract: |pos| = agnCameraDistance('nuclear', 0.58) = 277.708283,
+  // azimuth 0 (dir = (0, cos, sin) convention), polar 45 deg.
+  // Polar 45 deg puts the eye 45 deg above the equatorial plane, matching this
+  // preset's declared observerAngleToJetDeg: high enough to clear the
+  // geometrically thick torus rim (H/R = 0.5 => ~26.6 deg) and look down the
+  // obscuring funnel at the engine, which is the Type-1 sight line the unified
+  // model describes. The previous polar 62 deg looked along the torus midplane,
+  // so the dust filled the frame and hid the nucleus completely.
+  camera: { position: [0, 196.36941, 196.36941], target: [0, 0, 0], fovDeg: 55 },
   seed: 307,
   timelineInitialPhase: 0
 };
@@ -107,8 +117,8 @@ const INNER_ENGINE_PRESET: PresetDescriptor = {
     ' Zooms INTO the INNER zone: the DIRECT gravitational-lensing pass around ' +
     'the SMBH plus the procedural corona glow, viewed at 35 deg from the jet axis.',
   state: { ...INNER_STATE },
-  // d = agnCameraDistance('inner', 0.18) = 27.7738, polar 35 deg.
-  camera: { position: [0, 22.750291, 15.929926], target: [0, 0, 0], fovDeg: 55 },
+  // |pos| = agnCameraDistance('inner', 0) = 42 exactly, polar 40 deg.
+  camera: { position: [0, 32.173867, 26.99708], target: [0, 0, 0], fovDeg: 55 },
   seed: 307,
   timelineInitialPhase: 0
 };

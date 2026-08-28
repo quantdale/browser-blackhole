@@ -82,6 +82,62 @@ function createFullscreenTriangleGeometry(): THREE.BufferGeometry {
   return geometry;
 }
 
+/**
+ * Escape radius (r_g) at which a traced ray is declared to have reached the
+ * background. Mirrors the value blackHoleDestination uses so both consumers
+ * agree on where the background begins.
+ */
+const DEFAULT_ESCAPE_RADIUS_RG = 32;
+
+/**
+ * Per-frame camera/uniform state for a lensing pass.
+ *
+ * A pass created by this service renders a FULLSCREEN triangle and derives
+ * every ray from its uniforms, so a pass that is never fed the live camera
+ * produces a constant-colour frame — which is exactly what the Quasar/AGN
+ * INNER zone did before the phenomena-animation campaign: it created a
+ * `createBlackHoleLensingPass` and never called `setUniformsFromState`, so the
+ * "DIRECT GR reuse" view was a flat wash.
+ *
+ * `blackHoleDestination` keeps its own richer builder (observer-frame legs,
+ * LUT/Kerr debug gates); this is the minimal camera+disk state every other
+ * consumer needs.
+ */
+export function lensingCameraUniformState(
+  camera: THREE.PerspectiveCamera,
+  params: {
+    massRg: number;
+    diskEnabled: boolean;
+    diskInnerRg: number;
+    diskOuterRg: number;
+    escapeRadiusRg?: number;
+    backgroundIntensity?: number;
+    centerRg?: [number, number, number];
+  }
+): Record<string, unknown> {
+  camera.updateMatrixWorld();
+  const e = camera.matrixWorld.elements;
+  const right = new THREE.Vector3(e[0] ?? 0, e[1] ?? 0, e[2] ?? 0).normalize();
+  const up = new THREE.Vector3(e[4] ?? 0, e[5] ?? 0, e[6] ?? 0).normalize();
+  const forward = new THREE.Vector3(-(e[8] ?? 0), -(e[9] ?? 0), -(e[10] ?? 0)).normalize();
+  const aspect = camera.aspect;
+  return {
+    cameraPositionRg: [camera.position.x, camera.position.y, camera.position.z],
+    cameraRight: [right.x, right.y, right.z],
+    cameraUp: [up.x, up.y, up.z],
+    cameraForward: [forward.x, forward.y, forward.z],
+    tanHalfFovY: Math.tan((camera.fov * Math.PI) / 360),
+    aspect: Number.isFinite(aspect) && aspect > 0 ? aspect : 1,
+    massRg: params.massRg,
+    centerRg: params.centerRg ?? [0, 0, 0],
+    diskEnabled: params.diskEnabled,
+    diskInnerRg: params.diskInnerRg,
+    diskOuterRg: params.diskOuterRg,
+    escapeRadiusRg: params.escapeRadiusRg ?? DEFAULT_ESCAPE_RADIUS_RG,
+    backgroundIntensity: params.backgroundIntensity ?? 1
+  };
+}
+
 export class LensingService implements ILensingService {
   /** Live passes, so dispose() releases every created GPU resource. */
   private readonly passes: BlackHoleLensingPassHandle[] = [];
