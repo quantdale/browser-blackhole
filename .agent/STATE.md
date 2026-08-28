@@ -9,6 +9,27 @@ Canonical execution instructions: `.agent/START_HERE.md` → `.agent/EXECUTION_P
 
 Do not interpret older "no active campaign" / "certified production-ready" historical lines below as meaning there is no current work. They remain historical release evidence; the active performance-hardening checklist is currently unexecuted.
 
+## 2026-08-28 session — repository branch consolidation
+
+- Fetched and pruned `origin`, then audited every local and remote branch.
+- Preserved the useful repository-local add-ons work: the planning document
+  from `plan/repo-local-addons-2026-08-28` and the implementation from
+  `feat/repo-local-addons`. Both are now on `main`; the plan and handoff docs
+  were reconciled to record `main` as the landing branch.
+- The stale local `research/cosmic-atlas-phenomena` branch had no commits
+  absent from `main` and contained no additional work to preserve.
+- Validation at the integrated tip: `npm run check` passed (format, lint,
+  typecheck, 531 unit tests, and production build); MCP static and online
+  preflight both passed, including registry resolution for the two pinned
+  packages.
+- Pushed `main` to `origin` at `0c8266e`, deleted the remote planning branch,
+  and deleted both redundant local branches. Before this state record,
+  `git status --short --branch` was clean, local `main` matched `origin/main`,
+  and `git ls-remote --heads origin` listed only `main`.
+
+Next action: continue the active whole-atlas performance-hardening campaign
+from the synchronized `main` branch; no branch-specific work remains pending.
+
 ---
 
 ## 2026-08-28 session — WS1 (frame invalidation) + partial WS3 (visibility) implemented, NOT certified
