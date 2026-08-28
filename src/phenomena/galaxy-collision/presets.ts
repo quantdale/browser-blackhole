@@ -41,9 +41,14 @@ export const GALAXY_COLLISION_PRESETS: PresetDescriptor[] = [
     stateSchemaVersion: 1,
     fidelityNote: FIDELITY_NOTE,
     state: {},
-    camera: { position: [0, 6, 14], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    // Framed against the measured GC1 geometry: tracer extent runs ~11.5 disk
+    // radii at t=-50, tightens to ~5 at pericenter and reaches ~19 by t=+40, so
+    // a ~35-unit standoff keeps the whole encounter in frame while it plays.
+    camera: { position: [0, 10, 23], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
     seed: 1972,
-    timelineInitialPhase: 0.0
+    // t = -20 tau: the approach is already tidally distorting both disks, which
+    // is a live scene on arrival instead of two distant undisturbed blobs.
+    timelineInitialPhase: 0.25
   },
   {
     id: 'bridge-tail',
@@ -52,8 +57,9 @@ export const GALAXY_COLLISION_PRESETS: PresetDescriptor[] = [
     stateSchemaVersion: 1,
     fidelityNote: FIDELITY_NOTE,
     state: {},
-    camera: { position: [8, 4, 12], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    camera: { position: [10, 7, 19], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
     seed: 1972,
+    // t = +10 tau: bridge and both tails are developed, separation ~6.
     timelineInitialPhase: 0.5
   },
   {
@@ -63,7 +69,8 @@ export const GALAXY_COLLISION_PRESETS: PresetDescriptor[] = [
     stateSchemaVersion: 1,
     fidelityNote: FIDELITY_NOTE,
     state: {},
-    camera: { position: [10, 2, 10], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
+    // Tails reach ~26 disk radii by t=+58; pull back so they stay on screen.
+    camera: { position: [16, 12, 44], target: [0, 0, 0], up: [0, 1, 0], fovDeg: 55 },
     seed: 1972,
     timelineInitialPhase: 0.9
   }

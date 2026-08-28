@@ -16,10 +16,19 @@
  * - The active {@link PhaseMapping} converts UI phase to the destination's
  *   internal simulation coordinate (`forward`) and back (`inverse`); its
  *   `formatDisplay` renders the internal coordinate for humans.
- * - Playback advances the INTERNAL coordinate by `playbackRate * dt`, so
- *   speed is physically uniform in simulation coordinates even when the
- *   mapping itself is nonlinear; the stored UI phase is re-derived each step
- *   through `inverse`.
+ * - Playback advances the INTERNAL coordinate by `baseRate * playbackRate *
+ *   dt`, so speed is physically uniform in simulation coordinates even when
+ *   the mapping itself is nonlinear; the stored UI phase is re-derived each
+ *   step through `inverse`. `baseRate` is the mapping's cinematic pacing
+ *   (`span / playbackSeconds`, 1 when undeclared) and `playbackRate` is the
+ *   user's 0.25x-4x multiplier. Keeping them separate is what lets a
+ *   supernova (span 750 s), a BBH merger (span 3600 M) and a galaxy encounter
+ *   (span megayears) all play in a comparable wall-clock time without either
+ *   distorting their physical readouts or making the UI speed control mean
+ *   something different on every destination.
+ * - A mapping may set `loop` to wrap at its endpoints instead of holding
+ *   there, so a finite cinematic event keeps showing something after it
+ *   completes.
  * - Until a destination registers a real mapping, an identity mapping is
  *   active and `physicalTime` stays `null` ("no physical units defined").
  *   Once a mapping is registered, `physicalTime` mirrors the internal
@@ -108,6 +117,16 @@ export class TimeController {
 
   private rateValue: number;
   private pausedValue: boolean;
+
+  /**
+   * Internal-coordinate units advanced per wall second at 1x user speed.
+   * Derived from the active mapping's `playbackSeconds` (span / seconds);
+   * 1 for mappings that do not declare one, which preserves the legacy
+   * "one internal unit per second" behavior.
+   */
+  private baseRateValue = 1;
+  /** Active mapping's endpoint policy: wrap (true) or hold (false). */
+  private loopValue = false;
 
   /**
    * Sticky "coordinate changed since last consumed" flag (whole-atlas
@@ -199,6 +218,12 @@ export class TimeController {
     this.internalMax = Math.max(lo, hi);
     this.activeMapping = mapping;
     this.usingDefaultMapping = mapping === IDENTITY_MAPPING;
+    // Cinematic pacing is a property of the mapping (it owns the units), not
+    // of the user's speed control. See PhaseMapping.playbackSeconds.
+    const seconds = finiteOrNull(mapping.playbackSeconds);
+    const span = this.internalMax - this.internalMin;
+    this.baseRateValue = seconds !== null && seconds > 0 && span > 0 ? span / seconds : 1;
+    this.loopValue = mapping.loop === true;
     const before = this.internalTime;
     this.internalTime = clamp(this.internalTime, this.internalMin, this.internalMax);
     this.markDirtyIfChanged(before);
@@ -216,9 +241,14 @@ export class TimeController {
   }
 
   /**
-   * Set playback rate in internal-coordinate units per second. Negative
-   * values play in reverse; 0 freezes advancement while remaining "playing".
-   * Non-finite input is ignored.
+   * Set the user playback-speed MULTIPLIER (the UI's 0.25x–4x control).
+   * Negative values play in reverse; 0 freezes advancement while remaining
+   * "playing". Non-finite input is ignored.
+   *
+   * The effective internal-coordinate rate is `baseRate * rate`, where
+   * `baseRate` comes from the active mapping's `playbackSeconds`. For
+   * mappings that declare none, `baseRate` is 1 and this is still literally
+   * "internal units per second".
    */
   setRate(rate: number): void {
     this.rateValue = sanitizeRate(rate, this.rateValue);
@@ -226,22 +256,36 @@ export class TimeController {
 
   /**
    * Advance the timeline deterministically by `dtSeconds` of frame time:
-   * internal += playbackRate * dt, clamped to the mapping's range (the
-   * timeline holds at its endpoints rather than looping or auto-pausing).
+   * `internal += baseRate * playbackRate * dt`.
+   *
+   * At the mapping's endpoints the timeline either holds (default) or wraps
+   * to the opposite end when the mapping sets `loop` — never auto-pauses.
    * Paused controllers are a no-op. Non-finite dt is treated as 0.
    */
   update(dtSeconds: number): void {
     if (this.pausedValue) return;
     const dt = finiteOrNull(dtSeconds) ?? 0;
-    if (dt === 0 || this.rateValue === 0) return;
+    const rate = this.baseRateValue * this.rateValue;
+    if (dt === 0 || rate === 0) return;
     const before = this.internalTime;
-    this.internalTime = clamp(
-      this.internalTime + this.rateValue * dt,
-      this.internalMin,
-      this.internalMax
-    );
+    const advanced = this.internalTime + rate * dt;
+    this.internalTime = this.loopValue
+      ? this.wrapInternal(advanced)
+      : clamp(advanced, this.internalMin, this.internalMax);
     this.markDirtyIfChanged(before);
     this.refreshDerived();
+  }
+
+  /**
+   * Wrap an internal coordinate into `[internalMin, internalMax)` so looping
+   * playback re-enters from the opposite end. A degenerate (zero-width) span
+   * has nothing to wrap into and is clamped instead.
+   */
+  private wrapInternal(value: number): number {
+    const span = this.internalMax - this.internalMin;
+    if (!(span > 0)) return clamp(value, this.internalMin, this.internalMax);
+    const offset = (value - this.internalMin) % span;
+    return this.internalMin + (offset < 0 ? offset + span : offset);
   }
 
   // --- Scrubbing / reset ------------------------------------------------------
@@ -292,6 +336,19 @@ export class TimeController {
     return this.rateValue;
   }
 
+  /**
+   * Internal-coordinate units advanced per wall second at 1x user speed
+   * (mapping-derived; see `PhaseMapping.playbackSeconds`).
+   */
+  get basePlaybackRate(): number {
+    return this.baseRateValue;
+  }
+
+  /** True when the active mapping wraps at its endpoints instead of holding. */
+  get loopEnabled(): boolean {
+    return this.loopValue;
+  }
+
   get paused(): boolean {
     return this.pausedValue;
   }
@@ -316,7 +373,9 @@ export class TimeController {
       simulationPhase: this.simulationPhaseValue,
       physicalTime: this.physicalTimeValue,
       playbackRate: this.rateValue,
-      paused: this.pausedValue
+      paused: this.pausedValue,
+      basePlaybackRate: this.baseRateValue,
+      loop: this.loopValue
     };
   }
 

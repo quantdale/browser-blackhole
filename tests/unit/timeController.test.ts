@@ -87,3 +87,112 @@ describe('TimeController: consumeDirty invalidation signal', () => {
     expect(time.consumeDirty()).toBe(true);
   });
 });
+
+/**
+ * Cinematic pacing (phenomena-animation campaign): a destination's internal
+ * coordinate is in its own units and its span varies by seven orders of
+ * magnitude across the atlas (28 s for a compact merger, 1.5e7 s for a tidal
+ * disruption). Advancing it at one unit per wall second is what made most
+ * destinations look frozen. `PhaseMapping.playbackSeconds` states how long a
+ * full traverse should take in WALL time; the UI's 0.25x-4x control stays a
+ * pure multiplier on top of it. `loop` makes a finite event keep playing
+ * instead of holding forever on its last frame.
+ */
+describe('TimeController: mapping-declared cinematic pacing', () => {
+  /** Mapping over [0, span] internal units with optional pacing/loop. */
+  const spanMapping = (span: number, playbackSeconds?: number, loop?: boolean) => ({
+    id: 'span',
+    label: 'Span',
+    forward: (phase01: number) => phase01 * span,
+    inverse: (internal: number) => internal / span,
+    formatDisplay: (internal: number) => `${internal.toFixed(2)}`,
+    ...(playbackSeconds === undefined ? {} : { playbackSeconds }),
+    ...(loop === undefined ? {} : { loop })
+  });
+
+  const activate = (mapping: ReturnType<typeof spanMapping>): TimeController => {
+    const time = new TimeController({ initialPhase: 0, playbackRate: 1, paused: false });
+    time.registerPhaseMapping(mapping.id, mapping);
+    time.setPhaseMapping(mapping.id);
+    return time;
+  };
+
+  it('without playbackSeconds keeps the legacy one-unit-per-second rate', () => {
+    const time = activate(spanMapping(1_000_000));
+    expect(time.basePlaybackRate).toBe(1);
+    time.update(1);
+    expect(time.internalCoordinate).toBeCloseTo(1, 10);
+  });
+
+  it('with playbackSeconds a full traverse takes exactly that many seconds', () => {
+    const time = activate(spanMapping(1.5e7, 45));
+    expect(time.basePlaybackRate).toBeCloseTo(1.5e7 / 45, 6);
+    for (let i = 0; i < 45 * 100; i += 1) time.update(0.01);
+    expect(time.simulationPhase).toBeCloseTo(1, 6);
+  });
+
+  it('the user rate multiplies the mapping pace rather than replacing it', () => {
+    const time = activate(spanMapping(600, 30));
+    time.setRate(2);
+    time.update(1);
+    // 600/30 = 20 units/s at 1x, doubled by the user control.
+    expect(time.internalCoordinate).toBeCloseTo(40, 10);
+    expect(time.snapshot().playbackRate).toBe(2);
+    expect(time.snapshot().basePlaybackRate).toBeCloseTo(20, 10);
+  });
+
+  it('holds at the end by default', () => {
+    const time = activate(spanMapping(10, 1));
+    time.update(5);
+    expect(time.simulationPhase).toBe(1);
+    expect(time.internalCoordinate).toBe(10);
+    expect(time.loopEnabled).toBe(false);
+  });
+
+  it('loop wraps past the end instead of holding', () => {
+    const time = activate(spanMapping(10, 1, true));
+    expect(time.loopEnabled).toBe(true);
+    expect(time.snapshot().loop).toBe(true);
+    time.update(1.25); // 12.5 units into a 10-unit span
+    expect(time.internalCoordinate).toBeCloseTo(2.5, 10);
+    expect(time.simulationPhase).toBeCloseTo(0.25, 10);
+  });
+
+  it('loop wraps backwards for reverse playback', () => {
+    const time = activate(spanMapping(10, 1, true));
+    time.setRate(-1);
+    time.update(0.25); // -2.5 from 0 wraps to 7.5
+    expect(time.internalCoordinate).toBeCloseTo(7.5, 10);
+  });
+
+  it('a looping timeline keeps dirtying frames after its first traverse', () => {
+    const time = activate(spanMapping(10, 1, true));
+    time.update(2); // two full traverses
+    time.consumeDirty();
+    time.update(0.1);
+    expect(time.consumeDirty()).toBe(true);
+  });
+
+  it('a non-looping saturated timeline stops dirtying (idle-render contract)', () => {
+    const time = activate(spanMapping(10, 1));
+    time.update(5);
+    time.consumeDirty();
+    time.update(0.1);
+    expect(time.consumeDirty()).toBe(false);
+  });
+
+  it('scrubbing is unaffected by pacing and loop', () => {
+    const time = activate(spanMapping(600, 30, true));
+    time.scrubTo(0.5);
+    expect(time.internalCoordinate).toBeCloseTo(300, 10);
+    time.reset(0.25);
+    expect(time.internalCoordinate).toBeCloseTo(150, 10);
+  });
+
+  it('a zero-width mapping span cannot produce a non-finite rate', () => {
+    const time = activate(spanMapping(0, 30, true));
+    expect(time.basePlaybackRate).toBe(1);
+    time.update(1);
+    expect(Number.isFinite(time.internalCoordinate)).toBe(true);
+  });
+});

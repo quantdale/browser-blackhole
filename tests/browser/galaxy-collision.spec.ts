@@ -1,7 +1,12 @@
 import { expect, test, type Page } from '@playwright/test';
 
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS, collectErrors } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  collectErrors,
+  expectPresentedMotion,
+  measurePresentedMotion
+} from './support/appHarness.js';
 
 /**
  * CA9 — Galaxy Collision destination suite.
@@ -14,7 +19,13 @@ import { ARRIVAL_TIMEOUT_MS, collectErrors } from './support/appHarness.js';
  * - determinism: same phase twice yields identical probe positions;
  * - pause/scrub behaves deterministically;
  * - forced WebGL2 backend runs the same truthful data-driven path;
- * - repeated leave/re-enter cycles stay error-free (bounded resources).
+ * - repeated leave/re-enter cycles stay error-free (bounded resources);
+ * - the encounter ACTUALLY PLAYS: the presented image evolves on its own and
+ *   the timeline is paced in wall-clock seconds and loops (phenomena-animation
+ *   campaign). Before that campaign this destination registered no phase
+ *   mapping at all, so the shared identity mapping ran 0->1 in one second and
+ *   held there: every assertion above passed against a permanently frozen
+ *   final keyframe.
  */
 
 const BENIGN_ERROR = /powerPreference|readback|Failed to load resource|favicon|webgpu.*backend/i;
@@ -161,5 +172,45 @@ test('repeated leave/re-enter cycles stay error-free and bounded', async ({ page
   }
   const snap = await readDebugSnapshot(page);
   expect(snap.assetId).toBe('gc1-nequal');
+  expect(filteredErrors(errs)).toEqual([]);
+});
+
+test('the encounter plays on its own: the presented image evolves while running', async ({
+  page
+}) => {
+  const errs = collectErrors(page);
+  await page.goto('/atlas/galaxy-collision');
+  await waitForArrival(page, 'galaxy-collision');
+
+  const motion = await measurePresentedMotion(page, { captures: 4, framesBetween: 24 });
+  expectPresentedMotion(motion, { label: 'galaxy-collision' });
+  expect(filteredErrors(errs)).toEqual([]);
+});
+
+test('timeline is paced in wall-clock seconds and loops instead of holding', async ({ page }) => {
+  const errs = collectErrors(page);
+  await page.goto('/atlas/galaxy-collision');
+  await waitForArrival(page, 'galaxy-collision');
+
+  const snap = await page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot());
+  // GC1 spans 120 model-time units; a paced mapping advances many units per
+  // wall second, and an unpaced one exactly 1 (the legacy identity behavior
+  // that made the scene freeze one second after arrival).
+  expect(snap.basePlaybackRate, 'timeline must declare a wall-clock pace').toBeGreaterThan(1);
+  expect(snap.loop, 'a finite encounter must loop rather than hold on its last frame').toBe(true);
+  expect(snap.paused).toBe(false);
+
+  // Play past the end of the window and confirm it wrapped rather than pinned.
+  await page.evaluate(() => {
+    const h = window.__ATLAS_APP__!.host;
+    h.time.scrubTo(0.995);
+    h.time.play();
+  });
+  await expect
+    .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+      timeout: 20_000,
+      intervals: [200]
+    })
+    .toBeLessThan(0.9);
   expect(filteredErrors(errs)).toEqual([]);
 });

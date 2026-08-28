@@ -588,8 +588,17 @@ export interface TimeModelSnapshot {
   displayTime: string;
   simulationPhase: number;
   physicalTime: number | null;
+  /** User speed multiplier (the UI's 0.25x-4x control). */
   playbackRate: number;
   paused: boolean;
+  /**
+   * Internal-coordinate units advanced per wall second at 1x, derived from
+   * the active mapping's `playbackSeconds`. Exposed so tests and diagnostics
+   * can verify cinematic pacing without reaching into the controller.
+   */
+  basePlaybackRate: number;
+  /** Active mapping's endpoint policy (see `PhaseMapping.loop`). */
+  loop: boolean;
 }
 
 export interface PhaseMapping {
@@ -601,6 +610,32 @@ export interface PhaseMapping {
   inverse(internal: number): number;
   /** Human display string for a given internal coordinate. */
   formatDisplay(internal: number): string;
+  /**
+   * Wall-clock seconds a full 0→1 traverse should take at 1x user speed
+   * (ARCHITECTURE §8 "do not pretend one uniform seconds-per-frame scale
+   * works for every phase").
+   *
+   * A destination's internal coordinate is in ITS OWN units — seconds for a
+   * supernova, `M` for a binary-black-hole merger, megayears for a galaxy
+   * encounter — spanning anything from 30 s to 1.5e7 s. Advancing such a
+   * coordinate at one unit per wall second makes the scene look frozen (a
+   * tidal disruption would need ~173 days of real time to play once). This
+   * field decouples the two: {@link TimeController} derives the internal
+   * advance rate as `span / playbackSeconds`, and the UI's 0.25x–4x control
+   * multiplies THAT.
+   *
+   * Omit (or use a non-finite/non-positive value) to keep the legacy
+   * behavior of one internal unit per wall second.
+   */
+  playbackSeconds?: number;
+  /**
+   * When true, playback wraps at the mapping's endpoints instead of holding
+   * there. Cinematic destinations (an explosion, a merger, an encounter) run
+   * to completion in tens of seconds and then have nothing left to show, so
+   * holding at the endpoint reads as "broken/static" to a viewer who arrived
+   * late. Scrubbing and `reset` are unaffected. Default false (hold).
+   */
+  loop?: boolean;
 }
 
 // ---------------------------------------------------------------------------

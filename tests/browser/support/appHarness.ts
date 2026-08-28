@@ -276,3 +276,150 @@ export async function scrubAndAwaitDestination(
   }, phase01);
   await awaitDestinationTimeApplied(page, timeField, previous, timeoutMs);
 }
+
+// ---------------------------------------------------------------------------
+// Presented-frame MOTION evidence (phenomena-animation campaign)
+// ---------------------------------------------------------------------------
+
+/**
+ * Why this exists: every destination suite already asserted that debug numbers
+ * move when the timeline is scrubbed, and every one of them passed while the
+ * PRESENTED IMAGE never changed on its own. A destination whose timeline
+ * saturated in its first second, or whose point cloud rendered as 1-pixel
+ * points, satisfied all of those assertions and still looked frozen or blank
+ * to a viewer. These helpers close that gap: they measure the delivered
+ * pixels over a window of ANIMATION FRAMES (never wall time — see the rAF
+ * rationale in frame-invalidation.spec.ts) while the timeline plays.
+ */
+export interface MotionSample {
+  /** Spatial luminance std-dev of the first grid: is anything drawn at all? */
+  spatialStd: number;
+  /** Mean |Δluminance| between consecutive captures, 0-255 scale. */
+  meanDeltas: number[];
+  /** Largest single-cell |Δluminance| between first and last capture. */
+  peakDelta: number;
+  /** Mean of `meanDeltas`. */
+  meanDelta: number;
+}
+
+/** Advance exactly `count` animation frames in-page. */
+export async function waitForFrames(page: Page, count: number): Promise<void> {
+  await page.evaluate(
+    (frames) =>
+      new Promise<void>((resolve) => {
+        let remaining = frames;
+        const step = (): void => {
+          remaining -= 1;
+          if (remaining <= 0) resolve();
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+    count
+  );
+}
+
+/** Decodes a clipped screenshot to an NxN luminance grid, in-page. */
+async function luminanceGrid(page: Page, size = 48): Promise<number[]> {
+  const { dataUrl } = await takeDecodedScreenshot(page);
+  const raw: unknown = await page.evaluate(
+    async ({ src, n }) => {
+      const blob = await (await fetch(src)).blob();
+      const bmp = await createImageBitmap(blob);
+      const c = document.createElement('canvas');
+      c.width = n;
+      c.height = n;
+      const ctx = c.getContext('2d', { willReadFrequently: true });
+      if (!ctx) return null;
+      ctx.drawImage(bmp, 0, 0, n, n);
+      const d = ctx.getImageData(0, 0, n, n).data;
+      const out: number[] = [];
+      for (let i = 0; i < n * n; i += 1) {
+        out.push(
+          0.2126 * (d[i * 4] ?? 0) + 0.7152 * (d[i * 4 + 1] ?? 0) + 0.0722 * (d[i * 4 + 2] ?? 0)
+        );
+      }
+      return out;
+    },
+    { src: dataUrl, n: size }
+  );
+  expect(Array.isArray(raw), 'luminance sampling must return a grid').toBe(true);
+  return raw as number[];
+}
+
+/**
+ * Plays the destination timeline and measures how much the PRESENTED image
+ * actually changes, sampling every `framesBetween` animation frames.
+ *
+ * The timeline is left playing on return; callers that need determinism
+ * afterwards should pause explicitly.
+ */
+export async function measurePresentedMotion(
+  page: Page,
+  options: { captures?: number; framesBetween?: number } = {}
+): Promise<MotionSample> {
+  const captures = options.captures ?? 4;
+  const framesBetween = options.framesBetween ?? 20;
+
+  await page.evaluate(() => window.__ATLAS_APP__!.host.time.play());
+  // Let the first play() tick reach the destination before the baseline shot.
+  await waitForFrames(page, 2);
+
+  const grids: number[][] = [];
+  for (let i = 0; i < captures; i += 1) {
+    grids.push(await luminanceGrid(page));
+    if (i < captures - 1) await waitForFrames(page, framesBetween);
+  }
+
+  const first = grids[0]!;
+  const mean = first.reduce((a, b) => a + b, 0) / first.length;
+  const spatialStd = Math.sqrt(first.reduce((a, b) => a + (b - mean) ** 2, 0) / first.length);
+
+  const meanDeltas: number[] = [];
+  for (let i = 1; i < grids.length; i += 1) {
+    const a = grids[i - 1]!;
+    const b = grids[i]!;
+    let sum = 0;
+    for (let k = 0; k < a.length; k += 1) sum += Math.abs((a[k] ?? 0) - (b[k] ?? 0));
+    meanDeltas.push(sum / a.length);
+  }
+
+  const last = grids[grids.length - 1]!;
+  let peakDelta = 0;
+  for (let k = 0; k < first.length; k += 1) {
+    const d = Math.abs((first[k] ?? 0) - (last[k] ?? 0));
+    if (d > peakDelta) peakDelta = d;
+  }
+
+  const meanDelta = meanDeltas.reduce((a, b) => a + b, 0) / Math.max(1, meanDeltas.length);
+  return { spatialStd, meanDeltas, peakDelta, meanDelta };
+}
+
+/**
+ * Asserts a destination is BOTH drawing something and visibly evolving.
+ *
+ * `minSpatialStd` guards against "the timeline moves but the frame is black";
+ * `minMeanDelta` against "something is drawn but it never changes". Thresholds
+ * are deliberately far below what a working destination produces (measured
+ * values are typically 5-40x the floor) so the assertion catches a frozen or
+ * blank scene without becoming a rendering-appearance golden.
+ */
+export function expectPresentedMotion(
+  sample: MotionSample,
+  options: { minSpatialStd?: number; minMeanDelta?: number; label?: string } = {}
+): void {
+  const minSpatialStd = options.minSpatialStd ?? 3;
+  const minMeanDelta = options.minMeanDelta ?? 0.35;
+  const label = options.label ?? 'destination';
+  expect(
+    sample.spatialStd,
+    `${label}: presented frame is featureless (spatialStd ${sample.spatialStd.toFixed(2)}); ` +
+      'nothing is being drawn'
+  ).toBeGreaterThan(minSpatialStd);
+  expect(
+    sample.meanDelta,
+    `${label}: presented image does not change while the timeline plays ` +
+      `(mean |Δluma| ${sample.meanDelta.toFixed(3)} across ${sample.meanDeltas.length} intervals); ` +
+      'the scene is static'
+  ).toBeGreaterThan(minMeanDelta);
+}
