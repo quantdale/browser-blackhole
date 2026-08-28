@@ -200,3 +200,79 @@ export async function sampleColorsAtNdc(page: Page, points: NdcPoint[]): Promise
   expect(Array.isArray(raw), 'NDC sampling must return samples').toBe(true);
   return raw as NdcColorSample[];
 }
+
+/**
+ * Timeline-mutation helpers that wait on the ACTIVE DESTINATION actually
+ * consuming a new coordinate.
+ *
+ * `TimeController.scrubTo` only mutates shared timeline state; a destination's
+ * debug readout is written inside its `update()`, which runs on the next
+ * rendered frame. A fixed `waitForTimeout` is therefore not a postcondition:
+ * whenever a frame stalls longer than the sleep, the following snapshot still
+ * reports the PREVIOUS scrub's state. That is not hypothetical — entering the
+ * black-hole-merger `ringdown` phase makes the Kerr remnant subgraph visible
+ * for the first time, and that first pipeline compile stalls the frame loop
+ * for well over a second on slower/WebGL2-fallback hosts, so the final scrub
+ * of a phase-ordering sweep could be read before it was ever applied (the
+ * observed failure: the last expected phase never appears).
+ *
+ * `timeField` is the destination's own debug time readout (for example
+ * `timeM` for black-hole-merger, `timeSeconds` for compact-merger).
+ */
+/** Reads the active destination's own debug time readout (null when absent). */
+export async function readDestinationTime(page: Page, timeField: string): Promise<number | null> {
+  return page.evaluate((field) => {
+    const snap = window.__ATLAS_APP__?.host.activeDestinationDebugSnapshot() ?? {};
+    const value = snap[field];
+    return typeof value === 'number' ? value : null;
+  }, timeField);
+}
+
+/**
+ * Wait until the active destination has consumed the CURRENT shared timeline
+ * coordinate, given the destination time readout captured immediately before
+ * the mutation (`previous`, from {@link readDestinationTime}).
+ *
+ * Succeeds when the readout equals the shared physical coordinate, or — for
+ * readouts a destination clamps into its own data support — when it has moved
+ * off the pre-mutation value. Both clauses mean "a frame ran with the new
+ * coordinate"; neither weakens what the caller then asserts.
+ */
+export async function awaitDestinationTimeApplied(
+  page: Page,
+  timeField: string,
+  previous: number | null,
+  timeoutMs = ARRIVAL_TIMEOUT_MS
+): Promise<void> {
+  await page.waitForFunction(
+    ({ field, prev }) => {
+      const host = window.__ATLAS_APP__?.host;
+      if (host === undefined) return false;
+      const snap = host.activeDestinationDebugSnapshot();
+      if (snap === null) return false;
+      const seen = snap[field];
+      if (typeof seen !== 'number') return false;
+      const shared = host.time.snapshot().physicalTime;
+      if (typeof shared === 'number' && seen === shared) return true;
+      return prev !== null && seen !== prev;
+    },
+    { field: timeField, prev: previous },
+    { timeout: timeoutMs, polling: 50 }
+  );
+}
+
+/** Pause + scrub, then await the destination consuming the new coordinate. */
+export async function scrubAndAwaitDestination(
+  page: Page,
+  phase01: number,
+  timeField: string,
+  timeoutMs = ARRIVAL_TIMEOUT_MS
+): Promise<void> {
+  const previous = await readDestinationTime(page, timeField);
+  await page.evaluate((phase) => {
+    const host = window.__ATLAS_APP__!.host;
+    host.time.pause();
+    host.time.scrubTo(phase);
+  }, phase01);
+  await awaitDestinationTimeApplied(page, timeField, previous, timeoutMs);
+}

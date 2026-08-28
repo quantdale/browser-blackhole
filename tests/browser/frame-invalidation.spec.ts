@@ -38,32 +38,100 @@ async function waitForArrival(page: Page): Promise<void> {
     .toBe('arrived');
 }
 
-/** Freeze the timeline and let the arrival camera-ease finish settling. */
+/**
+ * Idle windows in this suite are measured in ANIMATION FRAMES, never in wall
+ * time. A `waitForTimeout(300)` window is not evidence of an idle frame loop:
+ * under parallel-worker load this host's rAF cadence itself drops below that
+ * window, so "no frames in 300 ms" can be satisfied while the loop simply had
+ * no opportunity to render. A rAF tick is the unit in which the loop actually
+ * decides to render or skip, so counting ticks measures the optimization.
+ */
+async function waitForAnimationFrames(page: Page, count: number): Promise<void> {
+  await page.evaluate(
+    (frames) =>
+      new Promise<void>((resolve) => {
+        let remaining = frames;
+        const step = (): void => {
+          remaining -= 1;
+          if (remaining <= 0) resolve();
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+    count
+  );
+}
+
+/** Consecutive quiet rAF ticks that define "settled". */
+const QUIESCENT_FRAMES = 20;
+/** Idle observation window for the zero-frame assertions. */
+const IDLE_FRAMES = 30;
+/** Ticks allowed for a genuine invalidation to reach the kernel. */
+const WAKE_FRAMES = 5;
+
+/**
+ * Resolves once the orchestrated-frame counter has not advanced across
+ * {@link QUIESCENT_FRAMES} consecutive rAF ticks. Fails loudly — rather than
+ * silently proceeding into a flaky zero-frame assertion — if the host never
+ * settles, because a host that keeps rendering a paused, untouched scene IS
+ * the WS1 defect this suite exists to catch.
+ */
+async function waitForRenderQuiescence(page: Page, maxFrames = 900): Promise<void> {
+  const settled = await page.evaluate(
+    ({ quietTarget, budget }) =>
+      new Promise<boolean>((resolve) => {
+        const counter = window as unknown as { __renderFrameCalls: number };
+        let mark = counter.__renderFrameCalls;
+        let quiet = 0;
+        let total = 0;
+        const step = (): void => {
+          total += 1;
+          if (counter.__renderFrameCalls === mark) {
+            quiet += 1;
+          } else {
+            quiet = 0;
+            mark = counter.__renderFrameCalls;
+          }
+          if (quiet >= quietTarget) {
+            resolve(true);
+            return;
+          }
+          if (total >= budget) {
+            resolve(false);
+            return;
+          }
+          requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      }),
+    { quietTarget: QUIESCENT_FRAMES, budget: maxFrames }
+  );
+  expect(settled, 'paused, untouched scene never stopped issuing orchestrated frames').toBe(true);
+}
+
+/**
+ * Freeze the timeline, then wait until the host has ACTUALLY gone quiet,
+ * measured with the independent orchestrated-frame counter rather than a
+ * camera-displacement heuristic.
+ *
+ * The arrival camera ease decays asymptotically, so a fixed displacement
+ * threshold can report "settled" while `CameraRig.update()` still reports a
+ * change and therefore still wakes frames for several more ticks — which
+ * showed up as a stray frame inside the supposedly idle measurement window.
+ *
+ * Returns with the counter installed and zeroed. Every assertion below still
+ * counts REAL `kernel.renderFrame` calls, so the evidence stays independent
+ * of `host.lastFrameRendered` (which the code under test writes itself).
+ */
 async function pauseAndSettle(page: Page): Promise<void> {
   await page.evaluate(() => {
     const host = window.__ATLAS_APP__!.host;
     host.time.pause();
     host.time.scrubTo(0);
   });
-  await page.evaluate(
-    (timeout) =>
-      new Promise<void>((resolve) => {
-        const host = window.__ATLAS_APP__!.host as unknown as {
-          camera: { position: { x: number; y: number; z: number } };
-        };
-        let last = { ...host.camera.position };
-        const startedAt = performance.now();
-        const poll = (): void => {
-          const now = host.camera.position;
-          const delta = Math.hypot(now.x - last.x, now.y - last.y, now.z - last.z);
-          last = { ...now };
-          if (delta < 1e-4 || performance.now() - startedAt > timeout) resolve();
-          else setTimeout(poll, 100);
-        };
-        setTimeout(poll, 150);
-      }),
-    10_000
-  );
+  await installRenderFrameCounter(page);
+  await waitForRenderQuiescence(page);
+  await resetRenderFrameCalls(page);
 }
 
 /** Installs a call counter on the real orchestrated-frame entry point. */
@@ -98,10 +166,10 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     await pauseAndSettle(page);
-    await installRenderFrameCounter(page);
 
-    // Several rAF ticks' worth of wall time with no interaction whatsoever.
-    await page.waitForTimeout(500);
+    // Many rAF ticks with no interaction whatsoever: every one of them is an
+    // opportunity the host declined to spend on an orchestrated frame.
+    await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
   });
 
@@ -111,16 +179,15 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     await pauseAndSettle(page);
-    await installRenderFrameCounter(page);
 
     await page.evaluate(() => {
       window.__ATLAS_APP__!.host.setDestinationControl('black-hole', { orbit: false });
     });
-    await page.waitForTimeout(150);
+    await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
 
     await resetRenderFrameCalls(page);
-    await page.waitForTimeout(400);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
   });
 
@@ -128,16 +195,15 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     await pauseAndSettle(page);
-    await installRenderFrameCounter(page);
 
     await page.evaluate(() => {
       window.__ATLAS_APP__!.host.handleResize(900, 600);
     });
-    await page.waitForTimeout(150);
+    await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
 
     await resetRenderFrameCalls(page);
-    await page.waitForTimeout(400);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
   });
 
@@ -145,12 +211,11 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     await pauseAndSettle(page);
-    await installRenderFrameCounter(page);
 
     await page.evaluate(() => {
       window.__ATLAS_APP__!.host.governor.setForcedTier('high');
     });
-    await page.waitForTimeout(150);
+    await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
   });
 
@@ -158,9 +223,8 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     await pauseAndSettle(page);
-    await installRenderFrameCounter(page);
 
-    await page.waitForTimeout(300);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
 
     const samples = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
@@ -180,17 +244,16 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);
     await pauseAndSettle(page);
-    await installRenderFrameCounter(page);
 
-    await page.waitForTimeout(300);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
 
     await page.evaluate(() => document.dispatchEvent(new Event('visibilitychange')));
-    await page.waitForTimeout(150);
+    await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
 
     await resetRenderFrameCalls(page);
-    await page.waitForTimeout(400);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
     expect(await renderFrameCalls(page)).toBe(0);
   });
 
@@ -199,7 +262,7 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await waitForArrival(page);
     // Deliberately do NOT pause: default transport state is playing.
     await installRenderFrameCounter(page);
-    await page.waitForTimeout(300);
+    await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
   });
 });

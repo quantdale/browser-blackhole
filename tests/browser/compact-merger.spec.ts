@@ -2,7 +2,7 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
+import { ARRIVAL_TIMEOUT_MS, scrubAndAwaitDestination } from './support/appHarness.js';
 
 /**
  * CA5 Compact Merger browser validation (mission §21).
@@ -94,12 +94,11 @@ test.describe('Compact Merger validation (CA5)', () => {
     const seen: string[] = [];
     let lastPhase = '';
     for (const phase of [0, 0.2, 0.32, 0.37, 0.45, 0.6, 0.85, 1]) {
-      await page.evaluate((p) => {
-        const h = window.__ATLAS_APP__!.host;
-        h.time.pause();
-        h.time.scrubTo(p);
-      }, phase);
-      await page.waitForTimeout(300);
+      // Postcondition wait, not a sleep: a first-time pipeline compile can
+      // stall a frame past any fixed delay, which previously let a scrub be
+      // read before the destination applied it (see the black-hole-merger
+      // last-phase failure this pattern caused).
+      await scrubAndAwaitDestination(page, phase, 'timeSeconds');
       const snap = await mergerSnapshot(page);
       const name = String(snap['phase']);
       if (name !== lastPhase) {

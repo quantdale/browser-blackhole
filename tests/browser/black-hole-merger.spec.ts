@@ -2,7 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  awaitDestinationTimeApplied,
+  readDestinationTime,
+  scrubAndAwaitDestination
+} from './support/appHarness.js';
 
 /**
  * CA8-19/§18 — Black-Hole Merger headless browser validation.
@@ -133,12 +138,10 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
     const seen: string[] = [];
     let lastPhase = '';
     for (const phase of [0.05, 0.3, 0.56, 0.585, 0.61, 0.655, 0.68, 0.75, 0.95]) {
-      await page.evaluate((p) => {
-        const h = window.__ATLAS_APP__!.host;
-        h.time.pause();
-        h.time.scrubTo(p);
-      }, phase);
-      await page.waitForTimeout(250);
+      // Postcondition wait, not a sleep: the first Kerr-remnant compile
+      // (entering `ringdown`) can stall a frame past any fixed delay, which
+      // previously let the final scrub be read before it was applied.
+      await scrubAndAwaitDestination(page, phase, 'timeM');
       const snap = await bbmSnapshot(page);
       const name = String(snap.phase);
       if (name !== lastPhase) {
@@ -154,11 +157,7 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
     ]);
 
     // Remnant state reports the SOURCE-DERIVED Kerr parameters.
-    await page.evaluate(() => {
-      const h = window.__ATLAS_APP__!.host;
-      h.time.scrubTo(0.9);
-    });
-    await page.waitForTimeout(250);
+    await scrubAndAwaitDestination(page, 0.9, 'timeM');
     const snap = await bbmSnapshot(page);
     expect(snap.kerrSpinDimensionless ?? null).toBeCloseTo(0.6864817488889335, 9);
     expect(errors).toEqual([]);
@@ -210,12 +209,16 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
     await page.waitForTimeout(800);
 
     const readAtReset = async (): Promise<BbmSnapshot> => {
+      // Postcondition wait, not a sleep: reading before the destination has
+      // applied the reset returns the still-playing state and compares two
+      // unrelated instants.
+      const previous = await readDestinationTime(page, 'timeM');
       await page.evaluate(() => {
         const h = window.__ATLAS_APP__!.host;
         h.time.pause();
         h.time.reset();
       });
-      await page.waitForTimeout(300);
+      await awaitDestinationTimeApplied(page, 'timeM', previous);
       return bbmSnapshot(page);
     };
 
