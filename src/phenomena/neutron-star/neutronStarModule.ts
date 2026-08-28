@@ -112,6 +112,12 @@ const ARRIVAL_ANIMATE_SECONDS = 1.2;
  */
 const TIMELINE_ROTATIONS = 50;
 
+/**
+ * Floor on the spin rate used to PACE the timeline coordinate. A non-rotating
+ * star would otherwise ask for an infinite traverse time.
+ */
+const MIN_TIMELINE_SPIN_HZ = 0.02;
+
 /** Energy-input rate fed to the flare machine per simulated second. */
 const FLARE_ENERGY_INPUT_PER_SECOND = 1;
 
@@ -645,14 +651,23 @@ export function createNeutronStarModule(): PhenomenonModule {
     // Timeline mapping: UI phase [0,1] <-> accumulated spin revolutions, so
     // scrubbing and the physical readout speak rotation counts. Registration
     // alone does not activate; activate immediately (ARCHITECTURE section 8).
+    // Pace the scrub coordinate at the star's ACTUAL spin rate, so the readout
+    // ("N rotations") advances in step with the star the viewer is watching, and
+    // LOOP it: a rotating star has no end state, and without `loop` the mapping
+    // saturated at 1.0 after TIMELINE_ROTATIONS and held there, which stops the
+    // TIME_ADVANCED invalidation signal from ever firing again.
+    const spinHz = Math.max(state.spinHz, MIN_TIMELINE_SPIN_HZ);
     ctx.services.time.registerPhaseMapping('rotation', {
       id: 'rotation',
       label: 'Spin rotation',
       forward: (phase01) => clamp01(phase01) * TIMELINE_ROTATIONS,
       inverse: (rotations) => clamp01(rotations / TIMELINE_ROTATIONS),
-      formatDisplay: (rotations) => `${rotations.toFixed(1)} rotations`
+      formatDisplay: (rotations) => `${rotations.toFixed(1)} rotations`,
+      playbackSeconds: TIMELINE_ROTATIONS / spinHz,
+      loop: true
     });
     ctx.services.time.setPhaseMapping('rotation');
+    ctx.services.time.resumeUnlessExplicitlyPaused();
   }
 
   function update(ctx: FrameContext): void {

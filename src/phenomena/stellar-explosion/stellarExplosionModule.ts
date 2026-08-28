@@ -452,8 +452,9 @@ export function createStellarExplosionModule(): PhenomenonModule {
     ctx.services.time.scrubTo(
       initialUiPhase === 0 ? ctx.preset.timelineInitialPhase : initialUiPhase
     );
-    // Arrive PLAYING: paused arrival meant the star never exploded on screen.
-    ctx.services.time.play();
+    // Arrive PLAYING unless something explicitly paused the clock (viewer or
+    // golden harness): paused arrival meant the star never exploded on screen.
+    ctx.services.time.resumeUnlessExplicitlyPaused();
     autoFramer.reset();
     // The shell grows past the rig's default 500-unit ceiling in the nebular
     // stage, which would clamp both the framing and the viewer's zoom.

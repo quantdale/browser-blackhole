@@ -153,12 +153,30 @@ export function formatMergerSeconds(seconds: number): string {
 }
 
 /** Build the TimeController-compatible PhaseMapping for this destination. */
+/**
+ * Wall-clock seconds for one full traverse at 1x. The segment weights above
+ * then split it: ~14 s of inspiral, ~5 s through contact and merger, and the
+ * rest across jet, kilonova and afterglow.
+ */
+export const TIMELINE_PLAYBACK_SECONDS = 45;
+
 export function makeMergerPhaseMapping(scenario: ResolvedMergerScenario): PhaseMapping {
   return {
     id: 'merger-timeline',
     label: 'Merger timeline',
     forward: (phase01) => uiPhaseToSeconds(phase01, scenario),
     inverse: (internal) => secondsToUiPhase(internal, scenario),
-    formatDisplay: (internal) => `${formatMergerSeconds(internal)} · ${phaseAt(internal, scenario)}`
+    formatDisplay: (internal) =>
+      `${formatMergerSeconds(internal)} · ${phaseAt(internal, scenario)}`,
+    // Phase-paced: the internal coordinate is physical seconds spanning ~0 to
+    // 180 days, and the segment table deliberately gives the sub-second contact
+    // and merger stages 12% of the phase axis while log-compressing the
+    // multi-day afterglow. Advancing uniformly in seconds throws that weighting
+    // away. Looping matters here too: the previous mapping declared neither, so
+    // playback ran its ~28 s span once and then HELD on the afterglow frame
+    // forever — the destination looked alive for half a minute and frozen after.
+    playbackSeconds: TIMELINE_PLAYBACK_SECONDS,
+    pacing: 'phase',
+    loop: true
   };
 }

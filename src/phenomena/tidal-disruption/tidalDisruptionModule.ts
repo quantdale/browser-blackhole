@@ -568,11 +568,11 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     ctx.services.time.scrubTo(
       deepLinkPhase !== 0 ? deepLinkPhase : ctx.preset.timelineInitialPhase
     );
-    // Arrive PLAYING. Arriving paused (the previous behaviour) meant the
-    // encounter never advanced unless the viewer found the transport, so the
-    // destination presented a single frozen frame of a star on approach.
-    // Specs that need determinism call `time.pause()` themselves.
-    ctx.services.time.play();
+    // Arrive PLAYING unless something explicitly paused the clock (a viewer
+    // who paused before navigating, or the golden harness). Arriving paused
+    // unconditionally — the previous behaviour — meant the encounter never
+    // advanced unless the viewer found the transport.
+    ctx.services.time.resumeUnlessExplicitlyPaused();
     autoFramer.reset();
     lastPhysicalTime = Number.NaN;
     uOrbitPhase.value = 0;

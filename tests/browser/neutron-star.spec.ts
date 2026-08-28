@@ -8,6 +8,8 @@ import './support/atlasHook.js';
 import {
   ARRIVAL_TIMEOUT_MS,
   collectErrors,
+  expectPresentedMotion,
+  measurePresentedMotion,
   sampleColorsAtNdc,
   type NdcPoint
 } from './support/appHarness.js';
@@ -528,4 +530,69 @@ test.describe('neutron-star surface-ray CPU/GPU parity corpus', () => {
       await runParityCorpus(page, backend);
     });
   }
+});
+
+/**
+ * Phenomena-animation campaign. The star's spin is integrated from active frame
+ * time, so it always rotated — but its timeline mapping declared neither pacing
+ * nor looping, so the scrub coordinate saturated at 1.0 after
+ * TIMELINE_ROTATIONS and held there, which stops the TIME_ADVANCED invalidation
+ * signal from firing again and leaves the readout stuck. The mapping is now
+ * paced at the star's ACTUAL spin rate and loops.
+ */
+test.describe('Neutron Star timeline is paced and endless (phenomena-animation)', () => {
+  test('timeline is paced at the spin rate and loops', async ({ page }) => {
+    const { consoleErrors, pageErrors } = collectErrors(page);
+    await page.goto('/atlas/neutron-star');
+    await waitForArrival(page, 'neutron-star');
+
+    const snap = await page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot());
+    expect(snap.loop).toBe(true);
+    expect(snap.paused).toBe(false);
+    // 50 rotations at the preset's 0.5 Hz spin => 1 rotation per 2 s, i.e. a
+    // base rate of ~0.5 internal units (rotations) per second.
+    expect(snap.basePlaybackRate).toBeGreaterThan(0.2);
+    expect(snap.basePlaybackRate).toBeLessThan(1.5);
+
+    const before = snap.physicalTime ?? 0;
+    await expect
+      .poll(
+        () => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().physicalTime ?? 0),
+        {
+          timeout: 15_000,
+          intervals: [200]
+        }
+      )
+      .toBeGreaterThan(before + 0.5);
+    expect(consoleErrors.concat(pageErrors)).toEqual([]);
+  });
+
+  test('the rotating star visibly evolves', async ({ page }) => {
+    const { consoleErrors, pageErrors } = collectErrors(page);
+    await page.goto('/atlas/neutron-star');
+    await waitForArrival(page, 'neutron-star');
+
+    const motion = await measurePresentedMotion(page, { captures: 4, framesBetween: 30 });
+    expectPresentedMotion(motion, { label: 'neutron-star' });
+    expect(consoleErrors.concat(pageErrors)).toEqual([]);
+  });
+
+  test('the scrub coordinate wraps instead of pinning at the end', async ({ page }) => {
+    const { consoleErrors, pageErrors } = collectErrors(page);
+    await page.goto('/atlas/neutron-star');
+    await waitForArrival(page, 'neutron-star');
+
+    await page.evaluate(() => {
+      const h = window.__ATLAS_APP__!.host;
+      h.time.scrubTo(0.995);
+      h.time.play();
+    });
+    await expect
+      .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+        timeout: 25_000,
+        intervals: [250]
+      })
+      .toBeLessThan(0.9);
+    expect(consoleErrors.concat(pageErrors)).toEqual([]);
+  });
 });

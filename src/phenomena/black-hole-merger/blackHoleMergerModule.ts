@@ -349,10 +349,10 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     ctx.services.time.registerPhaseMapping('bbm-timeline', makeBbmPhaseMapping(ds));
     ctx.services.time.setPhaseMapping('bbm-timeline');
     ctx.services.time.scrubTo(ctx.preset.timelineInitialPhase);
-    // Arrive PLAYING: arriving paused meant the merger never happened unless
-    // the viewer found the transport. Specs pause explicitly where they need
-    // determinism.
-    ctx.services.time.play();
+    // Arrive PLAYING unless something explicitly paused the clock (viewer or
+    // golden harness). Arriving paused unconditionally meant the merger never
+    // happened on screen.
+    ctx.services.time.resumeUnlessExplicitlyPaused();
   }
 
   function updateTrails(t: number, ds: BbmDataset): void {

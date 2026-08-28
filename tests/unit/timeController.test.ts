@@ -284,3 +284,44 @@ describe('TimeController: phase-space pacing for nonlinear mappings', () => {
     expect(time.consumeDirty()).toBe(true);
   });
 });
+
+/**
+ * Arrival autoplay must not override a DELIBERATE pause. Two callers depend on
+ * it: a viewer who paused and then navigated, and the visual-golden harness,
+ * which pauses the clock BEFORE navigating so every destination is captured
+ * frozen at phase 0.
+ */
+describe('TimeController: arrival autoplay respects an explicit pause', () => {
+  it('resumes from the default (never-paused) state', () => {
+    const time = new TimeController({ paused: true });
+    expect(time.explicitlyPaused).toBe(false);
+    expect(time.resumeUnlessExplicitlyPaused()).toBe(true);
+    expect(time.paused).toBe(false);
+  });
+
+  it('stays paused after an explicit pause', () => {
+    const time = new TimeController();
+    time.pause();
+    expect(time.explicitlyPaused).toBe(true);
+    expect(time.resumeUnlessExplicitlyPaused()).toBe(false);
+    expect(time.paused).toBe(true);
+  });
+
+  it('play() clears the explicit pause so later arrivals autoplay again', () => {
+    const time = new TimeController();
+    time.pause();
+    time.play();
+    expect(time.explicitlyPaused).toBe(false);
+    time.pause();
+    time.play();
+    expect(time.resumeUnlessExplicitlyPaused()).toBe(true);
+  });
+
+  it('scrub and reset do not count as explicit pauses', () => {
+    const time = new TimeController();
+    time.scrubTo(0.4);
+    time.reset(0.1);
+    expect(time.explicitlyPaused).toBe(false);
+    expect(time.resumeUnlessExplicitlyPaused()).toBe(true);
+  });
+});

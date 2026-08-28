@@ -2,7 +2,12 @@ import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
 import './support/atlasHook.js';
-import { ARRIVAL_TIMEOUT_MS, scrubAndAwaitDestination } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  expectPresentedMotion,
+  measurePresentedMotion,
+  scrubAndAwaitDestination
+} from './support/appHarness.js';
 
 /**
  * CA5 Compact Merger browser validation (mission §21).
@@ -287,6 +292,64 @@ test.describe('Compact Merger validation (CA5)', () => {
     const inv = await page.evaluate(() => window.__ATLAS_APP__!.host.debugInventory());
     expect(inv.pendingPrepares).toBe(0);
     expect(inv.liveScopeCount).toBeLessThan(10);
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * Phenomena-animation campaign. This destination arrived PAUSED, and its mapping
+ * declared neither pacing nor looping: playback advanced physical seconds at
+ * 1 s per wall second, so it ran its ~28 s span once and then HELD on the
+ * afterglow frame forever. It looked alive for half a minute and frozen after.
+ */
+test.describe('Compact Merger plays on its own (phenomena-animation)', () => {
+  test('arrives playing, phase-paced and looping', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/compact-merger');
+    await waitForArrival(page, 'compact-merger');
+
+    const snap = await page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot());
+    expect(snap.paused, 'destination must arrive playing').toBe(false);
+    expect(snap.loop).toBe(true);
+    expect(snap.basePlaybackRate).toBeGreaterThan(0);
+    expect(snap.basePlaybackRate).toBeLessThan(0.2); // phase units per second
+
+    const before = snap.simulationPhase;
+    await expect
+      .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+        timeout: 15_000,
+        intervals: [200]
+      })
+      .toBeGreaterThan(before + 0.03);
+    expect(errors).toEqual([]);
+  });
+
+  test('wraps at the end of the afterglow instead of holding', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/compact-merger');
+    await waitForArrival(page, 'compact-merger');
+
+    await page.evaluate(() => {
+      const h = window.__ATLAS_APP__!.host;
+      h.time.scrubTo(0.99);
+      h.time.play();
+    });
+    await expect
+      .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+        timeout: 20_000,
+        intervals: [200]
+      })
+      .toBeLessThan(0.9);
+    expect(errors).toEqual([]);
+  });
+
+  test('the presented image evolves while the merger runs', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/compact-merger');
+    await waitForArrival(page, 'compact-merger');
+
+    const motion = await measurePresentedMotion(page, { captures: 4, framesBetween: 30 });
+    expectPresentedMotion(motion, { label: 'compact-merger' });
     expect(errors).toEqual([]);
   });
 });

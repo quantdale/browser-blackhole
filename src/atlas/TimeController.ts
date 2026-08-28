@@ -135,6 +135,8 @@ export class TimeController {
   private loopValue = false;
   /** Active mapping's pacing coordinate (see PhaseMapping.pacing). */
   private pacingValue: 'internal' | 'phase' = 'internal';
+  /** True when an external caller paused (sticky across arrivals). */
+  private explicitPauseValue = false;
 
   /**
    * Sticky "coordinate changed since last consumed" flag (whole-atlas
@@ -250,10 +252,36 @@ export class TimeController {
 
   play(): void {
     this.pausedValue = false;
+    this.explicitPauseValue = false;
   }
 
   pause(): void {
     this.pausedValue = true;
+    // An explicit pause STICKS across destination arrivals: see
+    // resumeUnlessExplicitlyPaused.
+    this.explicitPauseValue = true;
+  }
+
+  /**
+   * Arrival autoplay: resume playback unless something explicitly paused the
+   * timeline. Returns true when playback is running afterwards.
+   *
+   * Destinations call this from `enter()` so a viewer who just navigated sees
+   * the phenomenon actually happen. Calling `play()` there instead would
+   * override a DELIBERATE pause — and two callers depend on that distinction:
+   * a viewer who paused and then navigated expects to stay paused, and the
+   * visual-golden harness pauses the clock BEFORE navigating precisely so every
+   * destination is captured frozen at phase 0.
+   */
+  resumeUnlessExplicitlyPaused(): boolean {
+    if (this.explicitPauseValue) return !this.pausedValue;
+    this.pausedValue = false;
+    return true;
+  }
+
+  /** True when `pause()` was called and no `play()` has cleared it. */
+  get explicitlyPaused(): boolean {
+    return this.explicitPauseValue;
   }
 
   /**

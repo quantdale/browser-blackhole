@@ -181,10 +181,23 @@ export function createCompactMergerModule(): PhenomenonModule {
     const starGeometry = new THREE.SphereGeometry(1, segments.width, segments.height);
     const starMaterial1 = new MeshBasicNodeMaterial();
     starMaterial1.name = 'compact-merger-star1';
-    starMaterial1.colorNode = vec4(vec3(...STAR_TINT).mul(uStar1Gain), 1);
+    // Linear-HDR radiance so the neutron-star photospheres BLOOM. At unit
+    // radiance the pair rendered as two flat pale discs — the hottest objects in
+    // the scene looked like matte paper cut-outs.
+    starMaterial1.colorNode = vec4(
+      vec3(...STAR_TINT)
+        .mul(uStar1Gain)
+        .mul(float(STAR_RADIANCE)),
+      1
+    );
     const starMaterial2 = new MeshBasicNodeMaterial();
     starMaterial2.name = 'compact-merger-star2';
-    starMaterial2.colorNode = vec4(vec3(...STAR_TINT).mul(uStar2Gain), 1);
+    starMaterial2.colorNode = vec4(
+      vec3(...STAR_TINT)
+        .mul(uStar2Gain)
+        .mul(float(STAR_RADIANCE)),
+      1
+    );
     star1 = new THREE.Mesh(starGeometry, starMaterial1);
     star1.name = 'compact-merger-star1';
     star2 = new THREE.Mesh(starGeometry, starMaterial2);
@@ -216,7 +229,13 @@ export function createCompactMergerModule(): PhenomenonModule {
     const remnantGeometry = new THREE.SphereGeometry(1, 32, 24);
     const remnantMaterial = new MeshBasicNodeMaterial();
     remnantMaterial.name = 'compact-merger-remnant';
-    remnantMaterial.colorNode = vec4(uRemnantTint.mul(uRemnantGain), 1);
+    // Linear-HDR radiance well above 1 so the hot remnant BLOOMS. At unit
+    // radiance a merger remnant surrounded by bright ejecta reads as a flat
+    // matte disc — the one object in frame that should look incandescent.
+    remnantMaterial.colorNode = vec4(
+      uRemnantTint.mul(uRemnantGain).mul(float(REMNANT_RADIANCE)),
+      1
+    );
     remnant = new THREE.Mesh(remnantGeometry, remnantMaterial);
     remnant.name = 'compact-merger-remnant';
     remnant.visible = false;
@@ -415,11 +434,17 @@ export function createCompactMergerModule(): PhenomenonModule {
     );
     ctx.services.time.setPhaseMapping('merger-timeline');
     const initialUiPhase = secondsToUiPhase(ready.state.timeSeconds, ready.resolved);
-    ctx.services.time.pause();
     ctx.services.time.scrubTo(
       initialUiPhase === 0 ? ctx.preset.timelineInitialPhase : initialUiPhase
     );
+    // Arrive PLAYING unless something explicitly paused the clock (viewer or
+    // golden harness): paused arrival left the inspiral frozen.
+    ctx.services.time.resumeUnlessExplicitlyPaused();
   }
+
+  /** Linear-HDR radiance multipliers for the photospheres (presentation). */
+  const REMNANT_RADIANCE = 3.2;
+  const STAR_RADIANCE = 4.0;
 
   /** Phase-gated particle population fraction (CA5-13). */
   function populationFractionFor(phase: MergerPhase): number {
