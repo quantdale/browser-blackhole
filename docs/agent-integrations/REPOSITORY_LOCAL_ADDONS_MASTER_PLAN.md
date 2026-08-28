@@ -2,10 +2,11 @@
 
 ## Status
 
-**PLANNING ONLY / IMPLEMENT IN A LATER SESSION**
+**IMPLEMENTED — landed on `main` on 2026-08-28**
 
 Target repository: `quantdale/browser-blackhole`  
-Planning branch: `plan/repo-local-addons-2026-08-28`
+Planning branch (historical source): `plan/repo-local-addons-2026-08-28`
+Implementation source branch (historical): `feat/repo-local-addons`
 
 ## Repository assessment
 
@@ -160,6 +161,6 @@ Record exact files, versions/endpoints, activation steps, repository scope mecha
 - Existing product/runtime/test/release authority remains unchanged.
 - The diff is bounded to integration configuration, local dev dependencies, tests/preflight and documentation.
 
-## Next-session execution prompt
+## Original execution prompt
 
 > Implement this `REPOSITORY_LOCAL_ADDONS_MASTER_PLAN.md` on `quantdale/browser-blackhole`. First inventory and protect every existing MCP/plugin/skill and agent integration. Revalidate the recommendation against current repository truth and current upstream documentation/security advisories. Add only tools that remain useful and can be repository-scoped. Never silently fall back to global installation; use `GLOBAL_SCOPE_BLOCKED` instead. Keep secrets/private data external, preserve all existing execution/test/governance authority, validate on safe local/synthetic targets, run relevant repository gates, perform a before/after preservation audit, and commit only the bounded integration changes and evidence.

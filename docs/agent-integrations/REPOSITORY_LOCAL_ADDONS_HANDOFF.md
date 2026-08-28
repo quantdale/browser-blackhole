@@ -1,7 +1,8 @@
 # Repository-Local Add-ons — Implementation Handoff
 
 Implements `REPOSITORY_LOCAL_ADDONS_MASTER_PLAN.md` on `quantdale/browser-blackhole`.
-Status: **IMPLEMENTED** (Phase 0–7 complete). Branch: `feat/repo-local-addons`.
+Status: **IMPLEMENTED** (Phase 0–7 complete). Landed on `main`; source branch:
+`feat/repo-local-addons` (historical).
 
 ## What was added (the bounded diff)
 
