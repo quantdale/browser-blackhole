@@ -129,6 +129,41 @@ fetched at boot. That case is deliberately NOT silenced and is pinned by
 `startup-graph.spec.ts` "a genuine implementation-chunk failure is still
 reported truthfully".
 
+### Known intermittent full-suite failure (diagnosed, NOT fixed, NOT hidden)
+
+`accessibility.spec.ts` failed once in each of the last two full-suite runs at
+`--workers=2`, on two DIFFERENT tests ("focus lands on a real element after a
+destination switch", then "keyboard flow: nav -> mode switch -> controls ->
+observer select", the latter timing out with `activeDestination` still on the
+previous destination). Both failures are keyboard-driven destination
+switching.
+
+Mechanism, measured directly rather than inferred: the shell's 4 Hz UI
+reflection tick rebuilds the nav and control panel once per completed
+arrival, and it notices the arrival up to a full tick LATE. A probe that
+watched the "Neutron Star" chip's element identity after an arrival poll
+returned found the node REPLACED at 106 ms, 106 ms and 165 ms across three
+runs, then stable. A test that focuses a chip inside that window has its
+focused node swapped out, so the subsequent `keyboard.press('Enter')` lands
+on a detached element and silently does nothing. The arrival poll's 250 ms
+interval usually hides this, which is why it is rare.
+
+The rebuild-after-arrival behaviour is pre-existing M11 code, not from this
+session. Whether this session's work made the race likelier is genuinely
+unresolved: it appeared in the two most recent full runs and not the two
+before, which is n=2 versus n=2, and the WS3 chunk fetch does shift arrival
+timing slightly.
+
+**A fix was attempted and REJECTED on evidence rather than shipped.** Adding
+a `waitForNavSettled` postcondition (wait for the chip element identity to
+survive a quiet window) scored 39/40 under `--workers=6 --repeat-each=10`
+while the UNCHANGED spec scored 40/40 in the same configuration — i.e. no
+demonstrated improvement, so shipping it would have been a speculative
+change dressed as a fix. The helper was removed rather than left as dead
+code. Note that isolated repeat-stress does not reproduce the failure at all;
+only the mixed full-suite workload does, so the next attempt needs a
+reproduction harness that mixes specs, not one that repeats a single file.
+
 ### Still open
 
 §0 baseline and §1 telemetry remain unexecuted and are still the declared
