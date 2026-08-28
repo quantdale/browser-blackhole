@@ -46,8 +46,10 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
 import {
   cameraPosition,
+  clamp,
   dot,
   float,
+  length,
   mix,
   normalize,
   positionWorld,
@@ -100,7 +102,8 @@ import {
 } from './types.js';
 import { resolveScenario } from './physics.js';
 import { shockRadiusUnits } from './physics.js';
-import { MIN_SHELL_WIDTH_UNITS, shellWidthUnits } from './shockShell.js';
+import { MIN_SHELL_WIDTH_UNITS, SHELL_SUPPORT, shellWidthUnits } from './shockShell.js';
+import { AutoFramer } from '../../renderer/shared/AutoFramer.js';
 import {
   engineIgnitionSeconds,
   phaseAt,
@@ -156,6 +159,46 @@ const JET_EMISSION_GAIN = 1.6;
 // Module factory
 // ---------------------------------------------------------------------------
 
+/**
+ * Wall-clock seconds for one full traverse at 1x, and the pacing/looping the
+ * mapping declares. The internal coordinate is physical seconds spanning ~0 to
+ * ~1.8e7 s (months), so advancing it uniformly needed ~208 real DAYS for one
+ * traverse: the destination was frozen. The segment table weights the phase
+ * axis by STAGE, so playback is paced in phase to honour that weighting.
+ */
+const TIMELINE_PLAYBACK_SECONDS = 50;
+
+/**
+ * Target optical depth along a sight line through the ejecta shell.
+ *
+ * VolumeService integrates `alpha = 1 - exp(-density * dt)` with dt in SCENE
+ * UNITS, while `density.ts` returns a dimensionless extinction PROXY of order
+ * 1 (a validated model with a CPU oracle). Multiplying the two directly gives
+ * an optical depth of order (peak density) x (shell chord), which reaches ~28
+ * once the shell is ~90 units across — the ejecta rendered as a featureless
+ * blown-out white ball. The render path therefore scales the model output by
+ * `TARGET / (peak x chord)`, leaving the validated density field itself
+ * untouched (its CPU/GPU parity tests compare the MODEL, not the presented
+ * alpha).
+ */
+const EJECTA_TARGET_OPTICAL_DEPTH = 2.8;
+
+/**
+ * Lower bound applied to the PRESENTED ejecta emission gain (disclosed). The
+ * modelled peak-normalized luminosity declines as t^-1.1 and is reported
+ * unchanged in the debug snapshot; this only keeps the late nebular phase from
+ * fading to black on screen.
+ */
+const EJECTA_EMISSION_DISPLAY_FLOOR = 0.22;
+
+/** Extra fraction of the shell radius included when framing (shell width). */
+const SHELL_WIDTH_MARGIN = 0.35;
+
+/** Auto-framing bounds for the growing shell (see AutoFramer). */
+const AUTO_FRAME_MARGIN = 2.1;
+const AUTO_FRAME_MIN_UNITS = 24;
+const AUTO_FRAME_MAX_UNITS = 2400;
+
 export function createStellarExplosionModule(): PhenomenonModule {
   let disposed = false;
   let scene: THREE.Scene | null = null;
@@ -166,6 +209,17 @@ export function createStellarExplosionModule(): PhenomenonModule {
   let jetU: JetUniformBundle | null = null;
   /** Jet visibility/emission gain folded with viewing response per frame. */
   let uJetGain: UniformNode<'float', number> | null = null;
+  /** Render-side optical-depth normalization (see EJECTA_TARGET_OPTICAL_DEPTH). */
+  let uOpticalScale: UniformNode<'float', number> | null = null;
+  /** Last MODELLED (unfloored) emission gain, for the debug readout. */
+  let lastEmissionGainModel = 0;
+  /** Characteristic radius of the once-seeded particle cloud (scene units). */
+  let seedCloudRadiusUnits = 0;
+  const autoFramer = new AutoFramer({
+    margin: AUTO_FRAME_MARGIN,
+    minUnits: AUTO_FRAME_MIN_UNITS,
+    maxUnits: AUTO_FRAME_MAX_UNITS
+  });
   // Progenitor surface presentation uniforms.
   const uProgTint = uniform(new THREE.Vector3(1, 0.6, 0.35));
   const uProgGain = uniform(0);
@@ -240,17 +294,39 @@ export function createStellarExplosionModule(): PhenomenonModule {
     emissionU = createExplosionEmissionUniforms();
     jetU = createExplosionJetUniforms();
     uJetGain = uniform(0);
+    uOpticalScale = uniform(1);
 
     const densityField = buildTslDensityField(densityU);
     const jetFactor = buildJetFactor(jetU);
     const combinedDensity = (args: { pos: unknown; dir: unknown }): Node<'float'> =>
-      densityField(args).add(jetFactor(args).mul(uJetGain!));
+      // uOpticalScale converts the model's dimensionless extinction proxy into
+      // an optical depth per SCENE UNIT for the current shell geometry; see
+      // EJECTA_TARGET_OPTICAL_DEPTH.
+      densityField(args).add(jetFactor(args).mul(uJetGain!)).mul(uOpticalScale!);
 
     const boundsRadius = computeBoundsRadius(res);
     const volume = ctx.services.volumes.createVolume({
       bounds: { kind: 'sphere', center: [0, 0, 0], radius: boundsRadius },
       density: combinedDensity,
-      emission: () => vec3(emissionU!.tint).mul(emissionU!.gain),
+      emission: ({ pos }) => {
+        // Radial temperature gradient: the ejecta cools outward, so the inner
+        // photosphere reads hot (the model's own tint) and the outer skirt
+        // shifts red and dims. A single global tint made the whole shell one
+        // flat colour, which — with a saturated optical depth — presented as a
+        // featureless white ball.
+        const p = vec3(pos as Node<'vec3'>);
+        const rNorm = clamp(
+          length(p).div(densityU!.shellRadius.max(float(1e-6)).mul(1.35)),
+          float(0),
+          float(1)
+        );
+        const hot = vec3(emissionU!.tint);
+        const cool = hot.mul(vec3(1.0, 0.52, 0.26));
+        const dim = mix(float(1), float(0.35), rNorm);
+        return mix(hot, cool, smoothstep(float(0.35), float(1), rNorm))
+          .mul(emissionU!.gain)
+          .mul(dim);
+      },
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       halfResolution: true,
       earlyAlphaTermination: true,
@@ -276,6 +352,11 @@ export function createStellarExplosionModule(): PhenomenonModule {
     // early-expansion shell (coherence: same velocity scale as the volume);
     // phase gating happens per frame through setPopulationScale().
     const refAge = Math.max(res.crossoverSeconds, 1);
+    // The particle emitters are seeded ONCE at this reference age, so the cloud
+    // has a fixed characteristic radius while the volume's shell grows through
+    // it. The framing floor below keeps the camera outside that cloud during the
+    // early stages; otherwise the flash frames from INSIDE the particle field.
+    seedCloudRadiusUnits = Math.max(shockRadiusUnits(refAge, res), res.progenitorRadiusUnits);
     const fullPlan = buildEjectaEmitterPlan(
       res.explosionTimeSeconds + refAge,
       'expanding-ejecta',
@@ -361,14 +442,22 @@ export function createStellarExplosionModule(): PhenomenonModule {
       label: 'Explosion timeline',
       forward: (phase01) => uiPhaseToSeconds(phase01, ready.resolved.scenarioId),
       inverse: (internal) => secondsToUiPhase(internal, ready.resolved.scenarioId),
-      formatDisplay: (internal) => `${Math.round(internal)} s`
+      formatDisplay: (internal) => `${Math.round(internal)} s`,
+      playbackSeconds: TIMELINE_PLAYBACK_SECONDS,
+      pacing: 'phase',
+      loop: true
     });
     ctx.services.time.setPhaseMapping('explosion-timeline');
     const initialUiPhase = secondsToUiPhase(ready.state.timeSeconds, ready.resolved.scenarioId);
-    ctx.services.time.pause();
     ctx.services.time.scrubTo(
       initialUiPhase === 0 ? ctx.preset.timelineInitialPhase : initialUiPhase
     );
+    // Arrive PLAYING: paused arrival meant the star never exploded on screen.
+    ctx.services.time.play();
+    autoFramer.reset();
+    // The shell grows past the rig's default 500-unit ceiling in the nebular
+    // stage, which would clamp both the framing and the viewer's zoom.
+    ctx.services.cameraRig.setDistanceLimits(6, AUTO_FRAME_MAX_UNITS * 3);
   }
 
   /** Phase-gated population fraction (mirrors ejecta.ts phase policy). */
@@ -413,10 +502,55 @@ export function createStellarExplosionModule(): PhenomenonModule {
       densityU.timeSeconds.value = seconds;
     }
 
+    // --- render-side optical depth ------------------------------------------
+    // Chord through the shell support: 2 x SHELL_SUPPORT x width. Peak density
+    // is the model's own bound (MAX_DENSITY_FACTOR x baseDensity).
+    if (uOpticalScale !== null && densityU !== null) {
+      const width = Math.max(densityU.shellWidth.value, MIN_SHELL_WIDTH_UNITS);
+      const chord = 2 * SHELL_SUPPORT * width;
+      const peak = Math.max(densityU.baseDensityValue.value * MAX_DENSITY_FACTOR, 1e-6);
+      uOpticalScale.value = EJECTA_TARGET_OPTICAL_DEPTH / Math.max(peak * chord, 1e-6);
+    }
+
+    // --- auto-framing: follow the growing shell -----------------------------
+    // The ejecta shell spans ~1 to ~500 scene units over the timeline, so a
+    // fixed standoff shows a speck, then a full frame, then the INSIDE of the
+    // shell (a white wash). Progenitor/collapse frame the star itself.
+    {
+      const shellR = densityU?.shellRadius.value ?? 0;
+      const shellExtent =
+        shellR > 0
+          ? shellR * (1 + SHELL_WIDTH_MARGIN)
+          : Math.max(ready.resolved.progenitorRadiusUnits * 3.5, AUTO_FRAME_MIN_UNITS);
+      // Never frame from inside the seeded particle cloud (see the note at the
+      // emitter plan): while the shell is smaller than the cloud, frame the
+      // cloud instead.
+      const extent =
+        populationFractionFor(phase) > 0
+          ? Math.max(shellExtent, seedCloudRadiusUnits * 1.15)
+          : shellExtent;
+      autoFramer.update(
+        ctx.services.cameraRig,
+        extent,
+        ctx.time.dt,
+        undefined,
+        snapshot.paused === true
+      );
+    }
+
     // --- emission evolution (early hot/bright -> later cool/dim/red) -----------
     if (emissionU !== null) {
       const sample = emissionColorAndGain(seconds, ready.resolved);
-      configureEmissionUniforms(emissionU, sample);
+      // DISPLAY FLOOR (disclosed): the modelled luminosity declines as t^-1.1
+      // from the flash, reaching ~1% by the expanding-ejecta stage and less
+      // later, which is physically right and visually black. The floor keeps the
+      // late nebular structure legible; the modelled value is reported unchanged
+      // in the debug readout as `emissionGainModel`.
+      configureEmissionUniforms(emissionU, {
+        ...sample,
+        intensity: Math.max(sample.intensity, EJECTA_EMISSION_DISPLAY_FLOOR)
+      });
+      lastEmissionGainModel = sample.intensity;
     }
 
     // --- progenitor surface ------------------------------------------------------
@@ -468,6 +602,14 @@ export function createStellarExplosionModule(): PhenomenonModule {
     debug['previousPhase'] = lastPhase;
     debug['timeSeconds'] = seconds;
     debug['shellRadiusUnits'] = densityU?.shellRadius.value ?? null;
+    debug['opticalScale'] = uOpticalScale?.value ?? null;
+    debug['emissionGainPresented'] = emissionU?.gain.value ?? null;
+    debug['emissionGainModel'] = lastEmissionGainModel;
+    debug['autoFrameEnabled'] = autoFramer.enabled;
+    debug['autoFrameDistanceUnits'] =
+      autoFramer.requestedDistance === null
+        ? null
+        : Number(autoFramer.requestedDistance.toFixed(2));
     debug['sceneUnitKm'] = SCENE_UNIT_KM;
     debug['tier'] = lastTier;
     debug['volumeVisible'] = volumeVisible;

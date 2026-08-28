@@ -1,7 +1,11 @@
 import { expect, test, type Page } from '@playwright/test';
 
 // Canonical __ATLAS_APP__ window typing (loads the single global augmentation).
-import { ARRIVAL_TIMEOUT_MS } from './support/appHarness.js';
+import {
+  ARRIVAL_TIMEOUT_MS,
+  expectPresentedMotion,
+  measurePresentedMotion
+} from './support/appHarness.js';
 import './support/atlasHook.js';
 
 /**
@@ -59,6 +63,14 @@ async function freezeAt(page: Page, phase01: number): Promise<void> {
  * after arrival can still be pipeline-compile black frames — dramatically so
  * on the forced-WebGL2 backend where TSL->GLSL compilation lands lazily.
  */
+/** Active destination debug snapshot (empty object when absent). */
+async function snapshotOf(page: Page): Promise<Record<string, unknown>> {
+  const snap = await page.evaluate(() =>
+    window.__ATLAS_APP__!.host.activeDestinationDebugSnapshot()
+  );
+  return snap ?? {};
+}
+
 async function waitForNonUniformFrame(page: Page, timeoutMs = ARRIVAL_TIMEOUT_MS): Promise<number> {
   let unique = 0;
   await expect
@@ -176,6 +188,16 @@ test.describe('Stellar Explosion validation', () => {
       });
     };
     pinMedium();
+    // Precondition for a deterministic-replay comparison in an AUTO-FRAMED
+    // destination: wait until the framer owns the orbit distance. Before that
+    // the camera is still where the rig's arrival ease left it, so the first
+    // capture would be taken at a different distance from the second.
+    await expect
+      .poll(async () => (await snapshotOf(page))['autoFrameDistanceUnits'] !== null, {
+        timeout: 20_000,
+        intervals: [200]
+      })
+      .toBe(true);
     await freezeAt(page, 0.6);
     await waitForNonUniformFrame(page);
     const first = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
@@ -260,6 +282,102 @@ test.describe('Stellar Explosion validation', () => {
     expect(final.pendingPrepares).toBe(0);
     expect(final.liveScopeCount).toBeLessThanOrEqual(baseline.liveScopeCount + 1);
     expect(final.totalEstimatedGpuBytes).toBeLessThan(baseline.totalEstimatedGpuBytes * 1.75);
+    expect(errors).toEqual([]);
+  });
+});
+
+/**
+ * Phenomena-animation campaign. This destination arrived PAUSED with a mapping
+ * that advanced physical seconds at 1 s per wall second — ~208 real DAYS for one
+ * traverse of its ~1.8e7 s window — so nothing ever exploded. Its ejecta also
+ * presented as a featureless blown-out white ball: the volume's dimensionless
+ * density proxy was fed to VolumeService as an optical depth PER SCENE UNIT
+ * (reaching ~28 through the shell), and thousands of additive particle sprites
+ * carried per-particle alphas of 0.3-0.9.
+ */
+test.describe('Stellar Explosion plays on its own (phenomena-animation)', () => {
+  test('arrives playing, phase-paced and looping', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/stellar-explosion');
+    await waitForArrival(page);
+
+    const snap = await page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot());
+    expect(snap.paused, 'destination must arrive playing').toBe(false);
+    expect(snap.loop).toBe(true);
+    expect(snap.basePlaybackRate).toBeGreaterThan(0);
+    expect(snap.basePlaybackRate).toBeLessThan(0.2);
+
+    const before = snap.simulationPhase;
+    await expect
+      .poll(() => page.evaluate(() => window.__ATLAS_APP__!.host.time.snapshot().simulationPhase), {
+        timeout: 20_000,
+        intervals: [250]
+      })
+      .toBeGreaterThan(before + 0.05);
+    expect(errors).toEqual([]);
+  });
+
+  test('the explosion visibly evolves and is not a saturated white ball', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/stellar-explosion');
+    await waitForArrival(page);
+
+    // Scrub into the expanding-ejecta stage so the measurement covers the
+    // stage that used to be a blown-out disc.
+    await page.evaluate(() => {
+      const h = window.__ATLAS_APP__!.host;
+      h.time.scrubTo(0.5);
+      h.time.play();
+    });
+
+    const motion = await measurePresentedMotion(page, { captures: 4, framesBetween: 30 });
+    expectPresentedMotion(motion, { label: 'stellar-explosion' });
+
+    // Not saturated: a blown-out frame has almost every sampled cell pinned
+    // near white with no spread left.
+    const grid = await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
+    expect(grid).not.toBeNull();
+    const saturated = (grid as string[]).filter((cell) => {
+      const [r, g, b] = cell.split(',').map(Number);
+      return (r ?? 0) > 245 && (g ?? 0) > 245 && (b ?? 0) > 245;
+    }).length;
+    expect(saturated, 'ejecta must not be a saturated white disc').toBeLessThan(
+      (grid as string[]).length * 0.4
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('the render-side optical depth is normalized to the shell geometry', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/stellar-explosion');
+    await waitForArrival(page);
+
+    await page.evaluate(() => {
+      const h = window.__ATLAS_APP__!.host;
+      h.time.pause();
+      h.time.scrubTo(0.55);
+    });
+    await expect
+      .poll(async () => Number((await snapshotOf(page))['shellRadiusUnits']), {
+        timeout: 15_000,
+        intervals: [200]
+      })
+      .toBeGreaterThan(10);
+
+    const snap = await snapshotOf(page);
+    const shellRadius = Number(snap['shellRadiusUnits']);
+    const opticalScale = Number(snap['opticalScale']);
+    expect(Number.isFinite(opticalScale)).toBe(true);
+    // The scale must SHRINK as the shell grows (it is target / (peak x chord)),
+    // which is exactly the property whose absence saturated the volume.
+    expect(opticalScale).toBeGreaterThan(0);
+    expect(opticalScale).toBeLessThan(1);
+    expect(shellRadius).toBeGreaterThan(10);
+
+    // The modelled luminosity decline is still reported unfloored.
+    expect(Number(snap['emissionGainModel'])).toBeLessThanOrEqual(
+      Number(snap['emissionGainPresented'])
+    );
     expect(errors).toEqual([]);
   });
 });

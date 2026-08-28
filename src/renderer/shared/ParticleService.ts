@@ -355,6 +355,13 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.material = new PointsNodeMaterial();
     this.material.transparent = true;
     this.material.depthWrite = false;
+    // `sizePx` means PIXELS, so perspective attenuation is off. With
+    // attenuation on (the PointsMaterial default) the value behaves as a
+    // world-space size divided by view depth, so a population the camera has to
+    // approach — a supernova's ejecta during the flash, when the shell is ~1
+    // scene unit across — inflated into frame-filling bokeh discs instead of a
+    // fine particle field.
+    this.material.sizeAttenuation = false;
     this.material.blending =
       config.blending === 'additive' ? THREE.AdditiveBlending : THREE.NormalBlending;
 

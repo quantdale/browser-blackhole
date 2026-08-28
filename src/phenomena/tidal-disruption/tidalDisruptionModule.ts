@@ -36,6 +36,8 @@
 
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
+
+import { AutoFramer } from '../../renderer/shared/AutoFramer.js';
 import {
   atan,
   clamp,
@@ -155,14 +157,12 @@ const STREAM_RADIAL_CAP = 12;
 const STREAM_VIEW_CAP_FACTOR = 3;
 
 /**
- * Auto-framing (DISCLOSED presentation behaviour). The scene's meaningful
- * extent grows by orders of magnitude across the timeline — from a star at a
- * few hundred scene units to debris arcs thousands out — so a fixed camera
- * distance shows an empty frame for most of the encounter. The module eases the
- * ORBIT DISTANCE toward the current extent and stops doing so permanently as
- * soon as the viewer changes the distance themselves (detected by comparing the
- * live orbit against the last value this module wrote). Azimuth and polar are
- * never touched: they stay user-owned.
+ * Auto-framing (DISCLOSED presentation behaviour) via the shared
+ * {@link AutoFramer}: the scene's meaningful extent grows by orders of
+ * magnitude across the timeline — from a star a few hundred scene units out to
+ * debris arcs thousands out — so a fixed camera distance shows an empty frame
+ * for most of the encounter. Only the orbit distance is driven, and the viewer
+ * takes it back permanently on any manual change.
  */
 /**
  * Distance = margin x extent. The pre-disruption stages have exactly one
@@ -183,17 +183,6 @@ const AUTO_FRAME_MIN_UNITS = 140;
  * keep that stretch short).
  */
 const AUTO_FRAME_MAX_UNITS = 3500;
-/** Ease constant (per second) for the distance approach. */
-const AUTO_FRAME_LERP_PER_SECOND = 3.2;
-/** Relative orbit-distance change that counts as "the viewer took over". */
-const AUTO_FRAME_USER_EPSILON = 0.05;
-/**
- * Grace period after `enter()` before the takeover check arms. The rig runs its
- * own arrival ease for the first second or so, and its writes would otherwise
- * be misread as the viewer grabbing the camera — which disabled auto-framing on
- * the second frame of every arrival.
- */
-const AUTO_FRAME_ARM_DELAY_SECONDS = 1.5;
 /**
  * Ribbon width is baked in world units, so it is scaled with the framing
  * distance to keep a roughly constant on-screen thickness (the widths in
@@ -584,9 +573,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // destination presented a single frozen frame of a star on approach.
     // Specs that need determinism call `time.pause()` themselves.
     ctx.services.time.play();
-    autoFrameEnabled = true;
-    autoFrameDistance = Number.NaN;
-    autoFrameAgeSeconds = 0;
+    autoFramer.reset();
     lastPhysicalTime = Number.NaN;
     uOrbitPhase.value = 0;
     // The rig's default ceiling is 500 scene units, which silently clamped
@@ -664,11 +651,12 @@ export function createTidalDisruptionModule(): PhenomenonModule {
    * near-BH stages (shock, nascent disk) depend on.
    */
   let streamMinRadiusUnits = 0;
-  /** Auto-framing state (see AUTO_FRAME_* constants). */
-  let autoFrameEnabled = true;
-  let autoFrameDistance = Number.NaN;
-  /** Seconds since enter(); the takeover check arms after the arrival ease. */
-  let autoFrameAgeSeconds = 0;
+  /** Auto-framing (see AUTO_FRAME_* constants and AutoFramer). */
+  const autoFramer = new AutoFramer({
+    margin: AUTO_FRAME_MARGIN,
+    minUnits: AUTO_FRAME_MIN_UNITS,
+    maxUnits: AUTO_FRAME_MAX_UNITS
+  });
   /** Previous frame's physical time, for the orbital-phase integrator. */
   let lastPhysicalTime = Number.NaN;
   function updateStreams(tSinceDisruption: number, viewDistanceUnits: number): void {
@@ -851,48 +839,22 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     }
 
     // --- auto-framing (disclosed presentation behaviour) -----------------------
-    if (autoFrameEnabled) {
-      autoFrameAgeSeconds += Math.max(ctx.time.dt, 0);
-      const armed = autoFrameAgeSeconds >= AUTO_FRAME_ARM_DELAY_SECONDS;
-      if (!armed) {
-        // The rig's arrival ease owns the camera during the grace period:
-        // neither read a baseline from it nor write to it (setOrbit would
-        // cancel that animation).
-      } else if (
-        Number.isFinite(autoFrameDistance) &&
-        Math.abs(orbit.distance - autoFrameDistance) >
-          Math.max(1e-3, AUTO_FRAME_USER_EPSILON * autoFrameDistance)
-      ) {
-        // The rig sits somewhere other than where this module last put it:
-        // the viewer moved the camera, so hand the distance back permanently.
-        autoFrameEnabled = false;
-      } else {
-        const extent = frameExtentUnits(
-          res,
-          phase,
-          enc.radiusUnits,
-          starGain > 0.001,
-          streamRawExtentUnits,
-          volumeVisible
-        );
-        const starOnly =
-          starGain > 0.001 && streamRawExtentUnits <= 0 && !volumeVisible && diskGain <= 0.001;
-        const margin = starOnly ? AUTO_FRAME_MARGIN_STAR_ONLY : AUTO_FRAME_MARGIN;
-        const desired = Math.min(
-          AUTO_FRAME_MAX_UNITS,
-          Math.max(AUTO_FRAME_MIN_UNITS, extent * margin)
-        );
-        // Ease from our own last value once we own the distance; on the first
-        // armed frame adopt whatever the arrival ease left behind.
-        const current = Number.isFinite(autoFrameDistance) ? autoFrameDistance : orbit.distance;
-        const blend = 1 - Math.exp(-AUTO_FRAME_LERP_PER_SECOND * Math.max(ctx.time.dt, 0));
-        const next = current + (desired - current) * blend;
-        autoFrameDistance = next;
-        if (Math.abs(next - orbit.distance) > 1e-4) {
-          ctx.services.cameraRig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, next);
-        }
-      }
-    }
+    const starOnly =
+      starGain > 0.001 && streamRawExtentUnits <= 0 && !volumeVisible && diskGain <= 0.001;
+    autoFramer.update(
+      ctx.services.cameraRig,
+      frameExtentUnits(
+        res,
+        phase,
+        enc.radiusUnits,
+        starGain > 0.001,
+        streamRawExtentUnits,
+        volumeVisible
+      ),
+      ctx.time.dt,
+      starOnly ? AUTO_FRAME_MARGIN_STAR_ONLY : AUTO_FRAME_MARGIN,
+      snapshot.paused === true
+    );
 
     // --- diagnostics snapshot ----------------------------------------------------
     const fractions = classificationFractions(referenceCounts.boundCount, REFERENCE_PLAN_COUNT);
@@ -919,10 +881,11 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     debug['streamExtentUnits'] = Number(streamExtentUnits.toFixed(2));
     debug['streamRawExtentUnits'] = Number(streamRawExtentUnits.toFixed(2));
     debug['streamMinRadiusUnits'] = Number(streamMinRadiusUnits.toFixed(2));
-    debug['autoFrameEnabled'] = autoFrameEnabled;
-    debug['autoFrameDistanceUnits'] = Number.isFinite(autoFrameDistance)
-      ? Number(autoFrameDistance.toFixed(2))
-      : null;
+    debug['autoFrameEnabled'] = autoFramer.enabled;
+    debug['autoFrameDistanceUnits'] =
+      autoFramer.requestedDistance === null
+        ? null
+        : Number(autoFramer.requestedDistance.toFixed(2));
     debug['ribbonWidthScale'] = Number(widthScale.toFixed(3));
     debug['bhMarkerScale'] = bhMarker !== null ? Number(bhMarker.scale.x.toFixed(3)) : null;
     debug['photonSphereUnits'] = res.photonSphereUnits;

@@ -115,11 +115,17 @@ export function representativeRampStops(): ReadonlyArray<{
   color: readonly [number, number, number];
   alpha: number;
 }> {
+  // ALPHAS ARE PER-PARTICLE AND THE BLENDING IS ADDITIVE. With a population of
+  // 4k-60k sprites concentrated in a shell, per-particle alphas of 0.3-0.9
+  // accumulate to hundreds of units of linear radiance: the ejecta presented as
+  // a featureless blown-out white ball with a bloom haze filling the frame. The
+  // shape of the ramp (hot/blue -> cool/red with declining opacity) is the model
+  // statement and is unchanged; only the accumulation scale is corrected.
   return [
-    { t: 0, color: kelvinToLinearRgb(2e5), alpha: 0.9 },
-    { t: 0.35, color: kelvinToLinearRgb(3e4), alpha: 0.75 },
-    { t: 0.65, color: kelvinToLinearRgb(8e3), alpha: 0.55 },
-    { t: 1, color: kelvinToLinearRgb(TEMPERATURE_FLOOR_K * 2), alpha: 0.3 }
+    { t: 0, color: kelvinToLinearRgb(2e5), alpha: 0.04 },
+    { t: 0.35, color: kelvinToLinearRgb(3e4), alpha: 0.03 },
+    { t: 0.65, color: kelvinToLinearRgb(8e3), alpha: 0.022 },
+    { t: 1, color: kelvinToLinearRgb(TEMPERATURE_FLOOR_K * 2), alpha: 0.01 }
   ];
 }
 
