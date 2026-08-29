@@ -29,19 +29,25 @@ that local evidence.
 | --- | --- | --- | --- | --- |
 | Chromium-family (msedge) + hardware WebGPU (amd rdna-2, Windows 11) — local capable runner | SUPPORTED — primary path | Full app: all 8 destinations, observer modes, parity corpora, goldens | `npm run check` (515/515 unit), full non-golden Playwright suite 131/131, goldens 43/43 twice-stable | 2026-08-27 |
 
-## Cinematic Visual Fidelity V2 certification (2026-08-29)
+## Cinematic Visual Fidelity V2 certification (2026-08-30 — restored scope)
 
 The current campaign was validated on Microsoft Edge headless 151 with the
-local hardware WebGPU adapter `intel gen-12lp` and Three.js `0.185.1`.
+local hardware WebGPU adapter `intel gen-12lp` and Three.js `0.185.1`. The
+software WebGL2 fallback (SwiftShader) on the same host is **functionally
+correct but ~30× slower** for the heaviest scenes: black-hole arriving
+measured **76s wall time** on SwiftShader vs 850ms design and 2.8ms GPU on
+hardware. Harness timeouts were therefore raised to **90s (CI 180s)** for
+`goldenHarness`/`cinematicGoldenHarness` arrival and **300s** for 10× screenshot
+readback on fallback; hardware is the product reference for performance.
 
 | Capability | WebGPU | forced WebGL2 | Classification |
 | --- | --- | --- | --- |
 | Shared HDR / FP16 volume intermediate | PASS | PASS | Tier A equivalent path |
 | SharedPost V2 selective FP16 bloom | PASS | PASS | Tier A TSL/custom hybrid |
-| Temporal history/jitter/reprojection | PASS | PASS | Tier A; bounded history |
-| Volumetrics V2 detail/depth composite | PASS | PASS | Tier A; lower work budget by tier |
+| Temporal history/jitter/reprojection | PASS | PASS (slower, bounded) | Tier A; `historyAge 8` on High, `meanLumaDelta<12` |
+| Volumetrics V2 detail/depth composite | PASS | PASS | Tier A; `depthClipActive:true` on both, lower budget by tier |
 | Particle profiles | PASS with compute where available | PASS with CPU/vertex fallback | Tier B equivalent |
-| TDE StrandService | PASS | PASS | Tier B same tube/core, explicit fallback available |
+| TDE StrandService | PASS | PASS | Tier B same tube/core, explicit fallback at Low |
 | Celestial Environment V2 | PASS | PASS | Tier A procedural path |
 | optional glare/PSF kernel | deliberately disabled | deliberately disabled | rejected; see `cosmic-atlas/POST_GLARE_DECISION.md` |
 
@@ -49,6 +55,12 @@ The forced-WebGL2 rows select `debugInventory().backend.api === 'webgl2'`;
 they do not silently pass because WebGPU remained active. The current suite
 covers every production destination for the V2 feature rows, device-loss
 injection, and resource teardown.
+
+Fallback slowness evidence (2026-08-30, same host, fallback SwiftShader):
+`ATLAS_DIAGNOSTIC` 2.2m PASS with 90s arrival; `CIN_BH_CLASSIC` 76s arrival + 3.1m
+screenshot loop (300s timeout) — functional; `hdr-continuity` 2/2 in 6-7s proves
+correctness without 10× readback. Hardware `intel gen-12lp` remains the 43/43
+and 8/8 reference (4.6m and 2/2 probe).
 
 Firefox/other-engine fallback behavior is covered by the engine-agnostic
 compatibility tests where the environment supplies a renderer. WebKit,

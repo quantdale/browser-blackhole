@@ -161,6 +161,7 @@ async function waitForArrival(page: Page): Promise<void> {
     page.locator('#scene'),
     'served page has no #scene — a foreign server is answering on the e2e port (set E2E_PORT)'
   ).toBeAttached({ timeout: 10_000 });
+  const arrivalTimeoutMs = process.env.CI ? 180_000 : 90_000;
   await expect
     .poll(
       async () =>
@@ -170,7 +171,7 @@ async function waitForArrival(page: Page): Promise<void> {
           if (app.host.state.atlas.transition.active) return 'transitioning';
           return 'arrived';
         }),
-      { timeout: 30_000, intervals: [250] }
+      { timeout: arrivalTimeoutMs, intervals: [250] }
     )
     .toBe('arrived');
 }

@@ -274,10 +274,11 @@ async function waitForArrival(page: Page): Promise<void> {
     })
     .toBe('ready');
   await page.evaluate(() => window.__ATLAS_APP__?.host.time.pause());
+  const arrivalTimeoutMs = process.env.CI ? 180_000 : 90_000;
   await expect
     .poll(
       () => page.evaluate(() => window.__ATLAS_APP__?.host.state.atlas.transition.active === false),
-      { timeout: 60_000, intervals: [250] }
+      { timeout: arrivalTimeoutMs, intervals: [250] }
     )
     .toBe(true);
 }
