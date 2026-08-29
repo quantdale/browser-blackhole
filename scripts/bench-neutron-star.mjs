@@ -158,7 +158,7 @@ const samples = await page.evaluate(
       const deltas = [];
       let last = performance.now();
       function tick(now) {
-        deltas.push(now - last);
+        deltas.push(Math.max(0, now - last));
         last = now;
         if (deltas.length >= frameCount) {
           resolve(deltas);

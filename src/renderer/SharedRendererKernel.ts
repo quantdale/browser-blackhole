@@ -189,7 +189,8 @@ export class SharedRendererKernel implements IRendererKernel {
    * resolving every 90 orchestrated frames keeps large headroom while making
    * any mapAsync stall a sub-percent event on the CPU frame timeline. */
   private static readonly GPU_RESOLVE_INTERVAL_FRAMES = 90;
-  private gpuResolveInFlight = false;
+  /** Shared promise so an explicit benchmark flush waits for an auto resolve. */
+  private gpuResolvePromise: Promise<void> | null = null;
   private gpuFramesSinceResolve = 0;
 
   /**
@@ -353,30 +354,34 @@ export class SharedRendererKernel implements IRendererKernel {
   }
 
   /** Best-effort async resolve of the shared render timestamp pool. */
-  private async resolveGpuTimestamps(): Promise<void> {
+  private resolveGpuTimestamps(): Promise<void> {
     const renderer = this.rendererValue as {
       resolveTimestampsAsync?: (type: string) => Promise<unknown>;
     } | null;
-    if (renderer === null || this.gpuResolveInFlight) return;
+    if (renderer === null) return Promise.resolve();
+    if (this.gpuResolvePromise !== null) return this.gpuResolvePromise;
     if (this.disposed || this.deviceLost) {
       // Reset the counter so a recovered session starts a fresh window.
       this.gpuFramesSinceResolve = 0;
-      return;
+      return Promise.resolve();
     }
-    this.gpuResolveInFlight = true;
-    try {
-      const result = await renderer.resolveTimestampsAsync?.('render');
-      const lastFrameMs = typeof result === 'number' ? result : Number(result);
-      // three.js TimestampQueryPool returns the LAST frame's summed pass
-      // duration — a per-frame quantity. Record it verbatim (no averaging).
-      if (!Number.isFinite(lastFrameMs) || lastFrameMs < 0) return;
-      this.lastGpuFrameMs = lastFrameMs;
-    } catch {
-      // Timestamp resolution is optional telemetry; never surface as an app error.
-    } finally {
-      this.gpuResolveInFlight = false;
-      this.gpuFramesSinceResolve = 0;
-    }
+    this.gpuResolvePromise = (async () => {
+      try {
+        const result = await renderer.resolveTimestampsAsync?.('render');
+        const lastFrameMs = typeof result === 'number' ? result : Number(result);
+        // three.js TimestampQueryPool returns the LAST frame's summed pass
+        // duration — a per-frame quantity. Record it verbatim (no averaging).
+        if (!Number.isFinite(lastFrameMs) || lastFrameMs < 0) return;
+        this.lastGpuFrameMs = lastFrameMs;
+      } catch {
+        // Timestamp resolution is optional telemetry; never surface as an app error.
+      } finally {
+        this.gpuFramesSinceResolve = 0;
+      }
+    })().finally(() => {
+      this.gpuResolvePromise = null;
+    });
+    return this.gpuResolvePromise;
   }
 
   // -- device loss ----------------------------------------------------------
@@ -599,7 +604,7 @@ export class SharedRendererKernel implements IRendererKernel {
       this.gpuFramesSinceResolve += 1;
       if (
         this.gpuFramesSinceResolve >= SharedRendererKernel.GPU_RESOLVE_INTERVAL_FRAMES &&
-        !this.gpuResolveInFlight
+        this.gpuResolvePromise === null
       ) {
         void this.resolveGpuTimestamps();
       }
