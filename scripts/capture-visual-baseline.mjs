@@ -80,7 +80,11 @@ const scenes = [
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     phases: [0.16, 0.36, 0.78],
     motionPhases: [0.16, 0.28, 0.4, 0.58, 0.78],
-    playingStartPhase: 0.365
+    playingStartPhase: 0.365,
+    // Follow the destination's disclosed auto-framer during the short
+    // log-compressed playback window. A fixed distance cannot cover the
+    // rapidly expanding physical stream while keeping it legible.
+    playingReviewShot: { followAutoFrame: true }
   },
   {
     id: 'quasar-agn',
@@ -194,23 +198,40 @@ async function selectMode(page, mode) {
   );
 }
 
-async function setCaptureState(page, mode, phase, shotFactor, baseOrbit) {
+async function setCaptureState(page, mode, phase, shotFactor, baseOrbit, reviewShot = null) {
   await selectMode(page, mode);
   await page.evaluate(
-    ({ phase, shotFactor, baseOrbit, tier }) => {
+    ({ phase, shotFactor, baseOrbit, tier, reviewShot }) => {
       const app = window.__ATLAS_APP__;
       if (!app) throw new Error('Atlas hook unavailable');
       const host = app.host;
       host.governor.setForcedTier(tier);
       host.time.pause();
       host.time.scrubTo(phase);
+      // Materialize any destination-owned auto-frame first. A review shot is
+      // then applied as an intentional viewer takeover, so a destination's
+      // first post-scrub system cue cannot overwrite it.
+      if (reviewShot !== null) app.captureFrame();
       const orbit = baseOrbit ?? host.cameraRig.getOrbit();
-      host.cameraRig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, orbit.distance * shotFactor);
+      if (reviewShot?.followAutoFrame !== true && reviewShot !== null) {
+        host.cameraRig.setTarget(
+          { x: reviewShot.target[0], y: reviewShot.target[1], z: reviewShot.target[2] },
+          'user'
+        );
+      }
+      if (reviewShot?.followAutoFrame !== true) {
+        host.cameraRig.setOrbit(
+          orbit.azimuthDeg,
+          orbit.polarDeg,
+          reviewShot === null ? orbit.distance * shotFactor : reviewShot.distance,
+          'user'
+        );
+      }
       const rect = document.getElementById('viewport')?.getBoundingClientRect();
       if (rect && rect.width > 0 && rect.height > 0) host.handleResize(rect.width, rect.height);
       app.captureFrame();
     },
-    { phase, shotFactor, baseOrbit, tier: captureTier }
+    { phase, shotFactor, baseOrbit, tier: captureTier, reviewShot }
   );
   await settleCamera(page);
   await page.evaluate(() => window.__ATLAS_APP__?.captureFrame());
@@ -511,12 +532,20 @@ for (const scene of selectedScenes) {
     };
 
     if (playingMotion) {
+      // Earlier still/shot captures intentionally use viewer-like camera
+      // locks. Re-enter destinations that request their authored auto-framer
+      // for playing review so those locks cannot disable the follow policy.
+      if (scene.playingReviewShot?.followAutoFrame === true) {
+        await page.goto(`http://127.0.0.1:${PORT}${scene.url}${qualityQuery}`);
+        await waitForArrival(page);
+      }
       await setCaptureState(
         page,
         mode,
         scene.playingStartPhase ?? scene.motionPhases[0] ?? 0,
         1.3,
-        baseOrbit
+        baseOrbit,
+        scene.playingReviewShot ?? null
       );
       await page.evaluate((tier) => {
         const app = window.__ATLAS_APP__;
@@ -528,6 +557,7 @@ for (const scene of selectedScenes) {
       }, captureTier);
       const playingUrls = [];
       const playingFiles = [];
+      const playingDebug = [];
       for (let frame = 0; frame < playingMotionFrames; frame += 1) {
         if (frame > 0) await page.waitForTimeout(playingMotionIntervalMs);
         await page.evaluate(() => window.__ATLAS_APP__?.captureFrame());
@@ -536,6 +566,11 @@ for (const scene of selectedScenes) {
         writeFileSync(file, buffer);
         playingUrls.push(`data:image/png;base64,${buffer.toString('base64')}`);
         playingFiles.push(file.slice(outputRoot.length + 1));
+        playingDebug.push(
+          await page.evaluate(
+            () => window.__ATLAS_APP__?.host.activeDestinationDebugSnapshot?.() ?? null
+          )
+        );
       }
       await page.evaluate(() => {
         const app = window.__ATLAS_APP__;
@@ -547,6 +582,8 @@ for (const scene of selectedScenes) {
         frames: playingFiles,
         contactSheet: playingStripFile.slice(outputRoot.length + 1),
         intervalMs: playingMotionIntervalMs,
+        reviewShot: scene.playingReviewShot ?? null,
+        debug: playingDebug,
         metrics: await temporalMetrics(page, playingUrls)
       };
     }
