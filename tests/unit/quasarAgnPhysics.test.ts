@@ -61,6 +61,7 @@ describe('scale-zone hysteresis machine (CA7-02)', () => {
     expect(resolveAgnZone(ZONE_BOUNDS.nuclearExit - 0.01, 'nuclear')).toBe('inner');
     expect(resolveAgnZone(ZONE_BOUNDS.galacticExit + 0.01, 'galactic')).toBe('galactic');
     expect(resolveAgnZone(ZONE_BOUNDS.galacticExit - 0.01, 'galactic')).toBe('nuclear');
+    expect(resolveAgnZone(0.18, 'galactic')).toBe('inner');
   });
 
   it('is total and stable across the whole domain sweep', () => {

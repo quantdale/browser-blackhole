@@ -795,6 +795,10 @@ export function createStellarExplosionModule(): PhenomenonModule {
       ...debug,
       disposed,
       fidelity: STELLAR_EXPLOSION_DESCRIPTOR.fidelity,
+      representation:
+        'seeded deep-space backdrop + resolved emissive photosphere + volume shell + GRB cones',
+      volumeWork: volumeHandle?.getDebugSnapshot?.() ?? null,
+      particleWork: particleHandle?.getDebugSnapshot() ?? null,
       disclosure:
         'PROCEDURAL_SCIENTIFIC reduced visual model: analytic shell + seeded clumping noise; not hydrodynamics.'
     };

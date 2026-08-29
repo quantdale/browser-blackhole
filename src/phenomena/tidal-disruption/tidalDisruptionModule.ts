@@ -39,6 +39,15 @@ import { MeshBasicNodeMaterial } from 'three/webgpu';
 
 import { AutoFramer } from '../../renderer/shared/AutoFramer.js';
 import {
+  CINEMATIC_DETAIL_BY_TIER,
+  createCinematicBackdrop,
+  createCinematicDiscMaterial,
+  createCinematicHalo,
+  createCinematicSurfaceMaterial,
+  type CinematicBackdropHandle,
+  type CinematicMaterialHandle
+} from '../../renderer/shared/CinematicPrimitives.js';
+import {
   atan,
   clamp,
   dot,
@@ -213,10 +222,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   const uStarAxis = uniform(new THREE.Vector3(1, 0, 0));
   const uStarStretch = uniform(1);
   const uStarTransverse = uniform(1);
-  const uStarGain = uniform(0);
   const uShockGain = uniform(0);
   const uShockRadius = uniform(1);
-  const uDiskGain = uniform(0);
   /**
    * Accumulated ORBITAL phase (radians) of gas circularizing at the shock
    * radius, integrated from the local Keplerian rate. Drives the azimuthal
@@ -233,8 +240,13 @@ export function createTidalDisruptionModule(): PhenomenonModule {
 
   // Handles owned indirectly (dispose flows through the prepare scope).
   let star: THREE.Mesh | null = null;
+  let starVisual: CinematicMaterialHandle | null = null;
+  let starHalo: THREE.Mesh | null = null;
+  let starHaloVisual: CinematicMaterialHandle | null = null;
+  let backdrop: CinematicBackdropHandle | null = null;
   let bhMarker: THREE.Mesh | null = null;
   let diskMesh: THREE.Mesh | null = null;
+  let diskVisual: CinematicMaterialHandle | null = null;
   let volumeHandle: VolumeHandle | null = null;
   let particleHandle: ParticleSystemHandle | null = null;
   let boundRibbon: RibbonHandle | null = null;
@@ -272,12 +284,46 @@ export function createTidalDisruptionModule(): PhenomenonModule {
 
     const destinationScene = new THREE.Scene();
     destinationScene.name = 'tidal-disruption';
+    const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
+    const cinematicBackdrop = createCinematicBackdrop({
+      seed: ctx.preset.seed,
+      intensity: 0.24,
+      dustColor: [0.055, 0.018, 0.012],
+      starColor: [1.0, 0.76, 0.58],
+      segments: detail.backdropSegments,
+      octaves: detail.backdropOctaves,
+      starCells: { x: 220, y: 110 }
+    });
+    destinationScene.add(cinematicBackdrop.mesh);
+    ctx.scope.track(
+      'geometry',
+      cinematicBackdrop.geometry,
+      () => cinematicBackdrop.geometry.dispose(),
+      32 * 20 * 32
+    );
+    ctx.scope.track(
+      'material',
+      cinematicBackdrop.material,
+      () => cinematicBackdrop.material.dispose(),
+      8192
+    );
+    backdrop = cinematicBackdrop;
 
     // --- star (bounded emissive sphere deformed by the tidal model) --------
     ctx.reportProgress(0.15, 'Building disrupted star');
     const segments = TIER_STAR_SEGMENTS[ctx.quality];
     const starGeometry = new THREE.SphereGeometry(1, segments.width, segments.height);
-    const starMaterial = new MeshBasicNodeMaterial();
+    const starSurface = createCinematicSurfaceMaterial({
+      tint: STAR_TINT_LINEAR,
+      secondaryTint: [1.0, 0.35, 0.08],
+      seed: ctx.preset.seed ^ 0x71d,
+      radiance: STAR_RADIANCE,
+      noiseScale: 4.6,
+      noiseStrength: 0.16,
+      rimStrength: 1.7,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const starMaterial = starSurface.material;
     starMaterial.name = 'tde-star';
     // Ellipsoid deformation in LOCAL space: compress every vertex along the
     // transverse plane and stretch along the star->BH axis. The axis is a
@@ -289,15 +335,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       .mul(uStarTransverse)
       .add(uStarAxis.mul(along.mul(uStarStretch.sub(uStarTransverse))));
     starMaterial.positionNode = deformed;
-    // Linear-HDR radiance well above 1 so the photosphere blooms: the star is
-    // the only luminous body in frame before disruption, and at unit radiance it
-    // read as a dull pale ellipse in a black void.
-    starMaterial.colorNode = vec4(
-      vec3(...STAR_TINT_LINEAR)
-        .mul(uStarGain)
-        .mul(float(STAR_RADIANCE)),
-      1
-    );
+    starVisual = starSurface;
     star = new THREE.Mesh(starGeometry, starMaterial);
     star.name = 'tde-star';
     // DISCLOSED display exaggeration (see types.visualStarRadius): the
@@ -309,6 +347,33 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     ctx.scope.track('geometry', starGeometry, () => starGeometry.dispose(), starBytes);
     ctx.scope.track('material', starMaterial, () => starMaterial.dispose(), 4096);
     abortGuard('star');
+
+    const starHaloGeometry = new THREE.SphereGeometry(
+      1.18,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const starHaloSurface = createCinematicHalo({
+      tint: [1.0, 0.45, 0.18],
+      seed: ctx.preset.seed ^ 0x72e,
+      gain: 0,
+      alpha: 0.22,
+      noiseScale: 3.6,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    starHalo = new THREE.Mesh(starHaloGeometry, starHaloSurface.material);
+    starHalo.name = 'tde-star-atmosphere';
+    starHalo.visible = false;
+    starHalo.renderOrder = 15;
+    destinationScene.add(starHalo);
+    starHaloVisual = starHaloSurface;
+    ctx.scope.track('geometry', starHaloGeometry, () => starHaloGeometry.dispose(), 16 * 12 * 32);
+    ctx.scope.track(
+      'material',
+      starHaloSurface.material,
+      () => starHaloSurface.material.dispose(),
+      4096
+    );
 
     // --- black-hole marker (cinematic site marker; NOT a lensing render) ---
     ctx.reportProgress(0.25, 'Preparing black-hole marker');
@@ -486,8 +551,6 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // --- nascent-disk annulus (procedural presentation, disclosed) ----------
     ctx.reportProgress(0.9, 'Preparing nascent-disk annulus');
     const diskGeo = nascentDiskGeometry(res);
-    const uDiskInner = uniform(diskGeo.innerRadiusUnits);
-    const uDiskOuter = uniform(diskGeo.outerRadiusUnits);
     const diskGeometry = new THREE.RingGeometry(
       diskGeo.innerRadiusUnits,
       diskGeo.outerRadiusUnits,
@@ -495,36 +558,19 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       1
     );
     diskGeometry.rotateX(-Math.PI / 2);
-    const diskMaterial = new MeshBasicNodeMaterial();
+    const diskSurface = createCinematicDiscMaterial({
+      innerRadius: diskGeo.innerRadiusUnits,
+      outerRadius: diskGeo.outerRadiusUnits,
+      innerTint: [1.0, 0.9, 0.72],
+      outerTint: [1.0, 0.38, 0.12],
+      seed: ctx.preset.seed ^ 0x7a1,
+      gain: 0,
+      arms: 2,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const diskMaterial = diskSurface.material;
     diskMaterial.name = 'tde-nascent-disk';
-    diskMaterial.transparent = true;
-    diskMaterial.side = THREE.DoubleSide;
-    // Radial presentation falloff: brighter at the inner edge, dimming
-    // outward across the procedural annulus; uDiskGain carries the ramp-in.
-    // WGSL contract: constant rising edges (low < high).
-    const rLocal = length(positionLocal);
-    const radial = smoothstep(uDiskInner, uDiskOuter, rLocal);
-    // Differential rotation: the pattern is carried at the local Keplerian
-    // rate, which falls as r^-3/2, so the inner annulus laps the outer one and
-    // the disc reads as ORBITING gas rather than a painted ring. uOrbitPhase is
-    // integrated at the shock radius, so the exponent is applied relative to it.
-    const rRel = clamp(rLocal.div(uShockRadius.max(float(1e-3))), float(0.05), float(20));
-    const localPhase = uOrbitPhase.mul(rRel.pow(float(-1.5)));
-    const azimuth = atan(positionLocal.z, positionLocal.x);
-    const arms = sin(azimuth.mul(float(2)).sub(localPhase))
-      .mul(float(0.18))
-      .add(float(0.9));
-    const fine = sin(azimuth.mul(float(7)).sub(localPhase.mul(float(1.3))))
-      .mul(float(0.07))
-      .add(float(1));
-    const hot = mix(vec3(1.0, 0.88, 0.72), vec3(1.0, 0.62, 0.36), radial);
-    diskMaterial.colorNode = vec4(
-      hot
-        .mul(mix(float(1.4), float(0.28), radial))
-        .mul(arms.mul(fine))
-        .mul(uDiskGain),
-      1
-    );
+    diskVisual = diskSurface;
     diskMesh = new THREE.Mesh(diskGeometry, diskMaterial);
     diskMesh.name = 'tde-nascent-disk';
     diskMesh.visible = false;
@@ -650,6 +696,9 @@ export function createTidalDisruptionModule(): PhenomenonModule {
    * near-BH stages (shock, nascent disk) depend on.
    */
   let streamMinRadiusUnits = 0;
+  let lastStreamTime = Number.NaN;
+  let lastStreamViewDistance = Number.NaN;
+  let lastStreamTier: QualityTier | null = null;
   /** Auto-framing (see AUTO_FRAME_* constants and AutoFramer). */
   const autoFramer = new AutoFramer({
     margin: AUTO_FRAME_MARGIN,
@@ -667,6 +716,16 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       return;
     }
     if (!(ready.resolved.energySpreadJPerKg > 0)) return;
+    if (
+      tSinceDisruption === lastStreamTime &&
+      viewDistanceUnits === lastStreamViewDistance &&
+      lastStreamTier === lastTier
+    ) {
+      return;
+    }
+    lastStreamTime = tSinceDisruption;
+    lastStreamViewDistance = viewDistanceUnits;
+    lastStreamTier = lastTier;
 
     const nBound = buildStreamSpine(
       ready.resolved,
@@ -685,7 +744,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     let extent = 0;
     let rawExtent = 0;
     let rawMin = Number.POSITIVE_INFINITY;
-    spinePoints.length = 0;
+    let spineWriteIndex = 0;
     for (let i = nBound - 1; i >= 0; i -= 1) {
       const r = boundScratch.rs[i]!;
       if (r > rawExtent) rawExtent = r;
@@ -693,8 +752,11 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       if (r > rCap) continue;
       if (r > extent) extent = r;
       // Most-bound first so ribbon taper runs head -> tail along the arc.
-      spinePoints.push(new THREE.Vector3(boundScratch.xs[i]!, 0, boundScratch.zs[i]!));
+      if (spinePoints[spineWriteIndex] === undefined) spinePoints.push(new THREE.Vector3());
+      spinePoints[spineWriteIndex]!.set(boundScratch.xs[i]!, 0, boundScratch.zs[i]!);
+      spineWriteIndex += 1;
     }
+    spinePoints.length = spineWriteIndex;
     if (spinePoints.length >= 2) boundRibbon.setSpine(spinePoints);
     spineCount = spinePoints.length;
 
@@ -705,15 +767,18 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       false,
       unboundScratch
     );
-    spinePoints.length = 0;
+    spineWriteIndex = 0;
     for (let i = 0; i < nUnbound; i += 1) {
       const r = unboundScratch.rs[i]!;
       if (r > rawExtent) rawExtent = r;
       if (r < rawMin) rawMin = r;
       if (r > rCap) continue;
       if (r > extent) extent = r;
-      spinePoints.push(new THREE.Vector3(unboundScratch.xs[i]!, 0, unboundScratch.zs[i]!));
+      if (spinePoints[spineWriteIndex] === undefined) spinePoints.push(new THREE.Vector3());
+      spinePoints[spineWriteIndex]!.set(unboundScratch.xs[i]!, 0, unboundScratch.zs[i]!);
+      spineWriteIndex += 1;
     }
+    spinePoints.length = spineWriteIndex;
     if (spinePoints.length >= 2) unboundRibbon.setSpine(spinePoints);
     unboundCount = spinePoints.length;
     streamExtentUnits = extent;
@@ -752,8 +817,16 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       const edge = Math.abs(t) / HANDOFF_FADE_SECONDS;
       starGain = edge >= 1 ? (t > 0 ? 0 : 1) : 1 - edge;
     }
-    uStarGain.value = starGain;
+    starVisual?.setGain(starGain);
+    starVisual?.setTime(t * 0.0002);
     if (star !== null) star.visible = starGain > 0.001;
+    if (starHalo !== null && starHaloVisual !== null) {
+      starHalo.position.set(enc.x, enc.y, enc.z);
+      starHalo.scale.setScalar(visualStarRadius(res) * 1.18);
+      starHalo.visible = starGain > 0.001;
+      starHaloVisual.setGain(starGain * 0.72);
+      starHaloVisual.setTime(t * 0.00024);
+    }
 
     // --- streams: active through the disruption->shock stages -----------------
     const orbit = ctx.services.cameraRig.getOrbit();
@@ -832,12 +905,13 @@ export function createTidalDisruptionModule(): PhenomenonModule {
 
     // --- nascent disk (late-phase procedural transition) ------------------------
     const diskGain = nascentDiskGainAt(res, tau, disrupts);
-    uDiskGain.value = diskGain;
+    diskVisual?.setGain(diskGain);
+    diskVisual?.setTime(uOrbitPhase.value);
     if (diskMesh !== null) {
       diskMesh.visible = diskGain > 0.001;
-      const mat = diskMesh.material as THREE.Material & { opacity: number };
-      mat.opacity = 0.55 * diskGain;
     }
+
+    backdrop?.setTime(t * 0.00002);
 
     // --- auto-framing (disclosed presentation behaviour) -----------------------
     const starOnly =
@@ -903,6 +977,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
 
   function render(ctx: RenderContext): void {
     if (ctx.scene !== null && ctx.camera !== null) {
+      backdrop?.syncToCamera(ctx.camera);
       ctx.renderer.render(ctx.scene, ctx.camera);
     }
   }
@@ -917,14 +992,22 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     scene?.clear();
     scene = null;
     star = null;
+    starVisual = null;
+    starHalo = null;
+    starHaloVisual = null;
+    backdrop = null;
     bhMarker = null;
     diskMesh = null;
+    diskVisual = null;
     volumeHandle = null;
     particleHandle = null;
     boundRibbon = null;
     unboundRibbon = null;
     boundScratch = null;
     unboundScratch = null;
+    lastStreamTime = Number.NaN;
+    lastStreamViewDistance = Number.NaN;
+    lastStreamTier = null;
     resolved = null;
     stateValue = null;
     verdictValue = null;

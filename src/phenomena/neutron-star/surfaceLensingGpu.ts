@@ -66,6 +66,7 @@ import {
   max,
   min,
   mix,
+  mx_fractal_noise_float,
   normalize,
   pow,
   select,
@@ -472,7 +473,11 @@ export function createNeutronStarSurfaceMaterial(params: {
    */
   const shadeSurfaceFn = Fn(([hitPos]: [unknown]): Vec3Node => {
     const normal = normalize(vec3(hitPos as Vec3Node));
-    const base = uTint.mul(uEmissionScale).mul(uRedshiftFactor);
+    // The surface-ray classification and hit coordinate remain authoritative;
+    // this low-amplitude geometry-seeded granulation is presentation-only
+    // structure for the resolved emitting surface, not an atmosphere model.
+    const granulation = mx_fractal_noise_float(normal.mul(5.2), 3, 2.0, 0.5).mul(0.12).add(0.94);
+    const base = uTint.mul(uEmissionScale).mul(uRedshiftFactor).mul(granulation);
     const dotA = dot(normal, uSlotADir);
     const profileA = smoothstep(uSlotACos.sub(SPOT_EDGE_SOFTNESS), uSlotACos, dotA);
     const glowA = uSlotATint.mul(uSlotAGain).mul(profileA);

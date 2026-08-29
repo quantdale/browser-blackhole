@@ -84,6 +84,14 @@ import { jetFrontRadiusUnits, jetViewingResponse, JET_FRONT_EJECTA_CAP } from '.
 import { remnantSampleAt, remnantVisibleAt } from './remnant.js';
 import { makeMergerPhaseMapping, phaseAt, secondsToUiPhase } from './timeline.js';
 import { COMPACT_MERGER_DESCRIPTOR } from './presets.js';
+import {
+  CINEMATIC_DETAIL_BY_TIER,
+  createCinematicBackdrop,
+  createCinematicHalo,
+  createCinematicSurfaceMaterial,
+  type CinematicBackdropHandle,
+  type CinematicMaterialHandle
+} from '../../renderer/shared/CinematicPrimitives.js';
 
 // ---------------------------------------------------------------------------
 // Presentation constants (disclosed)
@@ -117,11 +125,6 @@ export function createCompactMergerModule(): PhenomenonModule {
   const debug: Record<string, unknown> = {};
 
   // Uniform bundles (created once in prepare, mutated per frame).
-  const uStar1Gain = uniform(0);
-  const uStar2Gain = uniform(0);
-  const uFlashGain = uniform(0);
-  const uRemnantGain = uniform(0);
-  const uRemnantTint = uniform(new THREE.Vector3(1, 0.6, 0.4));
   const uGlowGain = uniform(0);
   const uVolumeTint = uniform(new THREE.Vector3(1, 0.5, 0.3));
   const uVolumeGain = uniform(0);
@@ -137,11 +140,22 @@ export function createCompactMergerModule(): PhenomenonModule {
   let star2: THREE.Mesh | null = null;
   let flash: THREE.Mesh | null = null;
   let remnant: THREE.Mesh | null = null;
+  let starVisual1: CinematicMaterialHandle | null = null;
+  let starVisual2: CinematicMaterialHandle | null = null;
+  let flashVisual: CinematicMaterialHandle | null = null;
+  let remnantVisual: CinematicMaterialHandle | null = null;
+  let remnantHaloVisual: CinematicMaterialHandle | null = null;
+  let remnantHalo: THREE.Mesh | null = null;
+  let backdrop: CinematicBackdropHandle | null = null;
   let jetGroup: THREE.Group | null = null;
   let volumeHandle: VolumeHandle | null = null;
   let particleHandle: ParticleSystemHandle | null = null;
   let trail1: RibbonHandle | null = null;
   let trail2: RibbonHandle | null = null;
+  const trailPoints1: THREE.Vector3[] = [];
+  const trailPoints2: THREE.Vector3[] = [];
+  let lastTrailTime = Number.NaN;
+  let lastTrailCount = 0;
 
   function assertReady(): { resolved: ResolvedMergerScenario; state: CompactMergerPublicState } {
     if (disposed || resolved === null || stateValue === null) {
@@ -170,6 +184,30 @@ export function createCompactMergerModule(): PhenomenonModule {
 
     const destinationScene = new THREE.Scene();
     destinationScene.name = 'compact-merger';
+    const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
+    const cinematicBackdrop = createCinematicBackdrop({
+      seed: ctx.preset.seed,
+      intensity: 0.32,
+      dustColor: [0.012, 0.028, 0.085],
+      starColor: [0.68, 0.82, 1.0],
+      segments: detail.backdropSegments,
+      octaves: detail.backdropOctaves,
+      starCells: { x: 220, y: 110 }
+    });
+    destinationScene.add(cinematicBackdrop.mesh);
+    ctx.scope.track(
+      'geometry',
+      cinematicBackdrop.geometry,
+      () => cinematicBackdrop.geometry.dispose(),
+      32 * 20 * 32
+    );
+    ctx.scope.track(
+      'material',
+      cinematicBackdrop.material,
+      () => cinematicBackdrop.material.dispose(),
+      8192
+    );
+    backdrop = cinematicBackdrop;
 
     // --- compact stars (destination-local bounded presentation) -------------
     // Reuse decision (mission section 11): the neutron-star destination owns
@@ -179,25 +217,32 @@ export function createCompactMergerModule(): PhenomenonModule {
     ctx.reportProgress(0.15, 'Building compact stars');
     const segments = TIER_STAR_SEGMENTS[ctx.quality];
     const starGeometry = new THREE.SphereGeometry(1, segments.width, segments.height);
-    const starMaterial1 = new MeshBasicNodeMaterial();
+    const surface1 = createCinematicSurfaceMaterial({
+      tint: STAR_TINT,
+      secondaryTint: [0.55, 0.72, 1.0],
+      seed: ctx.preset.seed ^ 0x101,
+      radiance: STAR_RADIANCE,
+      noiseScale: 5,
+      noiseStrength: 0.12,
+      rimStrength: 1.8,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const starMaterial1 = surface1.material;
     starMaterial1.name = 'compact-merger-star1';
-    // Linear-HDR radiance so the neutron-star photospheres BLOOM. At unit
-    // radiance the pair rendered as two flat pale discs — the hottest objects in
-    // the scene looked like matte paper cut-outs.
-    starMaterial1.colorNode = vec4(
-      vec3(...STAR_TINT)
-        .mul(uStar1Gain)
-        .mul(float(STAR_RADIANCE)),
-      1
-    );
-    const starMaterial2 = new MeshBasicNodeMaterial();
+    const surface2 = createCinematicSurfaceMaterial({
+      tint: [0.7, 0.82, 1.0],
+      secondaryTint: [0.5, 0.6, 1.0],
+      seed: ctx.preset.seed ^ 0x202,
+      radiance: STAR_RADIANCE,
+      noiseScale: 4.3,
+      noiseStrength: 0.12,
+      rimStrength: 1.8,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const starMaterial2 = surface2.material;
     starMaterial2.name = 'compact-merger-star2';
-    starMaterial2.colorNode = vec4(
-      vec3(...STAR_TINT)
-        .mul(uStar2Gain)
-        .mul(float(STAR_RADIANCE)),
-      1
-    );
+    starVisual1 = surface1;
+    starVisual2 = surface2;
     star1 = new THREE.Mesh(starGeometry, starMaterial1);
     star1.name = 'compact-merger-star1';
     star2 = new THREE.Mesh(starGeometry, starMaterial2);
@@ -213,9 +258,19 @@ export function createCompactMergerModule(): PhenomenonModule {
     // --- merger flash (presentation envelope; bloom carries the peak) -------
     ctx.reportProgress(0.3, 'Preparing merger flash');
     const flashGeometry = new THREE.SphereGeometry(1, 24, 18);
-    const flashMaterial = new MeshBasicNodeMaterial();
+    const flashSurface = createCinematicSurfaceMaterial({
+      tint: [1.0, 0.65, 0.35],
+      secondaryTint: [1.0, 0.2, 0.05],
+      seed: ctx.preset.seed ^ 0x303,
+      radiance: 2.4,
+      noiseScale: 4,
+      noiseStrength: 0.2,
+      rimStrength: 2.4,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const flashMaterial = flashSurface.material;
     flashMaterial.name = 'compact-merger-flash';
-    flashMaterial.colorNode = vec4(vec3(2.4, 2.0, 1.6).mul(uFlashGain), 1);
+    flashVisual = flashSurface;
     flash = new THREE.Mesh(flashGeometry, flashMaterial);
     flash.name = 'compact-merger-flash';
     flash.visible = false;
@@ -227,21 +282,57 @@ export function createCompactMergerModule(): PhenomenonModule {
     // --- remnant -------------------------------------------------------------
     ctx.reportProgress(0.4, 'Preparing remnant presentation');
     const remnantGeometry = new THREE.SphereGeometry(1, 32, 24);
-    const remnantMaterial = new MeshBasicNodeMaterial();
+    const remnantSurface = createCinematicSurfaceMaterial({
+      tint: [1.0, 0.58, 0.34],
+      secondaryTint: [0.95, 0.18, 0.05],
+      seed: ctx.preset.seed ^ 0x404,
+      radiance: REMNANT_RADIANCE,
+      noiseScale: 5.5,
+      noiseStrength: 0.16,
+      rimStrength: 2.2,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const remnantMaterial = remnantSurface.material;
     remnantMaterial.name = 'compact-merger-remnant';
-    // Linear-HDR radiance well above 1 so the hot remnant BLOOMS. At unit
-    // radiance a merger remnant surrounded by bright ejecta reads as a flat
-    // matte disc — the one object in frame that should look incandescent.
-    remnantMaterial.colorNode = vec4(
-      uRemnantTint.mul(uRemnantGain).mul(float(REMNANT_RADIANCE)),
-      1
-    );
+    remnantVisual = remnantSurface;
     remnant = new THREE.Mesh(remnantGeometry, remnantMaterial);
     remnant.name = 'compact-merger-remnant';
     remnant.visible = false;
     destinationScene.add(remnant);
     ctx.scope.track('geometry', remnantGeometry, () => remnantGeometry.dispose(), 12288);
     ctx.scope.track('material', remnantMaterial, () => remnantMaterial.dispose(), 4096);
+
+    const remnantHaloGeometry = new THREE.SphereGeometry(
+      1.35,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const remnantHaloSurface = createCinematicHalo({
+      tint: [1.0, 0.35, 0.08],
+      seed: ctx.preset.seed ^ 0x505,
+      gain: 0,
+      alpha: 0.28,
+      noiseScale: 3.8,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    remnantHalo = new THREE.Mesh(remnantHaloGeometry, remnantHaloSurface.material);
+    remnantHalo.name = 'compact-merger-remnant-atmosphere';
+    remnantHalo.visible = false;
+    remnantHalo.renderOrder = 15;
+    remnant.add(remnantHalo);
+    remnantHaloVisual = remnantHaloSurface;
+    ctx.scope.track(
+      'geometry',
+      remnantHaloGeometry,
+      () => remnantHaloGeometry.dispose(),
+      detail.haloSegments.width * detail.haloSegments.height * 32
+    );
+    ctx.scope.track(
+      'material',
+      remnantHaloSurface.material,
+      () => remnantHaloSurface.material.dispose(),
+      4096
+    );
 
     // Faint accretion glow (prompt/delayed BH presentation): thin emissive
     // shell slightly above the remnant radius, gain-driven.
@@ -470,19 +561,25 @@ export function createCompactMergerModule(): PhenomenonModule {
     const snapshot = ctx.services.time.snapshot();
     const t = Number.isFinite(snapshot.physicalTime ?? NaN) ? (snapshot.physicalTime as number) : 0;
     if (t >= ready.resolved.contactSeconds || trail1 === null || trail2 === null) return;
-    const points1: THREE.Vector3[] = [];
-    const points2: THREE.Vector3[] = [];
+    const count = TRAIL_SAMPLES;
+    if (t === lastTrailTime && lastTrailCount === count) return;
+    lastTrailTime = t;
+    lastTrailCount = count;
+    while (trailPoints1.length < count) trailPoints1.push(new THREE.Vector3());
+    while (trailPoints2.length < count) trailPoints2.push(new THREE.Vector3());
+    trailPoints1.length = count;
+    trailPoints2.length = count;
     const orbitSeconds =
       (2 * Math.PI) / Math.max(inspiralStateAt(ready.resolved, t).orbitalFrequency, 1e-6);
     const span = orbitSeconds * TRAIL_ORBITS;
-    for (let i = 0; i < TRAIL_SAMPLES; i += 1) {
-      const f = i / (TRAIL_SAMPLES - 1);
+    for (let i = 0; i < count; i += 1) {
+      const f = i / (count - 1);
       const sample = inspiralStateAt(ready.resolved, Math.max(0, t - span * (1 - f)));
-      points1.push(new THREE.Vector3(sample.position.x1, 0, sample.position.z1));
-      points2.push(new THREE.Vector3(sample.position.x2, 0, sample.position.z2));
+      trailPoints1[i]!.set(sample.position.x1, 0, sample.position.z1);
+      trailPoints2[i]!.set(sample.position.x2, 0, sample.position.z2);
     }
-    trail1.setSpine(points1);
-    trail2.setSpine(points2);
+    trail1.setSpine(trailPoints1);
+    trail2.setSpine(trailPoints2);
   }
 
   function update(ctx: FrameContext): void {
@@ -501,8 +598,10 @@ export function createCompactMergerModule(): PhenomenonModule {
       ? 1
       : Math.max(0, 1 - inspiral.secondsToContact / Math.max(res.contactSeconds * 0.25, 1e-6));
     const starGain = inspiral.atContact ? 0 : 1 - contactBlend * 0.85;
-    uStar1Gain.value = starGain;
-    uStar2Gain.value = starGain;
+    starVisual1?.setGain(starGain);
+    starVisual2?.setGain(starGain);
+    starVisual1?.setTime(t * 0.08);
+    starVisual2?.setTime(t * 0.08 + 1.7);
     if (star1 !== null && star2 !== null) {
       const sep = Math.max(inspiral.separation, res.contactSeparationUnits * 0.4);
       const f1 = res.m2Kg / res.totalKg;
@@ -525,7 +624,8 @@ export function createCompactMergerModule(): PhenomenonModule {
     // --- merger flash (presentation envelope) --------------------------------
     const flashTau = tau / FLASH_DURATION_S;
     const flashGain = tau > 0 && flashTau < 1 ? FLASH_PEAK_GAIN * (1 - flashTau) : 0;
-    uFlashGain.value = flashGain;
+    flashVisual?.setGain(flashGain);
+    flashVisual?.setTime(t * 0.2);
     if (flash !== null) {
       flash.visible = flashGain > 0.001;
       flash.scale.setScalar(res.contactSeparationUnits * (0.6 + flashTau * 0.9));
@@ -533,12 +633,23 @@ export function createCompactMergerModule(): PhenomenonModule {
 
     // --- remnant -------------------------------------------------------------
     const remnantSample = remnantSampleAt(t, res, res.r1Units);
-    uRemnantGain.value = remnantSample.gain;
-    uRemnantTint.value.set(remnantSample.tint[0], remnantSample.tint[1], remnantSample.tint[2]);
+    remnantVisual?.setGain(remnantSample.gain);
+    remnantVisual?.setTint(remnantSample.tint);
+    remnantVisual?.setSecondaryTint([
+      remnantSample.tint[0],
+      remnantSample.tint[1] * 0.42,
+      Math.max(0.02, remnantSample.tint[2] * 0.2)
+    ]);
+    remnantVisual?.setTime(t * 0.06);
     uGlowGain.value = remnantSample.glowGain * 0.5;
     if (remnant !== null) {
       remnant.visible = remnantVisibleAt(t, res);
       remnant.scale.setScalar(remnantSample.radiusUnits);
+    }
+    if (remnantHalo !== null && remnantHaloVisual !== null) {
+      remnantHalo.visible = remnant !== null && remnant.visible;
+      remnantHaloVisual.setGain(remnant?.visible ? remnantSample.glowGain * 0.65 : 0);
+      remnantHaloVisual.setTime(t * 0.08);
     }
 
     // --- ejecta volume + kilonova emission -----------------------------------
@@ -624,6 +735,7 @@ export function createCompactMergerModule(): PhenomenonModule {
 
   function render(ctx: RenderContext): void {
     if (ctx.scene !== null && ctx.camera !== null) {
+      backdrop?.syncToCamera(ctx.camera);
       ctx.renderer.render(ctx.scene, ctx.camera);
     }
   }
@@ -641,11 +753,22 @@ export function createCompactMergerModule(): PhenomenonModule {
     star2 = null;
     flash = null;
     remnant = null;
+    starVisual1 = null;
+    starVisual2 = null;
+    flashVisual = null;
+    remnantVisual = null;
+    remnantHaloVisual = null;
+    remnantHalo = null;
+    backdrop = null;
     jetGroup = null;
     volumeHandle = null;
     particleHandle = null;
     trail1 = null;
     trail2 = null;
+    trailPoints1.length = 0;
+    trailPoints2.length = 0;
+    lastTrailTime = Number.NaN;
+    lastTrailCount = 0;
     resolved = null;
     stateValue = null;
   }

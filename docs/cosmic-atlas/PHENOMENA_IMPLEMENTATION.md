@@ -215,6 +215,18 @@ Optimizations:
 - volume/particle bounds;
 - visual regression of shell/jet morphology.
 
+### Cinematic representation layer (2026-08-29)
+
+The Stellar Explosion slice now consumes the shared
+`CinematicPrimitives` layer: a seeded deep-space backdrop, resolved
+temperature/granulation photosphere, optically thin shell atmosphere, and
+finite GRB cone representation. The validated density, emission, jet-front,
+timeline, and particle model outputs are unchanged. The same layer is reused
+by the other destination modules for their own resolved surfaces, halos,
+annuli, nuclei, and context. It is presentation infrastructure, not a claim
+of hydrodynamics or full radiative transfer; each destination's fidelity note
+remains authoritative.
+
 ---
 
 ## 4. Compact Merger

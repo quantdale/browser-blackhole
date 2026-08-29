@@ -42,6 +42,12 @@ import {
 } from './dataset.js';
 import { loadGc1Dataset } from './loader.js';
 import { GALAXY_COLLISION_DESCRIPTOR } from './presets.js';
+import {
+  CINEMATIC_DETAIL_BY_TIER,
+  createCinematicBackdrop,
+  createCinematicHalo,
+  type CinematicBackdropHandle
+} from '../../renderer/shared/CinematicPrimitives.js';
 
 import type {
   EnterContext,
@@ -199,10 +205,20 @@ class GalaxyCollisionModule implements PhenomenonModule {
   private tracerPositions: Float32Array | null = null;
   private nucleusPosAttr: THREE.InstancedBufferAttribute | null = null;
   private nucleusPositions: Float32Array = new Float32Array(6);
+  private backdrop: CinematicBackdropHandle | null = null;
   private currentPhase = 0;
   private currentModelTime = 0;
+  private lastAppliedPhase = Number.NaN;
   private disposed = false;
-  private probe: Array<[number, number, number]> = [];
+  private readonly centerScratchA = new Float32Array(3);
+  private readonly centerScratchB = new Float32Array(3);
+  private nucleusHaloA: THREE.Mesh | null = null;
+  private nucleusHaloB: THREE.Mesh | null = null;
+  private readonly probe: Array<[number, number, number]> = [
+    [0, 0, 0],
+    [0, 0, 0],
+    [0, 0, 0]
+  ];
 
   async prepare(ctx: PrepareContext): Promise<{
     module: PhenomenonModule;
@@ -247,6 +263,30 @@ class GalaxyCollisionModule implements PhenomenonModule {
     nucleusMesh.frustumCulled = false;
     nucleusMesh.matrixAutoUpdate = false;
     nucleusMesh.name = 'GalaxyCollisionNuclei';
+    const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
+
+    // The GC1 tracers remain the sole source of galaxy morphology. These
+    // bounded nucleus halos only provide a soft stellar-core hierarchy so the
+    // data-driven pair does not read as two hard sprite stamps.
+    const nucleusHaloGeometry = new THREE.SphereGeometry(
+      0.28,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const nucleusHaloSurface = createCinematicHalo({
+      tint: [1.0, 0.64, 0.22],
+      seed: ctx.preset.seed ^ 0x9a1,
+      gain: 0.9,
+      alpha: 0.24,
+      noiseScale: 4,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const nucleusHaloA = new THREE.Mesh(nucleusHaloGeometry, nucleusHaloSurface.material);
+    const nucleusHaloB = new THREE.Mesh(nucleusHaloGeometry, nucleusHaloSurface.material);
+    nucleusHaloA.name = 'GalaxyCollisionNucleusHaloA';
+    nucleusHaloB.name = 'GalaxyCollisionNucleusHaloB';
+    nucleusHaloA.renderOrder = 5;
+    nucleusHaloB.renderOrder = 5;
 
     ctx.scope.track(
       'geometry',
@@ -262,8 +302,43 @@ class GalaxyCollisionModule implements PhenomenonModule {
       NUCLEUS_POINT_ESTIMATED_BYTES
     );
     ctx.scope.track('material', nucleusMaterial, () => nucleusMaterial.dispose(), 256 * 1024);
+    ctx.scope.track(
+      'geometry',
+      nucleusHaloGeometry,
+      () => nucleusHaloGeometry.dispose(),
+      detail.haloSegments.width * detail.haloSegments.height * 32
+    );
+    ctx.scope.track(
+      'material',
+      nucleusHaloSurface.material,
+      () => nucleusHaloSurface.material.dispose(),
+      4096
+    );
 
     const scene = new THREE.Scene();
+    const cinematicBackdrop = createCinematicBackdrop({
+      seed: ctx.preset.seed,
+      intensity: 0.18,
+      dustColor: [0.028, 0.018, 0.04],
+      starColor: [0.78, 0.78, 0.9],
+      segments: detail.backdropSegments,
+      octaves: detail.backdropOctaves,
+      starCells: { x: 240, y: 120 }
+    });
+    scene.add(cinematicBackdrop.mesh);
+    ctx.scope.track(
+      'geometry',
+      cinematicBackdrop.geometry,
+      () => cinematicBackdrop.geometry.dispose(),
+      32 * 20 * 32
+    );
+    ctx.scope.track(
+      'material',
+      cinematicBackdrop.material,
+      () => cinematicBackdrop.material.dispose(),
+      8192
+    );
+    this.backdrop = cinematicBackdrop;
     scene.add(nucleusMesh);
     scene.add(tracerMesh);
 
@@ -273,6 +348,8 @@ class GalaxyCollisionModule implements PhenomenonModule {
     this.tracerPositions = tracers.positions;
     this.nucleusPosAttr = nuclei.posAttr;
     this.nucleusPositions = nuclei.positions;
+    this.nucleusHaloA = nucleusHaloA;
+    this.nucleusHaloB = nucleusHaloB;
     this.currentPhase = ctx.preset.timelineInitialPhase;
 
     ctx.reportProgress(1, 'Galaxy collision ready');
@@ -310,31 +387,45 @@ class GalaxyCollisionModule implements PhenomenonModule {
 
   private applyPhase(phase: number): void {
     if (this.dataset === null || this.tracerPositions === null) return;
+    if (phase === this.lastAppliedPhase) return;
+    this.lastAppliedPhase = phase;
     this.currentPhase = phase;
     const t = phaseToModelTime(this.dataset, phase);
     this.currentModelTime = t;
     interpolateTracers(this.dataset, t, this.tracerPositions);
-    const x1 = new Float32Array(3);
-    const x2 = new Float32Array(3);
-    interpolateCenters(this.dataset, t, x1, x2);
-    this.nucleusPositions[0] = x1[0] ?? 0;
-    this.nucleusPositions[1] = x1[1] ?? 0;
-    this.nucleusPositions[2] = x1[2] ?? 0;
-    this.nucleusPositions[3] = x2[0] ?? 0;
-    this.nucleusPositions[4] = x2[1] ?? 0;
-    this.nucleusPositions[5] = x2[2] ?? 0;
+    interpolateCenters(this.dataset, t, this.centerScratchA, this.centerScratchB);
+    this.nucleusPositions[0] = this.centerScratchA[0] ?? 0;
+    this.nucleusPositions[1] = this.centerScratchA[1] ?? 0;
+    this.nucleusPositions[2] = this.centerScratchA[2] ?? 0;
+    this.nucleusPositions[3] = this.centerScratchB[0] ?? 0;
+    this.nucleusPositions[4] = this.centerScratchB[1] ?? 0;
+    this.nucleusPositions[5] = this.centerScratchB[2] ?? 0;
+    this.nucleusHaloA?.position.set(
+      this.nucleusPositions[0] ?? 0,
+      this.nucleusPositions[1] ?? 0,
+      this.nucleusPositions[2] ?? 0
+    );
+    this.nucleusHaloB?.position.set(
+      this.nucleusPositions[3] ?? 0,
+      this.nucleusPositions[4] ?? 0,
+      this.nucleusPositions[5] ?? 0
+    );
     if (this.tracerPosAttr) this.tracerPosAttr.needsUpdate = true;
     if (this.nucleusPosAttr) this.nucleusPosAttr.needsUpdate = true;
 
-    this.probe = PROBE_INDICES.map((idx) => [
-      this.tracerPositions![idx * 3] ?? 0,
-      this.tracerPositions![idx * 3 + 1] ?? 0,
-      this.tracerPositions![idx * 3 + 2] ?? 0
-    ]);
+    for (let i = 0; i < PROBE_INDICES.length; i += 1) {
+      const idx = PROBE_INDICES[i]!;
+      const probe = this.probe[i]!;
+      probe[0] = this.tracerPositions[idx * 3] ?? 0;
+      probe[1] = this.tracerPositions[idx * 3 + 1] ?? 0;
+      probe[2] = this.tracerPositions[idx * 3 + 2] ?? 0;
+    }
   }
 
   render(ctx: RenderContext): void {
     if (this.disposed || this.scene === null) return;
+    this.backdrop?.syncToCamera(ctx.camera);
+    this.backdrop?.setTime(this.currentModelTime * 0.001);
     ctx.renderer.render(this.scene, ctx.camera);
   }
 
@@ -351,6 +442,10 @@ class GalaxyCollisionModule implements PhenomenonModule {
     this.tracerPosAttr = null;
     this.tracerPositions = null;
     this.nucleusPosAttr = null;
+    this.nucleusHaloA = null;
+    this.nucleusHaloB = null;
+    this.backdrop = null;
+    this.lastAppliedPhase = Number.NaN;
   }
 
   getDebugSnapshot(): Record<string, unknown> {

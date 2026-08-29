@@ -9,6 +9,7 @@ pixel -> camera ray -> geodesic propagation
       -> captured | disk hit | escaped
       -> physical/emission shading
       -> HDR radiance
+      -> destination representation layers (surface/volume/sprite/ribbon)
 ```
 
 Then run temporal/post-processing stages and tone map for display.
@@ -49,6 +50,14 @@ Maintain scene radiance in HDR (prefer half-float render targets where supported
 `physical radiance -> temporal reconstruction -> bloom -> exposure/tone mapping -> output color space`
 
 Bloom is post-processing. It must not alter physics calculations or be necessary for the lensing to exist.
+
+For Cosmic Atlas destinations that are not already full-screen ray images, the
+representation layer is shared and deterministic: seeded deep-space context,
+structured emissive surfaces, optically thin halos, and bounded disc/jet
+geometry consume resolved destination outputs. These layers provide spatial
+readability; they do not replace authoritative ray tracing, datasets, or
+procedural model equations. Cinematic grading/grain/vignette are an opt-in
+display graph in `SharedPost` and are excluded from Scientific/Debug graphs.
 
 Record the exact Three.js color-management/tone-mapping setup in code and visual tests so dependency upgrades do not silently shift golden images.
 

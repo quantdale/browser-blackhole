@@ -50,6 +50,14 @@ import type { BbmDataset } from './dataset.js';
 import { loadBbmDataset } from './loader.js';
 import { BLACK_HOLE_MERGER_DESCRIPTOR, BBM_DISCLOSURE } from './presets.js';
 import {
+  CINEMATIC_DETAIL_BY_TIER,
+  createCinematicBackdrop,
+  createCinematicHalo,
+  createCinematicSurfaceMaterial,
+  type CinematicMaterialHandle,
+  type CinematicBackdropHandle
+} from '../../renderer/shared/CinematicPrimitives.js';
+import {
   formatBbmTime,
   makeBbmPhaseMapping,
   phaseAt,
@@ -106,7 +114,6 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   const debug: Record<string, unknown> = {};
 
   // Uniform bundles (created once, mutated per frame).
-  const uFlashGain = uniform(0);
   const uMarkerGain = uniform(1);
 
   // Handles owned indirectly (disposal flows through the prepare scope).
@@ -118,6 +125,11 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   let ringB: THREE.Mesh | null = null;
   let glowA: THREE.Mesh | null = null;
   let glowB: THREE.Mesh | null = null;
+  let markerHaloA: THREE.Mesh | null = null;
+  let markerHaloB: THREE.Mesh | null = null;
+  let markerHaloVisual: CinematicMaterialHandle | null = null;
+  let flashVisual: CinematicMaterialHandle | null = null;
+  let backdrop: CinematicBackdropHandle | null = null;
   let flash: THREE.Mesh | null = null;
   let trailA: RibbonHandle | null = null;
   let trailB: RibbonHandle | null = null;
@@ -138,6 +150,8 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   const trailScratch: BbmSampleOut = { ax: 0, ay: 0, az: 0, bx: 0, by: 0, bz: 0, hRe: 0, hIm: 0 };
   const trailPointsA: THREE.Vector3[] = [];
   const trailPointsB: THREE.Vector3[] = [];
+  let lastTrailTime = Number.NaN;
+  let lastTrailCount = 0;
 
   function requireDataset(): BbmDataset {
     if (disposed || dataset === null) {
@@ -160,6 +174,8 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     if (ringB !== null) ringB.visible = accentsWanted;
     if (glowA !== null) glowA.visible = accentsWanted;
     if (glowB !== null) glowB.visible = accentsWanted;
+    if (markerHaloA !== null) markerHaloA.visible = accentsWanted;
+    if (markerHaloB !== null) markerHaloB.visible = accentsWanted;
     if (flash !== null) flash.visible = flash.visible && inspiralActive;
     if (trailA !== null) trailA.setVisible(trailsWanted);
     if (trailB !== null) trailB.setVisible(trailsWanted);
@@ -193,6 +209,30 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
 
     const destinationScene = new THREE.Scene();
     destinationScene.name = 'black-hole-merger';
+    const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
+    const cinematicBackdrop = createCinematicBackdrop({
+      seed: ctx.preset.seed,
+      intensity: 0.22,
+      dustColor: [0.018, 0.02, 0.055],
+      starColor: [0.78, 0.84, 1.0],
+      segments: detail.backdropSegments,
+      octaves: detail.backdropOctaves,
+      starCells: { x: 220, y: 110 }
+    });
+    destinationScene.add(cinematicBackdrop.mesh);
+    ctx.scope.track(
+      'geometry',
+      cinematicBackdrop.geometry,
+      () => cinematicBackdrop.geometry.dispose(),
+      32 * 20 * 32
+    );
+    ctx.scope.track(
+      'material',
+      cinematicBackdrop.material,
+      () => cinematicBackdrop.material.dispose(),
+      8192
+    );
+    backdrop = cinematicBackdrop;
 
     // --- INSPIRAL system -----------------------------------------------------
     ctx.reportProgress(0.6, 'Building binary presentation');
@@ -271,15 +311,59 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
 
     // Merger flash envelope (CINEMATIC presentation over DATA_DRIVEN timing).
     const flashGeometry = new THREE.SphereGeometry(1, 24, 18);
-    const flashMaterial = new MeshBasicNodeMaterial();
+    const flashSurface = createCinematicSurfaceMaterial({
+      tint: [1.0, 0.7, 0.42],
+      secondaryTint: [1.0, 0.18, 0.04],
+      seed: ctx.preset.seed ^ 0x8a1,
+      radiance: 2.2,
+      noiseScale: 5,
+      noiseStrength: 0.2,
+      rimStrength: 2.1,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const flashMaterial = flashSurface.material;
     flashMaterial.name = 'bbm-flash';
-    flashMaterial.colorNode = vec4(vec3(2.2, 1.9, 1.7).mul(uFlashGain), 1);
+    flashVisual = flashSurface;
     flash = new THREE.Mesh(flashGeometry, flashMaterial);
     flash.name = 'bbm-flash';
     flash.visible = false;
     inspiralGroup.add(flash);
     ctx.scope.track('geometry', flashGeometry, () => flashGeometry.dispose(), 8192);
     ctx.scope.track('material', flashMaterial, () => flashMaterial.dispose(), 4096);
+
+    const markerHaloGeometry = new THREE.SphereGeometry(
+      1.55,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const markerHaloSurface = createCinematicHalo({
+      tint: [0.36, 0.58, 1.0],
+      seed: ctx.preset.seed ^ 0x8b2,
+      gain: 0,
+      alpha: 0.2,
+      noiseScale: 3.2,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    markerHaloA = new THREE.Mesh(markerHaloGeometry, markerHaloSurface.material);
+    markerHaloB = new THREE.Mesh(markerHaloGeometry, markerHaloSurface.material);
+    markerHaloA.name = 'bbm-marker-halo-a';
+    markerHaloB.name = 'bbm-marker-halo-b';
+    markerHaloA.visible = false;
+    markerHaloB.visible = false;
+    inspiralGroup.add(markerHaloA, markerHaloB);
+    markerHaloVisual = markerHaloSurface;
+    ctx.scope.track(
+      'geometry',
+      markerHaloGeometry,
+      () => markerHaloGeometry.dispose(),
+      detail.haloSegments.width * detail.haloSegments.height * 32
+    );
+    ctx.scope.track(
+      'material',
+      markerHaloSurface.material,
+      () => markerHaloSurface.material.dispose(),
+      4096
+    );
 
     trailA = ctx.services.ribbons.createRibbon({
       segments: TIER_TRAIL_SAMPLES[ctx.quality],
@@ -358,6 +442,9 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   function updateTrails(t: number, ds: BbmDataset): void {
     if (trailA === null || trailB === null) return;
     const count = TIER_TRAIL_SAMPLES[lastTier];
+    if (t === lastTrailTime && count === lastTrailCount) return;
+    lastTrailTime = t;
+    lastTrailCount = count;
     while (trailPointsA.length < count) trailPointsA.push(new THREE.Vector3());
     while (trailPointsB.length < count) trailPointsB.push(new THREE.Vector3());
     trailPointsA.length = count;
@@ -386,6 +473,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       : 0;
     const clampedT = Math.min(Math.max(t, ds.tStartM), ds.ringdownEndM + REMNANT_TAIL_M);
     lastTimeM = clampedT;
+    backdrop?.setTime(clampedT * 0.01);
     const phase = phaseAt(clampedT, ds);
     lastPhase = phase;
     applySystemVisibility(phase);
@@ -402,14 +490,19 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
         if (ringB !== null) ringB.position.copy(markerB.position);
         if (glowA !== null) glowA.position.copy(markerA.position);
         if (glowB !== null) glowB.position.copy(markerB.position);
+        if (markerHaloA !== null) markerHaloA.position.copy(markerA.position);
+        if (markerHaloB !== null) markerHaloB.position.copy(markerB.position);
       }
     }
     uMarkerGain.value = markersActive ? 1 : 0;
+    markerHaloVisual?.setGain(markersActive ? 0.65 : 0);
+    markerHaloVisual?.setTime(clampedT * 0.01);
 
     // Merger flash: exponential-decay envelope anchored at t=0 (the peak).
     const flashTau = clampedT <= 0 ? 0 : clampedT / Math.max(ds.mergerEndM, 1e-6);
     const flashGain = clampedT >= 0 && flashTau < 1 ? FLASH_PEAK_GAIN * Math.exp(-3 * flashTau) : 0;
-    uFlashGain.value = flashGain;
+    flashVisual?.setGain(flashGain);
+    flashVisual?.setTime(clampedT * 0.02);
     if (flash !== null) {
       flash.visible = flashGain > 0.001 && markersActive;
       flash.scale.setScalar(1.6 + flashTau * 2.4);
@@ -480,6 +573,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
 
   function render(ctx: RenderContext): void {
     if (ctx.scene !== null && ctx.camera !== null) {
+      backdrop?.syncToCamera(ctx.camera);
       if (remnantGroup !== null && remnantGroup.visible) {
         pushKerrUniforms(ctx.camera);
       }
@@ -504,6 +598,11 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     ringB = null;
     glowA = null;
     glowB = null;
+    markerHaloA = null;
+    markerHaloB = null;
+    markerHaloVisual = null;
+    flashVisual = null;
+    backdrop = null;
     flash = null;
     trailA = null;
     trailB = null;
@@ -512,6 +611,8 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     stateValue = null;
     trailPointsA.length = 0;
     trailPointsB.length = 0;
+    lastTrailTime = Number.NaN;
+    lastTrailCount = 0;
   }
 
   /** Canonical live control channel (host forwards UI events here). */

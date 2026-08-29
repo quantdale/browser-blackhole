@@ -165,7 +165,8 @@ export const ZONE_BOUNDS: Readonly<{
  *
  * Rules (evaluated top-down):
  * - from any zone, zoom >= galacticEnter -> 'galactic'
- * - from galactic, zoom <= galacticExit -> 'nuclear' (hysteresis exit)
+ * - from galactic, zoom <= galacticExit -> 'nuclear' (hysteresis exit), or
+ *   directly to 'inner' when a discrete jump crosses the inner exit boundary
  * - from inner/nuclear, zoom >= nuclearEnter -> 'nuclear' unless already past
  *   the galactic rule above
  * - from nuclear, zoom < nuclearExit -> 'inner' (hysteresis exit)
@@ -178,6 +179,9 @@ export function resolveAgnZone(zoom01: number, current: AgnZoneId): AgnZoneId {
     return 'galactic';
   }
   if (current === 'galactic') {
+    if (zoom01 <= ZONE_BOUNDS.nuclearExit) {
+      return 'inner';
+    }
     if (zoom01 <= ZONE_BOUNDS.galacticExit) {
       return 'nuclear';
     }

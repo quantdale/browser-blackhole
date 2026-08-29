@@ -41,7 +41,8 @@ import {
   Group,
   Mesh,
   MeshBasicNodeMaterial,
-  Scene
+  Scene,
+  SphereGeometry
 } from 'three/webgpu';
 import { CylinderGeometry, RingGeometry } from 'three/webgpu';
 import {
@@ -105,6 +106,13 @@ import {
   type VariabilityComponent
 } from './variability.js';
 import { lensingCameraUniformState } from '../../renderer/shared/LensingService.js';
+import {
+  CINEMATIC_DETAIL_BY_TIER,
+  createCinematicBackdrop,
+  createCinematicHalo,
+  type CinematicMaterialHandle,
+  type CinematicBackdropHandle
+} from '../../renderer/shared/CinematicPrimitives.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -265,6 +273,8 @@ export class QuasarAgnModule implements PhenomenonModule {
   private torusVolume: VolumeHandle | null = null;
   private hostParticles: ParticleSystemHandle | null = null;
   private knotParticles: ParticleSystemHandle | null = null;
+  private backdrop: CinematicBackdropHandle | null = null;
+  private nuclearEngineVisual: CinematicMaterialHandle | null = null;
 
   /** Live per-lobe gains (+Y lobe / −Y lobe), updated every frame. */
   private readonly gainPlus = uniform(1);
@@ -313,6 +323,30 @@ export class QuasarAgnModule implements PhenomenonModule {
     scene.name = 'quasar-agn-scene';
     const root = new Group();
     root.name = 'quasar-agn-root';
+    const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
+    const cinematicBackdrop = createCinematicBackdrop({
+      seed: ctx.preset.seed,
+      intensity: 0.2,
+      dustColor: [0.05, 0.018, 0.07],
+      starColor: [0.78, 0.8, 1.0],
+      segments: detail.backdropSegments,
+      octaves: detail.backdropOctaves,
+      starCells: { x: 220, y: 110 }
+    });
+    scene.add(cinematicBackdrop.mesh);
+    ctx.scope.track(
+      'geometry',
+      cinematicBackdrop.geometry,
+      () => cinematicBackdrop.geometry.dispose(),
+      32 * 20 * 32
+    );
+    ctx.scope.track(
+      'material',
+      cinematicBackdrop.material,
+      () => cinematicBackdrop.material.dispose(),
+      8192
+    );
+    this.backdrop = cinematicBackdrop;
 
     // --- INNER zone -------------------------------------------------------
     ctx.reportProgress(0.15, 'Preparing inner engine (DIRECT lensing reuse)');
@@ -363,6 +397,25 @@ export class QuasarAgnModule implements PhenomenonModule {
     abortGuard();
     const nuclearGroup = new Group();
     nuclearGroup.name = 'agn-nuclear';
+    const engineHaloGeometry = new SphereGeometry(
+      0.72,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const engineHaloVisual = createCinematicHalo({
+      tint: [1.0, 0.56, 0.18],
+      seed: ctx.preset.seed ^ 0x951,
+      gain: 0,
+      alpha: 0.42,
+      noiseScale: 4,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const engineHalo = new Mesh(engineHaloGeometry, engineHaloVisual.material);
+    engineHalo.name = 'agn-nuclear-engine-halo';
+    engineHalo.renderOrder = 12;
+    nuclearGroup.add(engineHalo);
+    this.nuclearEngineVisual = engineHaloVisual;
+    trackMesh(this.prepareCtxFor(engineHalo), engineHalo, 4096, 4096);
     nuclearGroup.add(this.buildOuterDisk());
     this.torusVolume = ctx.services.volumes.createVolume({
       bounds: {
@@ -442,10 +495,19 @@ export class QuasarAgnModule implements PhenomenonModule {
         // nucleus instead of glowing at a fixed brightness.
         const lagDays = length(p.xz).mul(this.uNuclearDelayPerUnit);
         const echo = continuumNode(this.variability, this.uTimeDays.sub(lagDays));
+        // A low-order azimuthal illumination wave turns the clumpy torus into
+        // a readable reverberating structure. It is a presentation response
+        // to the same delayed continuum, not an additional dynamical model.
+        const illumination = sin(
+          atan(p.z, p.x).mul(2).sub(this.uTimeDays.mul(0.12)).add(lagDays.mul(0.015))
+        )
+          .mul(0.24)
+          .add(0.84);
 
         return mix(hot, cool, smoothstep(float(0), float(0.55), tRad))
           .mul(falloff)
-          .mul(echo) as never;
+          .mul(echo.pow(1.45).mul(1.18))
+          .mul(illumination) as never;
       },
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       halfResolution: true,
@@ -489,7 +551,8 @@ export class QuasarAgnModule implements PhenomenonModule {
       ],
       blending: 'additive',
       seed: ctx.preset.seed,
-      preferCompute: false
+      preferCompute: false,
+      activity: 'static'
     });
     this.hostParticles.reset(ctx.preset.seed);
     galacticGroup.add(this.hostParticles.object3d());
@@ -512,7 +575,8 @@ export class QuasarAgnModule implements PhenomenonModule {
       colorRamp: [{ t: 0, color: [0.75, 0.88, 1.0], alpha: 1 }],
       blending: 'additive',
       seed: ctx.preset.seed + 1,
-      preferCompute: false
+      preferCompute: false,
+      activity: 'static'
     });
     this.knotParticles.reset(ctx.preset.seed + 1);
     galacticGroup.add(this.knotParticles.object3d());
@@ -587,6 +651,9 @@ export class QuasarAgnModule implements PhenomenonModule {
     this.uTimeDays.value = this.timeDays;
     this.continuumFactor = variabilityFactor(this.timeDays, this.variability);
     this.uContinuum.value = this.continuumFactor;
+    this.backdrop?.setTime(this.timeDays * 0.00002);
+    this.nuclearEngineVisual?.setGain(this.continuumFactor * 1.4);
+    this.nuclearEngineVisual?.setTime(this.timeDays * 0.02);
 
     // Zone machine (hysteresis) + exclusive visibility.
     const previousZone = this.activeZone;
@@ -654,6 +721,7 @@ export class QuasarAgnModule implements PhenomenonModule {
 
   render(ctx: RenderContext): void {
     if (this.disposed || this.scene === null || this.root === null) return;
+    this.backdrop?.syncToCamera(ctx.camera);
     this.applyLensingCamera(ctx.camera);
     ctx.renderer.render(this.scene, ctx.camera);
   }
@@ -670,6 +738,8 @@ export class QuasarAgnModule implements PhenomenonModule {
     this.torusVolume = null;
     this.hostParticles = null;
     this.knotParticles = null;
+    this.backdrop = null;
+    this.nuclearEngineVisual = null;
     this.groups = {};
     this.root = null;
     this.scene = null;
@@ -731,6 +801,16 @@ export class QuasarAgnModule implements PhenomenonModule {
         variability: VARIABILITY_DISCLOSURE,
         torus: 'PROCEDURAL_SCIENTIFIC clumpy dust distribution (Nenkova et al. 2008 picture)'
       },
+      representation:
+        'seeded deep-space backdrop + direct inner pass + layered torus/corona/jet/host representations',
+      particleWork: {
+        host: this.hostParticles?.getDebugSnapshot() ?? null,
+        knots: this.knotParticles?.getDebugSnapshot() ?? null
+      },
+      volumeWork: {
+        corona: this.coronaVolume?.getDebugSnapshot?.() ?? null,
+        torus: this.torusVolume?.getDebugSnapshot?.() ?? null
+      },
       disposed: this.disposed
     };
   }
@@ -750,7 +830,6 @@ export class QuasarAgnModule implements PhenomenonModule {
       this.torusVolume.setVisible(this.state.torusVisible && this.activeZone === 'nuclear');
     }
     if (this.hostParticles !== null) {
-      this.hostParticles.setPopulationScale(this.state.hostVisible ? 1 : 0);
       this.hostParticles.setPopulationScale(this.state.hostVisible ? 1 : 0);
     }
     if (this.knotParticles !== null) {
@@ -859,10 +938,13 @@ export class QuasarAgnModule implements PhenomenonModule {
     // Sheared clumping: a second, faster-varying azimuthal harmonic keeps the
     // pattern from reading as a clean sine wave.
     const fine = sin(phi.mul(float(DISK_PATTERN_ARMS * 5)).sub(omega.mul(this.uTimeDays).mul(1.6)));
-    const pattern = float(0.72)
-      .add(wave.mul(float(0.2)))
-      .add(fine.mul(float(0.08)));
-    const brightness = pattern.mul(this.uContinuum);
+    const pattern = float(0.62)
+      .add(wave.mul(float(0.32)))
+      .add(fine.mul(float(0.14)));
+    // The variability factor remains the model's resolved continuum; this
+    // display gain only gives the differential pattern enough contrast to
+    // read as orbiting gas at the destination's deliberately wide framing.
+    const brightness = pattern.mul(this.uContinuum).mul(float(1.08));
 
     material.colorNode = vec4(
       body.mul(edges).mul(brightness).mul(float(1.5)),
