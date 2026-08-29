@@ -241,6 +241,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
    * is on orbits, and that is the motion the late stages are about.
    */
   const uOrbitPhase = uniform(0);
+  const focusTargetScratch = new THREE.Vector3();
 
   // Scratch spine buffers (allocated once per ribbon capacity).
   let boundScratch: ReturnType<typeof createSpineScratch> | null = null;
@@ -927,6 +928,15 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       res.energySpreadJPerKg > 0 &&
       STREAM_PHASES.has(phase) &&
       t > -HANDOFF_FADE_SECONDS;
+    // The boot shot centers the incoming star, while post-disruption media is
+    // centered on the black-hole/debris origin. This is a presentation focus
+    // cue only; it is disabled permanently after viewer takeover and never
+    // alters the encounter coordinates.
+    if (autoFramer.enabled && !ctx.services.cameraRig.isAnimating()) {
+      if (streamVisible) focusTargetScratch.set(0, 0, 0);
+      else focusTargetScratch.set(enc.x, enc.y, enc.z);
+      ctx.services.cameraRig.setTarget(focusTargetScratch, 'system');
+    }
     if (streamVisible) updateStreams(tau, orbit.distance);
     else {
       streamExtentUnits = 0;

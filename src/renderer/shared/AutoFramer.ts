@@ -10,7 +10,9 @@
  * destinations previously did exactly that.
  *
  * CONTRACT
- * - Only the orbit DISTANCE is touched. Azimuth and polar stay user-owned.
+ * - Destinations may pair the distance update with an explicit presentation
+ *   focus target; azimuth and polar stay user-owned. AutoFramer itself never
+ *   changes physical observer state.
  * - The rig runs its own arrival/preset ease after `reset()`; writing during it
  *   would cancel that animation (`setOrbit` clears it), so the framer stays
  *   hands-off until `rig.isAnimating()` clears and then adopts whatever the ease

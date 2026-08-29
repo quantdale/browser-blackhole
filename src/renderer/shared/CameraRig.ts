@@ -413,7 +413,8 @@ export class CameraRig implements ICameraRig {
     };
   }
 
-  setTarget(target: Vector3): void {
+  setTarget(target: Vector3, source: 'system' | 'user' = 'user'): void {
+    if (source === 'system' && this.animation !== null) return;
     this.cancelAnimation();
     this.configured = true;
     this.target.set(
@@ -421,6 +422,7 @@ export class CameraRig implements ICameraRig {
       requireFinite(target.y, 'target.y'),
       requireFinite(target.z, 'target.z')
     );
+    if (source === 'user') this.userInteractionRevision += 1;
     this.dirty = true;
   }
 

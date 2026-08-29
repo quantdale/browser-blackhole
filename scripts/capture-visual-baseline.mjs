@@ -443,7 +443,10 @@ for (const scene of selectedScenes) {
         phase,
         shot: 'wide',
         file: file.slice(outputRoot.length + 1),
-        metrics: await imageMetrics(page, dataUrl)
+        metrics: await imageMetrics(page, dataUrl),
+        debug: await page.evaluate(
+          () => window.__ATLAS_APP__?.host.activeDestinationDebugSnapshot?.() ?? null
+        )
       });
     }
 

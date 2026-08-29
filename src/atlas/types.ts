@@ -551,7 +551,8 @@ export interface ICameraRig {
   getDistanceLimits(): { min: number; max: number };
   /** Monotonic counter for direct viewer camera input (optional for test rigs). */
   getUserInteractionRevision?(): number;
-  setTarget(target: THREE.Vector3): void;
+  /** Update a presentation focus target without altering physical state. */
+  setTarget(target: THREE.Vector3, source?: 'system' | 'user'): void;
   setFov(fovDeg: number): void;
   setControlsEnabled(enabled: boolean): void;
   setReducedMotion(reduced: boolean): void;
