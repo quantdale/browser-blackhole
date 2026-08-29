@@ -690,6 +690,7 @@ export class QuasarAgnModule implements PhenomenonModule {
     this.backdrop?.setDetail(
       ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0
     );
+    this.backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.5 : 0.22);
     this.nuclearEngineVisual?.setGain(this.continuumFactor * 1.4);
     this.nuclearEngineVisual?.setTime(this.timeDays * 0.02);
 

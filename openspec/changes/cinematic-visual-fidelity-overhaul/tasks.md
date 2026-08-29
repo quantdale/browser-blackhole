@@ -43,7 +43,7 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 2.7 Add a numeric HDR probe proving radiance >1 survives volume intermediate and reaches SharedPost. Evidence: `tests/browser/hdr-continuity.spec.ts` reads `[4,4,4,1]` at both stages on both backends.
 - [x] 2.8 Add a visual test proving 1x and 4x HDR input are not accidentally identical before tone mapping. Evidence: `hdr-continuity.spec.ts` raw pre-display reads 1.0 vs 4.0 at both volume and SharedPost targets on WebGPU/WebGL2.
 - [x] 2.9 Audit transition snapshot target for HDR preservation. Evidence: `SharedPost.captureSnapshot()` uses the same `createHdrTarget` HalfFloatType path; snapshot is explicitly raw off-screen HDR in `SharedPost.ts`.
-- [ ] 2.10 Audit any future MRT/temporal targets for format/color-space correctness.
+- [x] 2.10 Audit any future MRT/temporal targets for format/color-space correctness. Evidence: `SharedPost` HDR, selective, snapshot, temporal-history, and staged-depth targets are explicitly `HalfFloatType`/`NoColorSpace`; r185 MRT spike records named FP16 attachments.
 - [ ] 2.11 Record estimated GPU-memory increase caused by FP16 targets.
 
 ## 3. SharedPost V2 architecture spike
@@ -98,97 +98,97 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 ## 6. Volumetrics V2 core
 
-- [ ] 6.1 Define VolumeService V2 compatibility interface.
-- [ ] 6.2 Preserve legacy VolumeService path during first migration.
-- [ ] 6.3 Add half-float HDR intermediate.
-- [ ] 6.4 Add deterministic ray-start jitter.
-- [ ] 6.5 Integrate volume jitter with temporal reconstruction.
-- [ ] 6.6 Add optional macro/detail density composition.
-- [ ] 6.7 Implement deterministic multi-octave detail primitive.
-- [ ] 6.8 Implement optional ridged/filament detail primitive.
-- [ ] 6.9 Implement optional clump mask.
-- [ ] 6.10 Implement optional domain-warp control with bounded cost.
-- [ ] 6.11 Drive detail octaves from global work budget.
-- [ ] 6.12 Drive active march steps from global work budget.
-- [ ] 6.13 Preserve early-alpha termination.
-- [ ] 6.14 Add conservative scene-depth clipping where available.
+- [x] 6.1 Define VolumeService V2 compatibility interface. Evidence: `VolumeConfig`/`VolumeHandle` V2 fields and setters in `src/atlas/types.ts`, implemented in `VolumeService.ts` (`b4ea0d3`, `69e4e17`).
+- [x] 6.2 Preserve legacy VolumeService path during first migration. Evidence: detail/lighting/depth features are optional and the original no-detail/full-resolution path remains available.
+- [x] 6.3 Add half-float HDR intermediate. Evidence: default `rgba16f` target and raw >1 probe (`ae11244`, `tests/browser/hdr-continuity.spec.ts`).
+- [x] 6.4 Add deterministic ray-start jitter. Evidence: seeded frame-indexed jitter uniforms and deterministic unit/browser coverage.
+- [x] 6.5 Integrate volume jitter with temporal reconstruction. Evidence: host drives the same bounded frame sequence as temporal policy; V2 browser rows report jitter enabled with temporal High-tier resolve.
+- [x] 6.6 Add optional macro/detail density composition. Evidence: optional `detail` profile is applied over each destination macro density.
+- [x] 6.7 Implement deterministic multi-octave detail primitive. Evidence: bounded `mx_fractal_noise_float` octave graph with per-tier compile ceiling.
+- [x] 6.8 Implement optional ridged/filament detail primitive. Evidence: ridged response and filament strength controls in `VolumeService.buildDetailFactor()`.
+- [x] 6.9 Implement optional clump mask. Evidence: seeded clump-noise mask in the V2 detail factor and destination-specific strengths.
+- [x] 6.10 Implement optional domain-warp control with bounded cost. Evidence: clamped warp strength and two-octave warp graph.
+- [x] 6.11 Drive detail octaves from global work budget. Evidence: `VisualWorkBudget.volumeDetailOctaves` and per-tier compile/runtime clamps; V2 browser rows report bounded effective octaves.
+- [x] 6.12 Drive active march steps from global work budget. Evidence: `VisualWorkBudget.volumeActiveSteps` drives `setStepScale`; debug snapshots report active steps.
+- [x] 6.13 Preserve early-alpha termination. Evidence: existing `earlyAlphaTermination` loop guard remains active in V2 graph.
+- [ ] 6.14 Add conservative scene-depth clipping where available. Partial evidence: SharedPost now stages previous-frame depth and V2 uses it for edge-aware upsample; true ray-march termination against scene depth remains open.
 - [ ] 6.15 Research projected-bounds/scissor optimization.
-- [ ] 6.16 Add depth-aware/bilateral upsampling prototype.
-- [ ] 6.17 Validate camera-inside-volume.
+- [x] 6.16 Add depth-aware/bilateral upsampling prototype. Evidence: alpha/depth-guided five-tap composite and staged-depth debug row pass on WebGPU/WebGL2.
+- [x] 6.17 Validate camera-inside-volume. Evidence: the V2 browser probe uses a bounds sphere enclosing the auto-framed camera and passes on WebGPU/WebGL2 with the double-sided composite.
 - [ ] 6.18 Validate small foreground object over volume.
-- [ ] 6.19 Add optional approximate self-shadow/extinction taps.
-- [ ] 6.20 Add gradient-based front shading where visually useful.
-- [ ] 6.21 Keep service disclosure explicit: no full multi-scattering claim.
-- [ ] 6.22 Validate WebGPU.
-- [ ] 6.23 Validate forceWebGL fallback.
+- [x] 6.19 Add optional approximate self-shadow/extinction taps. Evidence: bounded zero-to-two lighting taps, destination profiles, and V2 browser compilation.
+- [x] 6.20 Add gradient-based front shading where visually useful. Evidence: optional forward-density gradient term in `VolumeService` and Stellar/TDE/AGN/CM profiles.
+- [x] 6.21 Keep service disclosure explicit: no full multi-scattering claim. Evidence: `VOLUME_DISCLOSURE` and service docs state single-scattering-style approximation.
+- [x] 6.22 Validate WebGPU. Evidence: `tests/browser/volumetrics-v2.spec.ts` and HDR continuity rows pass on hardware WebGPU.
+- [x] 6.23 Validate forceWebGL fallback. Evidence: same V2/HDR rows pass with `backend=webgl2`.
 - [ ] 6.24 Benchmark low/medium/high/ultra.
 - [ ] 6.25 Prove no unbounded resource growth over repeated create/dispose.
 
 ## 7. ParticleService V2
 
-- [ ] 7.1 Add rendering profile enum or equivalent extensible material policy.
-- [ ] 7.2 Implement compact star profile.
-- [ ] 7.3 Implement velocity-stretched ejecta profile.
-- [ ] 7.4 Implement motion-aligned debris profile if distinct from ejecta.
-- [ ] 7.5 Implement soft dust/clump profile if needed.
-- [ ] 7.6 Preserve existing generic sprite as fallback.
-- [ ] 7.7 Add deterministic per-particle cluster/brightness metadata.
-- [ ] 7.8 Add projected-velocity orientation input.
-- [ ] 7.9 Keep screen-space/world-space size semantics explicit.
-- [ ] 7.10 Add HDR emissive intensity path.
-- [ ] 7.11 Integrate selective bloom output.
+- [x] 7.1 Add rendering profile enum or equivalent extensible material policy. Evidence: `ParticleRenderProfile` and `ParticleService` profile policy (`b4ea0d3`).
+- [x] 7.2 Implement compact star profile. Evidence: profile shader branch and AGN host-star migration.
+- [x] 7.3 Implement velocity-stretched ejecta profile. Evidence: projected velocity stretch and Stellar/CM migrations.
+- [x] 7.4 Implement motion-aligned debris profile if distinct from ejecta. Evidence: distinct debris-streak mask/orientation and TDE migration.
+- [x] 7.5 Implement soft dust/clump profile if needed. Evidence: bounded dust-clump profile and browser profile matrix.
+- [x] 7.6 Preserve existing generic sprite as fallback. Evidence: generic-soft remains the default and its CPU/browser path remains covered.
+- [x] 7.7 Add deterministic per-particle cluster/brightness metadata. Evidence: seeded life/id brightness term in the material.
+- [x] 7.8 Add projected-velocity orientation input. Evidence: `aParticleVel` and camera-space `atan` rotation for streak profiles.
+- [x] 7.9 Keep screen-space/world-space size semantics explicit. Evidence: profile sizes remain CSS-pixel `sizePx` with documented camera attenuation policy.
+- [x] 7.10 Add HDR emissive intensity path. Evidence: bounded linear `emissiveIntensity` uniform/material gain.
+- [x] 7.11 Integrate selective bloom output. Evidence: particle materials are tagged for the SharedPost emissive auxiliary pass.
 - [ ] 7.12 Benchmark population cost and bandwidth.
-- [ ] 7.13 Validate WebGL2 fallback.
+- [x] 7.13 Validate WebGL2 fallback. Evidence: `tests/browser/particle-profiles-v2.spec.ts` passes for forced WebGL2.
 - [ ] 7.14 Add temporal stability tests for subpixel particles.
 
 ## 8. StrandService / Ribbon V2
 
-- [ ] 8.1 Keep RibbonService unchanged for fallback until migration proves success.
-- [ ] 8.2 Define StrandService input contract around authoritative spine data.
-- [ ] 8.3 Implement parallel-transported local frame.
-- [ ] 8.4 Implement variable elliptical cross-section.
-- [ ] 8.5 Implement radial opacity profile.
-- [ ] 8.6 Implement longitudinal temperature/color profile.
-- [ ] 8.7 Implement deterministic clump/detail modulation.
-- [ ] 8.8 Decide mesh-impostor versus volumetric representation using measured cost/quality.
-- [ ] 8.9 Add screen-space antialiasing/stability policy.
-- [ ] 8.10 Add High/Ultra mode selection through global budget.
-- [ ] 8.11 Validate against TDE authoritative centerline.
-- [ ] 8.12 Validate forceWebGL fallback.
+- [x] 8.1 Keep RibbonService unchanged for fallback until migration proves success. Evidence: TDE retains ribbon handles and switches below the Strand quality threshold.
+- [x] 8.2 Define StrandService input contract around authoritative spine data. Evidence: `StrandConfig`/`StrandHandle` accepts world-space spine only.
+- [x] 8.3 Implement parallel-transported local frame. Evidence: transported tangent/lateral/binormal frame in `StrandService.ts`.
+- [x] 8.4 Implement variable elliptical cross-section. Evidence: per-ring aspect/width interpolation.
+- [x] 8.5 Implement radial opacity profile. Evidence: radial vertex alpha profile plus alpha test.
+- [x] 8.6 Implement longitudinal temperature/color profile. Evidence: seeded longitudinal color/temperature wave.
+- [x] 8.7 Implement deterministic clump/detail modulation. Evidence: clump seed and bounded per-ring modulation.
+- [x] 8.8 Decide mesh-impostor versus volumetric representation using measured cost/quality. Evidence: bounded low-sided tube selected; `tests/browser/strand-service.spec.ts` validates tube/ribbon quality switch and unit geometry cost is recorded in scope.
+- [x] 8.9 Add screen-space antialiasing/stability policy. Evidence: stable transported frame, transparent alpha-test tube, double-sided rendering, and no per-frame geometry allocation.
+- [x] 8.10 Add High/Ultra mode selection through global budget. Evidence: `VisualWorkBudget.strandQuality` selects tube at High/Ultra and ribbon below.
+- [x] 8.11 Validate against TDE authoritative centerline. Evidence: TDE browser debug reports 140/140 spine points on tube and unit tests prove ring centers preserve supplied spine.
+- [x] 8.12 Validate forceWebGL fallback. Evidence: Strand browser row passes with forced WebGL2.
 - [ ] 8.13 Benchmark against current ribbon implementation.
 
 ## 9. Celestial Environment V2
 
-- [ ] 9.1 Audit current procedural star/environment implementation.
-- [ ] 9.2 Define fixed world-frame orientation.
-- [ ] 9.3 Add multi-scale diffuse galactic background.
-- [ ] 9.4 Add deterministic bright-star population.
-- [ ] 9.5 Add dense unresolved star field.
-- [ ] 9.6 Add stellar temperature/color distribution.
-- [ ] 9.7 Add restrained dust/nebular large-scale structure where appropriate.
-- [ ] 9.8 Keep all generated content deterministic under seed.
-- [ ] 9.9 Ensure linear HDR environment output.
-- [ ] 9.10 Add environment detail budget by quality tier.
+- [x] 9.1 Audit current procedural star/environment implementation. Evidence: audit and `docs/cosmic-atlas/ENVIRONMENT_V2.md`.
+- [x] 9.2 Define fixed world-frame orientation. Evidence: cube-face direction sampler and camera-synchronized backdrop use canonical world direction without camera-dependent regeneration.
+- [x] 9.3 Add multi-scale diffuse galactic background. Evidence: cinematic sampler/backdrop diffuse band plus coarse/fine dust modulation.
+- [x] 9.4 Add deterministic bright-star population. Evidence: locked scientific sparse HDR cube-cell field retained and reused.
+- [x] 9.5 Add dense unresolved star field. Evidence: separate dense cube-cell population in `starfieldGpu.ts` and backdrop.
+- [x] 9.6 Add stellar temperature/color distribution. Evidence: deterministic warm/cool hashed temperature tint.
+- [x] 9.7 Add restrained dust/nebular large-scale structure where appropriate. Evidence: bounded seeded dust radiance and backdrop nebula strength.
+- [x] 9.8 Keep all generated content deterministic under seed. Evidence: CPU unit test and no time/frame-order input to the environment sampler.
+- [x] 9.9 Ensure linear HDR environment output. Evidence: sampler and backdrop feed `NoColorSpace` scene targets; raw environment toggle probe shows additive radiance.
+- [x] 9.10 Add environment detail budget by quality tier. Evidence: host drives direct lensed passes and backdrops from `VisualWorkBudget.environmentDetail` only in Cinematic mode.
 - [ ] 9.11 Verify lensing visibility around critical curves.
 - [ ] 9.12 Verify no moiré/shimmer during camera motion.
-- [ ] 9.13 Record asset provenance if any external texture is introduced.
-- [ ] 9.14 Validate WebGL2 fallback.
+- [x] 9.13 Record asset provenance if any external texture is introduced. Evidence: no external environment texture was introduced; provenance/disclosure is recorded in `docs/cosmic-atlas/ENVIRONMENT_V2.md`.
+- [x] 9.14 Validate WebGL2 fallback. Evidence: `tests/browser/environment-v2.spec.ts` reports additive raw HDR environment detail on forced WebGL2.
 
 ## 10. First showcase vertical slice — Stellar Explosion
 
 - [ ] 10.1 Capture locked before references for core-collapse, hypernova and GRB presets.
-- [ ] 10.2 Preserve current explosion physics/timeline tests.
-- [ ] 10.3 Migrate ejecta volume to Volumetrics V2.
-- [ ] 10.4 Add structured shell detail controlled by scientific shell radius/width.
-- [ ] 10.5 Add hot-interior to cool-outer temperature structure.
-- [ ] 10.6 Add deterministic large-scale asymmetry.
-- [ ] 10.7 Add filament/ridged detail appropriate to ejecta presentation.
-- [ ] 10.8 Add clumpy density breakup.
-- [ ] 10.9 Improve shock-front edge definition.
-- [ ] 10.10 Migrate ejecta particles to velocity-stretched profile.
-- [ ] 10.11 Integrate selective emissive bloom.
-- [ ] 10.12 Integrate temporal reconstruction.
-- [ ] 10.13 Tune auto-framing only if needed; preserve user takeover.
+- [x] 10.2 Preserve current explosion physics/timeline tests. Evidence: existing explosion unit/timeline suites remain in the passing `npm run check` gate.
+- [x] 10.3 Migrate ejecta volume to Volumetrics V2. Evidence: Stellar `VolumeConfig` uses FP16/detail/depth/jitter/self-shadow V2 fields.
+- [x] 10.4 Add structured shell detail controlled by scientific shell radius/width. Evidence: the authoritative shell density supplies radius/width; V2 detail and structured shock skin consume that state.
+- [x] 10.5 Add hot-interior to cool-outer temperature structure. Evidence: emission graph mixes the resolved temperature tint toward a cool outer radial response.
+- [x] 10.6 Add deterministic large-scale asymmetry. Evidence: existing validated angular-asymmetry model remains the volume macro field.
+- [x] 10.7 Add filament/ridged detail appropriate to ejecta presentation. Evidence: Stellar filament-strength profile plus structured-shock-skin material.
+- [x] 10.8 Add clumpy density breakup. Evidence: clumping model and V2 clump-strength profile remain seed-driven.
+- [x] 10.9 Improve shock-front edge definition. Evidence: 1.4 target optical depth and tagged structured shock skin; saved `stellar-gate-shell-core-v3` human-review frames.
+- [x] 10.10 Migrate ejecta particles to velocity-stretched profile. Evidence: Stellar particle debug reports `profile: ejecta-streak` and `aParticleVel` orientation input.
+- [x] 10.11 Integrate selective emissive bloom. Evidence: shell/volume/particle materials are tagged and Stellar gate reports `selective-emissive` source.
+- [x] 10.12 Integrate temporal reconstruction. Evidence: High/Ultra Stellar gate rows report temporal resolve, bounded history targets and direct-ray NDC jitter.
+- [x] 10.13 Tune auto-framing only if needed; preserve user takeover. Evidence: gate rows report destination AutoFramer state; existing camera takeover tests remain green.
 - [ ] 10.14 Validate all presets in Scientific mode.
 - [ ] 10.15 Validate all presets in Cinematic mode.
 - [ ] 10.16 Run temporal flicker gate.

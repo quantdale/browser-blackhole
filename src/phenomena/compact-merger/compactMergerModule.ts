@@ -606,6 +606,7 @@ export function createCompactMergerModule(): PhenomenonModule {
     const ready = assertReady();
     lastTier = ctx.quality;
     backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
+    backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.5 : 0.22);
     const snapshot = ctx.services.time.snapshot();
     const t = Number.isFinite(snapshot.physicalTime ?? NaN) ? (snapshot.physicalTime as number) : 0;
     const res = ready.resolved;

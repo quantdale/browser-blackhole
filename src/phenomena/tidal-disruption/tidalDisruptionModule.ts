@@ -875,6 +875,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     const snapshot = ctx.services.time.snapshot();
     const t = Number.isFinite(snapshot.physicalTime ?? NaN) ? (snapshot.physicalTime as number) : 0;
     const res = ready.resolved;
+    backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.52 : 0.24);
     lastStrandQuality = ctx.workBudget.strandQuality;
     const phase = tdePhaseAt(t, res);
     const disrupts = res.disrupts;

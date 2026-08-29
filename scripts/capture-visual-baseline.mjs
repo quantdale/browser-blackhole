@@ -106,6 +106,15 @@ const shots = [
   { id: 'medium', factor: 1 },
   { id: 'detail', factor: 0.72 }
 ];
+const selectedSceneIds = new Set(
+  (process.env.BASELINE_SCENES ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+);
+const selectedScenes =
+  selectedSceneIds.size === 0 ? scenes : scenes.filter((scene) => selectedSceneIds.has(scene.id));
+const qualityQuery = process.env.BASELINE_QUALITY ? `&q=${process.env.BASELINE_QUALITY}` : '';
 
 function gitSha() {
   try {
@@ -384,9 +393,9 @@ const manifest = {
   consoleErrors: errors
 };
 
-for (const scene of scenes) {
+for (const scene of selectedScenes) {
   console.log(`BASELINE ${scene.id}`);
-  await page.goto(`http://127.0.0.1:${PORT}${scene.url}`);
+  await page.goto(`http://127.0.0.1:${PORT}${scene.url}${qualityQuery}`);
   await waitForArrival(page);
   const baseOrbit = await page.evaluate(
     () => window.__ATLAS_APP__?.host.cameraRig.getOrbit() ?? null

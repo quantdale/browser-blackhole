@@ -611,6 +611,88 @@ export function createCinematicDiscMaterial(
   };
 }
 
+export interface CinematicCausticOptions {
+  innerRadius: number;
+  outerRadius: number;
+  tint: readonly [number, number, number];
+  secondaryTint?: readonly [number, number, number];
+  seed: number;
+  gain?: number;
+  alpha?: number;
+  lobes?: number;
+}
+
+/**
+ * Illustrative spacetime-caustic annulus for vacuum compact binaries. It is
+ * explicitly not an accretion-disc or gas material: its gain is tied to the
+ * NR trajectory/amplitude by the destination and its color/arc variation only
+ * communicates lensing-like distortion around the source marker.
+ */
+export function createCinematicCausticMaterial(
+  options: CinematicCausticOptions
+): CinematicMaterialHandle {
+  const inner = uniform(toVector3(options.tint, [1, 1, 1]));
+  const outer = uniform(toVector3(options.secondaryTint ?? options.tint, [1, 1, 1]));
+  const gain = uniform(cinematicIntensity(options.gain ?? 1));
+  const alpha = Math.max(0, Math.min(1, options.alpha ?? 0.4));
+  const phase = uniform(0);
+  const seed = uniform(cinematicSeed(options.seed));
+  const lobeCount = Math.max(1, Math.floor(options.lobes ?? 3));
+  const radius = length(positionLocal.xz);
+  const radial = clamp(
+    radius.sub(options.innerRadius).div(Math.max(options.outerRadius - options.innerRadius, 1e-5)),
+    0,
+    1
+  );
+  const angle = atan(positionLocal.z, positionLocal.x);
+  const arcNoise = mx_fractal_noise_float(
+    vec3(
+      positionLocal.x.mul(3.4).add(seed.mul(0.011)),
+      positionLocal.y.mul(3.4).add(phase.mul(0.013)),
+      positionLocal.z.mul(3.4).sub(seed.mul(0.017))
+    ),
+    2,
+    2.0,
+    0.5
+  )
+    .mul(0.5)
+    .add(0.5);
+  const arc = sin(angle.mul(lobeCount).add(phase.mul(0.08)).add(arcNoise.mul(2.6)))
+    .abs()
+    .pow(4.2);
+  const edge = smoothstep(0, 0.16, radial).mul(oneMinus(smoothstep(0.76, 1, radial)));
+  const color = mix(inner, outer, radial).mul(arc.mul(0.82).add(0.18));
+
+  const material = new MeshBasicNodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.depthTest = false;
+  material.side = THREE.DoubleSide;
+  material.blending = THREE.AdditiveBlending;
+  material.userData['cinematicEmissive'] = true;
+  material.userData['cinematicRepresentation'] = 'vacuum-spacetime-caustic';
+  material.colorNode = vec4(color.mul(gain), edge.mul(alpha).mul(arc.mul(0.65).add(0.35)));
+
+  return {
+    material,
+    setTint(value) {
+      inner.value.copy(toVector3(value, [1, 1, 1]));
+    },
+    setSecondaryTint(value) {
+      outer.value.copy(toVector3(value, [1, 1, 1]));
+    },
+    setGain(value) {
+      gain.value = cinematicIntensity(value, 0);
+    },
+    setTime(value) {
+      phase.value = Number.isFinite(value) ? value : 0;
+    },
+    dispose() {
+      material.dispose();
+    }
+  };
+}
+
 export interface CinematicJetOptions {
   tint: readonly [number, number, number];
   secondaryTint?: readonly [number, number, number];

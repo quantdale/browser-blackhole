@@ -52,6 +52,7 @@ import { BLACK_HOLE_MERGER_DESCRIPTOR, BBM_DISCLOSURE } from './presets.js';
 import {
   CINEMATIC_DETAIL_BY_TIER,
   createCinematicBackdrop,
+  createCinematicCausticMaterial,
   createCinematicHalo,
   createCinematicSurfaceMaterial,
   type CinematicMaterialHandle,
@@ -86,6 +87,9 @@ const RING_OUTER_UNITS = 1.62;
 /** Illustrative soft-glow accent annulus around each component. */
 const GLOW_INNER_UNITS = 1.05;
 const GLOW_OUTER_UNITS = 3.1;
+/** Separate caustic-band radii for the cinematic vacuum-spacetime layer. */
+const CAUSTIC_INNER_UNITS = 1.7;
+const CAUSTIC_OUTER_UNITS = 2.45;
 /** Merger flash envelope peak gain (bloom carries it further). */
 const FLASH_PEAK_GAIN = 5;
 /** Trail ribbon arc behind the current position, NR M units. */
@@ -128,6 +132,11 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   let markerHaloA: THREE.Mesh | null = null;
   let markerHaloB: THREE.Mesh | null = null;
   let markerHaloVisual: CinematicMaterialHandle | null = null;
+  let causticA: THREE.Mesh | null = null;
+  let causticB: THREE.Mesh | null = null;
+  let causticVisual: CinematicMaterialHandle | null = null;
+  let wavefront: THREE.Mesh | null = null;
+  let wavefrontVisual: CinematicMaterialHandle | null = null;
   let flashVisual: CinematicMaterialHandle | null = null;
   let backdrop: CinematicBackdropHandle | null = null;
   let flash: THREE.Mesh | null = null;
@@ -176,6 +185,9 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     if (glowB !== null) glowB.visible = accentsWanted;
     if (markerHaloA !== null) markerHaloA.visible = accentsWanted;
     if (markerHaloB !== null) markerHaloB.visible = accentsWanted;
+    if (causticA !== null) causticA.visible = accentsWanted;
+    if (causticB !== null) causticB.visible = accentsWanted;
+    if (wavefront !== null) wavefront.visible = false;
     if (flash !== null) flash.visible = flash.visible && inspiralActive;
     if (trailA !== null) trailA.setVisible(trailsWanted);
     if (trailB !== null) trailB.setVisible(trailsWanted);
@@ -365,6 +377,63 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       4096
     );
 
+    // Vacuum-safe cinematic lensing language: these are caustic bands tied to
+    // each source trajectory, not matter. The validated Kerr pass remains the
+    // only remnant strong-field renderer; this layer is only used for the
+    // illustrative inspiral/merger presentation.
+    const causticGeometry = new THREE.RingGeometry(CAUSTIC_INNER_UNITS, CAUSTIC_OUTER_UNITS, 96, 1);
+    causticGeometry.rotateX(-Math.PI / 2);
+    const causticSurface = createCinematicCausticMaterial({
+      innerRadius: CAUSTIC_INNER_UNITS,
+      outerRadius: CAUSTIC_OUTER_UNITS,
+      tint: [0.28, 0.58, 1.0],
+      secondaryTint: [0.7, 0.25, 1.0],
+      seed: ctx.preset.seed ^ 0x8c3,
+      gain: 0,
+      alpha: 0.55,
+      lobes: 4
+    });
+    causticA = new THREE.Mesh(causticGeometry, causticSurface.material);
+    causticB = new THREE.Mesh(causticGeometry, causticSurface.material);
+    causticA.name = 'bbm-vacuum-caustic-a';
+    causticB.name = 'bbm-vacuum-caustic-b';
+    causticA.visible = false;
+    causticB.visible = false;
+    inspiralGroup.add(causticA, causticB);
+    causticVisual = causticSurface;
+    ctx.scope.track('geometry', causticGeometry, () => causticGeometry.dispose(), 96 * 2 * 32);
+    ctx.scope.track(
+      'material',
+      causticSurface.material,
+      () => causticSurface.material.dispose(),
+      4096
+    );
+
+    // A restrained expanding wavefront communicates the merger event as a
+    // spacetime disturbance. It never introduces gas/fire/accretion matter.
+    const wavefrontGeometry = new THREE.SphereGeometry(1, 40, 24);
+    const wavefrontSurface = createCinematicHalo({
+      tint: [0.3, 0.5, 1.0],
+      seed: ctx.preset.seed ^ 0x8d4,
+      gain: 0,
+      alpha: 0.14,
+      noiseScale: 2.8,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    wavefront = new THREE.Mesh(wavefrontGeometry, wavefrontSurface.material);
+    wavefront.name = 'bbm-vacuum-merger-wavefront';
+    wavefront.visible = false;
+    wavefront.renderOrder = 14;
+    destinationScene.add(wavefront);
+    wavefrontVisual = wavefrontSurface;
+    ctx.scope.track('geometry', wavefrontGeometry, () => wavefrontGeometry.dispose(), 40 * 24 * 32);
+    ctx.scope.track(
+      'material',
+      wavefrontSurface.material,
+      () => wavefrontSurface.material.dispose(),
+      4096
+    );
+
     trailA = ctx.services.ribbons.createRibbon({
       segments: TIER_TRAIL_SAMPLES[ctx.quality],
       // Wider and brighter than the original 0.055/0.012 hairline: the orbital
@@ -402,10 +471,10 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       massRg: ds.remnantMassOverM,
       spinDimensionless: ds.remnantChiZ,
       backgroundEquirect: null,
-      // Illustrative remnant presentation: a faint hot inner-glow proxy on
-      // the validated Kerr backend (labeled ILLUSTRATIVE — no post-merger
-      // accretion-disk physics is claimed).
-      diskEnabled: true,
+      // Vacuum BBH: the validated Kerr handoff carries no accretion matter.
+      // The inspiral/merger caustic and wavefront layers are presentation-only
+      // spacetime cues, never a hidden disk or gas proxy.
+      diskEnabled: false,
       diskInnerRg: 4,
       diskOuterRg: 14,
       qualityTier: ctx.quality
@@ -475,15 +544,25 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     lastTimeM = clampedT;
     backdrop?.setTime(clampedT * 0.01);
     backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
+    backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.46 : 0.22);
     const phase = phaseAt(clampedT, ds);
     lastPhase = phase;
     applySystemVisibility(phase);
+    sampleBbmAt(ds, Math.min(clampedT, 0), sample);
+    const amplitudeNormalized = Math.max(
+      0,
+      Math.min(1, strainAmplitudeAt(ds, clampedT) / Math.max(ds.h22PeakAmplitude, 1e-12))
+    );
+    const sourceSeparation = Math.hypot(
+      sample.ax - sample.bx,
+      sample.ay - sample.by,
+      sample.az - sample.bz
+    );
 
     // Markers converge along the reduced coordinate paths; positions hold at
     // the merger anchor afterwards (no extrapolation beyond data support).
     const markersActive = phase === 'inspiral' || phase === 'merger';
     if (markersActive) {
-      sampleBbmAt(ds, Math.min(clampedT, 0), sample);
       if (markerA !== null && markerB !== null) {
         markerA.position.set(sample.ax, sample.ay, sample.az);
         markerB.position.set(sample.bx, sample.by, sample.bz);
@@ -493,11 +572,42 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
         if (glowB !== null) glowB.position.copy(markerB.position);
         if (markerHaloA !== null) markerHaloA.position.copy(markerA.position);
         if (markerHaloB !== null) markerHaloB.position.copy(markerB.position);
+        if (causticA !== null && causticB !== null) {
+          causticA.position.copy(markerA.position);
+          causticB.position.copy(markerB.position);
+          const causticScale = 0.82 + Math.min(0.5, Math.max(0, 1 - sourceSeparation / 10));
+          causticA.scale.setScalar(causticScale);
+          causticB.scale.setScalar(causticScale);
+        }
       }
     }
     uMarkerGain.value = markersActive ? 1 : 0;
     markerHaloVisual?.setGain(markersActive ? 0.65 : 0);
     markerHaloVisual?.setTime(clampedT * 0.01);
+    const cinematicCaustic =
+      markersActive &&
+      (stateValue?.illustrativeLensing ?? true) &&
+      ctx.experienceMode === 'cinematic' &&
+      ctx.workBudget.environmentDetail >= 0.5;
+    const accentsAllowed = markersActive && (stateValue?.illustrativeLensing ?? true);
+    if (ringA !== null) ringA.visible = accentsAllowed && !cinematicCaustic;
+    if (ringB !== null) ringB.visible = accentsAllowed && !cinematicCaustic;
+    if (causticA !== null) causticA.visible = cinematicCaustic;
+    if (causticB !== null) causticB.visible = cinematicCaustic;
+    causticVisual?.setGain(cinematicCaustic ? 0.9 + amplitudeNormalized * 0.55 : 0);
+    causticVisual?.setTime(clampedT * 0.04);
+
+    const mergerWave =
+      ctx.experienceMode === 'cinematic' &&
+      (phase === 'merger' || phase === 'ringdown') &&
+      (stateValue?.illustrativeLensing ?? true);
+    if (wavefront !== null) {
+      wavefront.visible = mergerWave;
+      wavefront.position.set(0, 0, 0);
+      wavefront.scale.setScalar(2.5 + Math.min(34, Math.max(0, clampedT) * 0.35));
+    }
+    wavefrontVisual?.setGain(mergerWave ? Math.min(1.8, amplitudeNormalized * 1.2) : 0);
+    wavefrontVisual?.setTime(clampedT * 0.025);
 
     // Merger flash: exponential-decay envelope anchored at t=0 (the peak).
     const flashTau = clampedT <= 0 ? 0 : clampedT / Math.max(ds.mergerEndM, 1e-6);
@@ -521,7 +631,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     debug['previousPhase'] = lastPhase;
     debug['timeM'] = clampedT;
     debug['timeDisplay'] = formatBbmTime(clampedT);
-    debug['amplitudeNormalized'] = strainAmplitudeAt(ds, clampedT) / ds.h22PeakAmplitude;
+    debug['amplitudeNormalized'] = amplitudeNormalized;
     debug['separationM'] = Math.hypot(
       sample.ax - sample.bx,
       sample.ay - sample.by,
@@ -534,6 +644,13 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     debug['kerrMassRg'] = ds.remnantMassOverM;
     debug['datasetId'] = ds.assetId;
     debug['tier'] = lastTier;
+    debug['lensingRepresentation'] = cinematicCaustic
+      ? 'trajectory-tied-vacuum-caustics'
+      : phase === 'ringdown' || phase === 'remnant'
+        ? 'validated-kerr-remnant'
+        : 'schematic-marker-fallback';
+    debug['wavefrontRepresentation'] = mergerWave ? 'illustrative-spacetime-wavefront' : 'off';
+    debug['remnantDiskEnabled'] = false;
   }
 
   /**
@@ -562,7 +679,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       massRg: dataset.remnantMassOverM,
       spinDimensionless: dataset.remnantChiZ,
       centerRg: [0, 0, 0],
-      diskEnabled: true,
+      diskEnabled: false,
       diskInnerRg: 4,
       diskOuterRg: 14,
       maxSteps: TIER_KERR_STEPS[lastTier],
@@ -606,6 +723,11 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     markerHaloA = null;
     markerHaloB = null;
     markerHaloVisual = null;
+    causticA = null;
+    causticB = null;
+    causticVisual = null;
+    wavefront = null;
+    wavefrontVisual = null;
     flashVisual = null;
     backdrop = null;
     flash = null;

@@ -82,7 +82,9 @@ test.describe('Volumetrics V2 detail and composition', () => {
         const rect = document.getElementById('viewport')?.getBoundingClientRect();
         if (rect) host.handleResize(rect.width, rect.height);
         const volume = host.services.volumes.createVolume({
-          bounds: { kind: 'sphere', center: [0, 0, 0], radius: 6 },
+          // The large probe sphere deliberately contains the auto-framed
+          // camera, exercising the camera-inside-volume path.
+          bounds: { kind: 'sphere', center: [0, 0, 0], radius: 2000 },
           density: () => 0.35,
           baseMaxSteps: 24,
           halfResolution: true,
