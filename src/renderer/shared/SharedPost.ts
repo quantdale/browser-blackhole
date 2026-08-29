@@ -303,6 +303,10 @@ export class SharedPost implements ISharedPost {
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
   }
 
+  getTemporalJitter(): [number, number] {
+    return this.temporal.getJitter();
+  }
+
   resolveTemporal(camera: THREE.PerspectiveCamera): void {
     if (this.hdrTarget === null) return;
     this.temporal.resolve(this.hdrTarget.texture, camera);

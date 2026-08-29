@@ -54,6 +54,7 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
   NodeMaterial,
+  Vector2,
   Vector3,
   Vector4
 } from 'three/webgpu';
@@ -262,6 +263,12 @@ function readVec3Components(raw: unknown): [number, number, number] | null {
   return null;
 }
 
+function readVec2Components(raw: unknown): [number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const c = [Number(raw[0]), Number(raw[1])];
+  return c.every(Number.isFinite) ? (c as [number, number]) : null;
+}
+
 // ---------------------------------------------------------------------------
 // Material factory
 // ---------------------------------------------------------------------------
@@ -305,6 +312,7 @@ export function createKerrLensingMaterial(
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
   const uEnvironmentDetail = uniform(0);
+  const uTemporalJitterNdc = uniform(new Vector2());
   const uDebugMode = uniform(0);
   // --- M10 observer-frame block (OBSERVER_FRAME_ADR §5) ---
   const uObserverF = uniform(0);
@@ -378,12 +386,14 @@ export function createKerrLensingMaterial(
   // --- World-ray reconstruction (NDC convention of shaders/cameraRayMath.ts):
   // --- dir = normalize(forward + right*x*tanHalfFovY*aspect + up*y*tanHalfFovY)
   const legacyRayDir = normalize(
-    uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
+    uForward
+      .add(uRight.mul(vX.add(uTemporalJitterNdc.x).mul(uTanHalfFovY).mul(uAspect)))
+      .add(uUp.mul(vY.add(uTemporalJitterNdc.y).mul(uTanHalfFovY)))
   );
 
   // --- M10 observer-frame local components (OBSERVER_FRAME_ADR §5) ---
-  const obsNx = vX.mul(uTanHalfFovY).mul(uAspect);
-  const obsNy = vY.mul(uTanHalfFovY);
+  const obsNx = vX.add(uTemporalJitterNdc.x).mul(uTanHalfFovY).mul(uAspect);
+  const obsNy = vY.add(uTemporalJitterNdc.y).mul(uTanHalfFovY);
   const obsNz = float(1);
   const obsLen = sqrt(obsNx.mul(obsNx).add(obsNy.mul(obsNy)).add(obsNz.mul(obsNz)));
   const nxObs = obsNx.div(obsLen);
@@ -1102,6 +1112,8 @@ export function createKerrLensingMaterial(
       if (environmentDetail !== null && environmentDetail >= 0) {
         uEnvironmentDetail.value = Math.min(1, environmentDetail);
       }
+      const jitter = readVec2Components(state['temporalJitterNdc']);
+      if (jitter) uTemporalJitterNdc.value.set(jitter[0], jitter[1]);
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 

@@ -831,6 +831,7 @@ export function createNeutronStarModule(): PhenomenonModule {
       surfaceRadiusRg: rt.radiusKm / rgKm,
       maxSteps: nsQualityTierStepBudget(lastQualityTier),
       backgroundIntensity: 1,
+      temporalJitterNdc: ctx.temporalJitterNdc ?? [0, 0],
       debugMode: surfaceDebugOverride ? 1 : 0
     });
 

@@ -103,4 +103,14 @@ option to move stable opaque materials to MRT after evidence warrants it.
   production target is ResourceScope-owned and reused across frames.
 - Final production stage order and selective-source state: PASS in
   `tests/browser/shared-post-v2.spec.ts` on WebGPU/WebGL2; the temporal stage
-  is an explicit `off` placeholder until VF3 is implemented.
+  is enabled at High/Ultra and disabled at Low/Medium by the global budget;
+  `tests/browser/temporal-stability.spec.ts` reaches the bounded High-tier
+  history cap on both backends.
+
+Depth note: the first V2 volume prototype proved that binding the active
+SharedPost depth attachment as a texture during the same destination render is
+invalid on WebGPU (`TextureBinding|RenderAttachment` usage conflict). The
+accepted implementation now stages that depth into two FP16 targets after the
+destination draw and feeds the previous copy to the next frame. The first
+frame/discontinuity fallback remains alpha-guided and is covered by
+`tests/browser/volumetrics-v2.spec.ts` on WebGPU/WebGL2.

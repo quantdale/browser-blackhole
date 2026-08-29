@@ -49,7 +49,13 @@
  *   NEVER black — so numerical failure cannot masquerade as shadow or sky.
  */
 
-import { BufferGeometry, Float32BufferAttribute, NodeMaterial, Vector3 } from 'three/webgpu';
+import {
+  BufferGeometry,
+  Float32BufferAttribute,
+  NodeMaterial,
+  Vector2,
+  Vector3
+} from 'three/webgpu';
 import type { Node } from 'three/webgpu';
 import {
   Break,
@@ -253,6 +259,12 @@ function readVec3Components(raw: unknown): [number, number, number] | null {
   return null;
 }
 
+function readVec2Components(raw: unknown): [number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const c = [Number(raw[0]), Number(raw[1])];
+  return c.every(Number.isFinite) ? (c as [number, number]) : null;
+}
+
 function applySpotState(slot: SpotUniforms, raw: Record<string, unknown> | undefined): void {
   if (!raw) return;
   const dir = readVec3Components(raw['direction']);
@@ -300,6 +312,7 @@ export function createNeutronStarSurfaceMaterial(params: {
   const uEscapeRadiusRg = uniform(128);
   const uBackgroundIntensity = uniform(1);
   const uEnvironmentDetail = uniform(0);
+  const uTemporalJitterNdc = uniform(new Vector2());
   const uDebugMode = uniform(0);
 
   // Emission block (mirrors the retired mesh graph's uniform semantics).
@@ -361,7 +374,9 @@ export function createNeutronStarSurfaceMaterial(params: {
 
   // World-ray reconstruction (+x right, +y up, pixel-center exact).
   const rayDir = normalize(
-    uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
+    uForward
+      .add(uRight.mul(vX.add(uTemporalJitterNdc.x).mul(uTanHalfFovY).mul(uAspect)))
+      .add(uUp.mul(vY.add(uTemporalJitterNdc.y).mul(uTanHalfFovY)))
   );
 
   // ---------------------------------------------------------------------------
@@ -674,6 +689,8 @@ export function createNeutronStarSurfaceMaterial(params: {
       if (environmentDetail !== null && environmentDetail >= 0) {
         uEnvironmentDetail.value = Math.min(1, environmentDetail);
       }
+      const jitter = readVec2Components(state['temporalJitterNdc']);
+      if (jitter) uTemporalJitterNdc.value.set(jitter[0], jitter[1]);
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 

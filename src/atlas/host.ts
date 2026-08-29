@@ -238,6 +238,10 @@ class DeferredSharedPost implements ISharedPost {
     this.inner?.beginTemporalFrame(camera);
   }
 
+  getTemporalJitter(): [number, number] {
+    return this.inner?.getTemporalJitter() ?? [0, 0];
+  }
+
   resolveTemporal(camera: import('three').PerspectiveCamera): void {
     this.inner?.resolveTemporal(camera);
   }

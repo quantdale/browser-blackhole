@@ -474,6 +474,7 @@ export class BlackHoleModule implements PhenomenonModule {
         ...baseState,
         ...observerPayload.stateKeys
       };
+      lensingState['temporalJitterNdc'] = ctx.temporalJitterNdc ?? [0, 0];
       const obsMode = this.controls.observer.mode;
       const movingMode = obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
       if (

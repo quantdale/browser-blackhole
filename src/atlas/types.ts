@@ -523,6 +523,7 @@ export interface ILensingService {
   createThinLensDisplacement(massRg: number, impactParameterScale: number): TslDensityFn;
   /** Set the additive cinematic environment contribution for live passes. */
   setEnvironmentDetail(detail: number): void;
+  getDebugSnapshot?(): Record<string, unknown>;
   dispose(): void;
 }
 
@@ -736,6 +737,8 @@ export interface ISharedPost {
   invalidateTemporal?(reason: string): void;
   /** Begin/resolve/end a jittered temporal frame around destination rendering. */
   beginTemporalFrame?(camera: THREE.PerspectiveCamera): void;
+  /** Current pixel-space jitter for destinations that reconstruct rays manually. */
+  getTemporalJitter?(): [number, number];
   resolveTemporal?(camera: THREE.PerspectiveCamera): void;
   clearTemporalOutput?(): void;
   endTemporalFrame?(camera: THREE.PerspectiveCamera): void;
@@ -992,6 +995,8 @@ export interface RenderContext {
   scene: THREE.Scene;
   /** Shared HDR target the destination renders into (may be null pre-init). */
   hdrTarget: THREE.Texture | null;
+  /** Deterministic pixel jitter expressed in NDC for fullscreen ray passes. */
+  temporalJitterNdc?: [number, number];
 }
 
 export interface ExitContext {

@@ -541,7 +541,10 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
    * contract as the black-hole destination's lensing state; scene units are
    * total-mass M and the remnant parameters are SOURCE-DERIVED).
    */
-  function pushKerrUniforms(camera: THREE.PerspectiveCamera): void {
+  function pushKerrUniforms(
+    camera: THREE.PerspectiveCamera,
+    temporalJitterNdc?: [number, number]
+  ): void {
     if (kerrPass === null || dataset === null) return;
     camera.updateMatrixWorld();
     const e = camera.matrixWorld.elements;
@@ -568,7 +571,8 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       // background they reach identically at 32 M, which pushed a large
       // fraction of the frame into the max-steps failure class.
       escapeRadiusRg: 32,
-      backgroundIntensity: 1
+      backgroundIntensity: 1,
+      temporalJitterNdc: temporalJitterNdc ?? [0, 0]
     });
   }
 
@@ -576,7 +580,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     if (ctx.scene !== null && ctx.camera !== null) {
       backdrop?.syncToCamera(ctx.camera);
       if (remnantGroup !== null && remnantGroup.visible) {
-        pushKerrUniforms(ctx.camera);
+        pushKerrUniforms(ctx.camera, ctx.temporalJitterNdc);
       }
       ctx.renderer.render(ctx.scene, ctx.camera);
     }

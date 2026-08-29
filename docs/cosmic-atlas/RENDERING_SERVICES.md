@@ -99,6 +99,21 @@ Support:
 
 No one `Mesh` object per particle.
 
+ParticleService V2 exposes bounded representation profiles rather than
+forcing every phenomenon through one sprite treatment:
+
+- `star` for compact stellar points;
+- `ejecta-streak` for velocity-stretched supernova/kilonova material;
+- `debris-streak` for motion-aligned TDE debris;
+- `dust-clump` for soft clumps; and
+- `emissive-core` for compact bright knots.
+
+The generic-soft profile remains the compatibility fallback. Velocity is
+projected into camera space for streak orientation, sizes remain explicit
+screen-pixel inputs, per-particle brightness is seeded, and emissive gains
+stay in linear HDR. Population/profile quality is globally bounded by
+`VisualWorkBudget`.
+
 ## 4. VolumeService
 
 ### Use cases
@@ -151,6 +166,15 @@ Outputs:
 - depth-aware upsample;
 - cap expensive shadow/self-absorption.
 
+The current V2 implementation keeps the full loop bounded at the configured
+compile-time ceiling, adds deterministic macro/detail composition (octaves,
+ridged filaments, clumps, and bounded domain warp), optional gradient/front
+shading and approximate extinction taps, and preserves early-alpha
+termination. A depth-aware bilateral composite samples a staged previous-frame
+scene-depth copy when available; its first-frame/discontinuity fallback is the
+alpha-guided filter. It is an illustrative single-scattering approximation,
+not a multi-scattering solver.
+
 ## 5. RibbonService
 
 ### Use cases
@@ -180,6 +204,19 @@ Quality controls:
 - tube radial segments;
 - screen-space width threshold;
 - distance culling.
+
+## 5a. StrandService
+
+High/Ultra TDE streams use `StrandService` while RibbonService remains the
+lower-tier/debug fallback. The service accepts the authoritative world-space
+spine and never moves its centerline. It transports a stable local frame,
+builds a bounded low-sided tube with variable elliptical cross-section,
+applies a radial opacity profile, deterministic longitudinal color/temperature
+variation, and seeded clumping. Quality is a global scalar: below the V2
+threshold the destination switches back to its existing ribbon handles.
+
+The tube is a presentation representation, not a hydrodynamic reconstruction;
+the TDE model and its spine/debris-family tests remain authoritative.
 
 ## 6. TrajectoryService
 

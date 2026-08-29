@@ -546,6 +546,11 @@ export class SharedRendererKernel implements IRendererKernel {
           const hdrTarget = this.resolveHdrTargetOrDegraded(hdrTexture);
           const camera = this.requireCamera();
           this.options.post.beginTemporalFrame?.(camera);
+          const jitter = this.options.post.getTemporalJitter?.() ?? [0, 0];
+          const jitterNdc: [number, number] = [
+            (2 * jitter[0]) / Math.max(1, hdrTarget?.width ?? 1),
+            (2 * jitter[1]) / Math.max(1, hdrTarget?.height ?? 1)
+          ];
 
           // The union RendererLike spans WebGPURenderer (accepts base RenderTarget)
           // and WebGLRenderer (whose d.ts narrows to WebGLRenderTarget); at runtime
@@ -557,7 +562,8 @@ export class SharedRendererKernel implements IRendererKernel {
                 renderer,
                 camera,
                 scene: plan.scene,
-                hdrTarget: hdrTexture
+                hdrTarget: hdrTexture,
+                temporalJitterNdc: jitterNdc
               };
               destination.render(renderContext);
               destinationDrawn = true;

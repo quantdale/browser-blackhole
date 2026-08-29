@@ -34,6 +34,7 @@ import {
   BufferGeometry,
   Float32BufferAttribute,
   NodeMaterial,
+  Vector2,
   Vector3,
   Vector4
 } from 'three/webgpu';
@@ -184,6 +185,12 @@ function readVec3Components(raw: unknown): [number, number, number] | null {
   return null;
 }
 
+function readVec2Components(raw: unknown): [number, number] | null {
+  if (!Array.isArray(raw) || raw.length !== 2) return null;
+  const c = [Number(raw[0]), Number(raw[1])];
+  return c.every(Number.isFinite) ? (c as [number, number]) : null;
+}
+
 const K1 = DEFAULT_AXIS_X.xKnots[1] as number;
 const K2 = DEFAULT_AXIS_X.xKnots[2] as number;
 const K3 = DEFAULT_AXIS_X.xKnots[3] as number;
@@ -210,6 +217,7 @@ export function createLutLensingMaterial(
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
   const uEnvironmentDetail = uniform(0);
+  const uTemporalJitterNdc = uniform(new Vector2());
   const uDebugMode = uniform(0);
   const uLutEnabled = uniform(0);
   const uLutDebugStatus = uniform(0);
@@ -308,7 +316,9 @@ export function createLutLensingMaterial(
   const vX = varying(positionAttr.x);
   const vY = varying(positionAttr.y);
   const legacyRayDir = normalize(
-    uForward.add(uRight.mul(vX.mul(uTanHalfFovY).mul(uAspect))).add(uUp.mul(vY.mul(uTanHalfFovY)))
+    uForward
+      .add(uRight.mul(vX.add(uTemporalJitterNdc.x).mul(uTanHalfFovY).mul(uAspect)))
+      .add(uUp.mul(vY.add(uTemporalJitterNdc.y).mul(uTanHalfFovY)))
   );
 
   const relPos = uCamPos.sub(uCenter);
@@ -320,8 +330,8 @@ export function createLutLensingMaterial(
 
   // --- M10 observer-frame photon initialization (OBSERVER_FRAME_ADR §5) —
   // mirrors schwarzschildIntegrator exactly (shared uniform contract).
-  const obsNx = vX.mul(uTanHalfFovY).mul(uAspect);
-  const obsNy = vY.mul(uTanHalfFovY);
+  const obsNx = vX.add(uTemporalJitterNdc.x).mul(uTanHalfFovY).mul(uAspect);
+  const obsNy = vY.add(uTemporalJitterNdc.y).mul(uTanHalfFovY);
   const obsNz = float(1);
   const obsLen = sqrt(obsNx.mul(obsNx).add(obsNy.mul(obsNy)).add(obsNz.mul(obsNz)));
   const nxO = obsNx.div(obsLen);
@@ -949,6 +959,8 @@ export function createLutLensingMaterial(
       if (environmentDetail !== null && environmentDetail >= 0) {
         uEnvironmentDetail.value = Math.min(1, environmentDetail);
       }
+      const jitter = readVec2Components(state['temporalJitterNdc']);
+      if (jitter) uTemporalJitterNdc.value.set(jitter[0], jitter[1]);
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 

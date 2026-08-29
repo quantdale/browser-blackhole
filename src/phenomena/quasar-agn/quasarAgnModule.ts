@@ -735,7 +735,10 @@ export class QuasarAgnModule implements PhenomenonModule {
    * called `setUniformsFromState`, so the advertised "DIRECT GR reuse" view was
    * a flat purple wash with no black hole in it.
    */
-  private applyLensingCamera(camera: RenderContext['camera']): void {
+  private applyLensingCamera(
+    camera: RenderContext['camera'],
+    temporalJitterNdc?: [number, number]
+  ): void {
     if (this.lensing === null || this.groups.inner?.visible !== true) return;
     this.lensing.setUniformsFromState(
       lensingCameraUniformState(camera, {
@@ -745,7 +748,8 @@ export class QuasarAgnModule implements PhenomenonModule {
         diskOuterRg: 18,
         // The accretion disc brightness follows the same continuum factor as
         // the corona; the pass exposes it as a background/emission scale.
-        backgroundIntensity: 1
+        backgroundIntensity: 1,
+        temporalJitterNdc: temporalJitterNdc ?? [0, 0]
       })
     );
   }
@@ -753,7 +757,7 @@ export class QuasarAgnModule implements PhenomenonModule {
   render(ctx: RenderContext): void {
     if (this.disposed || this.scene === null || this.root === null) return;
     this.backdrop?.syncToCamera(ctx.camera);
-    this.applyLensingCamera(ctx.camera);
+    this.applyLensingCamera(ctx.camera, ctx.temporalJitterNdc);
     ctx.renderer.render(this.scene, ctx.camera);
   }
 

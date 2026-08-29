@@ -34,6 +34,14 @@ feeds `SharedPost.Emissive`; direct ray passes without authored tags use the
 reported legacy scene-threshold fallback. This fallback is compatibility
 behavior, not the selective path.
 
+Volumetrics V2 uses an alpha-guided bilateral upsample and, when a volume opts
+in, a staged previous-frame depth copy. SharedPost copies the completed scene
+depth into two ResourceScope-owned FP16 targets after the destination draw;
+the next frame samples the read target, so no pass samples a texture while it
+is simultaneously a writable render attachment. If the staged copy is not yet
+valid (first frame or a discontinuity), the service conservatively falls back
+to the alpha-only filter.
+
 A full-screen triangle avoids the diagonal interpolation seam/extra vertex work of a two-triangle quad and keeps the ray shader's invocation mapping simple.
 
 ## 2. Camera ray reconstruction
@@ -44,7 +52,13 @@ Early tests should render a deterministic direction/color diagnostic before any 
 
 ## 3. Environment
 
-Escaped rays sample a celestial environment using their final asymptotic direction. Start with a deterministic procedural star field or a properly licensed static environment. The background needs high-frequency structure because gravitational lensing is much easier to perceive when stars/features are present.
+Escaped rays sample a celestial environment using their final asymptotic
+direction. The scientific sampler remains the locked sparse cube-cell field.
+Cinematic mode adds a separately budgeted deterministic layer: diffuse
+galactic structure, a dense unresolved stellar population with warm/cool
+temperature colors, and restrained dust/nebular modulation. The additive layer
+is driven by `VisualWorkBudget.environmentDetail`, has no wall-clock input, and
+is zero in Scientific/Debug mode so existing parity images remain comparable.
 
 Never couple star generation to frame order; deterministic seeds are required for visual regression tests.
 
@@ -67,7 +81,7 @@ Higher-order disk images should emerge from ray geometry, not be duplicated manu
 
 Maintain scene radiance in HDR (prefer half-float render targets where supported/appropriate). Display chain:
 
-`physical radiance -> temporal reconstruction -> bloom -> exposure/tone mapping -> output color space`
+`physical radiance -> temporal reconstruction -> selective bloom -> exposure/tone mapping -> output color space`
 
 Every intermediate that carries emissive volume radiance is part of the HDR
 contract, not only the final SharedPost target. SharedPost and emissive

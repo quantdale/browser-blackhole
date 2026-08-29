@@ -114,6 +114,7 @@ export function lensingCameraUniformState(
     escapeRadiusRg?: number;
     backgroundIntensity?: number;
     centerRg?: [number, number, number];
+    temporalJitterNdc?: [number, number];
   }
 ): Record<string, unknown> {
   camera.updateMatrixWorld();
@@ -135,13 +136,15 @@ export function lensingCameraUniformState(
     diskInnerRg: params.diskInnerRg,
     diskOuterRg: params.diskOuterRg,
     escapeRadiusRg: params.escapeRadiusRg ?? DEFAULT_ESCAPE_RADIUS_RG,
-    backgroundIntensity: params.backgroundIntensity ?? 1
+    backgroundIntensity: params.backgroundIntensity ?? 1,
+    temporalJitterNdc: params.temporalJitterNdc ?? [0, 0]
   };
 }
 
 export class LensingService implements ILensingService {
   /** Live passes, so dispose() releases every created GPU resource. */
   private readonly passes: BlackHoleLensingPassHandle[] = [];
+  private environmentDetail = 0;
 
   /**
    * Full Schwarzschild backwards-ray-tracing pass (black-hole destination).
@@ -250,7 +253,16 @@ export class LensingService implements ILensingService {
   /** Apply the bounded cinematic environment contribution to every live pass. */
   setEnvironmentDetail(detail: number): void {
     const value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
+    this.environmentDetail = value;
     for (const pass of this.passes) pass.setEnvironmentDetail(value);
+  }
+
+  getDebugSnapshot(): Record<string, unknown> {
+    return {
+      environmentDetail: this.environmentDetail,
+      livePassCount: this.passes.length,
+      environmentLayer: 'cinematic-diffuse+dense-stars+dust'
+    };
   }
 
   /**
