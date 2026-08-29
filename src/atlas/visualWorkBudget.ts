@@ -73,7 +73,12 @@ const BASE_BY_TIER: Readonly<Record<QualityTier, Omit<VisualWorkBudget, 'tier' |
       strandQuality: 1,
       environmentDetail: 1,
       bloomResolutionScale: 0.75,
-      glareEnabled: true,
+      // A separate glare/PSF kernel is intentionally rejected for this
+      // campaign: selective FP16 bloom supplies the measured highlight gain,
+      // while an additional kernel adds cost and risks washing out strong-
+      // field silhouettes. Keep the budget flag truthful until a dedicated
+      // glare spike is accepted on both backends.
+      glareEnabled: false,
       lensingSupersampleQuality: 1
     }
   };

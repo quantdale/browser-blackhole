@@ -88,10 +88,12 @@ import {
   CINEMATIC_DETAIL_BY_TIER,
   createCinematicBackdrop,
   createCinematicHalo,
+  createCinematicShellMaterial,
   createCinematicSurfaceMaterial,
   type CinematicBackdropHandle,
   type CinematicMaterialHandle
 } from '../../renderer/shared/CinematicPrimitives.js';
+import { AutoFramer } from '../../renderer/shared/AutoFramer.js';
 
 // ---------------------------------------------------------------------------
 // Presentation constants (disclosed)
@@ -103,12 +105,31 @@ const FLASH_DURATION_S = 0.02;
 const FLASH_PEAK_GAIN = 6;
 /** Star surface tint (hot NS photosphere proxy), linear RGB. */
 const STAR_TINT = kelvinToLinearRgb(6e5);
+/**
+ * Cinematic-only multiplier for the reduced kilonova luminosity proxy. The
+ * model's luminosity stays in the debug/Scientific path; this bounded display
+ * lift keeps the cooling ejecta readable after tone mapping at High/Ultra,
+ * where the same proxy is intentionally kept below display white.
+ */
+const KILONOVA_CINEMATIC_RADIANCE_GAIN = 4;
 /** Trail ribbon length (samples of closed-form model history). */
 const TRAIL_SAMPLES = 96;
 /** Trail arc span behind the current phase, fraction of the last orbit. */
 const TRAIL_ORBITS = 1.25;
 /** Ejecta volume bounds safety margin over the capped shell radius. */
 const BOUNDS_MARGIN = 1.15;
+
+/**
+ * Cinematic framing for the presentation-compressed ejecta shell. The
+ * physical binary is only a few scene units across, while the disclosed
+ * post-merger presentation shell grows to tens of units. Keeping the preset
+ * arrival distance for both states places the camera inside the volume once
+ * the kilonova is visible. This is a presentation camera policy; it never
+ * changes the inspiral/ejecta model or the observer state.
+ */
+const AUTO_FRAME_MIN_UNITS = 6;
+const AUTO_FRAME_MAX_UNITS = 900;
+const AUTO_FRAME_MARGIN = 2.2;
 
 /** Compile-time detail ceilings; live work budget may reduce these branches. */
 const TIER_DETAIL_OCTAVES: Record<QualityTier, number> = {
@@ -154,6 +175,8 @@ export function createCompactMergerModule(): PhenomenonModule {
   let remnantVisual: CinematicMaterialHandle | null = null;
   let remnantHaloVisual: CinematicMaterialHandle | null = null;
   let remnantHalo: THREE.Mesh | null = null;
+  let ejectaShellMesh: THREE.Mesh | null = null;
+  let ejectaShellVisual: CinematicMaterialHandle | null = null;
   let backdrop: CinematicBackdropHandle | null = null;
   let jetGroup: THREE.Group | null = null;
   let volumeHandle: VolumeHandle | null = null;
@@ -164,6 +187,12 @@ export function createCompactMergerModule(): PhenomenonModule {
   const trailPoints2: THREE.Vector3[] = [];
   let lastTrailTime = Number.NaN;
   let lastTrailCount = 0;
+  const autoFramer = new AutoFramer({
+    margin: AUTO_FRAME_MARGIN,
+    minUnits: AUTO_FRAME_MIN_UNITS,
+    maxUnits: AUTO_FRAME_MAX_UNITS,
+    lerpPerSecond: 3.2
+  });
 
   function assertReady(): { resolved: ResolvedMergerScenario; state: CompactMergerPublicState } {
     if (disposed || resolved === null || stateValue === null) {
@@ -456,6 +485,45 @@ export function createCompactMergerModule(): PhenomenonModule {
     volumeHandle = volume;
     abortGuard('volume');
 
+    // Stable silhouette companion for the half-resolution V2 volume. The
+    // volume remains the source of the anisotropic density/emission field;
+    // this thin, structured skin only keeps the expanding shell legible when
+    // its cool late-time luminosity is below a display pixel. It is disabled
+    // in Scientific mode and is disclosed as presentation geometry.
+    const ejectaShellGeometry = new THREE.SphereGeometry(
+      1,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const ejectaShellSurface = createCinematicShellMaterial({
+      tint: [1.0, 0.62, 0.28],
+      secondaryTint: [0.8, 0.16, 0.06],
+      seed: ctx.preset.seed ^ 0x5e7,
+      gain: 0,
+      alpha: 0.34,
+      structureScale: 5.2,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    ejectaShellMesh = new THREE.Mesh(ejectaShellGeometry, ejectaShellSurface.material);
+    ejectaShellMesh.name = 'compact-merger-ejecta-structured-skin';
+    ejectaShellMesh.renderOrder = 11;
+    ejectaShellMesh.visible = false;
+    destinationScene.add(ejectaShellMesh);
+    ejectaShellVisual = ejectaShellSurface;
+    ctx.scope.track(
+      'geometry',
+      ejectaShellGeometry,
+      () => ejectaShellGeometry.dispose(),
+      detail.haloSegments.width * detail.haloSegments.height * 32
+    );
+    ctx.scope.track(
+      'material',
+      ejectaShellSurface.material,
+      () => ejectaShellSurface.material.dispose(),
+      4096
+    );
+    abortGuard('ejecta-skin');
+
     // --- GPU ejecta particles (shared ParticleService) ------------------------
     ctx.reportProgress(0.75, 'Seeding ejecta particles');
     const plan = buildEjectaParticlePlan(res, TIER_PARTICLE_CAPACITY[ctx.quality]);
@@ -551,6 +619,10 @@ export function createCompactMergerModule(): PhenomenonModule {
     // Arrive PLAYING unless something explicitly paused the clock (viewer or
     // golden harness): paused arrival left the inspiral frozen.
     ctx.services.time.resumeUnlessExplicitlyPaused();
+    autoFramer.reset();
+    // The shell plateau and the inspiral separation both fit this envelope;
+    // the wider range is only for the cinematic camera policy below.
+    ctx.services.cameraRig.setDistanceLimits(AUTO_FRAME_MIN_UNITS, AUTO_FRAME_MAX_UNITS);
   }
 
   /** Linear-HDR radiance multipliers for the photospheres (presentation). */
@@ -679,7 +751,9 @@ export function createCompactMergerModule(): PhenomenonModule {
     const kilonova = kilonovaSampleAt(t, res);
     uVolumeRadius.value = Math.max(shell, res.contactSeparationUnits * 0.6);
     uVolumeWidth.value = Math.max(0.35, shell * 0.22);
-    uVolumeGain.value = kilonova.luminosity;
+    uVolumeGain.value =
+      kilonova.luminosity *
+      (ctx.experienceMode === 'cinematic' ? KILONOVA_CINEMATIC_RADIANCE_GAIN : 1);
     uVolumeTint.value.set(kilonova.tint[0], kilonova.tint[1], kilonova.tint[2]);
     uVolumePolar.value =
       res.ejectaScenario === 'polar-enhanced'
@@ -690,6 +764,21 @@ export function createCompactMergerModule(): PhenomenonModule {
     const volumeVisible = tau > 0;
     volumeHandle?.setVisible(volumeVisible);
     volumeHandle?.setStepScale(ctx.workBudget.volumeActiveSteps);
+    if (ejectaShellMesh !== null && ejectaShellVisual !== null) {
+      const tint = kilonova.tint;
+      ejectaShellMesh.scale.setScalar(Math.max(uVolumeRadius.value * 1.012, 0.1));
+      ejectaShellMesh.visible = volumeVisible && ctx.experienceMode === 'cinematic';
+      ejectaShellVisual.setTint(tint);
+      ejectaShellVisual.setSecondaryTint([
+        tint[0],
+        Math.max(0.04, tint[1] * 0.35),
+        Math.max(0.02, tint[2] * 0.16)
+      ]);
+      ejectaShellVisual.setGain(
+        ejectaShellMesh.visible ? Math.min(2.4, 1.25 + kilonova.luminosity * 1.6) : 0
+      );
+      ejectaShellVisual.setTime(t * 0.04);
+    }
 
     // --- jet (scenario + phase gated; viewing response = presentation gain) --
     // Active during the jet phase; fades through kilonova; gone by afterglow.
@@ -729,6 +818,26 @@ export function createCompactMergerModule(): PhenomenonModule {
     trail2?.setVisible(trailsVisible);
     if (trailsVisible) updateTrails(ctx);
 
+    // --- cinematic camera framing --------------------------------------------
+    // The compact binary arrives at a ~26-unit distance, which is correct for
+    // the inspiral separation. Once the presentation-compressed shell expands
+    // after contact, that same distance is inside the volume and depth entry
+    // becomes ambiguous. Follow the visible bounded extent only in Cinematic
+    // mode; Scientific/Debug keep their authored arrival camera unchanged.
+    if (ctx.experienceMode === 'cinematic') {
+      const frameExtent =
+        phase === 'inspiral'
+          ? Math.max(inspiral.separation, res.contactSeparationUnits * 4)
+          : Math.max(shell * 1.12, front * 0.9, res.contactSeparationUnits * 4, res.r1Units * 3);
+      autoFramer.update(
+        ctx.services.cameraRig,
+        frameExtent,
+        ctx.time.dt,
+        AUTO_FRAME_MARGIN,
+        snapshot.paused === true
+      );
+    }
+
     debug['phase'] = phase;
     debug['previousPhase'] = lastPhase;
     debug['timeSeconds'] = t;
@@ -745,6 +854,9 @@ export function createCompactMergerModule(): PhenomenonModule {
     debug['contactSeconds'] = res.contactSeconds;
     debug['ejectaRadiusUnits'] = shell;
     debug['kilonovaLuminosity'] = kilonova.luminosity;
+    debug['volumePresentationGain'] = uVolumeGain.value;
+    debug['ejectaShellSkinVisible'] = ejectaShellMesh?.visible ?? false;
+    debug['ejectaShellSkinRepresentation'] = 'structured-thin-silhouette-companion';
     debug['kilonovaTemperatureK'] = kilonova.temperatureK;
     debug['jetFrontUnits'] = front;
     debug['jetViewingResponse'] = response;
@@ -753,6 +865,22 @@ export function createCompactMergerModule(): PhenomenonModule {
     debug['volumeVisible'] = volumeVisible;
     debug['tier'] = lastTier;
     debug['viewingAngleDeg'] = ready.state.viewingAngleDeg;
+    debug['autoFrameEnabled'] = autoFramer.enabled;
+    debug['autoFrameDistanceUnits'] =
+      autoFramer.requestedDistance === null
+        ? null
+        : Number(autoFramer.requestedDistance.toFixed(2));
+    debug['cameraFrameExtentUnits'] =
+      ctx.experienceMode === 'cinematic'
+        ? Number(
+            Math.max(
+              phase === 'inspiral' ? inspiral.separation : shell * 1.12,
+              front * 0.9,
+              res.contactSeparationUnits * 4,
+              res.r1Units * 3
+            ).toFixed(2)
+          )
+        : null;
   }
 
   function render(ctx: RenderContext): void {
@@ -781,6 +909,8 @@ export function createCompactMergerModule(): PhenomenonModule {
     remnantVisual = null;
     remnantHaloVisual = null;
     remnantHalo = null;
+    ejectaShellMesh = null;
+    ejectaShellVisual = null;
     backdrop = null;
     jetGroup = null;
     volumeHandle = null;
@@ -791,6 +921,7 @@ export function createCompactMergerModule(): PhenomenonModule {
     trailPoints2.length = 0;
     lastTrailTime = Number.NaN;
     lastTrailCount = 0;
+    autoFramer.reset();
     resolved = null;
     stateValue = null;
   }

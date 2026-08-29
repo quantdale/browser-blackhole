@@ -85,6 +85,20 @@ describe('CameraRig.update(): CAMERA_CHANGED invalidation signal', () => {
     expect(rig.update(0.016)).toBe(true);
     expect(rig.update(0.016)).toBe(false);
   });
+
+  it('system framing cannot cancel an in-flight arrival, while user framing can', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016);
+    rig.applyArrivalPreset({ position: [18, 0, 0], target: [0, 0, 0], fovDeg: 60 }, 1);
+    const before = rig.getOrbit();
+    rig.setTarget(new Vector3(4, 0, 0), 'system');
+    expect(rig.isAnimating()).toBe(true);
+    expect(rig.getOrbit().distance).toBe(before.distance);
+
+    rig.setTarget(new Vector3(4, 0, 0), 'user');
+    expect(rig.isAnimating()).toBe(false);
+    expect(rig.update(0.016)).toBe(true);
+  });
 });
 
 /**

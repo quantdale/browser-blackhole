@@ -11,7 +11,7 @@ describe('global visual work budget', () => {
 
     expect(low.temporalEnabled).toBe(false);
     expect(high.temporalEnabled).toBe(true);
-    expect(ultra.glareEnabled).toBe(true);
+    expect(ultra.glareEnabled).toBe(false);
     expect(low.volumeDetailOctaves).toBeLessThan(medium.volumeDetailOctaves);
     expect(medium.volumeDetailOctaves).toBeLessThan(high.volumeDetailOctaves);
     expect(high.volumeDetailOctaves).toBeLessThan(ultra.volumeDetailOctaves);
@@ -36,6 +36,6 @@ describe('global visual work budget', () => {
     expect(settling.volumeDetailOctaves).toBeLessThanOrEqual(stable.volumeDetailOctaves);
     expect(interaction.temporalHistoryFrames).toBe(1);
     expect(interaction.glareEnabled).toBe(false);
-    expect(stable.glareEnabled).toBe(true);
+    expect(stable.glareEnabled).toBe(false);
   });
 });

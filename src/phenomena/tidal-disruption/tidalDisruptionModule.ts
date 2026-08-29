@@ -1013,6 +1013,12 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
 
     // --- auto-framing (disclosed presentation behaviour) -----------------------
+    // Frame the CROPPED near-BH representation, not the full raw debris family.
+    // The raw family can extend to ~1e5 scene units while the renderer
+    // deliberately presents a bounded near-BH window. Following that raw
+    // extent pushed the camera to its ceiling and reduced the authored strand
+    // to a barely visible line. The raw extent remains in diagnostics so this
+    // presentation crop is explicit and auditable.
     const starOnly =
       starGain > 0.001 && streamRawExtentUnits <= 0 && !volumeVisible && diskGain <= 0.001;
     autoFramer.update(
@@ -1022,7 +1028,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
         phase,
         enc.radiusUnits,
         starGain > 0.001,
-        streamRawExtentUnits,
+        streamExtentUnits,
         volumeVisible
       ),
       ctx.time.dt,

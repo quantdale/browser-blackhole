@@ -678,7 +678,16 @@ export class CosmicAtlasHost {
       reasons |= INVALIDATION_REASON.TIME_ADVANCED;
     }
 
-    if (this.cameraRig.update(dt)) reasons |= INVALIDATION_REASON.CAMERA_CHANGED;
+    const cameraChanged = this.cameraRig.update(dt);
+    if (cameraChanged) {
+      reasons |= INVALIDATION_REASON.CAMERA_CHANGED;
+      // The staged volume-depth texture is in the previous camera's screen
+      // space. It cannot be sampled after a camera transform change without a
+      // reprojection path of its own; discard it and let the current frame
+      // repopulate the ping-pong depth target. Temporal color history has its
+      // own camera reprojection policy and is intentionally left intact.
+      this.post.invalidateDepthHistory?.();
+    }
 
     this.director.update(dt);
     const workBudget = this.governor.getVisualWorkBudget();

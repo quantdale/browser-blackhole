@@ -40,6 +40,7 @@
     "bench:galaxy-collision": "node scripts/bench-galaxy-collision.mjs",
     "capture:visual-baseline": "node scripts/capture-visual-baseline.mjs",
     "capture:stellar-gate": "node scripts/capture-stellar-gate.mjs",
+    "bench:cinematic-matrix": "node scripts/bench-cinematic-matrix.mjs",
     "mcp:preflight": "node scripts/mcp-preflight.mjs",
     "mcp:preflight:online": "node scripts/mcp-preflight.mjs --online"
   },

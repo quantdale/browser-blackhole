@@ -119,6 +119,12 @@ export async function runCinematicGoldenExpectation(
     },
     { phase: spec.phase }
   );
+  await expect
+    .poll(
+      () => page.evaluate(() => window.__ATLAS_APP__?.host.time.snapshot().simulationPhase ?? -1),
+      { timeout: 15_000, intervals: [100] }
+    )
+    .toBeCloseTo(spec.phase, 4);
   await settleCamera(page);
 
   const frames: Buffer[] = [];
@@ -157,12 +163,23 @@ export async function runCinematicGoldenExpectation(
       bloomEnabled: state.sharedVisual.bloomEnabled,
       bloomStrength: state.sharedVisual.bloomStrength,
       temporal: post.temporal ?? null,
-      stages: post.stages ?? []
+      stages: post.stages ?? [],
+      destination: app.host.activeDestinationDebugSnapshot?.() ?? null
     };
   });
+  const temporalMetadata = runtimeMetadata.temporal as {
+    historyAge?: number;
+    historyFrames?: number;
+  } | null;
   const metadata: Record<string, unknown> = {
     ...runtimeMetadata,
-    commit: process.env.CINEMATIC_GOLDEN_COMMIT ?? 'uncommitted'
+    commit: process.env.CINEMATIC_GOLDEN_COMMIT ?? 'uncommitted',
+    settleProtocol: {
+      captureFrames: frames.length,
+      historySettleCount: temporalMetadata?.historyAge ?? 0,
+      maximumHistoryFrames: temporalMetadata?.historyFrames ?? 0,
+      finiteDeadlineSeconds: 15
+    }
   };
   const suffix = spec.backend === undefined ? '' : `_${spec.backend.toUpperCase()}`;
   const fileName = `${spec.name}${suffix}.png`;
