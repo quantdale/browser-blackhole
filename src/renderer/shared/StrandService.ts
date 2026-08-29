@@ -81,10 +81,17 @@ class StrandHandleImpl implements StrandHandle {
   private readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
   private readonly geometry: THREE.BufferGeometry;
   private readonly material: THREE.MeshBasicMaterial;
+  private readonly coreGeometry: THREE.BufferGeometry;
+  private readonly coreMaterial: THREE.LineBasicMaterial;
+  private readonly coreMesh: THREE.Line;
   private readonly positions: Float32Array;
   private readonly colors: Float32Array;
+  private readonly corePositions: Float32Array;
+  private readonly coreColors: Float32Array;
   private readonly positionAttribute: THREE.BufferAttribute;
   private readonly colorAttribute: THREE.BufferAttribute;
+  private readonly corePositionAttribute: THREE.BufferAttribute;
+  private readonly coreColorAttribute: THREE.BufferAttribute;
   private readonly tangents: THREE.Vector3[];
   private readonly laterals: THREE.Vector3[];
   private readonly binormals: THREE.Vector3[];
@@ -107,6 +114,8 @@ class StrandHandleImpl implements StrandHandle {
       opacityEnd: clamp(config.opacityEnd, 0, 1),
       temperatureVariation: clamp(config.temperatureVariation ?? 0.25, 0, 1),
       clumpStrength: clamp(config.clumpStrength ?? 0.2, 0, 1),
+      radianceScale: clamp(config.radianceScale ?? 1, 0, 8),
+      coreOpacity: clamp(config.coreOpacity ?? 0.55, 0, 1),
       colorStart: [...config.colorStart] as [number, number, number],
       colorEnd: [...config.colorEnd] as [number, number, number]
     };
@@ -114,6 +123,8 @@ class StrandHandleImpl implements StrandHandle {
     const radial = this.config.radialSegments!;
     this.positions = new Float32Array(pointCapacity * (radial + 1) * 3);
     this.colors = new Float32Array(pointCapacity * (radial + 1) * 4);
+    this.corePositions = new Float32Array(pointCapacity * 3);
+    this.coreColors = new Float32Array(pointCapacity * 3);
     this.tangents = Array.from({ length: pointCapacity }, () => new THREE.Vector3(0, 1, 0));
     this.laterals = Array.from({ length: pointCapacity }, () => new THREE.Vector3(1, 0, 0));
     this.binormals = Array.from({ length: pointCapacity }, () => new THREE.Vector3(0, 0, 1));
@@ -126,11 +137,41 @@ class StrandHandleImpl implements StrandHandle {
     this.geometry.setIndex(buildTubeIndices(pointCapacity, radial));
     this.geometry.setDrawRange(0, 0);
 
+    // A narrow centerline is a deliberate part of the high-quality stream
+    // representation, not a second source of motion: it is copied directly
+    // from the authoritative spine. It keeps a subpixel tube from vanishing
+    // at long standoffs while the swept surface supplies the cross-section,
+    // clumping and temperature profile.
+    this.coreGeometry = new THREE.BufferGeometry();
+    this.corePositionAttribute = new THREE.BufferAttribute(this.corePositions, 3);
+    this.coreColorAttribute = new THREE.BufferAttribute(this.coreColors, 3);
+    this.coreGeometry.setAttribute('position', this.corePositionAttribute);
+    this.coreGeometry.setAttribute('color', this.coreColorAttribute);
+    this.coreGeometry.setDrawRange(0, 0);
+    this.coreMaterial = new THREE.LineBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      depthTest: false,
+      blending: config.additive ? THREE.AdditiveBlending : THREE.NormalBlending
+    });
+    this.coreMaterial.userData['cinematicEmissive'] = true;
+    this.coreMaterial.userData['strandRepresentation'] = 'authoritative-spine-core';
+    this.coreMesh = new THREE.Line(this.coreGeometry, this.coreMaterial);
+    this.coreMesh.frustumCulled = false;
+    this.coreMesh.renderOrder = 1;
+    this.coreMesh.name = 'StrandCore';
+    this.coreMesh.layers.enable(CINEMATIC_EMISSIVE_LAYER);
+
     this.material = new THREE.MeshBasicMaterial({
       vertexColors: true,
       transparent: true,
       depthWrite: false,
-      depthTest: true,
+      // Strands are a translucent presentation layer over the destination's
+      // site marker/volume. Their depth is already represented by the
+      // authoritative spine; testing against an opaque marker can erase the
+      // near-BH portion of a tube at exactly the framing where it is needed.
+      depthTest: false,
       alphaTest: 0.002,
       side: THREE.DoubleSide,
       blending: config.additive ? THREE.AdditiveBlending : THREE.NormalBlending
@@ -145,6 +186,7 @@ class StrandHandleImpl implements StrandHandle {
     this.root.name = 'StrandService.Tube';
     this.root.frustumCulled = false;
     this.root.add(this.mesh);
+    this.root.add(this.coreMesh);
     this.onRelease = onRelease;
   }
 
@@ -153,6 +195,7 @@ class StrandHandleImpl implements StrandHandle {
   setSpine(points: THREE.Vector3[]): void {
     if (this.released || points.length < MIN_POINTS) {
       this.geometry.setDrawRange(0, 0);
+      this.coreGeometry.setDrawRange(0, 0);
       return;
     }
     const capacity = this.tangents.length;
@@ -178,6 +221,14 @@ class StrandHandleImpl implements StrandHandle {
       const r = THREE.MathUtils.lerp(this.config.colorStart[0], this.config.colorEnd[0], colorT);
       const g = THREE.MathUtils.lerp(this.config.colorStart[1], this.config.colorEnd[1], colorT);
       const b = THREE.MathUtils.lerp(this.config.colorStart[2], this.config.colorEnd[2], colorT);
+      const radianceScale = this.config.radianceScale!;
+      const coreIndex = i * 3;
+      this.corePositions[coreIndex] = spine[i]!.x;
+      this.corePositions[coreIndex + 1] = spine[i]!.y;
+      this.corePositions[coreIndex + 2] = spine[i]!.z;
+      this.coreColors[coreIndex] = r * radianceScale;
+      this.coreColors[coreIndex + 1] = g * radianceScale;
+      this.coreColors[coreIndex + 2] = b * radianceScale;
       const lateral = this.laterals[i]!;
       const binormal = this.binormals[i]!;
       for (let j = 0; j <= radial; j += 1) {
@@ -199,20 +250,24 @@ class StrandHandleImpl implements StrandHandle {
         // second noisy material. Alpha remains continuous at the seam.
         const radialProfile = 0.2 + 0.8 * Math.max(0, cos * 0.5 + 0.5);
         const colorIndex = (i * (radial + 1) + j) * 4;
-        this.colors[colorIndex] = r;
-        this.colors[colorIndex + 1] = g;
-        this.colors[colorIndex + 2] = b;
+        this.colors[colorIndex] = r * radianceScale;
+        this.colors[colorIndex + 1] = g * radianceScale;
+        this.colors[colorIndex + 2] = b * radianceScale;
         this.colors[colorIndex + 3] = clamp(baseOpacity * radialProfile, 0, 1);
       }
     }
     this.geometry.setDrawRange(0, (spine.length - 1) * radial * 6);
+    this.coreGeometry.setDrawRange(0, spine.length);
     this.positionAttribute.needsUpdate = true;
     this.colorAttribute.needsUpdate = true;
+    this.corePositionAttribute.needsUpdate = true;
+    this.coreColorAttribute.needsUpdate = true;
   }
 
   setQuality(quality: number): void {
     this.quality = clamp(Number.isFinite(quality) ? quality : 1, 0, 1);
     this.material.opacity = this.quality;
+    this.coreMaterial.opacity = this.config.coreOpacity! * this.quality;
     this.root.visible = this.quality > 0.02;
     if (this.pointCount > 1) this.colorAttribute.needsUpdate = true;
   }
@@ -232,6 +287,8 @@ class StrandHandleImpl implements StrandHandle {
       radialSegments: this.config.radialSegments,
       quality: this.quality,
       clumpStrength: this.config.clumpStrength,
+      radianceScale: this.config.radianceScale,
+      coreOpacity: this.config.coreOpacity,
       temperatureVariation: this.config.temperatureVariation,
       authoritativeSpine: true
     };
@@ -244,6 +301,8 @@ class StrandHandleImpl implements StrandHandle {
     this.root.removeFromParent();
     this.geometry.dispose();
     this.material.dispose();
+    this.coreGeometry.dispose();
+    this.coreMaterial.dispose();
   }
 
   private computeFrames(spine: readonly THREE.Vector3[]): void {

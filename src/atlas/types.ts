@@ -392,6 +392,10 @@ export interface StrandConfig {
   temperatureVariation?: number;
   clumpStrength?: number;
   clumpSeed: number;
+  /** Bounded linear display radiance multiplier for the strand material. */
+  radianceScale?: number;
+  /** Opacity of the narrow spine-preserving emissive core, in [0, 1]. */
+  coreOpacity?: number;
   additive: boolean;
 }
 

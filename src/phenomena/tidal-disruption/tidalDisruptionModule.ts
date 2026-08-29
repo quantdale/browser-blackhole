@@ -164,15 +164,14 @@ const BH_MARKER_MIN_FRACTION_OF_DISTANCE = 0.035;
  * portion is rendered; the distant stream continues far beyond any presented
  * frame by construction.
  *
- * The cap is `max(STREAM_RADIAL_CAP x periapsis, STREAM_VIEW_CAP_FACTOR x the
- * current framing distance)`, i.e. it follows what is actually ON SCREEN. With
- * the old fixed 12 x periapsis cap the ribbons emptied completely a few hours
- * after disruption — every bound element is out near apoapsis until it returns
- * at the fallback time, so the destination drew NOTHING at all across the
- * debris and winding stages, which is most of its timeline.
+ * The cap includes a fixed presentation window in addition to the physical
+ * near-BH radius. A crop derived from the current camera distance creates a
+ * feedback loop: every stream point can be rejected before the framer has a
+ * chance to move out far enough to see it. The raw family remains available in
+ * diagnostics; only this bounded, disclosed presentation subset is swept.
  */
 const STREAM_RADIAL_CAP = 12;
-const STREAM_VIEW_CAP_FACTOR = 3;
+const STREAM_PRESENTATION_CAP_UNITS = 10_000;
 
 /**
  * Auto-framing (DISCLOSED presentation behaviour) via the shared
@@ -581,6 +580,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       temperatureVariation: 0.36,
       clumpStrength: 0.42,
       clumpSeed: res.seed ^ 0x891,
+      radianceScale: 2.8,
+      coreOpacity: 0.68,
       additive: true
     });
     unboundStrand = ctx.services.strands.createStrand({
@@ -597,6 +598,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       temperatureVariation: 0.28,
       clumpStrength: 0.3,
       clumpSeed: res.seed ^ 0x892,
+      radianceScale: 2.2,
+      coreOpacity: 0.56,
       additive: true
     });
     boundRibbon.setVisible(false);
@@ -815,9 +818,14 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // DISCLOSED presentation crop: ribbons render the family's near-BH
     // portion (r <= STREAM_RADIAL_CAP x periapsis); the distant stream
     // continues far beyond any presented frame by construction.
+    // Keep a camera-independent presentation window. The previous
+    // `max(12*rp, 3*viewDistance)` policy coupled visibility to the camera and
+    // could discard an entire winding stream before AutoFramer converged.
+    // `viewDistanceUnits` is retained in the signature for cache invalidation
+    // because width/framing still depend on it.
     const rCap = Math.max(
       STREAM_RADIAL_CAP * ready.resolved.rpUnits,
-      STREAM_VIEW_CAP_FACTOR * viewDistanceUnits
+      STREAM_PRESENTATION_CAP_UNITS
     );
     let extent = 0;
     let rawExtent = 0;

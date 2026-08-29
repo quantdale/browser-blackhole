@@ -62,7 +62,7 @@ export const CINEMATIC_GOLDEN_SPECS: CinematicGoldenSpec[] = [
   {
     name: 'CIN_TDE_DEBRIS',
     url: '/atlas/tidal-disruption?preset=solar-canonical',
-    phase: 0.36,
+    phase: 0.42,
     notes: 'High-tier transported strand against the authoritative debris family.'
   },
   {

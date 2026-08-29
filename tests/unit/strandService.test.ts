@@ -18,6 +18,8 @@ function config() {
     temperatureVariation: 0.3,
     clumpStrength: 0.4,
     clumpSeed: 17,
+    radianceScale: 3,
+    coreOpacity: 0.7,
     additive: true
   };
 }
@@ -62,6 +64,8 @@ describe('StrandService', () => {
       radialSegments: radial,
       authoritativeSpine: true
     });
+    expect(strand.getDebugSnapshot?.()).toMatchObject({ radianceScale: 3 });
+    expect(strand.getDebugSnapshot?.()).toMatchObject({ coreOpacity: 0.7 });
     service.dispose();
   });
 
