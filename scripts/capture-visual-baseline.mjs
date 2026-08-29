@@ -115,6 +115,17 @@ const selectedSceneIds = new Set(
 const selectedScenes =
   selectedSceneIds.size === 0 ? scenes : scenes.filter((scene) => selectedSceneIds.has(scene.id));
 const qualityQuery = process.env.BASELINE_QUALITY ? `&q=${process.env.BASELINE_QUALITY}` : '';
+const captureTier = process.env.BASELINE_TIER ?? 'high';
+const playingMotion = process.env.BASELINE_PLAYING_MOTION === '1';
+const playingMotionFrames = Math.max(3, Number(process.env.BASELINE_MOTION_FRAMES ?? 5));
+const playingMotionIntervalMs = Math.max(
+  16,
+  Number(process.env.BASELINE_MOTION_INTERVAL_MS ?? 120)
+);
+const captureKind = process.env.BASELINE_KIND ?? 'cinematic-visual-fidelity-capture';
+if (!['low', 'medium', 'high', 'ultra'].includes(captureTier)) {
+  throw new Error(`BASELINE_TIER must be low, medium, high, or ultra (got ${captureTier})`);
+}
 
 function gitSha() {
   try {
@@ -178,11 +189,11 @@ async function selectMode(page, mode) {
 async function setCaptureState(page, mode, phase, shotFactor, baseOrbit) {
   await selectMode(page, mode);
   await page.evaluate(
-    ({ phase, shotFactor, baseOrbit }) => {
+    ({ phase, shotFactor, baseOrbit, tier }) => {
       const app = window.__ATLAS_APP__;
       if (!app) throw new Error('Atlas hook unavailable');
       const host = app.host;
-      host.governor.setForcedTier('high');
+      host.governor.setForcedTier(tier);
       host.time.pause();
       host.time.scrubTo(phase);
       const orbit = baseOrbit ?? host.cameraRig.getOrbit();
@@ -191,7 +202,7 @@ async function setCaptureState(page, mode, phase, shotFactor, baseOrbit) {
       if (rect && rect.width > 0 && rect.height > 0) host.handleResize(rect.width, rect.height);
       app.captureFrame();
     },
-    { phase, shotFactor, baseOrbit }
+    { phase, shotFactor, baseOrbit, tier: captureTier }
   );
   await settleCamera(page);
   await page.evaluate(() => window.__ATLAS_APP__?.captureFrame());
@@ -374,7 +385,7 @@ page.on('pageerror', (error) => errors.push(`PAGE_ERROR: ${error.message}`));
 ensureDir(outputRoot);
 const manifest = {
   schemaVersion: 1,
-  kind: 'cinematic-visual-fidelity-before-state',
+  kind: captureKind,
   capturedAt: new Date().toISOString(),
   commit: gitSha(),
   node: process.version,
@@ -389,6 +400,10 @@ const manifest = {
   browser: { channel: CHANNEL },
   viewportCss: [WIDTH, HEIGHT],
   devicePixelRatio: 1,
+  captureTier,
+  playingMotion,
+  playingMotionFrames: playingMotion ? playingMotionFrames : 0,
+  playingMotionIntervalMs: playingMotion ? playingMotionIntervalMs : 0,
   scenes: [],
   consoleErrors: errors
 };
@@ -431,7 +446,7 @@ for (const scene of selectedScenes) {
     console.log(`  mode=${mode}`);
     const modeRoot = join(outputRoot, scene.id, mode);
     ensureDir(modeRoot);
-    const modeRecord = { phaseCaptures: [], shotCaptures: [], motion: null };
+    const modeRecord = { phaseCaptures: [], shotCaptures: [], motion: null, playingMotion: null };
 
     for (const phase of scene.phases) {
       await setCaptureState(page, mode, phase, 1.3, baseOrbit);
@@ -485,6 +500,41 @@ for (const scene of selectedScenes) {
       contactSheet: stripFile.slice(outputRoot.length + 1),
       metrics: await temporalMetrics(page, motionUrls)
     };
+
+    if (playingMotion) {
+      await selectMode(page, mode);
+      await page.evaluate((tier) => {
+        const app = window.__ATLAS_APP__;
+        if (!app) throw new Error('Atlas hook unavailable');
+        const host = app.host;
+        host.governor.setForcedTier(tier);
+        host.time.play();
+        app.captureFrame();
+      }, captureTier);
+      const playingUrls = [];
+      const playingFiles = [];
+      for (let frame = 0; frame < playingMotionFrames; frame += 1) {
+        if (frame > 0) await page.waitForTimeout(playingMotionIntervalMs);
+        await page.evaluate(() => window.__ATLAS_APP__?.captureFrame());
+        const file = join(modeRoot, `playing-${String(frame).padStart(2, '0')}.png`);
+        const buffer = await page.locator('#viewport').screenshot();
+        writeFileSync(file, buffer);
+        playingUrls.push(`data:image/png;base64,${buffer.toString('base64')}`);
+        playingFiles.push(file.slice(outputRoot.length + 1));
+      }
+      await page.evaluate(() => {
+        const app = window.__ATLAS_APP__;
+        app?.host.time.pause();
+      });
+      const playingStripFile = join(modeRoot, 'playing-motion-strip.png');
+      writeDataUrl(playingStripFile, await contactSheet(page, playingUrls));
+      modeRecord.playingMotion = {
+        frames: playingFiles,
+        contactSheet: playingStripFile.slice(outputRoot.length + 1),
+        intervalMs: playingMotionIntervalMs,
+        metrics: await temporalMetrics(page, playingUrls)
+      };
+    }
     sceneRecord.modes[mode] = modeRecord;
   }
   sceneRecord.finalRuntime = await page.evaluate(async () => {
