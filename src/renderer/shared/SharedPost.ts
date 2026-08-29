@@ -37,7 +37,20 @@
 
 import * as THREE from 'three';
 import { MeshBasicNodeMaterial } from 'three/webgpu';
-import { mix, texture, uniform, vec4 } from 'three/tsl';
+import {
+  clamp,
+  dot,
+  float,
+  hash,
+  length,
+  mix,
+  screenUV,
+  texture,
+  uniform,
+  vec2,
+  vec3,
+  vec4
+} from 'three/tsl';
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
 
 import type { ISharedPost, RendererLike, ResourceScope } from '../../atlas/types';
@@ -70,6 +83,7 @@ export class SharedPost implements ISharedPost {
   private exposure = 1;
   private bloomEnabled = false;
   private bloomStrength = 0;
+  private cinematicStyleEnabled = false;
 
   /** Cached composite inputs; rebuilds the TSL graphs when any part changes. */
   private graphKey: string | null = null;
@@ -163,6 +177,13 @@ export class SharedPost implements ISharedPost {
     }
   }
 
+  setCinematicStyle(enabled: boolean): void {
+    const next = enabled === true;
+    if (next === this.cinematicStyleEnabled) return;
+    this.cinematicStyleEnabled = next;
+    this.graphKey = null;
+  }
+
   setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void {
     // Presentation state only: three invalidates its output pipeline when
     // renderer.toneMapping changes, and never applies it to off-screen targets.
@@ -249,7 +270,7 @@ export class SharedPost implements ISharedPost {
     const hdrTexture = this.hdrTarget.texture;
     const overlayTexture = this.overlayTexture;
 
-    const key = `${hdrTexture.id}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}`;
+    const key = `${hdrTexture.id}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}|${this.cinematicStyleEnabled ? 1 : 0}`;
     if (key === this.graphKey) return;
     this.graphKey = key;
 
@@ -279,6 +300,27 @@ export class SharedPost implements ISharedPost {
 
     if (overlayTexture !== null) {
       rgb = mix(rgb, texture(overlayTexture).rgb, this.overlayOpacityU);
+    }
+
+    if (this.cinematicStyleEnabled) {
+      // Display-only finishing pass. The lift/contrast/warmth/vignette and
+      // seeded static grain are deliberately applied after bloom and before
+      // the renderer's output transform. The branch is graph-build-time, so
+      // Scientific/Debug do not pay for cinematic grading at all.
+      const centered = screenUV.sub(0.5);
+      const vignette = clamp(
+        float(1).sub(length(vec2(centered.x.mul(1.12), centered.y.mul(1.12))).mul(0.42)),
+        0.74,
+        1
+      );
+      const luminance = dot(rgb, vec3(0.2126, 0.7152, 0.0722));
+      const lifted = rgb.sub(vec3(0.18)).mul(1.06).add(vec3(0.18));
+      const warm = lifted.mul(vec3(1.035, 1.0, 0.975)).mul(vignette);
+      const grain = hash(screenUV.x.mul(173.17).add(screenUV.y.mul(311.71)))
+        .sub(0.5)
+        .mul(0.012)
+        .mul(luminance.add(0.18).clamp(0, 4));
+      rgb = warm.add(vec3(grain, grain, grain));
     }
 
     this.presentMaterial.colorNode = vec4(rgb, 1);

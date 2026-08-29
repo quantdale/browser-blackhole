@@ -182,6 +182,8 @@ export class CameraRig implements ICameraRig {
   private configured = false;
   private dirty = false;
   private animation: OrbitAnimation | null = null;
+  /** Changes only for pointer/wheel/keyboard input, not host/director writes. */
+  private userInteractionRevision = 0;
 
   private dragPointerId: number | null = null;
   private lastDragX = 0;
@@ -367,6 +369,16 @@ export class CameraRig implements ICameraRig {
   /** Current orbit-distance limits (scene units). */
   getDistanceLimits(): { min: number; max: number } {
     return { min: this.minDistance, max: this.maxDistance };
+  }
+
+  /**
+   * Lets camera-follow presentation layers distinguish viewer takeover from
+   * host/director interpolation. `setOrbit()` intentionally does not advance
+   * this counter because it is also the internal handoff primitive used by
+   * arrival ramps and AutoFramer.
+   */
+  getUserInteractionRevision(): number {
+    return this.userInteractionRevision;
   }
 
   setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void {
@@ -591,6 +603,7 @@ export class CameraRig implements ICameraRig {
     this.dragPointerId = event.pointerId;
     this.lastDragX = event.clientX;
     this.lastDragY = event.clientY;
+    this.userInteractionRevision += 1;
     // User input takes ownership from any in-flight arrival animation.
     this.cancelAnimation();
     this.configured = true;
@@ -608,6 +621,7 @@ export class CameraRig implements ICameraRig {
     const deltaY = event.clientY - this.lastDragY;
     this.lastDragX = event.clientX;
     this.lastDragY = event.clientY;
+    this.userInteractionRevision += 1;
     // Matches the OrbitControls feel: drag right orbits left, drag down
     // raises the camera toward the north pole.
     this.azimuthDeg -= deltaX * DRAG_DEGREES_PER_PIXEL;
@@ -640,6 +654,7 @@ export class CameraRig implements ICameraRig {
           ? event.deltaY * WHEEL_DELTA_PAGE_PIXELS
           : event.deltaY;
     if (!Number.isFinite(deltaY) || deltaY === 0) return;
+    this.userInteractionRevision += 1;
     // Scroll down (positive deltaY) dollies out; exponential keeps the zoom
     // perceptually uniform across the clamped distance range.
     this.zoomBy(Math.exp(deltaY * WHEEL_ZOOM_PER_PIXEL));
@@ -674,6 +689,9 @@ export class CameraRig implements ICameraRig {
         handled = false;
         break;
     }
-    if (handled) event.preventDefault();
+    if (handled) {
+      this.userInteractionRevision += 1;
+      event.preventDefault();
+    }
   };
 }

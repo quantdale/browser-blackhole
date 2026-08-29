@@ -216,6 +216,8 @@ export interface ParticleSystemConfig {
   seed: number;
   /** Use GPU compute update when available; otherwise shader/CPU fallback. */
   preferCompute: boolean;
+  /** Explicit lifecycle semantics for deterministic static populations. */
+  activity?: 'static' | 'dynamic';
 }
 
 export interface ParticleSystemHandle {
@@ -258,6 +260,8 @@ export interface VolumeHandle {
   object3d(): THREE.Object3D;
   setStepScale(scale: number): void;
   setVisible(visible: boolean): void;
+  /** Bounded local work/residency snapshot for debug and benchmark probes. */
+  getDebugSnapshot?(): Record<string, unknown>;
   dispose(): void;
 }
 
@@ -433,6 +437,8 @@ export interface ICameraRig {
   setDistanceLimits(minDistance: number, maxDistance: number): void;
   /** Current orbit-distance limits (scene units). */
   getDistanceLimits(): { min: number; max: number };
+  /** Monotonic counter for direct viewer camera input (optional for test rigs). */
+  getUserInteractionRevision?(): number;
   setTarget(target: THREE.Vector3): void;
   setFov(fovDeg: number): void;
   setControlsEnabled(enabled: boolean): void;
@@ -593,6 +599,8 @@ export interface ISharedPost {
   getHdrTarget(): THREE.Texture | null;
   setExposure(exposure: number): void;
   setBloom(enabled: boolean, strength: number): void;
+  /** Display-only cinematic grade; never changes destination radiance. */
+  setCinematicStyle(enabled: boolean): void;
   setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void;
   /** Composite HDR result + transition overlay to the canvas. */
   present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void;

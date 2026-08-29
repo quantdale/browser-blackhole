@@ -55,6 +55,8 @@ export interface AutoFramerRig {
   setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
   /** True while the rig's own arrival/preset ease is still interpolating. */
   isAnimating(): boolean;
+  /** Optional viewer-input revision; separates user takeover from host writes. */
+  getUserInteractionRevision?(): number;
 }
 
 const DEFAULTS: AutoFramerOptions = {
@@ -71,6 +73,7 @@ export class AutoFramer {
   private enabledValue = true;
   private lastWritten = Number.NaN;
   private ageSeconds = 0;
+  private userInteractionRevision: number | null = null;
 
   constructor(options: Partial<AutoFramerOptions> = {}) {
     this.options = { ...DEFAULTS, ...options };
@@ -81,6 +84,7 @@ export class AutoFramer {
     this.enabledValue = true;
     this.lastWritten = Number.NaN;
     this.ageSeconds = 0;
+    this.userInteractionRevision = null;
   }
 
   /** False once the viewer has taken over the distance for this visit. */
@@ -111,6 +115,18 @@ export class AutoFramer {
     const orbit = rig.getOrbit();
     if (!this.enabledValue) return orbit.distance;
 
+    const userRevision = rig.getUserInteractionRevision?.();
+    if (userRevision !== undefined) {
+      if (this.userInteractionRevision === null) {
+        this.userInteractionRevision = userRevision;
+      } else if (userRevision !== this.userInteractionRevision) {
+        // The camera may also be written by a transition ramp between frames;
+        // only direct viewer input is a takeover signal.
+        this.enabledValue = false;
+        return orbit.distance;
+      }
+    }
+
     this.ageSeconds += Math.max(dtSeconds, 0);
     const easing = rig.isAnimating() && this.ageSeconds < this.options.armDelaySeconds;
     if (easing) {
@@ -120,6 +136,7 @@ export class AutoFramer {
     }
 
     if (
+      userRevision === undefined &&
       Number.isFinite(this.lastWritten) &&
       Math.abs(orbit.distance - this.lastWritten) >
         Math.max(1e-3, this.options.userEpsilon * this.lastWritten)

@@ -21,10 +21,10 @@
  *    cameraPosition) (backwards, camera -> emitter/background).
  * 2. Analytic ray/bounds intersection: slab test for boxes, quadratic for
  *    spheres. Misses output vec4(0) immediately (early ray-box miss, §4).
- * 3. Constant-step front-to-back march between tNear/tFar with the compile-time
- *    literal loop bound `baseMaxSteps`. `setStepScale(s)` scales the step LENGTH
- *    by 1/s at runtime through a uniform (s > 1 = finer sampling), so quality
- *    changes never recompile the shader.
+ * 3. Constant-step front-to-back march between tNear/tFar with a compile-time
+ *    upper bound and a runtime active-step guard. `setStepScale(s)` changes
+ *    the number of executed density/emission evaluations, while the active
+ *    samples still span the same analytic interval.
  * 4. Accumulation is emission-absorption with premultiplied color:
  *      a_i     = 1 - exp(-density * absorb * dt)
  *      rgbAcc += transmittance * emission * a_i
@@ -141,9 +141,14 @@ class VolumeImpl implements VolumeHandle {
   private readonly target: THREE.RenderTarget | null;
 
   private readonly uStepScale: UniformNode<'float', number>;
+  private readonly uActiveSteps: UniformNode<'float', number>;
   private readonly uJitterSeed: UniformNode<'float', number>;
   private readonly uJitterFrame: UniformNode<'float', number>;
   private readonly uInternalScale: { value: number };
+  private readonly baseMaxSteps: number;
+  private activeStepCount: number;
+  private visible = true;
+  private readonly rendererSizeScratch = new THREE.Vector2();
 
   private disposed = false;
 
@@ -157,6 +162,9 @@ class VolumeImpl implements VolumeHandle {
 
     // --- uniforms ---
     this.uStepScale = uniform(1);
+    this.baseMaxSteps = Math.max(1, Math.floor(config.baseMaxSteps));
+    this.activeStepCount = this.baseMaxSteps;
+    this.uActiveSteps = uniform(this.activeStepCount);
     this.uJitterSeed = uniform(seed);
     this.uJitterFrame = uniform(0);
     this.uInternalScale = internalScaleState;
@@ -242,9 +250,12 @@ class VolumeImpl implements VolumeHandle {
         : intersectSphere(ro, rd, config.bounds.center, config.bounds.radius);
 
     const span = hit.y.sub(hit.x).max(0);
-    // Compile-time literal bound; runtime quality scales step length instead.
-    const steps = config.baseMaxSteps;
-    const dt = span.div(float(steps)).div(this.uStepScale.max(1e-5));
+    // Compile-time upper bound plus a runtime active count. Quality changes
+    // now guard the expensive density/emission callback itself; dt remains
+    // normalized to the full analytic ray interval.
+    const steps = this.baseMaxSteps;
+    const activeSteps = this.uActiveSteps.clamp(1, steps);
+    const dt = span.div(activeSteps);
 
     // Seeded temporal jitter of the start offset within the first step.
     const jitter01 = gpuHash01(this.uJitterSeed.add(this.uJitterFrame));
@@ -258,34 +269,36 @@ class VolumeImpl implements VolumeHandle {
       If(hit.y.greaterThan(hit.x), () => {
         const t = hit.x.add(startOffset).toVar();
 
-        Loop(steps, () => {
-          const pos = ro.add(rd.mul(t));
-          // Contract boundary: callbacks receive plain nodes typed `unknown`
-          // and are cast back exactly like LensingService.createThinLensDisplacement.
-          const densityRaw = config.density({ pos, dir: rd });
-          const density = float(densityRaw as Node<'float'>).max(0);
+        Loop({ start: 0, end: steps, type: 'int', condition: '<' }, ({ i }) => {
+          If(float(i).lessThan(activeSteps), () => {
+            const pos = ro.add(rd.mul(t));
+            // Contract boundary: callbacks receive plain nodes typed `unknown`
+            // and are cast back exactly like LensingService.createThinLensDisplacement.
+            const densityRaw = config.density({ pos, dir: rd });
+            const density = float(densityRaw as Node<'float'>).max(0);
 
-          const emissionRaw =
-            config.emission !== undefined ? config.emission({ pos, dir: rd }) : null;
-          const emission =
-            emissionRaw !== null
-              ? vec3(emissionRaw as Node<'vec3'>)
-              : vec3(density, density, density);
+            const emissionRaw =
+              config.emission !== undefined ? config.emission({ pos, dir: rd }) : null;
+            const emission =
+              emissionRaw !== null
+                ? vec3(emissionRaw as Node<'vec3'>)
+                : vec3(density, density, density);
 
-          const aSample = float(1).sub(expNeg(density.mul(ABSORPTION_SCALE).mul(dt)));
-          const sampleAlpha = aSample.mul(transmittance);
+            const aSample = float(1).sub(expNeg(density.mul(ABSORPTION_SCALE).mul(dt)));
+            const sampleAlpha = aSample.mul(transmittance);
 
-          rgbAcc.assign(rgbAcc.add(emission.mul(sampleAlpha)));
-          alphaAcc.assign(alphaAcc.add(sampleAlpha));
-          transmittance.assign(transmittance.mul(float(1).sub(aSample)));
+            rgbAcc.assign(rgbAcc.add(emission.mul(sampleAlpha)));
+            alphaAcc.assign(alphaAcc.add(sampleAlpha));
+            transmittance.assign(transmittance.mul(float(1).sub(aSample)));
 
-          if (config.earlyAlphaTermination) {
-            If(alphaAcc.greaterThan(EARLY_ALPHA_THRESHOLD), () => {
-              Break();
-            });
-          }
+            if (config.earlyAlphaTermination) {
+              If(alphaAcc.greaterThan(EARLY_ALPHA_THRESHOLD), () => {
+                Break();
+              });
+            }
 
-          t.assign(t.add(dt));
+            t.assign(t.add(dt));
+          });
         });
       });
 
@@ -305,8 +318,8 @@ class VolumeImpl implements VolumeHandle {
   ): void {
     if (this.disposed || this.target === null) return;
 
-    const size = new THREE.Vector2();
-    renderer.getSize(size);
+    renderer.getSize(this.rendererSizeScratch);
+    const size = this.rendererSizeScratch;
     const dpr = Math.min(renderer.getPixelRatio(), 16);
     const scale = clampRange(this.uInternalScale.value, INTERNAL_SCALE_MIN, INTERNAL_SCALE_MAX);
     const w = Math.max(2, Math.floor(size.x * dpr * scale * 0.5));
@@ -328,15 +341,32 @@ class VolumeImpl implements VolumeHandle {
     return this.mesh;
   }
 
-  /** Scale effective step size: s > 1 means finer steps (more samples). */
+  /** Scale the effective march budget: s > 1 means more executed samples. */
   setStepScale(scale: number): void {
     if (this.disposed) return;
-    this.uStepScale.value = Math.max(1e-5, scale);
+    const safeScale = Number.isFinite(scale) ? Math.max(1e-5, scale) : 1;
+    this.uStepScale.value = safeScale;
+    this.activeStepCount = Math.max(
+      1,
+      Math.min(this.baseMaxSteps, Math.round(this.baseMaxSteps * safeScale))
+    );
+    this.uActiveSteps.value = this.activeStepCount;
   }
 
   setVisible(visible: boolean): void {
     if (this.disposed) return;
+    this.visible = visible;
     this.mesh.visible = visible;
+  }
+
+  getDebugSnapshot(): Record<string, unknown> {
+    return {
+      baseMaxSteps: this.baseMaxSteps,
+      activeSteps: this.activeStepCount,
+      internalScale: this.uInternalScale.value,
+      visible: this.visible,
+      halfResolution: this.target !== null
+    };
   }
 
   dispose(): void {

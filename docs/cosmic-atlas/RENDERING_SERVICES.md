@@ -254,6 +254,23 @@ Centralize:
 
 Destinations supply physical radiance/emissive values under their model. Cinematic multipliers live in visual state, not hidden inside physics shaders.
 
+## 9a. CinematicPrimitives (visual fidelity overhaul)
+
+`src/renderer/shared/CinematicPrimitives.ts` owns the shared representation
+layer used by non-fullscreen destinations:
+
+- seeded inside-facing deep-space backdrop (sparse stars + multiscale dust);
+- emissive surfaces with analytic limb response and bounded granulation;
+- optically thin atmosphere/halo shells;
+- structured emissive annuli and finite jet cones.
+
+These are display representations. They consume resolved radius, temperature,
+gain, axis, seed, and model-time values from a destination and never replace
+the authoritative physics/data path. No wall-clock shader time is used, and
+paused captures remain stable. Detail budgets are selected from the global
+quality tier; every geometry and material belongs to the destination's
+`ResourceScope`.
+
 ## 10. GPU resource allocation
 
 Each service allocation belongs to either:
@@ -346,6 +363,13 @@ VolumeService:
 - max/average samples where measurable;
 - target bytes;
 - GPU time.
+
+The live `VolumeHandle.getDebugSnapshot()` also reports the compile-time upper
+bound and current `activeSteps`; `setStepScale()` guards the density/emission
+work itself, so a quality reduction is measurable rather than a spacing-only
+hint. Particle snapshots report `static`/`dynamic` activity, simulation and
+skip counts. Ribbons use a bounded wider companion strip for a geometry-backed
+halo; it is not a screen-space bloom dependency.
 
 TrajectoryService:
 

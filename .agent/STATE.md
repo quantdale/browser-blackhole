@@ -1,5 +1,57 @@
 # ACTIVE CAMPAIGN OVERRIDE — 2026-08-29
 
+## 2026-08-29 session — CINEMATIC VISUAL FIDELITY OVERHAUL
+
+The user requested `openspec/changes/cinematic-visual-fidelity-overhaul/`, but
+that directory did not exist in the checked-in repository. The only active
+OpenSpec was the paused performance campaign, whose proposal explicitly
+declared visual redesign out of scope. After reading the requested repository
+contracts and confirming the path was absent, a new scoped campaign contract
+was added under the requested path. It preserves all physics/data/timeline
+contracts and makes Stellar Explosion the first full-quality gate as directed.
+
+Baseline evidence:
+
+- starting SHA: `518bff7b8c14e4a22ada4c9376f166d8565c5263`;
+- `npm ci` initially hit a Windows EPERM on a locked native Rolldown file;
+  `npm install --ignore-scripts --no-audit --no-fund` restored the dependency
+  tree with the existing lock/package versions, after which `npm run check`
+  passed (format, lint, typecheck, 572/572 unit, build);
+- browser visual audit showed flat emissive surfaces, hard line strips, sparse
+  sprites, and black voids across non-black-hole destinations.
+
+First slice / shared foundation landed in the working tree:
+
+- `src/renderer/shared/CinematicPrimitives.ts` adds seeded, TSL-based deep
+  space backdrops, structured emissive surfaces, optically thin halos, discs,
+  and jet cones with tier-bounded detail;
+- Stellar Explosion consumes the resolved progenitor temperature/time/seed,
+  adds the backdrop, photosphere, shell atmosphere, and coherent GRB cone
+  representation; its validated density/emission/jet/timeline model is
+  untouched;
+- VolumeService now guards a runtime active-step count and reuses its renderer
+  size scratch; ParticleService has explicit static/zero-population skip
+  semantics; RibbonService adds a geometry-backed halo strip;
+- SharedPost has an opt-in graph-build-time cinematic grade; Scientific/Debug
+  do not pay for it. CameraRig/AutoFramer now distinguish viewer input from
+  transition/host writes, fixing late-phase explosion framing.
+
+Evidence at this checkpoint:
+
+- new primitive/volume/particle/camera unit coverage passes;
+- Stellar Explosion browser suite: 15/15 pass at one worker, including normal
+  and forced-WebGL2 paths, timeline motion, deterministic reset, transitions,
+  and resource stress;
+- SN golden rows were deliberately regenerated for the new environment,
+  surface, halo, active-step, and framing representation, then verified 6/6
+  in a dedicated comparison run. A second stable run remains before marking
+  the slice certified.
+
+Next action: commit this shared/first-slice checkpoint, then validate and
+finish Compact Merger, Tidal Disruption, Neutron Star, Quasar/AGN,
+Black-Hole Merger, Galaxy Collision, and Black Hole non-regression before
+producing `docs/VISUAL_FIDELITY_CERTIFICATION.md`.
+
 The active work is the **phenomena-animation campaign** (see the 2026-08-29
 session entry immediately below). It was selected by explicit user redirect:
 every non-black-hole destination was reported as visually static or

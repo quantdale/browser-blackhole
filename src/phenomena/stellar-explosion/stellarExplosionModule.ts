@@ -42,23 +42,8 @@
  */
 
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
 import type { Node, UniformNode } from 'three/webgpu';
-import {
-  cameraPosition,
-  clamp,
-  dot,
-  float,
-  length,
-  mix,
-  normalize,
-  positionWorld,
-  smoothstep,
-  sub,
-  uniform,
-  vec3,
-  vec4
-} from 'three/tsl';
+import { clamp, float, length, mix, smoothstep, uniform, vec3 } from 'three/tsl';
 
 import type {
   EnterContext,
@@ -104,6 +89,15 @@ import { resolveScenario } from './physics.js';
 import { shockRadiusUnits } from './physics.js';
 import { MIN_SHELL_WIDTH_UNITS, SHELL_SUPPORT, shellWidthUnits } from './shockShell.js';
 import { AutoFramer } from '../../renderer/shared/AutoFramer.js';
+import {
+  CINEMATIC_DETAIL_BY_TIER,
+  createCinematicBackdrop,
+  createCinematicHalo,
+  createCinematicJetMaterial,
+  createCinematicSurfaceMaterial,
+  type CinematicBackdropHandle,
+  type CinematicMaterialHandle
+} from '../../renderer/shared/CinematicPrimitives.js';
 import {
   engineIgnitionSeconds,
   phaseAt,
@@ -220,16 +214,22 @@ export function createStellarExplosionModule(): PhenomenonModule {
     minUnits: AUTO_FRAME_MIN_UNITS,
     maxUnits: AUTO_FRAME_MAX_UNITS
   });
-  // Progenitor surface presentation uniforms.
-  const uProgTint = uniform(new THREE.Vector3(1, 0.6, 0.35));
-  const uProgGain = uniform(0);
-  const uProgRadius = uniform(1);
-
   // Handles owned indirectly (dispose flows through the prepare scope and
   // the shared services' own disposal).
   let volumeHandle: import('../../atlas/types.js').VolumeHandle | null = null;
   let particleHandle: import('../../atlas/types.js').ParticleSystemHandle | null = null;
   let progenitorMesh: THREE.Mesh | null = null;
+  let progenitorVisual: CinematicMaterialHandle | null = null;
+  let shellHaloMesh: THREE.Mesh | null = null;
+  let shellHaloVisual: CinematicMaterialHandle | null = null;
+  let jetGroup: THREE.Group | null = null;
+  let jetTop: THREE.Mesh | null = null;
+  let jetBottom: THREE.Mesh | null = null;
+  let jetVisual: CinematicMaterialHandle | null = null;
+  let backdrop: CinematicBackdropHandle | null = null;
+  const jetAxisScratch = new THREE.Vector3();
+  const jetNegativeAxisScratch = new THREE.Vector3();
+  const jetUpScratch = new THREE.Vector3(0, 1, 0);
 
   let resolved: ResolvedScenario | null = null;
   let stateValue: StellarExplosionPublicState | null = null;
@@ -261,6 +261,34 @@ export function createStellarExplosionModule(): PhenomenonModule {
     const destinationScene = new THREE.Scene();
     destinationScene.name = 'stellar-explosion';
 
+    // A destination-safe deep-space context gives the ejecta a scale and
+    // silhouette. The validated explosion volume remains the source of all
+    // shell morphology; this is only the camera-facing environment layer.
+    const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
+    const cinematicBackdrop = createCinematicBackdrop({
+      seed: ctx.preset.seed,
+      intensity: 0.28,
+      dustColor: [0.055, 0.012, 0.045],
+      starColor: [0.72, 0.82, 1.0],
+      segments: detail.backdropSegments,
+      octaves: detail.backdropOctaves,
+      starCells: { x: 220, y: 110 }
+    });
+    destinationScene.add(cinematicBackdrop.mesh);
+    ctx.scope.track(
+      'geometry',
+      cinematicBackdrop.geometry,
+      () => cinematicBackdrop.geometry.dispose(),
+      32 * 20 * 32
+    );
+    ctx.scope.track(
+      'material',
+      cinematicBackdrop.material,
+      () => cinematicBackdrop.material.dispose(),
+      8192
+    );
+    backdrop = cinematicBackdrop;
+
     // --- progenitor star -----------------------------------------------------
     ctx.reportProgress(0.2, 'Building progenitor star');
     const segments = PROGENITOR_SEGMENTS[ctx.quality];
@@ -269,14 +297,18 @@ export function createStellarExplosionModule(): PhenomenonModule {
       segments.width,
       segments.height
     );
-    const progenitorMaterial = new MeshBasicNodeMaterial();
+    const progenitorSurface = createCinematicSurfaceMaterial({
+      tint: [1.0, 0.6, 0.35],
+      secondaryTint: [1.0, 0.24, 0.06],
+      seed: ctx.preset.seed,
+      radiance: 1,
+      noiseScale: 4.5,
+      noiseStrength: 0.18,
+      rimStrength: 1.35,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const progenitorMaterial = progenitorSurface.material;
     progenitorMaterial.name = 'stellar-explosion-progenitor';
-    // Restrained limb behaviour: slight center-limb brightening falloff via
-    // view-angle smoothstep (illustrative photosphere proxy, disclosed).
-    const viewDir = normalize(sub(cameraPosition, positionWorld));
-    const facing = float(dot(normalize(positionWorld), viewDir));
-    const limb = smoothstep(sub(0.15, 0.1), 0.25, facing);
-    progenitorMaterial.colorNode = vec4(uProgTint.mul(uProgGain.mul(mix(0.55, 1, limb))), 1);
     progenitorMesh = new THREE.Mesh(progenitorGeometry, progenitorMaterial);
     progenitorMesh.name = 'stellar-explosion-progenitor';
     destinationScene.add(progenitorMesh);
@@ -285,7 +317,66 @@ export function createStellarExplosionModule(): PhenomenonModule {
       (segments.width + 1) * (segments.height + 1) * 32 + segments.width * segments.height * 6 * 4;
     ctx.scope.track('geometry', progenitorGeometry, () => progenitorGeometry.dispose(), progBytes);
     ctx.scope.track('material', progenitorMaterial, () => progenitorMaterial.dispose(), 4096);
+    progenitorVisual = progenitorSurface;
     abortGuard('progenitor');
+
+    // Optically thin shell atmosphere. The volume still supplies the modelled
+    // emission/absorption field; this bounded additive layer restores a soft
+    // shock silhouette at the display edge without relying on bloom.
+    const haloGeometry = new THREE.SphereGeometry(
+      1,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const haloVisual = createCinematicHalo({
+      tint: [1.0, 0.22, 0.06],
+      seed: ctx.preset.seed ^ 0x51e7,
+      gain: 0,
+      alpha: 0.24,
+      noiseScale: 3.5,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const haloMesh = new THREE.Mesh(haloGeometry, haloVisual.material);
+    haloMesh.name = 'stellar-explosion-shell-atmosphere';
+    haloMesh.visible = false;
+    haloMesh.renderOrder = 15;
+    destinationScene.add(haloMesh);
+    ctx.scope.track('geometry', haloGeometry, () => haloGeometry.dispose(), 16 * 12 * 32);
+    ctx.scope.track('material', haloVisual.material, () => haloVisual.material.dispose(), 4096);
+    shellHaloMesh = haloMesh;
+    shellHaloVisual = haloVisual;
+
+    // The jet density remains inside the validated volume field. These two
+    // finite cones expose the same resolved front/axis/viewing response as a
+    // legible engine structure at cinematic scale; they do not introduce a
+    // second jet model or alter the model's density.
+    const jetGeometry = new THREE.ConeGeometry(1, 1, 24, 1, true);
+    jetGeometry.translate(0, 0.5, 0);
+    const jetSurface = createCinematicJetMaterial({
+      tint: [0.38, 0.64, 1.0],
+      secondaryTint: [0.16, 0.18, 0.8],
+      seed: ctx.preset.seed ^ 0x531,
+      gain: 0,
+      alpha: 0.58,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const top = new THREE.Mesh(jetGeometry, jetSurface.material);
+    const bottom = new THREE.Mesh(jetGeometry, jetSurface.material);
+    top.name = 'stellar-explosion-jet-plus';
+    bottom.name = 'stellar-explosion-jet-minus';
+    top.visible = false;
+    bottom.visible = false;
+    const jets = new THREE.Group();
+    jets.name = 'stellar-explosion-grb-jets';
+    jets.renderOrder = 20;
+    jets.add(top, bottom);
+    destinationScene.add(jets);
+    ctx.scope.track('geometry', jetGeometry, () => jetGeometry.dispose(), 24 * 6 * 32);
+    ctx.scope.track('material', jetSurface.material, () => jetSurface.material.dispose(), 4096);
+    jetGroup = jets;
+    jetTop = top;
+    jetBottom = bottom;
+    jetVisual = jetSurface;
 
     // --- volumetric ejecta (shared VolumeService, HALF-RESOLUTION path) ------
     ctx.reportProgress(0.45, 'Preparing ejecta volume field');
@@ -555,20 +646,25 @@ export function createStellarExplosionModule(): PhenomenonModule {
     }
 
     // --- progenitor surface ------------------------------------------------------
-    if (uProgGain !== null && progenitorMesh !== null) {
+    if (progenitorVisual !== null && progenitorMesh !== null) {
       const preExplosion = phase === 'progenitor';
       const collapsing = phase === 'collapse';
       const flashFade = phase === 'flash' ? 0.35 : 0;
       const gain = preExplosion ? 1 : collapsing ? 0.8 : flashFade;
-      uProgGain.value = gain;
+      progenitorVisual.setGain(gain);
+      progenitorVisual.setTime(seconds * 0.0001);
       if (preExplosion || collapsing || phase === 'flash') {
         const tint = kelvinToLinearRgb(ready.resolved.progenitorTemperatureK);
-        uProgTint.value.set(tint[0], tint[1], tint[2]);
+        progenitorVisual.setTint(tint);
+        progenitorVisual.setSecondaryTint([
+          tint[0],
+          tint[1] * 0.42,
+          Math.max(0.02, tint[2] * 0.22)
+        ]);
         progenitorMesh.visible = gain > 0;
       } else {
         progenitorMesh.visible = false;
       }
-      uProgRadius.value = ready.resolved.progenitorRadiusUnits;
     }
 
     // --- jet -----------------------------------------------------------------
@@ -584,11 +680,44 @@ export function createStellarExplosionModule(): PhenomenonModule {
       const normalizedResponse = response / (viewingResponse(90, ready.resolved) || 1);
       uJetGain.value =
         ready.resolved.jet.enabled && front > 0 ? JET_EMISSION_GAIN * normalizedResponse : 0;
+      if (jetGroup !== null && jetTop !== null && jetBottom !== null && jetVisual !== null) {
+        const jetVisible = ready.resolved.jet.enabled && front > 0;
+        jetGroup.visible = jetVisible;
+        const coneRadius = Math.max(
+          front * Math.tan(ready.resolved.jet.halfOpeningAngleRad),
+          ready.resolved.progenitorRadiusUnits * 0.08
+        );
+        jetTop.scale.set(coneRadius, Math.max(front, 1e-4), coneRadius);
+        jetBottom.scale.copy(jetTop.scale);
+        jetAxisScratch.set(ready.resolved.axis[0], ready.resolved.axis[1], ready.resolved.axis[2]);
+        if (jetAxisScratch.lengthSq() < 1e-12) jetAxisScratch.copy(jetUpScratch);
+        else jetAxisScratch.normalize();
+        jetNegativeAxisScratch.copy(jetAxisScratch).multiplyScalar(-1);
+        jetTop.quaternion.setFromUnitVectors(jetUpScratch, jetAxisScratch);
+        jetBottom.quaternion.setFromUnitVectors(jetUpScratch, jetNegativeAxisScratch);
+        jetVisual.setGain(Math.min(8, uJetGain.value));
+        jetVisual.setTime(seconds * 0.0002);
+        jetTop.visible = jetVisible;
+        jetBottom.visible = jetVisible;
+      }
     }
 
     // --- resource phase awareness ---------------------------------------------
     const volumeVisible = phaseHasEjecta(phase) && age > 0;
     volumeHandle?.setVisible(volumeVisible);
+    if (shellHaloMesh !== null && shellHaloVisual !== null) {
+      const shellRadius = Math.max(
+        ready.resolved.progenitorRadiusUnits,
+        densityU?.shellRadius.value ?? ready.resolved.progenitorRadiusUnits
+      );
+      shellHaloMesh.scale.setScalar(shellRadius * 1.08);
+      shellHaloMesh.visible = volumeVisible;
+      shellHaloVisual.setGain(
+        volumeVisible ? Math.min(1.6, (emissionU?.gain.value ?? 0) * 0.34) : 0
+      );
+      shellHaloVisual.setTime(seconds * 0.00012);
+    }
+    backdrop?.setTime(seconds * 0.00002);
     if (particleHandle !== null) {
       particleHandle.setPopulationScale(populationFractionFor(phase));
       if (volumeVisible && !snapshot.paused) {
@@ -622,6 +751,7 @@ export function createStellarExplosionModule(): PhenomenonModule {
 
   function render(ctx: RenderContext): void {
     if (ctx.scene !== null && ctx.camera !== null) {
+      backdrop?.syncToCamera(ctx.camera);
       ctx.renderer.render(ctx.scene, ctx.camera);
     }
   }
@@ -638,6 +768,14 @@ export function createStellarExplosionModule(): PhenomenonModule {
     scene?.clear();
     scene = null;
     progenitorMesh = null;
+    progenitorVisual = null;
+    shellHaloMesh = null;
+    shellHaloVisual = null;
+    jetGroup = null;
+    jetTop = null;
+    jetBottom = null;
+    jetVisual = null;
+    backdrop = null;
     volumeHandle = null;
     particleHandle = null;
     densityU = null;

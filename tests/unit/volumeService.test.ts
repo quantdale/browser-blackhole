@@ -266,4 +266,17 @@ describe('VolumeService lifecycle and disposal ownership', () => {
     expect(volume.object3d().visible).toBe(false);
     service.dispose();
   });
+
+  it('reports the active march budget independently from the render proxy', () => {
+    const service = new VolumeService();
+    const volume = service.createVolume(makeConfig({ baseMaxSteps: 80 }));
+    expect(volume.getDebugSnapshot?.()).toMatchObject({
+      baseMaxSteps: 80,
+      activeSteps: 80,
+      visible: true
+    });
+    volume.setStepScale(0.5);
+    expect(volume.getDebugSnapshot?.()).toMatchObject({ activeSteps: 40 });
+    service.dispose();
+  });
 });

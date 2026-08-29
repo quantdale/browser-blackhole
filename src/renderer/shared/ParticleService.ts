@@ -286,6 +286,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   readonly capacity: number;
 
   private readonly config: ParticleSystemConfig;
+  private readonly activity: 'static' | 'dynamic';
   private readonly emitters: EmitterBlock;
   private readonly hasComputeRenderer: boolean;
   private readonly rendererRef: RendererLike | null;
@@ -308,6 +309,9 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   private readonly dtUniform: UniformNode<'float', number>;
   private readonly computeUpdate: ComputeNode | null;
   private drawnCount: number;
+  private simulationUpdates = 0;
+  private skippedUpdates = 0;
+  private lastSkipReason: 'none' | 'zero-population' | 'static' | 'zero-dt' = 'none';
   private disposed = false;
 
   constructor(config: ParticleSystemConfig, rendererRef: RendererLike | null) {
@@ -315,6 +319,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
       throw new Error(`ParticleService: invalid capacity ${config.capacity}.`);
     }
     this.config = config;
+    this.activity = config.activity ?? 'dynamic';
     this.capacity = Math.floor(config.capacity);
     this.emitters = buildEmitterBlock(config.emitters);
     this.rendererRef = rendererRef;
@@ -629,8 +634,24 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   /** Advance the simulation deterministically by `dtSeconds`. */
   update(dtSeconds: number): void {
     if (this.disposed) return;
+    if (this.activity === 'static') {
+      this.skippedUpdates += 1;
+      this.lastSkipReason = 'static';
+      return;
+    }
+    if (this.drawnCount <= 0) {
+      this.skippedUpdates += 1;
+      this.lastSkipReason = 'zero-population';
+      return;
+    }
     const dt = Math.min(Math.max(dtSeconds, 0), MAX_DT_SECONDS);
-    if (dt === 0) return;
+    if (dt === 0) {
+      this.skippedUpdates += 1;
+      this.lastSkipReason = 'zero-dt';
+      return;
+    }
+    this.lastSkipReason = 'none';
+    this.simulationUpdates += 1;
 
     if (this.useCompute && this.computeUpdate !== null) {
       // GPU path: set dt, dispatch, done. No CPU readback, no attribute upload.
@@ -680,7 +701,9 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   setPopulationScale(scale: number): void {
     if (this.disposed) return;
     const s = Math.min(Math.max(scale, 0), 1);
-    this.drawnCount = Math.round(this.capacity * s);
+    const nextCount = Math.round(this.capacity * s);
+    if (nextCount === this.drawnCount) return;
+    this.drawnCount = nextCount;
     // Instanced equivalent of drawRange: the renderer skips the draw entirely at 0.
     this.geometry.instanceCount = this.drawnCount;
   }
@@ -709,7 +732,11 @@ class ParticleSystemImpl implements ParticleSystemHandle {
       bufferBytes: this.capacity * BYTES_PER_PARTICLE,
       updatePath: this.useCompute ? 'compute' : 'cpu',
       computeAvailable: this.useCompute,
-      blending: this.config.blending
+      blending: this.config.blending,
+      activity: this.activity,
+      simulationUpdates: this.simulationUpdates,
+      skippedUpdates: this.skippedUpdates,
+      lastSkipReason: this.lastSkipReason
     };
   }
 }

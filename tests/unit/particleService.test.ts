@@ -300,6 +300,33 @@ describe('ParticleSystem configuration validation', () => {
 });
 
 describe('ParticleSystem population scaling and debug metadata', () => {
+  it('does not advance an explicitly static population', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const system = service.createSystem(makeConfig({ activity: 'static' }));
+    const before = snapshot(system).pos.slice();
+    system.update(0.5);
+    expect(snapshot(system).pos).toEqual(before);
+    expect(system.getDebugSnapshot()).toMatchObject({
+      activity: 'static',
+      simulationUpdates: 0,
+      lastSkipReason: 'static'
+    });
+    service.dispose();
+  });
+
+  it('does not simulate a dynamic population while its draw count is zero', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const system = service.createSystem(makeConfig());
+    system.setPopulationScale(0);
+    system.update(0.5);
+    expect(system.getDebugSnapshot()).toMatchObject({
+      activity: 'dynamic',
+      simulationUpdates: 0,
+      lastSkipReason: 'zero-population'
+    });
+    service.dispose();
+  });
+
   it('throttles instanceCount and clamps the scale into [0, 1]', () => {
     const service = new ParticleService({ computeAvailable: false });
     const system = service.createSystem(makeConfig({ capacity: 100 }));

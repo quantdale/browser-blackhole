@@ -119,14 +119,20 @@ function resamplePolyline(points: readonly THREE.Vector3[], count: number): THRE
 /** Concrete ribbon handle. One GPU geometry + material pair per ribbon. */
 class RibbonHandleImpl implements RibbonHandle {
   readonly mesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
+  private readonly root: THREE.Group;
+  private readonly haloMesh: THREE.Mesh<THREE.BufferGeometry, THREE.MeshBasicMaterial>;
 
   private readonly cfg: RibbonConfig;
   private readonly capacityPoints: number;
   private readonly positions: Float32Array;
   private readonly colors: Float32Array;
+  private readonly haloPositions: Float32Array;
+  private readonly haloColors: Float32Array;
   private readonly tangents: Float32Array;
   private readonly positionAttr: THREE.BufferAttribute;
   private readonly colorAttr: THREE.BufferAttribute;
+  private readonly haloPositionAttr: THREE.BufferAttribute;
+  private readonly haloColorAttr: THREE.BufferAttribute;
   private readonly vecA = new THREE.Vector3();
   private readonly vecB = new THREE.Vector3();
   private readonly lateral = new THREE.Vector3();
@@ -147,6 +153,8 @@ class RibbonHandleImpl implements RibbonHandle {
     const vertexCount = this.capacityPoints * 2;
     this.positions = new Float32Array(vertexCount * 3);
     this.colors = new Float32Array(vertexCount * 4);
+    this.haloPositions = new Float32Array(vertexCount * 3);
+    this.haloColors = new Float32Array(vertexCount * 4);
     this.tangents = new Float32Array(this.capacityPoints * 3);
 
     const geometry = new THREE.BufferGeometry();
@@ -169,6 +177,32 @@ class RibbonHandleImpl implements RibbonHandle {
     // Vertices are rewritten wholesale on setSpine; maintaining a bounding sphere
     // across partial rewrites is not worth it for ribbon-sized vertex counts.
     this.mesh.frustumCulled = false;
+
+    // A wider, lower-alpha companion strip supplies an actual spatial halo
+    // around the ribbon. It is separate geometry, not a screen-space blur, so
+    // the stream remains legible with bloom disabled and under WebGL2.
+    const haloGeometry = new THREE.BufferGeometry();
+    this.haloPositionAttr = new THREE.BufferAttribute(this.haloPositions, 3);
+    this.haloColorAttr = new THREE.BufferAttribute(this.haloColors, 4);
+    haloGeometry.setAttribute('position', this.haloPositionAttr);
+    haloGeometry.setAttribute('color', this.haloColorAttr);
+    haloGeometry.setIndex(buildStripIndices(this.capacityPoints));
+    haloGeometry.setDrawRange(0, 0);
+    const haloMaterial = new THREE.MeshBasicMaterial({
+      vertexColors: true,
+      transparent: true,
+      depthWrite: false,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending
+    });
+    this.haloMesh = new THREE.Mesh(haloGeometry, haloMaterial);
+    this.haloMesh.frustumCulled = false;
+    this.haloMesh.renderOrder = -1;
+    this.mesh.renderOrder = 0;
+    this.root = new THREE.Group();
+    this.root.name = 'CinematicRibbon';
+    this.root.frustumCulled = false;
+    this.root.add(this.haloMesh, this.mesh);
   }
 
   setWidthScale(scale: number): void {
@@ -206,6 +240,7 @@ class RibbonHandleImpl implements RibbonHandle {
         Math.max(0, THREE.MathUtils.lerp(cfg.widthStart, cfg.widthEnd, s)) *
         taper *
         this.widthScale;
+      const haloHalfWidth = halfWidth * 3.8;
 
       const p = spine[i]!;
       const lx = this.lateral.x * halfWidth;
@@ -221,34 +256,54 @@ class RibbonHandleImpl implements RibbonHandle {
       positions[v0 + 0] = p.x - lx;
       positions[v0 + 1] = p.y - ly;
       positions[v0 + 2] = p.z - lz;
+      const haloLx = this.lateral.x * haloHalfWidth;
+      const haloLy = this.lateral.y * haloHalfWidth;
+      const haloLz = this.lateral.z * haloHalfWidth;
+      this.haloPositions[v0 + 0] = p.x - haloLx;
+      this.haloPositions[v0 + 1] = p.y - haloLy;
+      this.haloPositions[v0 + 2] = p.z - haloLz;
       const v1 = v0 + 3;
       positions[v1 + 0] = p.x + lx;
       positions[v1 + 1] = p.y + ly;
       positions[v1 + 2] = p.z + lz;
+      this.haloPositions[v1 + 0] = p.x + haloLx;
+      this.haloPositions[v1 + 1] = p.y + haloLy;
+      this.haloPositions[v1 + 2] = p.z + haloLz;
 
       const c0 = i * 8; // (i * 2) * 4
       colors[c0 + 0] = r;
       colors[c0 + 1] = g;
       colors[c0 + 2] = b;
       colors[c0 + 3] = a;
+      this.haloColors[c0 + 0] = r;
+      this.haloColors[c0 + 1] = g;
+      this.haloColors[c0 + 2] = b;
+      this.haloColors[c0 + 3] = a * 0.16;
       const c1 = c0 + 4;
       colors[c1 + 0] = r;
       colors[c1 + 1] = g;
       colors[c1 + 2] = b;
       colors[c1 + 3] = a;
+      this.haloColors[c1 + 0] = r;
+      this.haloColors[c1 + 1] = g;
+      this.haloColors[c1 + 2] = b;
+      this.haloColors[c1 + 3] = a * 0.16;
     }
 
     geometry.setDrawRange(0, (n - 1) * 6);
+    this.haloMesh.geometry.setDrawRange(0, (n - 1) * 6);
     this.positionAttr.needsUpdate = true;
     this.colorAttr.needsUpdate = true;
+    this.haloPositionAttr.needsUpdate = true;
+    this.haloColorAttr.needsUpdate = true;
   }
 
   object3d(): THREE.Object3D {
-    return this.mesh;
+    return this.root;
   }
 
   setVisible(visible: boolean): void {
-    this.mesh.visible = visible;
+    this.root.visible = visible;
   }
 
   dispose(): void {
@@ -257,9 +312,11 @@ class RibbonHandleImpl implements RibbonHandle {
     }
     this.released = true;
     this.onRelease();
-    this.mesh.removeFromParent();
+    this.root.removeFromParent();
     this.mesh.geometry.dispose();
     this.mesh.material.dispose();
+    this.haloMesh.geometry.dispose();
+    this.haloMesh.material.dispose();
   }
 
   /** Per-point unit tangents with midpoint averaging; degenerate joints inherit. */

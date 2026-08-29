@@ -137,8 +137,9 @@ class DeferredSharedPost implements ISharedPost {
   private inner: SharedPost | null = null;
   private pendingSize: { widthPx: number; heightPx: number; renderScale: number } | null = null;
   private exposureValue = 1;
-  private bloomEnabledValue = true;
-  private bloomStrengthValue = 0.5;
+  private bloomEnabledValue = false;
+  private bloomStrengthValue = 0;
+  private cinematicStyleValue = false;
   private toneMappingValue: ToneMappingMode = 'aces-filmic';
 
   attach(renderer: RendererLike, scope: ResourceScope): void {
@@ -151,6 +152,7 @@ class DeferredSharedPost implements ISharedPost {
     }
     this.inner.setExposure(this.exposureValue);
     this.inner.setBloom(this.bloomEnabledValue, this.bloomStrengthValue);
+    this.inner.setCinematicStyle(this.cinematicStyleValue);
     this.inner.setToneMapping(this.toneMappingValue);
   }
 
@@ -172,6 +174,11 @@ class DeferredSharedPost implements ISharedPost {
     this.bloomEnabledValue = enabled;
     this.bloomStrengthValue = strength;
     this.inner?.setBloom(enabled, strength);
+  }
+
+  setCinematicStyle(enabled: boolean): void {
+    this.cinematicStyleValue = enabled === true;
+    this.inner?.setCinematicStyle(enabled);
   }
 
   setToneMapping(mode: ToneMappingMode): void {
@@ -282,8 +289,8 @@ export class CosmicAtlasHost {
   // Visual presentation state mirrored for the public snapshot; applied to the
   // shared post through the deferred front-end.
   private exposureValue = 1;
-  private bloomEnabledValue = true;
-  private bloomStrengthValue = 0.5;
+  private bloomEnabledValue = false;
+  private bloomStrengthValue = 0;
   private toneMappingValue: ToneMappingMode = 'aces-filmic';
 
   // M5 canonical product state.
@@ -803,6 +810,7 @@ export class CosmicAtlasHost {
   setExperienceMode(mode: ExperienceMode): void {
     if (!(mode in EXPERIENCE_VISUAL_DEFAULTS)) return;
     this.experienceModeValue = mode;
+    this.post.setCinematicStyle(mode === 'cinematic');
     const defaults = EXPERIENCE_VISUAL_DEFAULTS[mode];
     this.setVisual(defaults);
     if (mode === 'debug') this.diagnosticsEnabledValue = true;
