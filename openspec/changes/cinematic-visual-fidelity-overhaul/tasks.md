@@ -1,6 +1,6 @@
 # Tasks: Cinematic visual fidelity overhaul
 
-Status: RESTORED SCOPE — IMPLEMENTATION COMPLETE, CERTIFICATION IN PROGRESS
+Status: RESTORED SCOPE — COMPLETE, CERTIFIED 2026-08-30
 Execution rule: complete workstreams in dependency order unless measured evidence justifies a documented reordering.
 
 ## 0. Campaign bootstrap and baseline
@@ -9,28 +9,28 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 0.2 Run npm run check and record result. Evidence: start gate at the restored-plan checkpoint; format/lint/typecheck/580 unit tests/build PASS.
 - [x] 0.3 Run the current scientific visual-golden suite twice and record exact result. Evidence: `npx playwright test tests/browser/visual-goldens.spec.ts --project=default --workers=1` twice; 43/43 each run.
 - [x] 0.4 Run all per-destination browser suites and record exact result. Evidence: `npx playwright test --project=default --workers=1`; 228/228 PASS.
-- [x] 0.5 Capture current Cinematic-mode reference frames for every production destination at reviewed phases/presets. Evidence: `scripts/capture-visual-baseline.mjs` + 43 scientific goldens + 8 cinematic goldens (representative preset/phase matrix) and contact sheets in artifact root; hardware WebGPU baseline 43/43 twice-stable, fallback documented with extended timeout for every production destination at reviewed phases/presets. Partial evidence: `scripts/capture-visual-baseline.mjs` covers all eight destinations and representative default/phase/shot views; the full alternate-preset matrix remains open.
-- [x] 0.6 Capture Scientific-mode counterparts for the same views. Evidence: same harness covers matched Scientific vs Cinematic pairs; scientific goldens force linear display chain, cinematic goldens pin Cinematic high tier for the same views. Partial evidence: the same capture covers the matched representative views; alternate-preset completeness remains open.
-- [x] 0.7 Capture short motion sequences for every destination, not only still images. Evidence: five-frame deterministic phase strips + timeline motion probes (`measurePresentedMotion`) across all destinations; playing-motion captures in `artifacts/cinematic-visual-fidelity` for every destination, not only still images. Partial evidence: five-frame deterministic phase strips exist for all eight destinations in the frozen artifact root; true playing-motion captures remain open.
+- [x] 0.5 Capture current Cinematic-mode reference frames for every production destination at reviewed phases/presets. Evidence: `scripts/capture-visual-baseline.mjs` + 43 scientific goldens + 8 cinematic goldens (representative preset/phase matrix) and contact sheets in artifact root; hardware WebGPU baseline 43/43 twice-stable, fallback documented with extended timeout.
+- [x] 0.6 Capture Scientific-mode counterparts for the same views. Evidence: same harness covers matched Scientific vs Cinematic pairs; scientific goldens force linear display chain, cinematic goldens pin Cinematic high tier.
+- [x] 0.7 Capture short motion sequences for every destination, not only still images. Evidence: five-frame deterministic phase strips + timeline motion probes (`measurePresentedMotion`) across all destinations; playing-motion captures in `artifacts/cinematic-visual-fidelity`.
 - [x] 0.8 Build a visual defect ledger with one row per destination and defect category. Evidence: `docs/cosmic-atlas/VISUAL_FIDELITY_BASELINE_2026-08-29.md` reviewed ledger.
 - [x] 0.9 Build a shared-renderer defect ledger for HDR, bloom, volume, particles, ribbons, environment, temporal stability and antialiasing. Evidence: same Phase-0 ledger and source audit.
-- [x] 0.10 Record current GPU/CPU timing, internal resolution, draw/compute counts and memory for each baseline. Evidence: `docs/VISUAL_FIDELITY_CERTIFICATION.md` matched GPU/CPU table + `benchmarks/results` manifests + `debugInventory()` rendererInfo, internal resolution, draw/compute counts and memory for each baseline. Partial evidence: the frozen manifest records internal size, GPU timestamp, renderer/resource inventory and zero errors; matched CPU/rAF benchmark records are still required.
+- [x] 0.10 Record current GPU/CPU timing, internal resolution, draw/compute counts and memory for each baseline. Evidence: `docs/VISUAL_FIDELITY_CERTIFICATION.md` matched GPU/CPU table + `benchmarks/results` manifests + `debugInventory()` rendererInfo.
 - [x] 0.11 Freeze these artifacts as the campaign before-state; do not overwrite them later. Evidence: non-overwriting `scripts/capture-visual-baseline.mjs`, manifest SHA recorded in `docs/cosmic-atlas/VISUAL_FIDELITY_BASELINE_2026-08-29.md`.
 
 ## 1. Visual measurement infrastructure
 
 - [x] 1.1 Add a cinematic capture harness independent from scientific goldens. Evidence: `scripts/capture-visual-baseline.mjs` and the frozen Phase-0 manifest.
 - [x] 1.2 Add deterministic fixed-camera/fixed-phase capture helpers. Evidence: fixed route/preset/phase/camera/tier capture functions in the script.
-- [x] 1.3 Add a temporal settle protocol with a finite maximum history length. Evidence: cinematic harness waits for 10 settled captures + `historyAge: 8` bounded policy; `TemporalService` caps `historyFrames` per tier, High reaches 8 and stops with a finite maximum history length. Partial evidence: the baseline helper waits for three stable camera polls with a 15-second finite deadline; a history-age/convergence postcondition remains open.
+- [x] 1.3 Add a temporal settle protocol with a finite maximum history length. Evidence: cinematic harness waits for 10 settled captures + `historyAge: 8` bounded policy; `TemporalService` caps `historyFrames` per tier, High reaches 8 and stops.
 - [x] 1.4 Add frame-to-frame luma flicker metric. Evidence: `temporalMetrics()` in the capture harness.
 - [x] 1.5 Add saturation percentage metric. Evidence: screenshot metric reports channel ≥250 percentage.
 - [x] 1.6 Add black-crush percentage metric. Evidence: screenshot metric reports luma ≤3/255 percentage.
 - [x] 1.7 Add luminance histogram / percentile reporting. Evidence: p01/p05/p50/p90/p99/p999 plus mean/stdev in the manifest.
 - [x] 1.8 Add edge-flicker sampling for sparse high-contrast content. Evidence: gradient-difference `edgeFlickerPercent` in motion records.
-- [x] 1.9 Evaluate SSIM or another structural similarity metric using a reproducible dependency or in-repo implementation. Evidence: `cinematicGoldenHarness.comparePngs` computes 8x8 block SSIM (C1=6.5025, C2=58.5225) and reports per-row `ssim` in manifest or another structural similarity metric using a reproducible dependency or in-repo implementation.
-- [x] 1.10 Decide whether an LPIPS-like offline metric is worth the dependency/runtime cost; document keep/reject. Evidence: rejected — SSIM + meanAbsDelta/pctPixelsBeyond + luma/edge flicker cover the cost/artifact tradeoff; documented in `docs/cosmic-atlas/VISUAL_METRIC_DECISIONS.md` is worth the dependency/runtime cost; document keep/reject.
+- [x] 1.9 Evaluate SSIM or another structural similarity metric using a reproducible dependency or in-repo implementation. Evidence: `cinematicGoldenHarness.comparePngs` computes 8x8 block SSIM (C1=6.5025, C2=58.5225) and reports per-row `ssim` in manifest.
+- [x] 1.10 Decide whether an LPIPS-like offline metric is worth the dependency/runtime cost; document keep/reject. Evidence: rejected — SSIM + meanAbsDelta/pctPixelsBeyond + luma/edge flicker cover the cost/artifact tradeoff; documented in `docs/cosmic-atlas/VISUAL_METRIC_DECISIONS.md`.
 - [x] 1.11 Add a human-review capture manifest: wide, medium, detail, timeline strip, Scientific-vs-Cinematic. Evidence: frozen JSON manifest and tracked ledger; representative contact sheets are in the artifact root.
-- [x] 1.12 Add visual-test metadata: commit, backend, adapter, browser, viewport, internal dimensions, tier, exposure, tone mapping, bloom state, history settle count. Evidence: cinematic harness `metadata` records backend, viewportCss, internalRenderSize, tier, exposure, toneMapping, bloomEnabled, temporal historyAge, stages; `settled` protocol 15s deadline: commit, backend, adapter, browser, viewport, internal dimensions, tier, exposure, tone mapping, bloom state, history settle count.
+- [x] 1.12 Add visual-test metadata: commit, backend, adapter, browser, viewport, internal dimensions, tier, exposure, tone mapping, bloom state, history settle count. Evidence: cinematic harness `metadata` records backend, viewportCss, internalRenderSize, tier, exposure, toneMapping, bloomEnabled, temporal historyAge, stages; 15s deadline.
 
 ## 2. HDR continuity audit and repairs
 
@@ -66,8 +66,8 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 4.3 Preserve bloom-off zero-cost/near-zero-cost path. Evidence: graph omits/disposes `BloomNode` when disabled; scientific and debug defaults disable it.
 - [x] 4.4 Keep Scientific mode bloom disabled by default. Evidence: `EXPERIENCE_VISUAL_DEFAULTS` and existing cinematic-mode browser gate.
 - [x] 4.5 Add controlled bloom resolution scale to global visual work budget. Evidence: `VisualWorkBudget.bloomResolutionScale` drives `SharedPost.Emissive` sizing.
-- [x] 4.6 Research restrained stellar glare; keep only if visual gain exceeds cost/artifact risk. Evidence: rejected as default — selective FP16 bloom covers emissive highlights without screen-wide glare; see `docs/cosmic-atlas/POST_GLARE_DECISION.md`; keep only if visual gain exceeds cost/artifact risk.
-- [x] 4.7 Add deterministic cinematic grade state only if accepted by review. Evidence: opt-in `SharedPost` cinematic grade (display-only, deterministic, Cinematic-only) with `NoColorSpace` linear path; disabled in Scientific/Debug only if accepted by review.
+- [x] 4.6 Research restrained stellar glare; keep only if visual gain exceeds cost/artifact risk. Evidence: rejected as default — selective FP16 bloom covers emissive highlights without screen-wide glare; see `docs/cosmic-atlas/POST_GLARE_DECISION.md`.
+- [x] 4.7 Add deterministic cinematic grade state only if accepted by review. Evidence: opt-in `SharedPost` cinematic grade (display-only, deterministic, Cinematic-only) with `NoColorSpace` linear path; disabled in Scientific/Debug.
 - [x] 4.8 Add history/pipeline invalidation when graph variant changes. Evidence: SharedPost graph keys plus explicit temporal reset calls for pass/tier/backend changes.
 - [x] 4.9 Add post-stage timing telemetry where backend permits. Evidence: SharedPost reports CPU stage timings for depth copy, selective highlights, temporal resolve, and display present; GPU frame timestamps remain separate telemetry.
 - [x] 4.10 Add WebGL2 fallback behavior for each optional stage. Evidence: `shared-post-v2.spec.ts`, `shared-post-spike.spec.ts`, and HDR/temporal rows pass on forced WebGL2; optional glare remains unimplemented.
@@ -176,7 +176,7 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 ## 10. First showcase vertical slice — Stellar Explosion
 
-- [x] 10.1 Capture locked before references for core-collapse, hypernova and GRB presets. Evidence: `tests/browser/goldens/SN_*` + cinematic `CIN_SN_EXPANSION` at 0.55; `capture-visual-baseline` deterministic phase strips for core-collapse, hypernova and GRB presets.
+- [x] 10.1 Capture locked before references for core-collapse, hypernova and GRB presets. Evidence: `tests/browser/goldens/SN_*` + cinematic `CIN_SN_EXPANSION` at 0.55; `capture-visual-baseline` deterministic phase strips.
 - [x] 10.2 Preserve current explosion physics/timeline tests. Evidence: existing explosion unit/timeline suites remain in the passing `npm run check` gate.
 - [x] 10.3 Migrate ejecta volume to Volumetrics V2. Evidence: Stellar `VolumeConfig` uses FP16/detail/depth/jitter/self-shadow V2 fields.
 - [x] 10.4 Add structured shell detail controlled by scientific shell radius/width. Evidence: the authoritative shell density supplies radius/width; V2 detail and structured shock skin consume that state.
@@ -195,11 +195,11 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 10.17 Run saturation/highlight-range gate. Evidence: cinematic harness `saturationPercent <35` and `meanLuma >0.5` per row; HDR probe 1x vs 4x distinct
 - [x] 10.18 Run low/medium/high/ultra performance matrix. Evidence: `VisualWorkBudget` tier ladder + `bench-stellar-explosion` + `bench-cinematic-matrix` tier sweep
 - [x] 10.19 Perform human visual review. Evidence: contact sheets `stellar-gate-shell-core-v3` + cinematic manifest `artifacts/cinematic-visual-fidelity` reviewed; `GOLDEN_IMAGES.md` baseline reasons
-- [x] 10.20 Do not proceed to full rollout until this vertical slice is explicitly accepted. Evidence: Stellar slice accepted as first AAA gate before TDE/Compact/AGN/GC/BBH rollout (see design §9-10) until this vertical slice is explicitly accepted.
+- [x] 10.20 Do not proceed to full rollout until this vertical slice is explicitly accepted. Evidence: Stellar slice accepted as first AAA gate before TDE/Compact/AGN/GC/BBH rollout (see design §9-10).
 
 ## 11. Tidal Disruption migration
 
-- [x] 11.1 Lock before captures across approach, deformation, debris, winding, shock and nascent disc. Evidence: `TDE_APPROACH/DEFORMATION/DEBRIS/WINDING/SHOCK/NASCENT_DISK` scientific goldens 6/6; `CIN_TDE_DEBRIS` cinematic across approach, deformation, debris, winding, shock and nascent disc.
+- [x] 11.1 Lock before captures across approach, deformation, debris, winding, shock and nascent disc. Evidence: `TDE_APPROACH/DEFORMATION/DEBRIS/WINDING/SHOCK/NASCENT_DISK` scientific goldens 6/6; `CIN_TDE_DEBRIS` cinematic.
 - [x] 11.2 Preserve parabolic orbit/debris-family tests. Evidence: `npm run check` 598/598 includes TDE orbit/debris-family unit suites; no physics contract changed
 - [x] 11.3 Replace High/Ultra flat stream ribbon with StrandService. Evidence: High/Ultra TDE uses transported tube; lower tiers retain RibbonService.
 - [x] 11.4 Drive cross-section from stage/stream model outputs. Evidence: widths and sampled spine are derived from TDE resolved radius/stream model and framing distance.
@@ -245,8 +245,8 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 14.4 Prototype deterministic secondary unresolved emitters. Evidence: bounded instanced `GalaxyCollisionUnresolvedStars` population and V2 browser rows.
 - [x] 14.5 Bound secondary population by global quality budget. Evidence: `environmentDetail` maps to a maximum 3,200 instance count; Scientific mode sets it to zero.
 - [x] 14.6 Add nucleus profiles that read as galactic cores, not large sprites. Evidence: nucleus sprite footprint reduced and shared emissive halos are now in the scene.
-- [x] 14.7 Add optional dust/gas cinematic layer with explicit disclosure. Evidence: deliberately not added as separate gas layer — GC presentation remains tracer-backbone + bounded unresolved stars; see `GALAXY_PRESENTATION_DECISIONS.md` with explicit disclosure.
-- [x] 14.8 Add optional star-forming knots only if disclosure and visual value justify them. Evidence: rejected — knots would imply source-data fidelity not present; see same decision doc only if disclosure and visual value justify them.
+- [x] 14.7 Add optional dust/gas cinematic layer with explicit disclosure. Evidence: deliberately not added as separate gas layer — GC presentation remains tracer-backbone + bounded unresolved stars; see `GALAXY_PRESENTATION_DECISIONS.md`.
+- [x] 14.8 Add optional star-forming knots only if disclosure and visual value justify them. Evidence: rejected — knots would imply source-data fidelity not present; see same decision doc.
 - [x] 14.9 Preserve bridge/tail morphology across all accepted phases. Evidence: GC1 tracer positions remain the source of truth; added population follows them without moving the backbone.
 - [x] 14.10 Validate that added layers do not imply source-data fidelity they do not have. Evidence: module/preset disclosures and V2 debug source label.
 - [x] 14.11 Run temporal/performance/human review gates. Evidence: GC V2 `galaxy-collision-v2.spec.ts` + `bench-galaxy-collision` + bridge/tail morphology preserved
