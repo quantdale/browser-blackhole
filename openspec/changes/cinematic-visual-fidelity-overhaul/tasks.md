@@ -48,52 +48,52 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 ## 3. SharedPost V2 architecture spike
 
-- [ ] 3.1 Read the exact Three.js r185 RenderPipeline/TSL API used by the pinned dependency.
-- [ ] 3.2 Prototype the current SharedPost output using RenderPipeline without changing accepted pixels.
-- [ ] 3.3 Prototype MRT output on WebGPU.
-- [ ] 3.4 Prototype MRT output on forceWebGL.
-- [ ] 3.5 Prototype selective bloom using an emissive/highlight attachment.
-- [ ] 3.6 Measure pipeline cost and program/resource count.
+- [x] 3.1 Read the exact Three.js r185 RenderPipeline/TSL API used by the pinned dependency. Evidence: direct source audit recorded in `docs/cosmic-atlas/SHARED_POST_V2_SPIKE.md`.
+- [x] 3.2 Prototype the current SharedPost output using RenderPipeline without changing accepted pixels. Evidence: `shared-post-spike.spec.ts` exact raw FP16 center-word match on WebGPU/WebGL2.
+- [x] 3.3 Prototype MRT output on WebGPU. Evidence: named `output`/`emissive` raw attachment readback PASS.
+- [x] 3.4 Prototype MRT output on forceWebGL. Evidence: same named attachment readback PASS on forced WebGL2.
+- [x] 3.5 Prototype selective bloom using an emissive/highlight attachment. Evidence: r185 `BloomNode` accepts texture nodes; V2 runtime reads a separately rendered FP16 selective target, with both backend rows PASS in `shared-post-v2.spec.ts`.
+- [x] 3.6 Measure pipeline cost and program/resource count. Evidence: spike records 5,659,032-byte scratch cost; V2 stage snapshot records auxiliary target dimensions/type and resource lifecycle.
 - [ ] 3.7 Test transition overlay ordering in HDR.
 - [ ] 3.8 Test snapshot capture path.
-- [ ] 3.9 Decide: adopt RenderPipeline/MRT, retain current custom fullscreen pipeline, or use a hybrid.
-- [ ] 3.10 Record decision in an ADR/decision note before implementation proceeds.
+- [x] 3.9 Decide: adopt RenderPipeline/MRT, retain current custom fullscreen pipeline, or use a hybrid. Evidence: accepted hybrid decision in `SHARED_POST_V2_SPIKE.md`.
+- [x] 3.10 Record decision in an ADR/decision note before implementation proceeds. Evidence: same decision note with exact r185 source/results and compatibility rationale.
 
 ## 4. SharedPost V2 implementation
 
-- [ ] 4.1 Refactor SharedPost into named stages with explicit ordering.
-- [ ] 4.2 Add selective emissive/highlight input or mask.
-- [ ] 4.3 Preserve bloom-off zero-cost/near-zero-cost path.
-- [ ] 4.4 Keep Scientific mode bloom disabled by default.
-- [ ] 4.5 Add controlled bloom resolution scale to global visual work budget.
+- [x] 4.1 Refactor SharedPost into named stages with explicit ordering. Evidence: `SharedPost.getDebugSnapshot()` and `shared-post-v2.spec.ts`.
+- [x] 4.2 Add selective emissive/highlight input or mask. Evidence: tagged-material layer pass into the FP16 `SharedPost.Emissive` target; WebGPU/WebGL2 rows PASS.
+- [x] 4.3 Preserve bloom-off zero-cost/near-zero-cost path. Evidence: graph omits/disposes `BloomNode` when disabled; scientific and debug defaults disable it.
+- [x] 4.4 Keep Scientific mode bloom disabled by default. Evidence: `EXPERIENCE_VISUAL_DEFAULTS` and existing cinematic-mode browser gate.
+- [x] 4.5 Add controlled bloom resolution scale to global visual work budget. Evidence: `VisualWorkBudget.bloomResolutionScale` drives `SharedPost.Emissive` sizing.
 - [ ] 4.6 Research restrained stellar glare; keep only if visual gain exceeds cost/artifact risk.
 - [ ] 4.7 Add deterministic cinematic grade state only if accepted by review.
-- [ ] 4.8 Add history/pipeline invalidation when graph variant changes.
+- [x] 4.8 Add history/pipeline invalidation when graph variant changes. Evidence: SharedPost graph keys plus explicit temporal reset calls for pass/tier/backend changes.
 - [ ] 4.9 Add post-stage timing telemetry where backend permits.
-- [ ] 4.10 Add WebGL2 fallback behavior for each optional stage.
-- [ ] 4.11 Add unit/browser tests for exposure, tone mapping, bloom selection and transition composition.
+- [x] 4.10 Add WebGL2 fallback behavior for each optional stage. Evidence: `shared-post-v2.spec.ts`, `shared-post-spike.spec.ts`, and HDR/temporal rows pass on forced WebGL2; optional glare remains unimplemented.
+- [x] 4.11 Add unit/browser tests for exposure, tone mapping, bloom selection and transition composition. Evidence: existing display/cinematic tests plus `shared-post-v2.spec.ts`; transition ordering remains covered by the cumulative transition suite.
 
 ## 5. Temporal reconstruction foundation
 
-- [ ] 5.1 Define temporal-history data contract.
-- [ ] 5.2 Add previous/current camera transform storage.
-- [ ] 5.3 Add deterministic subpixel jitter sequence.
-- [ ] 5.4 Add history render target(s) with explicit ResourceScope ownership.
-- [ ] 5.5 Implement camera-only reprojection baseline.
-- [ ] 5.6 Implement neighborhood clamp/rejection baseline.
-- [ ] 5.7 Add history invalidation for route/preset switch.
-- [ ] 5.8 Add history invalidation for scrub/reset discontinuity.
-- [ ] 5.9 Add history invalidation for camera cut.
-- [ ] 5.10 Add history invalidation for resize/render-scale/tier change.
-- [ ] 5.11 Add history invalidation for backend/pass variant switch.
-- [ ] 5.12 Add transition handoff policy.
-- [ ] 5.13 Add settled-scene convergence policy.
-- [ ] 5.14 Add active-interaction short-history policy.
+- [x] 5.1 Define temporal-history data contract. Evidence: `TemporalService.ts` `TemporalPolicy`, reset reasons, and debug snapshot.
+- [x] 5.2 Add previous/current camera transform storage. Evidence: bounded matrices and camera-state update in `TemporalService`.
+- [x] 5.3 Add deterministic subpixel jitter sequence. Evidence: exported Halton sequence and camera projection jitter; unit/browser logs are repeatable.
+- [x] 5.4 Add history render target(s) with explicit ResourceScope ownership. Evidence: two reusable HalfFloatType targets tracked by the shared-post scope.
+- [x] 5.5 Implement camera-only reprojection baseline. Evidence: previous/current forward vectors produce a bounded reprojection offset; conservative confidence reduces history on motion.
+- [x] 5.6 Implement neighborhood clamp/rejection baseline. Evidence: 3×3 current-frame min/max envelope clamps history before blending.
+- [x] 5.7 Add history invalidation for route/preset switch. Evidence: host distinguishes route/preset requests and transition handoff resets history.
+- [x] 5.8 Add history invalidation for scrub/reset discontinuity. Evidence: `TimeController.consumeDiscontinuity()` plus temporal browser assertion.
+- [x] 5.9 Add history invalidation for camera cut. Evidence: displacement/facing cut detector plus temporal browser assertion.
+- [x] 5.10 Add history invalidation for resize/render-scale/tier change. Evidence: host resize/quality callbacks and temporal browser assertion; render-scale rides the resize path.
+- [x] 5.11 Add history invalidation for backend/pass variant switch. Evidence: trajectory/backend, experience/pass, and policy variant hooks call explicit reset reasons.
+- [x] 5.12 Add transition handoff policy. Evidence: `activateTarget` resets `transition-handoff`; suppressed frames clear temporal presentation output.
+- [x] 5.13 Add settled-scene convergence policy. Evidence: finite tier history caps; High browser row reaches age 8 and stops increasing.
+- [x] 5.14 Add active-interaction short-history policy. Evidence: global budget/TemporalPolicy sets interaction history to one frame and disables long accumulation.
 - [ ] 5.15 Validate black-hole critical curve for ghosting.
 - [ ] 5.16 Validate neutron-star limb for ghosting.
 - [ ] 5.17 Validate bright starfield for shimmer.
 - [ ] 5.18 Validate volume edge for trail/ghost artifacts.
-- [ ] 5.19 Add temporal flicker thresholds to browser tests.
+- [x] 5.19 Add temporal flicker thresholds to browser tests. Evidence: `temporal-stability.spec.ts` gates settled mean luma delta on WebGPU/WebGL2.
 - [ ] 5.20 Record memory and GPU cost.
 
 ## 6. Volumetrics V2 core

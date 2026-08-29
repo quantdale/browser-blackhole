@@ -27,6 +27,7 @@
 
 import * as THREE from 'three';
 import type { IRibbonService, RibbonConfig, RibbonHandle } from '../../atlas/types';
+import { CINEMATIC_EMISSIVE_LAYER } from './visualLayers.js';
 
 /** Dot-product threshold above which a seed axis counts as parallel to the tangent. */
 const PARALLEL_THRESHOLD = 0.99;
@@ -172,6 +173,7 @@ class RibbonHandleImpl implements RibbonHandle {
       side: THREE.DoubleSide,
       blending: config.additive ? THREE.AdditiveBlending : THREE.NormalBlending
     });
+    material.userData['cinematicEmissive'] = true;
 
     this.mesh = new THREE.Mesh(geometry, material);
     // Vertices are rewritten wholesale on setSpine; maintaining a bounding sphere
@@ -195,6 +197,7 @@ class RibbonHandleImpl implements RibbonHandle {
       side: THREE.DoubleSide,
       blending: THREE.AdditiveBlending
     });
+    haloMaterial.userData['cinematicEmissive'] = true;
     this.haloMesh = new THREE.Mesh(haloGeometry, haloMaterial);
     this.haloMesh.frustumCulled = false;
     this.haloMesh.renderOrder = -1;
@@ -203,6 +206,9 @@ class RibbonHandleImpl implements RibbonHandle {
     this.root.name = 'CinematicRibbon';
     this.root.frustumCulled = false;
     this.root.add(this.haloMesh, this.mesh);
+    this.root.layers.enable(CINEMATIC_EMISSIVE_LAYER);
+    this.haloMesh.layers.enable(CINEMATIC_EMISSIVE_LAYER);
+    this.mesh.layers.enable(CINEMATIC_EMISSIVE_LAYER);
   }
 
   setWidthScale(scale: number): void {

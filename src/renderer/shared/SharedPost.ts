@@ -36,7 +36,7 @@
  */
 
 import * as THREE from 'three';
-import { MeshBasicNodeMaterial } from 'three/webgpu';
+import { MeshBasicNodeMaterial, RenderPipeline } from 'three/webgpu';
 import {
   clamp,
   dot,
@@ -44,6 +44,7 @@ import {
   hash,
   length,
   mix,
+  mrt,
   screenUV,
   texture,
   uniform,
@@ -54,6 +55,12 @@ import {
 import { bloom } from 'three/examples/jsm/tsl/display/BloomNode.js';
 
 import type { ISharedPost, RendererLike, ResourceScope } from '../../atlas/types';
+import {
+  TemporalService,
+  type TemporalPolicy,
+  type TemporalResetReason
+} from './TemporalService.js';
+import { CINEMATIC_EMISSIVE_LAYER } from './visualLayers.js';
 
 /** Tone-mapping enum -> THREE constant applied to the canvas-present path. */
 const TONE_MAPPING_CONSTANTS = {
@@ -76,8 +83,11 @@ type BloomNodeObject = ReturnType<typeof bloom>;
 export class SharedPost implements ISharedPost {
   private readonly renderer: RendererLike;
   private readonly scope: ResourceScope;
+  private readonly temporal: TemporalService;
 
   private hdrTarget: THREE.WebGLRenderTarget | null = null;
+  /** Separate selective-highlight source; never substitutes for scene radiance. */
+  private highlightTarget: THREE.WebGLRenderTarget | null = null;
   private snapshotTarget: THREE.WebGLRenderTarget | null = null;
 
   private exposure = 1;
@@ -89,6 +99,10 @@ export class SharedPost implements ISharedPost {
   private graphKey: string | null = null;
   private overlayTexture: THREE.Texture | null = null;
   private bloomNode: BloomNodeObject | null = null;
+  private highlightRendered = false;
+  private bloomResolutionScale = 0.5;
+  private temporalPresentationActive = false;
+  private temporalProjectionBackup: THREE.Matrix4 | null = null;
 
   private readonly overlayOpacityU = uniform(0);
 
@@ -105,6 +119,7 @@ export class SharedPost implements ISharedPost {
   constructor(services: { renderer: RendererLike; scope: ResourceScope }) {
     this.renderer = services.renderer;
     this.scope = services.scope;
+    this.temporal = new TemporalService(services);
 
     for (const material of [this.presentMaterial, this.copyMaterial]) {
       material.depthTest = false;
@@ -150,12 +165,94 @@ export class SharedPost implements ISharedPost {
     if (previous !== null) {
       this.releaseTarget(previous);
     }
+    const highlightWidth = Math.max(2, Math.floor(width * this.bloomResolutionScale));
+    const highlightHeight = Math.max(2, Math.floor(height * this.bloomResolutionScale));
+    if (
+      this.highlightTarget === null ||
+      this.highlightTarget.width !== highlightWidth ||
+      this.highlightTarget.height !== highlightHeight
+    ) {
+      const previousHighlight = this.highlightTarget;
+      this.highlightTarget = this.createAuxiliaryTarget(
+        highlightWidth,
+        highlightHeight,
+        'SharedPost.Emissive'
+      );
+      if (previousHighlight !== null) this.releaseTarget(previousHighlight);
+    }
+    this.highlightRendered = false;
+    this.temporal.ensureSize(width, height);
+    this.temporalPresentationActive = false;
     // Force graph rebuild against the new texture on the next present/capture.
     this.graphKey = null;
   }
 
   getHdrTarget(): THREE.Texture | null {
     return this.disposed || this.hdrTarget === null ? null : this.hdrTarget.texture;
+  }
+
+  /** Current selective-highlight attachment, or null before sizing. */
+  getHighlightTarget(): THREE.Texture | null {
+    return this.disposed || this.highlightTarget === null ? null : this.highlightTarget.texture;
+  }
+
+  /** Set the global bloom auxiliary resolution; takes effect immediately. */
+  setBloomResolutionScale(scale: number): void {
+    const next = Number.isFinite(scale) ? THREE.MathUtils.clamp(scale, 0.25, 1) : 0.5;
+    if (next === this.bloomResolutionScale) return;
+    this.bloomResolutionScale = next;
+    this.graphKey = null;
+    if (this.hdrTarget !== null) {
+      const width = Math.max(2, Math.floor(this.hdrTarget.width * next));
+      const height = Math.max(2, Math.floor(this.hdrTarget.height * next));
+      const previous = this.highlightTarget;
+      this.highlightTarget = this.createAuxiliaryTarget(width, height, 'SharedPost.Emissive');
+      if (previous !== null) this.releaseTarget(previous);
+    }
+  }
+
+  setTemporalPolicy(policy: TemporalPolicy, interaction = false): void {
+    this.temporal.setPolicy(policy, interaction);
+    this.graphKey = null;
+  }
+
+  invalidateTemporal(reason: string): void {
+    const knownReason: TemporalResetReason = isTemporalResetReason(reason) ? reason : 'explicit';
+    this.temporal.reset(knownReason);
+    this.temporalPresentationActive = false;
+    this.graphKey = null;
+  }
+
+  beginTemporalFrame(camera: THREE.PerspectiveCamera): void {
+    this.temporalPresentationActive = false;
+    this.temporalProjectionBackup = null;
+    const state = this.temporal.getDebugSnapshot();
+    if (!state.enabled || this.hdrTarget === null) return;
+    const jitter = this.temporal.beginFrame();
+    this.temporalProjectionBackup = camera.projectionMatrix.clone();
+    const elements = camera.projectionMatrix.elements;
+    elements[8] = (elements[8] ?? 0) + (2 * jitter[0]) / this.hdrTarget.width;
+    elements[9] = (elements[9] ?? 0) + (2 * jitter[1]) / this.hdrTarget.height;
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+  }
+
+  resolveTemporal(camera: THREE.PerspectiveCamera): void {
+    if (this.hdrTarget === null) return;
+    this.temporal.resolve(this.hdrTarget.texture, camera);
+    this.temporalPresentationActive = this.temporal.getResolvedTexture() !== null;
+    this.graphKey = null;
+  }
+
+  clearTemporalOutput(): void {
+    this.temporalPresentationActive = false;
+    this.graphKey = null;
+  }
+
+  endTemporalFrame(camera: THREE.PerspectiveCamera): void {
+    if (this.temporalProjectionBackup === null) return;
+    camera.projectionMatrix.copy(this.temporalProjectionBackup);
+    camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
+    this.temporalProjectionBackup = null;
   }
 
   setExposure(exposure: number): void {
@@ -188,6 +285,49 @@ export class SharedPost implements ISharedPost {
     // Presentation state only: three invalidates its output pipeline when
     // renderer.toneMapping changes, and never applies it to off-screen targets.
     this.renderer.toneMapping = TONE_MAPPING_CONSTANTS[mode];
+  }
+
+  /**
+   * Render only materials tagged `userData.cinematicEmissive` into the
+   * auxiliary target. The main scene is not mutated: camera layers are
+   * restored synchronously and the target is cleared by the normal render.
+   * A direct ray pass with no authored tag is reported as a legacy fallback
+   * and may use the whole-image bloom source for compatibility.
+   */
+  renderSelectiveHighlights(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
+    this.highlightRendered = false;
+    this.graphKey = null;
+    if (this.disposed || this.highlightTarget === null || !this.bloomEnabled) return;
+
+    let marked = 0;
+    scene.traverse((object) => {
+      const mesh = object as THREE.Mesh & { isMesh?: boolean };
+      if (!object.visible || mesh.isMesh !== true) return;
+      const material = mesh.material;
+      const materials = Array.isArray(material) ? material : [material];
+      if (materials.some((entry) => entry.userData['cinematicEmissive'] === true)) {
+        object.layers.enable(CINEMATIC_EMISSIVE_LAYER);
+        marked += 1;
+      }
+    });
+    if (marked === 0) return;
+
+    const previousTarget = this.renderer.getRenderTarget();
+    const previousMask = camera.layers.mask;
+    try {
+      camera.layers.set(CINEMATIC_EMISSIVE_LAYER);
+      this.renderer.setRenderTarget(this.highlightTarget);
+      this.renderer.render(scene, camera);
+      this.highlightRendered = true;
+    } finally {
+      this.renderer.setRenderTarget(previousTarget as THREE.WebGLRenderTarget | null);
+      camera.layers.mask = previousMask;
+    }
+  }
+
+  clearSelectiveHighlights(): void {
+    this.highlightRendered = false;
+    this.graphKey = null;
   }
 
   present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void {
@@ -233,6 +373,144 @@ export class SharedPost implements ISharedPost {
     this.releaseTarget(target);
   }
 
+  /**
+   * Execute the bounded r185 RenderPipeline/MRT spike against scratch targets.
+   * This method is reached only by browser architecture tests; normal frames
+   * stay on the explicit SharedPost lifecycle and never allocate these probes.
+   */
+  async runArchitectureSpikeForTest(): Promise<Record<string, unknown>> {
+    if (this.disposed || this.hdrTarget === null) {
+      return { status: 'not-ready' };
+    }
+
+    const renderer = this.renderer as RendererLike & {
+      readRenderTargetPixelsAsync?: (
+        target: THREE.RenderTarget,
+        x: number,
+        y: number,
+        width: number,
+        height: number,
+        textureIndex?: number
+      ) => Promise<ArrayLike<number>>;
+      getMRT?: () => unknown;
+      setMRT?: (mrtNode: unknown) => void;
+    };
+    if (typeof renderer.readRenderTargetPixelsAsync !== 'function') {
+      return { status: 'unsupported', reason: 'readRenderTargetPixelsAsync unavailable' };
+    }
+
+    const readCenter = async (target: THREE.RenderTarget, textureIndex = 0): Promise<number[]> => {
+      const data = await renderer.readRenderTargetPixelsAsync!(
+        target,
+        Math.floor(target.width / 2),
+        Math.floor(target.height / 2),
+        1,
+        1,
+        textureIndex
+      );
+      return Array.from(data).slice(0, 4);
+    };
+
+    const sourceTarget = this.hdrTarget;
+    const copyTarget = new THREE.RenderTarget(sourceTarget.width, sourceTarget.height, {
+      depthBuffer: false,
+      stencilBuffer: false,
+      type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat,
+      colorSpace: THREE.NoColorSpace
+    });
+    // The kernel intentionally exposes a union for its public fallback
+    // contract, but both supported node paths use WebGPURenderer (forceWebGL
+    // selects its WebGLBackend). The r185 RenderPipeline type is narrower.
+    const pipeline = new RenderPipeline(
+      renderer as unknown as import('three/webgpu').WebGPURenderer,
+      texture(sourceTarget.texture)
+    );
+    pipeline.outputColorTransform = false;
+    pipeline.needsUpdate = true;
+    const previousTarget = renderer.getRenderTarget();
+    let renderPipelineResult: Record<string, unknown>;
+    try {
+      renderer.setRenderTarget(copyTarget as THREE.WebGLRenderTarget);
+      pipeline.render();
+      renderPipelineResult = {
+        status: 'pass',
+        sourceChannels: await readCenter(sourceTarget),
+        copyChannels: await readCenter(copyTarget),
+        sourceType: sourceTarget.texture.type,
+        copyType: copyTarget.texture.type
+      };
+    } catch (error) {
+      renderPipelineResult = {
+        status: 'fail',
+        error: error instanceof Error ? error.message : String(error)
+      };
+    } finally {
+      renderer.setRenderTarget(previousTarget as THREE.WebGLRenderTarget | null);
+      pipeline.dispose();
+      copyTarget.dispose();
+    }
+
+    const mrtTarget = new THREE.RenderTarget(2, 2, {
+      depthBuffer: false,
+      stencilBuffer: false,
+      type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat,
+      count: 2,
+      colorSpace: THREE.NoColorSpace
+    });
+    mrtTarget.textures[0]!.name = 'output';
+    mrtTarget.textures[1]!.name = 'emissive';
+    const mrtMaterial = new MeshBasicNodeMaterial();
+    const output = vec4(2, 2, 2, 1);
+    const emissive = vec4(4, 4, 4, 1);
+    mrtMaterial.colorNode = output;
+    mrtMaterial.mrtNode = mrt({ output, emissive });
+    mrtMaterial.depthTest = false;
+    mrtMaterial.depthWrite = false;
+    const mrtScene = new THREE.Scene();
+    const mrtCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+    const mrtMesh = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), mrtMaterial);
+    mrtScene.add(mrtMesh);
+    let mrtResult: Record<string, unknown>;
+    const previousMrt = renderer.getMRT?.();
+    try {
+      renderer.setMRT?.(null);
+      renderer.setRenderTarget(mrtTarget as THREE.WebGLRenderTarget);
+      renderer.render(mrtScene, mrtCamera);
+      mrtResult = {
+        status: 'pass',
+        outputChannels: await readCenter(mrtTarget, 0),
+        emissiveChannels: await readCenter(mrtTarget, 1),
+        textureNames: mrtTarget.textures.map((entry) => entry.name),
+        targetType: mrtTarget.texture.type
+      };
+    } catch (error) {
+      mrtResult = {
+        status: 'fail',
+        error: error instanceof Error ? error.message : String(error)
+      };
+    } finally {
+      renderer.setRenderTarget(previousTarget as THREE.WebGLRenderTarget | null);
+      renderer.setMRT?.(previousMrt);
+      mrtScene.remove(mrtMesh);
+      mrtMesh.geometry.dispose();
+      mrtMaterial.dispose();
+      mrtTarget.dispose();
+    }
+
+    return {
+      status: 'complete',
+      api: {
+        renderPipeline: 'r185 RenderPipeline',
+        mrt: 'r185 MRTNode/mrt()'
+      },
+      renderPipeline: renderPipelineResult,
+      mrt: mrtResult,
+      scratchMemoryBytes: sourceTarget.width * sourceTarget.height * 8 + 2 * 2 * 8 * 2
+    };
+  }
+
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
@@ -240,6 +518,11 @@ export class SharedPost implements ISharedPost {
     if (this.hdrTarget !== null) {
       const target = this.hdrTarget;
       this.hdrTarget = null;
+      this.releaseTarget(target);
+    }
+    if (this.highlightTarget !== null) {
+      const target = this.highlightTarget;
+      this.highlightTarget = null;
       this.releaseTarget(target);
     }
     if (this.snapshotTarget !== null) {
@@ -255,6 +538,7 @@ export class SharedPost implements ISharedPost {
     this.graphKey = null;
     this.overlayTexture = null;
 
+    this.temporal.dispose();
     this.presentMaterial.dispose();
     this.copyMaterial.dispose();
     this.triangleGeometry.dispose();
@@ -268,26 +552,37 @@ export class SharedPost implements ISharedPost {
   private syncGraphs(): void {
     if (this.hdrTarget === null) return;
     const hdrTexture = this.hdrTarget.texture;
+    const temporalTexture = this.temporalPresentationActive
+      ? this.temporal.getResolvedTexture()
+      : null;
+    const sceneTexture = temporalTexture ?? hdrTexture;
     const overlayTexture = this.overlayTexture;
+    const highlightTexture = this.highlightTarget?.texture ?? null;
+    const bloomSourceKind =
+      this.highlightRendered && highlightTexture !== null ? 'selective' : 'legacy';
 
-    const key = `${hdrTexture.id}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}|${this.cinematicStyleEnabled ? 1 : 0}`;
+    const key = `${sceneTexture.id}|${hdrTexture.id}|${highlightTexture?.id ?? -1}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}|${bloomSourceKind}|${this.cinematicStyleEnabled ? 1 : 0}`;
     if (key === this.graphKey) return;
     this.graphKey = key;
 
     // Raw copy graph for captureSnapshot().
-    this.copyMaterial.fragmentNode = texture(hdrTexture);
+    this.copyMaterial.fragmentNode = texture(sceneTexture);
     this.copyMaterial.needsUpdate = true;
 
     // Present graph: HDR -> (+ additive bloom) -> overlay lerp -> tonemap/sRGB
     // (the last step is the renderer's automatic canvas-present transform).
-    const hdrNode = texture(hdrTexture);
+    const hdrNode = texture(sceneTexture);
     let rgb = hdrNode.rgb;
 
     if (this.bloomEnabled) {
+      const bloomInput =
+        bloomSourceKind === 'selective' && highlightTexture !== null
+          ? texture(highlightTexture)
+          : hdrNode;
       if (this.bloomNode === null) {
-        this.bloomNode = bloom(hdrNode, this.bloomStrength, BLOOM_RADIUS, BLOOM_THRESHOLD);
+        this.bloomNode = bloom(bloomInput, this.bloomStrength, BLOOM_RADIUS, BLOOM_THRESHOLD);
       } else {
-        this.bloomNode.inputNode = hdrNode;
+        this.bloomNode.inputNode = bloomInput;
       }
       this.bloomNode.strength.value = this.bloomStrength;
       this.bloomNode.radius.value = BLOOM_RADIUS;
@@ -343,12 +638,71 @@ export class SharedPost implements ISharedPost {
       stencilBuffer: false,
       generateMipmaps: false,
       minFilter: THREE.LinearFilter,
-      magFilter: THREE.LinearFilter
+      magFilter: THREE.LinearFilter,
+      colorSpace: THREE.NoColorSpace
     });
     target.texture.name = name;
     // ~12 bytes/px: 4 channels x half float + 4-byte depth estimate.
     this.scope.track('renderTarget', target, () => target.dispose(), width * height * 12);
     return target;
+  }
+
+  private createAuxiliaryTarget(
+    width: number,
+    height: number,
+    name: string
+  ): THREE.WebGLRenderTarget {
+    const target = new THREE.WebGLRenderTarget(width, height, {
+      type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat,
+      depthBuffer: true,
+      stencilBuffer: false,
+      generateMipmaps: false,
+      minFilter: THREE.LinearFilter,
+      magFilter: THREE.LinearFilter,
+      colorSpace: THREE.NoColorSpace
+    });
+    target.texture.name = name;
+    // Four FP16 color channels plus a conservative 4-byte depth estimate.
+    this.scope.track('renderTarget', target, () => target.dispose(), width * height * 12);
+    return target;
+  }
+
+  getDebugSnapshot(): Record<string, unknown> {
+    return {
+      stages: [
+        'scene-hdr',
+        this.temporal.getDebugSnapshot().enabled ? 'temporal-resolve' : 'temporal-resolve:off',
+        'selective-bloom',
+        'transition-composite',
+        'display-transform',
+        'cinematic-grade'
+      ],
+      hdrTarget:
+        this.hdrTarget === null
+          ? null
+          : {
+              width: this.hdrTarget.width,
+              height: this.hdrTarget.height,
+              type: this.hdrTarget.texture.type,
+              colorSpace: this.hdrTarget.texture.colorSpace
+            },
+      highlightTarget:
+        this.highlightTarget === null
+          ? null
+          : {
+              width: this.highlightTarget.width,
+              height: this.highlightTarget.height,
+              type: this.highlightTarget.texture.type,
+              colorSpace: this.highlightTarget.texture.colorSpace
+            },
+      highlightRendered: this.highlightRendered,
+      bloomEnabled: this.bloomEnabled,
+      bloomSource: this.highlightRendered ? 'selective-emissive' : 'legacy-scene-threshold',
+      bloomResolutionScale: this.bloomResolutionScale,
+      cinematicStyleEnabled: this.cinematicStyleEnabled,
+      temporal: this.temporal.getDebugSnapshot()
+    };
   }
 
   private releaseTarget(target: THREE.WebGLRenderTarget): void {
@@ -365,4 +719,24 @@ export class SharedPost implements ISharedPost {
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return value < 0 ? 0 : value > 1 ? 1 : value;
+}
+
+const TEMPORAL_RESET_REASONS: ReadonlySet<string> = new Set([
+  'initial',
+  'route-change',
+  'preset-change',
+  'timeline-discontinuity',
+  'camera-cut',
+  'resize',
+  'render-scale-change',
+  'quality-tier-change',
+  'backend-change',
+  'pass-variant-change',
+  'transition-handoff',
+  'material-change',
+  'explicit'
+]);
+
+function isTemporalResetReason(value: string): value is TemporalResetReason {
+  return TEMPORAL_RESET_REASONS.has(value);
 }

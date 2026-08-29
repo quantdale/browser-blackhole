@@ -324,6 +324,14 @@ grain. Volume active-step budgets, static particle short-circuits, and ribbon
 core/halo updates remain governed by the shared performance tier and are
 reported through the existing debug/resource inventories.
 
+SharedPost V2 inserts a bounded temporal resolve between destination HDR and
+selective highlight bloom. `TemporalService` owns two reusable FP16 history
+targets, deterministic Halton jitter, camera-only reprojection, neighborhood
+clamping, and explicit reset reasons. The kernel brackets destination drawing
+with temporal projection jitter and restores the camera transform before the
+frame returns to the host. A suppressed/transition frame clears the temporal
+presentation source so old history cannot appear over the transition envelope.
+
 ## 7. Frame lifecycle
 
 Recommended:

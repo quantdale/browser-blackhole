@@ -541,24 +541,39 @@ export class SharedRendererKernel implements IRendererKernel {
         if (!plan.destinationDrawSuppressed) {
           const hdrTexture = this.options.post.getHdrTarget();
           const hdrTarget = this.resolveHdrTargetOrDegraded(hdrTexture);
+          const camera = this.requireCamera();
+          this.options.post.beginTemporalFrame?.(camera);
 
           // The union RendererLike spans WebGPURenderer (accepts base RenderTarget)
           // and WebGLRenderer (whose d.ts narrows to WebGLRenderTarget); at runtime
           // both accept the shared HDR target produced by post.
-          renderer.setRenderTarget(hdrTarget as THREE.WebGLRenderTarget | null);
           try {
-            const renderContext: RenderContext = {
-              renderer,
-              camera: this.requireCamera(),
-              scene: plan.scene,
-              hdrTarget: hdrTexture
-            };
-            destination.render(renderContext);
-            destinationDrawn = true;
+            renderer.setRenderTarget(hdrTarget as THREE.WebGLRenderTarget | null);
+            try {
+              const renderContext: RenderContext = {
+                renderer,
+                camera,
+                scene: plan.scene,
+                hdrTarget: hdrTexture
+              };
+              destination.render(renderContext);
+              destinationDrawn = true;
+            } finally {
+              renderer.setRenderTarget(null);
+            }
+            this.options.post.renderSelectiveHighlights?.(plan.scene, camera);
+            this.options.post.resolveTemporal?.(camera);
           } finally {
-            renderer.setRenderTarget(null);
+            if (!destinationDrawn) this.options.post.clearTemporalOutput?.();
+            this.options.post.endTemporalFrame?.(camera);
           }
+        } else {
+          this.options.post.clearSelectiveHighlights?.();
+          this.options.post.clearTemporalOutput?.();
         }
+      } else {
+        this.options.post.clearSelectiveHighlights?.();
+        this.options.post.clearTemporalOutput?.();
       }
 
       // Present even without an active destination so transition overlays
@@ -645,6 +660,7 @@ export class SharedRendererKernel implements IRendererKernel {
       time: this.options.getTimeInfo(),
       quality: this.options.getQuality(),
       renderScale: this.options.governor.renderScale,
+      workBudget: this.options.governor.getVisualWorkBudget(),
       trajectoryBackend: this.options.getTrajectoryBackend?.() ?? 'auto'
     };
   }

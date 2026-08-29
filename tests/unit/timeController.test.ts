@@ -11,6 +11,16 @@ import { TimeController } from '../../src/atlas/TimeController.js';
  * on its own.
  */
 describe('TimeController: consumeDirty invalidation signal', () => {
+  it('marks scrub/reset and mapping changes as temporal discontinuities', () => {
+    const time = new TimeController({ initialPhase: 0.4, paused: true });
+    expect(time.consumeDiscontinuity()).toBe(true);
+    expect(time.consumeDiscontinuity()).toBe(false);
+    time.scrubTo(0.4);
+    expect(time.consumeDiscontinuity()).toBe(true);
+    time.reset(0.4);
+    expect(time.consumeDiscontinuity()).toBe(true);
+  });
+
   it('starts dirty so the very first frame renders', () => {
     const time = new TimeController();
     expect(time.consumeDirty()).toBe(true);

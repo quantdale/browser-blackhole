@@ -56,8 +56,10 @@ import type {
   GovernorActivityMode,
   GovernorConfig,
   IPerformanceGovernor,
-  QualityTier
+  QualityTier,
+  VisualWorkBudget
 } from './types';
+import { resolveVisualWorkBudget } from './visualWorkBudget';
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -299,6 +301,10 @@ export class PerformanceGovernor implements IPerformanceGovernor {
       return 'settling';
     }
     return 'stable';
+  }
+
+  getVisualWorkBudget(): VisualWorkBudget {
+    return resolveVisualWorkBudget(this.tierValue, this.activityMode);
   }
 
   onTierChanged(cb: (tier: QualityTier) => void): () => void {

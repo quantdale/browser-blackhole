@@ -198,6 +198,61 @@ class DeferredSharedPost implements ISharedPost {
     this.inner?.releaseSnapshot();
   }
 
+  runArchitectureSpikeForTest(): Promise<Record<string, unknown>> {
+    return this.inner?.runArchitectureSpikeForTest() ?? Promise.resolve({ status: 'not-ready' });
+  }
+
+  renderSelectiveHighlights(
+    scene: import('three').Scene,
+    camera: import('three').PerspectiveCamera
+  ): void {
+    this.inner?.renderSelectiveHighlights(scene, camera);
+  }
+
+  clearSelectiveHighlights(): void {
+    this.inner?.clearSelectiveHighlights();
+  }
+
+  setBloomResolutionScale(scale: number): void {
+    this.inner?.setBloomResolutionScale(scale);
+  }
+
+  setTemporalPolicy(
+    policy: {
+      enabled: boolean;
+      historyFrames: number;
+      jitterScale: number;
+      interactionHistoryFrames?: number;
+    },
+    interaction = false
+  ): void {
+    this.inner?.setTemporalPolicy(policy, interaction);
+  }
+
+  invalidateTemporal(reason: string): void {
+    this.inner?.invalidateTemporal(reason);
+  }
+
+  beginTemporalFrame(camera: import('three').PerspectiveCamera): void {
+    this.inner?.beginTemporalFrame(camera);
+  }
+
+  resolveTemporal(camera: import('three').PerspectiveCamera): void {
+    this.inner?.resolveTemporal(camera);
+  }
+
+  clearTemporalOutput(): void {
+    this.inner?.clearTemporalOutput();
+  }
+
+  endTemporalFrame(camera: import('three').PerspectiveCamera): void {
+    this.inner?.endTemporalFrame(camera);
+  }
+
+  getDebugSnapshot(): Record<string, unknown> {
+    return this.inner?.getDebugSnapshot() ?? { stages: [], status: 'not-ready' };
+  }
+
   dispose(): void {
     this.inner?.dispose();
     this.inner = null;
@@ -424,6 +479,7 @@ export class CosmicAtlasHost {
     // scene is otherwise static (paused, camera settled) — it must wake the
     // frame loop for at least one frame.
     this.unsubscribeTierChanged = this.governor.onTierChanged(() => {
+      this.post.invalidateTemporal?.('quality-tier-change');
       this.invalidate(INVALIDATION_REASON.QUALITY_CHANGED);
     });
 
@@ -594,10 +650,26 @@ export class CosmicAtlasHost {
 
     this.time.update(dt);
     if (this.time.consumeDirty()) reasons |= INVALIDATION_REASON.TIME_ADVANCED;
+    if (this.time.consumeDiscontinuity()) {
+      this.post.invalidateTemporal?.('timeline-discontinuity');
+      reasons |= INVALIDATION_REASON.TIME_ADVANCED;
+    }
 
     if (this.cameraRig.update(dt)) reasons |= INVALIDATION_REASON.CAMERA_CHANGED;
 
     this.director.update(dt);
+    const workBudget = this.governor.getVisualWorkBudget();
+    this.volumesService.setInternalScale(workBudget.volumeInternalScale);
+    this.post.setBloomResolutionScale?.(workBudget.bloomResolutionScale);
+    this.post.setTemporalPolicy?.(
+      {
+        enabled: workBudget.temporalEnabled,
+        historyFrames: workBudget.temporalHistoryFrames,
+        jitterScale: workBudget.temporalJitterScale,
+        interactionHistoryFrames: 1
+      },
+      workBudget.activityMode === 'interaction'
+    );
     if (this.applyBloomInteractionThrottle()) reasons |= INVALIDATION_REASON.POST_CHANGED;
     if (this.director.getPublicState().active) reasons |= INVALIDATION_REASON.TRANSITION_CHANGED;
 
@@ -750,6 +822,7 @@ export class CosmicAtlasHost {
     if (this.disposed) return;
     if (!Number.isFinite(cssWidth) || !Number.isFinite(cssHeight)) return;
     this.invalidate(INVALIDATION_REASON.RESIZE);
+    this.post.invalidateTemporal?.('resize');
     const scale = this.effectiveRenderScale();
     this.kernel.handleResize(cssWidth, cssHeight, scale);
 
@@ -810,6 +883,7 @@ export class CosmicAtlasHost {
   setExperienceMode(mode: ExperienceMode): void {
     if (!(mode in EXPERIENCE_VISUAL_DEFAULTS)) return;
     this.experienceModeValue = mode;
+    this.post.invalidateTemporal?.('pass-variant-change');
     this.post.setCinematicStyle(mode === 'cinematic');
     const defaults = EXPERIENCE_VISUAL_DEFAULTS[mode];
     this.setVisual(defaults);
@@ -889,6 +963,7 @@ export class CosmicAtlasHost {
     } else {
       this.renderScaleOverrideValue = scale;
     }
+    this.post.invalidateTemporal?.('render-scale-change');
     this.handleResize(
       this.canvas.clientWidth || FALLBACK_CSS_WIDTH,
       this.canvas.clientHeight || FALLBACK_CSS_HEIGHT
@@ -914,6 +989,7 @@ export class CosmicAtlasHost {
     )
       ? preference
       : 'auto';
+    this.post.invalidateTemporal?.('backend-change');
     this.invalidate(INVALIDATION_REASON.CONTROL_CHANGED);
   }
 
@@ -945,6 +1021,7 @@ export class CosmicAtlasHost {
     if (typeof active.applyControlState !== 'function') return;
     active.applyControlState(partial);
     this.cacheDestinationState(active);
+    this.post.invalidateTemporal?.('material-change');
     this.invalidate(INVALIDATION_REASON.CONTROL_CHANGED);
   }
 
@@ -1049,7 +1126,8 @@ export class CosmicAtlasHost {
       backend: this.kernel.backend,
       gpuFrameMs: this.kernel.gpuFrameMs,
       frame: this.frameTelemetry(),
-      rendererInfo: this.kernel.readRendererInfo()
+      rendererInfo: this.kernel.readRendererInfo(),
+      visualWorkBudget: this.governor.getVisualWorkBudget()
     });
   }
 
@@ -1208,6 +1286,7 @@ export class CosmicAtlasHost {
     // The arriving destination's work multiplier now drives the governor's
     // fps expectation (and re-arms its warmup grace window).
     this.governor.setActiveDestination(prepared.module.descriptor.id);
+    this.post.invalidateTemporal?.('transition-handoff');
     // Transitions ramp the camera themselves; this instant/snap application
     // covers plain activations and reduced motion (animateSeconds 0).
     this.cameraRig.applyArrivalPreset(
@@ -1256,6 +1335,13 @@ export class CosmicAtlasHost {
     // rejection has already been delivered by this point, so clearing here
     // restores truthful reporting without reopening the teardown race.
     this.tearingDown = false;
+    const activeDestination = this.activePrepared?.module.descriptor.id ?? null;
+    const activePreset = this.state.atlas.activePreset;
+    this.post.invalidateTemporal?.(
+      activeDestination === intent.destinationId && activePreset !== intent.presetId
+        ? 'preset-change'
+        : 'route-change'
+    );
     this.director.requestTransition({
       destinationId: intent.destinationId,
       presetId: intent.presetId

@@ -21,7 +21,8 @@ import type {
   IPerformanceGovernor,
   QualityTier,
   RendererInfoTelemetry,
-  ResourceScopeCounters
+  ResourceScopeCounters,
+  VisualWorkBudget
 } from './types';
 import type { ScopeInventory } from './ResourceManager';
 
@@ -68,6 +69,8 @@ export interface DebugInventoryHostPieces {
   frame: FrameInvalidationTelemetry | null;
   /** WS0/tasks.md §1 renderer.info mirror (null when no renderer is live). */
   rendererInfo: RendererInfoTelemetry | null;
+  /** Resolved global visual-work budget (null before the governor is live). */
+  visualWorkBudget?: VisualWorkBudget | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -96,6 +99,8 @@ export interface DebugInventoryView {
   frame: FrameInvalidationTelemetry | null;
   /** WS0/tasks.md §1 renderer.info mirror (null when no renderer is live). */
   rendererInfo: RendererInfoTelemetry | null;
+  /** Resolved global visual-work budget for destination services. */
+  visualWorkBudget: VisualWorkBudget | null;
   /** Per-scope entries exactly as reported by the ResourceManager. */
   resourceScopes: readonly ResourceScopeInventoryEntry[];
   /** True when `debugInventory()` was reachable and returned without throwing. */
@@ -202,6 +207,7 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
     gpuFrameMs: pieces.gpuFrameMs,
     frame: pieces.frame,
     rendererInfo: pieces.rendererInfo,
+    visualWorkBudget: pieces.visualWorkBudget ?? null,
     resourceScopes: scopes,
     resourceInventoryAvailable,
     resourceInventoryError,
@@ -278,6 +284,18 @@ export function formatInventoryText(view: DebugInventoryView): string {
   lines.push(`${label('renderer generation')}${view.rendererGeneration}`);
   lines.push(`${label('active destination')}${view.activeDestinationId ?? 'none'}`);
   lines.push(`${label('pending prepares')}${view.pendingPrepares}`);
+  if (view.visualWorkBudget !== null) {
+    const budget = view.visualWorkBudget;
+    lines.push(`${label('visual budget tier')}${budget.tier}`);
+    lines.push(`${label('visual budget activity')}${budget.activityMode}`);
+    lines.push(`${label('volume detail octaves')}${budget.volumeDetailOctaves}`);
+    lines.push(`${label('volume step scale')}${formatFixed(budget.volumeActiveSteps, 2)}`);
+    lines.push(`${label('particle scale')}${formatFixed(budget.particlePopulationScale, 2)}`);
+    lines.push(`${label('strand quality')}${formatFixed(budget.strandQuality, 2)}`);
+    lines.push(
+      `${label('temporal history')}${budget.temporalEnabled ? budget.temporalHistoryFrames : 'off'}`
+    );
+  }
 
   if (view.governor !== null) {
     lines.push(`${label('governor tier')}${view.governor.tier}`);

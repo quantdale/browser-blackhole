@@ -254,6 +254,14 @@ Centralize:
 
 Destinations supply physical radiance/emissive values under their model. Cinematic multipliers live in visual state, not hidden inside physics shaders.
 
+SharedPost V2 additionally owns a separate FP16 `Emissive` auxiliary target.
+Materials tagged with `userData.cinematicEmissive` are rendered through the
+reserved selective layer before `BloomNode`, keeping bright photospheres,
+volumes and strands separate from unrelated scene radiance. A direct ray pass
+with no authored tag is reported as the legacy whole-scene threshold fallback.
+The same service delegates bounded history/jitter/reprojection to
+`TemporalService` and exposes the named stage/debug contract.
+
 ## 9a. CinematicPrimitives (visual fidelity overhaul)
 
 `src/renderer/shared/CinematicPrimitives.ts` owns the shared representation

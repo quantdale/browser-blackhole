@@ -147,6 +147,8 @@ export class TimeController {
    * by a same-tick before/after comparison.
    */
   private dirtyValue = true;
+  /** Scrub/reset/mapping changes invalidate accumulated image history. */
+  private discontinuityValue = true;
 
   constructor(options: TimeControllerOptions = {}) {
     this.rateValue = sanitizeRate(options.playbackRate ?? 1, 1);
@@ -169,6 +171,13 @@ export class TimeController {
     const dirty = this.dirtyValue;
     this.dirtyValue = false;
     return dirty;
+  }
+
+  /** Consume a discontinuity marker distinct from ordinary frame advancement. */
+  consumeDiscontinuity(): boolean {
+    const discontinuity = this.discontinuityValue;
+    this.discontinuityValue = false;
+    return discontinuity;
   }
 
   // --- Mapping registry ----------------------------------------------------
@@ -242,6 +251,7 @@ export class TimeController {
       this.baseRateValue = seconds !== null && seconds > 0 && span > 0 ? span / seconds : 1;
     }
     this.loopValue = mapping.loop === true;
+    this.discontinuityValue = true;
     const before = this.internalTime;
     this.internalTime = clamp(this.internalTime, this.internalMin, this.internalMax);
     this.markDirtyIfChanged(before);
@@ -365,6 +375,7 @@ export class TimeController {
 
   private setPhaseFromUi(phase01: number): void {
     const ui = clamp(finiteOrNull(phase01) ?? 0, 0, 1);
+    this.discontinuityValue = true;
     const before = this.internalTime;
     this.internalTime = clamp(this.activeMapping.forward(ui), this.internalMin, this.internalMax);
     this.markDirtyIfChanged(before);

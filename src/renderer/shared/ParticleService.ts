@@ -80,6 +80,7 @@ import type {
   ParticleSystemHandle,
   RendererLike
 } from '../../atlas/types';
+import { CINEMATIC_EMISSIVE_LAYER } from './visualLayers.js';
 
 /** Any float-valued TSL shader-graph node. */
 type TslFloat = Node<'float'>;
@@ -369,6 +370,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.material.sizeAttenuation = false;
     this.material.blending =
       config.blending === 'additive' ? THREE.AdditiveBlending : THREE.NormalBlending;
+    this.material.userData['cinematicEmissive'] = true;
 
     const posRead = attribute<'vec4'>('aParticlePos', 'vec4');
     const lifeRead = attribute<'vec4'>('aParticleLife', 'vec4');
@@ -393,6 +395,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false; // world-space population; skip bogus culling
     this.mesh.matrixAutoUpdate = false; // identity world matrix: positions are world-space
+    this.mesh.layers.enable(CINEMATIC_EMISSIVE_LAYER);
     this.mesh.name = 'ParticleSystem';
 
     // --- compute update graph (built once; dispatched per frame when active) ---

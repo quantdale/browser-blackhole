@@ -14,6 +14,26 @@ pixel -> camera ray -> geodesic propagation
 
 Then run temporal/post-processing stages and tone map for display.
 
+The current SharedPost V2 stage contract is explicit:
+
+```text
+scene HDR
+  → bounded temporal resolve (when the global budget enables it)
+  → selective FP16 highlight extraction + bloom
+  → transition composite
+  → exposure/tone mapping/output color conversion
+  → optional Cinematic display grade
+```
+
+Temporal history is camera-only in its first validated version: deterministic
+Halton projection jitter, previous/current camera transforms, a bounded pair of
+FP16 history targets, a 3×3 neighborhood clamp, and aggressive invalidation on
+model/route/camera/size/tier/backend/pass discontinuities. During interaction
+the global budget reduces history to one frame. A separate tagged-object pass
+feeds `SharedPost.Emissive`; direct ray passes without authored tags use the
+reported legacy scene-threshold fallback. This fallback is compatibility
+behavior, not the selective path.
+
 A full-screen triangle avoids the diagonal interpolation seam/extra vertex work of a two-triangle quad and keeps the ray shader's invocation mapping simple.
 
 ## 2. Camera ray reconstruction

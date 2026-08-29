@@ -152,6 +152,7 @@ export function createCinematicSurfaceMaterial(
   material.depthTest = true;
   material.side = options.side ?? THREE.FrontSide;
   if (options.blending !== undefined) material.blending = options.blending;
+  material.userData['cinematicEmissive'] = true;
 
   const surfaceNormal = normalize(normalLocal);
   const view = normalize(cameraPosition.sub(positionWorld));
@@ -228,6 +229,7 @@ export function createCinematicHalo(options: CinematicHaloOptions): CinematicMat
   material.depthTest = false;
   material.side = options.side ?? THREE.DoubleSide;
   material.blending = THREE.AdditiveBlending;
+  material.userData['cinematicEmissive'] = true;
 
   const surfaceNormal = normalize(normalLocal);
   const view = normalize(cameraPosition.sub(positionWorld));
@@ -414,6 +416,7 @@ export function createCinematicDiscMaterial(
   material.depthTest = false;
   material.side = THREE.DoubleSide;
   material.blending = THREE.AdditiveBlending;
+  material.userData['cinematicEmissive'] = true;
 
   const radius = length(positionLocal.xz);
   const radial = clamp(
@@ -492,6 +495,7 @@ export function createCinematicJetMaterial(options: CinematicJetOptions): Cinema
   material.depthTest = false;
   material.side = THREE.DoubleSide;
   material.blending = THREE.AdditiveBlending;
+  material.userData['cinematicEmissive'] = true;
 
   const axial = clamp(positionLocal.y, 0, 1);
   const baseFade = smoothstep(0, 0.12, axial).mul(oneMinus(smoothstep(0.72, 1, axial)));

@@ -23,6 +23,28 @@ export type FidelityClass = 'DIRECT' | 'DATA_DRIVEN' | 'PROCEDURAL_SCIENTIFIC' |
 export type QualityMode = 'auto' | 'low' | 'medium' | 'high' | 'ultra';
 export type QualityTier = 'low' | 'medium' | 'high' | 'ultra';
 
+/** Global bounded presentation budget resolved by PerformanceGovernor. */
+export interface VisualWorkBudget {
+  tier: QualityTier;
+  activityMode: GovernorActivityMode;
+  renderScale: number;
+  temporalEnabled: boolean;
+  temporalHistoryFrames: number;
+  temporalJitterScale: number;
+  /** Normalized multiplier applied to each service's compile-time step bound. */
+  volumeActiveSteps: number;
+  volumeInternalScale: number;
+  volumeDetailOctaves: number;
+  volumeLightingTaps: number;
+  particlePopulationScale: number;
+  particleProfileQuality: number;
+  strandQuality: number;
+  environmentDetail: number;
+  bloomResolutionScale: number;
+  glareEnabled: boolean;
+  lensingSupersampleQuality: number;
+}
+
 /**
  * Product experience mode (M5 canonical state, campaign §4/§5).
  *
@@ -481,6 +503,7 @@ export interface IPerformanceGovernor {
   readonly currentTier: QualityTier;
   readonly renderScale: number;
   readonly activityMode: GovernorActivityMode;
+  getVisualWorkBudget(): VisualWorkBudget;
   onTierChanged(cb: (tier: QualityTier) => void): () => void;
   dispose(): void;
 }
@@ -613,9 +636,36 @@ export interface ISharedPost {
   setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void;
   /** Composite HDR result + transition overlay to the canvas. */
   present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void;
+  /** Render explicitly tagged emissive objects into the highlight auxiliary target. */
+  renderSelectiveHighlights?(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void;
+  /** Clear the previous selective source when destination drawing is suppressed. */
+  clearSelectiveHighlights?(): void;
+  /** Global bloom auxiliary-resolution control. */
+  setBloomResolutionScale?(scale: number): void;
+  /** Apply the global bounded temporal policy for the next frame. */
+  setTemporalPolicy?(
+    policy: {
+      enabled: boolean;
+      historyFrames: number;
+      jitterScale: number;
+      interactionHistoryFrames?: number;
+    },
+    interaction?: boolean
+  ): void;
+  /** Explicit temporal invalidation for discontinuities and graph variants. */
+  invalidateTemporal?(reason: string): void;
+  /** Begin/resolve/end a jittered temporal frame around destination rendering. */
+  beginTemporalFrame?(camera: THREE.PerspectiveCamera): void;
+  resolveTemporal?(camera: THREE.PerspectiveCamera): void;
+  clearTemporalOutput?(): void;
+  endTemporalFrame?(camera: THREE.PerspectiveCamera): void;
+  /** Debug description of named image stages and auxiliary resources. */
+  getDebugSnapshot?(): Record<string, unknown>;
   /** Frozen outgoing frame for transitions. */
   captureSnapshot(): THREE.Texture | null;
   releaseSnapshot(): void;
+  /** Test-only r185 RenderPipeline/MRT architecture spike; not a frame path. */
+  runArchitectureSpikeForTest?(): Promise<Record<string, unknown>>;
   dispose(): void;
 }
 
@@ -839,6 +889,8 @@ export interface FrameContext {
   time: FrameTimeInfo;
   quality: QualityTier;
   renderScale: number;
+  /** One global resolved budget for all expensive presentation services. */
+  workBudget: VisualWorkBudget;
   /** Canonical trajectory-backend preference (M8-09, atlas rendering domain). */
   trajectoryBackend: TrajectoryBackendPreference;
 }
