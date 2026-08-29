@@ -82,10 +82,14 @@ const NUCLEUS_B_COLOR: [number, number, number] = [0.86, 0.92, 1.0];
 
 /** Sprite footprint in CSS pixels (fixed size: a star cloud, not spheres). */
 const TRACER_SIZE_PX = 3.2;
-const NUCLEUS_SIZE_PX = 34;
+const NUCLEUS_SIZE_PX = 14;
 /** Additive radiance scale per sprite before brightness jitter. */
 const TRACER_INTENSITY = 1.6;
 const NUCLEUS_INTENSITY = 3.5;
+/** Upper bound for secondary unresolved emitters around the GC1 backbone. */
+const SECONDARY_EMITTER_CAPACITY = 3200;
+const SECONDARY_SIZE_PX = 1.8;
+const SECONDARY_INTENSITY = 0.62;
 
 /**
  * Stage label for a GC1 model time, used in the timeline readout. Boundaries
@@ -203,6 +207,10 @@ class GalaxyCollisionModule implements PhenomenonModule {
   private scene: THREE.Scene | null = null;
   private tracerPosAttr: THREE.InstancedBufferAttribute | null = null;
   private tracerPositions: Float32Array | null = null;
+  private secondaryPosAttr: THREE.InstancedBufferAttribute | null = null;
+  private secondaryPositions: Float32Array | null = null;
+  private secondaryMesh: THREE.Mesh | null = null;
+  private secondaryCount = 0;
   private nucleusPosAttr: THREE.InstancedBufferAttribute | null = null;
   private nucleusPositions: Float32Array = new Float32Array(6);
   private backdrop: CinematicBackdropHandle | null = null;
@@ -265,6 +273,24 @@ class GalaxyCollisionModule implements PhenomenonModule {
     nucleusMesh.name = 'GalaxyCollisionNuclei';
     const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
 
+    // GC1's 1,600 source-driven tracers remain the authoritative morphology.
+    // This separate bounded instanced population is generated around those
+    // positions only to supply unresolved stellar density; it is not a second
+    // trajectory solver or a claim of source-data resolution.
+    const secondary = buildSpriteCloud(SECONDARY_EMITTER_CAPACITY);
+    const secondaryMaterial = buildSpriteMaterial({
+      colorA: [0.9, 0.64, 0.38],
+      colorB: [0.5, 0.7, 1.0],
+      sizePx: SECONDARY_SIZE_PX,
+      intensity: SECONDARY_INTENSITY,
+      softness: 2.8
+    });
+    const secondaryMesh = new THREE.Mesh(secondary.geometry, secondaryMaterial);
+    secondaryMesh.frustumCulled = false;
+    secondaryMesh.matrixAutoUpdate = false;
+    secondaryMesh.name = 'GalaxyCollisionUnresolvedStars';
+    secondaryMesh.renderOrder = 1;
+
     // The GC1 tracers remain the sole source of galaxy morphology. These
     // bounded nucleus halos only provide a soft stellar-core hierarchy so the
     // data-driven pair does not read as two hard sprite stamps.
@@ -304,6 +330,18 @@ class GalaxyCollisionModule implements PhenomenonModule {
     ctx.scope.track('material', nucleusMaterial, () => nucleusMaterial.dispose(), 256 * 1024);
     ctx.scope.track(
       'geometry',
+      secondary.geometry,
+      () => secondary.geometry.dispose(),
+      SECONDARY_EMITTER_CAPACITY * TRACER_POINT_ESTIMATED_BYTES
+    );
+    ctx.scope.track(
+      'material',
+      secondaryMaterial,
+      () => secondaryMaterial.dispose(),
+      SECONDARY_EMITTER_CAPACITY * 256
+    );
+    ctx.scope.track(
+      'geometry',
       nucleusHaloGeometry,
       () => nucleusHaloGeometry.dispose(),
       detail.haloSegments.width * detail.haloSegments.height * 32
@@ -341,11 +379,17 @@ class GalaxyCollisionModule implements PhenomenonModule {
     this.backdrop = cinematicBackdrop;
     scene.add(nucleusMesh);
     scene.add(tracerMesh);
+    scene.add(secondaryMesh);
+    scene.add(nucleusHaloA, nucleusHaloB);
 
     this.dataset = dataset;
     this.scene = scene;
     this.tracerPosAttr = tracers.posAttr;
     this.tracerPositions = tracers.positions;
+    this.secondaryPosAttr = secondary.posAttr;
+    this.secondaryPositions = secondary.positions;
+    this.secondaryMesh = secondaryMesh;
+    this.secondaryCount = 0;
     this.nucleusPosAttr = nuclei.posAttr;
     this.nucleusPositions = nuclei.positions;
     this.nucleusHaloA = nucleusHaloA;
@@ -383,9 +427,16 @@ class GalaxyCollisionModule implements PhenomenonModule {
   update(ctx: FrameContext): void {
     if (this.disposed || this.dataset === null) return;
     this.applyPhase(ctx.time.phase);
-    this.backdrop?.setDetail(
-      ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0
-    );
+    const secondaryDetail =
+      ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0;
+    this.secondaryCount = Math.round(SECONDARY_EMITTER_CAPACITY * secondaryDetail);
+    if (this.secondaryMesh !== null) {
+      (this.secondaryMesh.geometry as THREE.InstancedBufferGeometry).instanceCount =
+        this.secondaryCount;
+      this.secondaryMesh.visible = this.secondaryCount > 0;
+    }
+    this.backdrop?.setDetail(secondaryDetail);
+    this.backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.48 : 0.18);
   }
 
   private applyPhase(phase: number): void {
@@ -415,6 +466,25 @@ class GalaxyCollisionModule implements PhenomenonModule {
     );
     if (this.tracerPosAttr) this.tracerPosAttr.needsUpdate = true;
     if (this.nucleusPosAttr) this.nucleusPosAttr.needsUpdate = true;
+    if (this.secondaryPositions !== null && this.secondaryPosAttr !== null) {
+      const sourceCount = this.dataset.tracerCount;
+      for (let i = 0; i < SECONDARY_EMITTER_CAPACITY; i += 1) {
+        const source = sourceCount > 0 ? (i * 17 + 11) % sourceCount : 0;
+        const sourceOffset = source * 3;
+        const angle = hash01(i + 0x4f31) * Math.PI * 2;
+        const elevation = hash01(i + 0x8217) * 2 - 1;
+        const spread = 0.035 + hash01(i + 0xb19d) * 0.18;
+        const radial = Math.sqrt(Math.max(0, 1 - elevation * elevation));
+        const targetOffset = i * 3;
+        this.secondaryPositions[targetOffset] =
+          (this.tracerPositions?.[sourceOffset] ?? 0) + Math.cos(angle) * radial * spread;
+        this.secondaryPositions[targetOffset + 1] =
+          (this.tracerPositions?.[sourceOffset + 1] ?? 0) + elevation * spread * 0.42;
+        this.secondaryPositions[targetOffset + 2] =
+          (this.tracerPositions?.[sourceOffset + 2] ?? 0) + Math.sin(angle) * radial * spread;
+      }
+      this.secondaryPosAttr.needsUpdate = true;
+    }
 
     for (let i = 0; i < PROBE_INDICES.length; i += 1) {
       const idx = PROBE_INDICES[i]!;
@@ -444,6 +514,10 @@ class GalaxyCollisionModule implements PhenomenonModule {
     this.scene = null;
     this.tracerPosAttr = null;
     this.tracerPositions = null;
+    this.secondaryPosAttr = null;
+    this.secondaryPositions = null;
+    this.secondaryMesh = null;
+    this.secondaryCount = 0;
     this.nucleusPosAttr = null;
     this.nucleusHaloA = null;
     this.nucleusHaloB = null;
@@ -462,6 +536,10 @@ class GalaxyCollisionModule implements PhenomenonModule {
       probe0: this.probe[0] ?? null,
       probe1: this.probe[1] ?? null,
       probe2: this.probe[2] ?? null,
+      authoritativeTracerCount: this.dataset?.tracerCount ?? null,
+      unresolvedEmitterCapacity: SECONDARY_EMITTER_CAPACITY,
+      unresolvedEmitterCount: this.secondaryCount,
+      unresolvedEmitterSource: 'deterministic offsets around GC1 tracers',
       disposed: this.disposed
     };
   }
