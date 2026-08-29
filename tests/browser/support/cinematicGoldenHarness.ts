@@ -13,6 +13,8 @@ export interface CinematicGoldenSpec {
   phase: number;
   /** Optional fixed review distance for very large-scale destination shots. */
   cameraDistance?: number;
+  /** Optional presentation target for a fixed review shot. */
+  cameraTarget?: [number, number, number];
   /** Sparse-on-black rows use a scene-specific radiance floor. */
   minimumMeanLuma?: number;
   backend?: 'webgpu' | 'webgl2';
@@ -67,6 +69,8 @@ export const CINEMATIC_GOLDEN_SPECS: CinematicGoldenSpec[] = [
     name: 'CIN_TDE_DEBRIS',
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     phase: 0.42,
+    cameraDistance: 600,
+    cameraTarget: [-3150, 0, -1150],
     minimumMeanLuma: 0.1,
     notes: 'High-tier transported strand against the authoritative debris family.'
   },
@@ -108,7 +112,7 @@ export async function runCinematicGoldenExpectation(
   await waitForArrival(page);
   await page.locator('input[value="cinematic"]').check();
   await page.evaluate(
-    ({ phase, cameraDistance }) => {
+    ({ phase, cameraDistance, cameraTarget }) => {
       const app = window.__ATLAS_APP__!;
       const host = app.host as unknown as {
         governor: { setForcedTier(tier: 'high'): void };
@@ -121,12 +125,24 @@ export async function runCinematicGoldenExpectation(
             distance: number,
             source?: 'system' | 'user'
           ): void;
+          setTarget(target: { x: number; y: number; z: number }, source?: 'system' | 'user'): void;
         };
         handleResize(width: number, height: number): void;
       };
       host.governor.setForcedTier('high');
       host.time.pause();
       host.time.scrubTo(phase);
+      // Let the destination first materialize the scrubbed geometry and settle
+      // any authored auto-framing. A fixed review shot is then a real viewer
+      // takeover applied after that destination-owned pass, so its target and
+      // orbit cannot be overwritten by the first frame's system cue.
+      if (cameraTarget !== null || cameraDistance !== null) app.captureFrame();
+      if (cameraTarget !== null) {
+        host.cameraRig.setTarget(
+          { x: cameraTarget[0], y: cameraTarget[1], z: cameraTarget[2] },
+          'user'
+        );
+      }
       if (cameraDistance !== null) {
         const orbit = host.cameraRig.getOrbit();
         // A review shot is an explicit camera takeover. It disables the
@@ -138,7 +154,11 @@ export async function runCinematicGoldenExpectation(
       if (rect) host.handleResize(rect.width, rect.height);
       app.captureFrame();
     },
-    { phase: spec.phase, cameraDistance: spec.cameraDistance ?? null }
+    {
+      phase: spec.phase,
+      cameraDistance: spec.cameraDistance ?? null,
+      cameraTarget: spec.cameraTarget ?? null
+    }
   );
   await expect
     .poll(
@@ -204,6 +224,7 @@ export async function runCinematicGoldenExpectation(
     reviewShot: {
       phase: spec.phase,
       cameraDistance: spec.cameraDistance ?? 'destination-authored/auto-framed',
+      cameraTarget: spec.cameraTarget ?? 'destination-authored/auto-framed',
       minimumMeanLuma: spec.minimumMeanLuma ?? 0.5
     }
   };
