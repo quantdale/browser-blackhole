@@ -42,6 +42,11 @@ is simultaneously a writable render attachment. If the staged copy is not yet
 valid (first frame or a discontinuity), the service conservatively falls back
 to the alpha-only filter.
 
+Because staged depth is screen-space data, any host camera transform change
+invalidates it before the next volume draw. The current frame repopulates the
+ping-pong target after the destination has rendered; this prevents an
+auto-framed or manually moved camera from clipping against the previous view.
+
 A full-screen triangle avoids the diagonal interpolation seam/extra vertex work of a two-triangle quad and keeps the ray shader's invocation mapping simple.
 
 ## 2. Camera ray reconstruction
@@ -91,6 +96,10 @@ storage); an effect may opt down to RGBA8 only when its `VolumeConfig` marks
 probe in `tests/browser/hdr-continuity.spec.ts` reads the raw half-float
 samples before display conversion and proves a constant value of 4 survives
 both the volume target and SharedPost on WebGPU and forced WebGL2.
+
+The optional glare/PSF stage remains disabled by decision: selective FP16
+bloom is the accepted highlight treatment, so “glare enabled” is not a hidden
+quality flag. See `docs/cosmic-atlas/POST_GLARE_DECISION.md`.
 
 Bloom is post-processing. It must not alter physics calculations or be necessary for the lensing to exist.
 

@@ -218,6 +218,13 @@ threshold the destination switches back to its existing ribbon handles.
 The tube is a presentation representation, not a hydrodynamic reconstruction;
 the TDE model and its spine/debris-family tests remain authoritative.
 
+At High/Ultra each strand also carries a narrow `StrandCore` copied directly
+from the same spine. It is an emissive readability aid for subpixel/long-
+standoff views, with a bounded linear `radianceScale` and no independent
+motion. The swept tube remains the primary representation and supplies the
+transported frame, elliptical cross-section, radial opacity and temperature/
+clump variation; RibbonService remains the Low/Debug fallback.
+
 ## 6. TrajectoryService
 
 ### Modes
@@ -285,7 +292,7 @@ Centralize:
 - exposure;
 - tone mapping;
 - bloom;
-- optional glare;
+- optional glare (currently rejected; see `POST_GLARE_DECISION.md`);
 - color conversion;
 - final compositing.
 

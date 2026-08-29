@@ -241,6 +241,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
    */
   const uOrbitPhase = uniform(0);
   const focusTargetScratch = new THREE.Vector3();
+  const streamFocusScratch = new THREE.Vector3();
 
   // Scratch spine buffers (allocated once per ribbon capacity).
   let boundScratch: ReturnType<typeof createSpineScratch> | null = null;
@@ -830,6 +831,10 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     let extent = 0;
     let rawExtent = 0;
     let rawMin = Number.POSITIVE_INFINITY;
+    let focusMinX = Number.POSITIVE_INFINITY;
+    let focusMaxX = Number.NEGATIVE_INFINITY;
+    let focusMinZ = Number.POSITIVE_INFINITY;
+    let focusMaxZ = Number.NEGATIVE_INFINITY;
     let spineWriteIndex = 0;
     for (let i = nBound - 1; i >= 0; i -= 1) {
       const r = boundScratch.rs[i]!;
@@ -837,6 +842,10 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       if (r < rawMin) rawMin = r;
       if (r > rCap) continue;
       if (r > extent) extent = r;
+      focusMinX = Math.min(focusMinX, boundScratch.xs[i]!);
+      focusMaxX = Math.max(focusMaxX, boundScratch.xs[i]!);
+      focusMinZ = Math.min(focusMinZ, boundScratch.zs[i]!);
+      focusMaxZ = Math.max(focusMaxZ, boundScratch.zs[i]!);
       // Most-bound first so ribbon taper runs head -> tail along the arc.
       if (spinePoints[spineWriteIndex] === undefined) spinePoints.push(new THREE.Vector3());
       spinePoints[spineWriteIndex]!.set(boundScratch.xs[i]!, 0, boundScratch.zs[i]!);
@@ -863,6 +872,10 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       if (r < rawMin) rawMin = r;
       if (r > rCap) continue;
       if (r > extent) extent = r;
+      focusMinX = Math.min(focusMinX, unboundScratch.xs[i]!);
+      focusMaxX = Math.max(focusMaxX, unboundScratch.xs[i]!);
+      focusMinZ = Math.min(focusMinZ, unboundScratch.zs[i]!);
+      focusMaxZ = Math.max(focusMaxZ, unboundScratch.zs[i]!);
       if (spinePoints[spineWriteIndex] === undefined) spinePoints.push(new THREE.Vector3());
       spinePoints[spineWriteIndex]!.set(unboundScratch.xs[i]!, 0, unboundScratch.zs[i]!);
       spineWriteIndex += 1;
@@ -876,6 +889,16 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     streamExtentUnits = extent;
     streamRawExtentUnits = rawExtent;
     streamMinRadiusUnits = Number.isFinite(rawMin) ? rawMin : 0;
+    if (
+      Number.isFinite(focusMinX) &&
+      Number.isFinite(focusMaxX) &&
+      Number.isFinite(focusMinZ) &&
+      Number.isFinite(focusMaxZ)
+    ) {
+      streamFocusScratch.set((focusMinX + focusMaxX) * 0.5, 0, (focusMinZ + focusMaxZ) * 0.5);
+    } else {
+      streamFocusScratch.set(0, 0, 0);
+    }
   }
 
   function update(ctx: FrameContext): void {
@@ -941,7 +964,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // cue only; it is disabled permanently after viewer takeover and never
     // alters the encounter coordinates.
     if (autoFramer.enabled && !ctx.services.cameraRig.isAnimating()) {
-      if (streamVisible) focusTargetScratch.set(0, 0, 0);
+      if (streamVisible) focusTargetScratch.copy(streamFocusScratch);
       else focusTargetScratch.set(enc.x, enc.y, enc.z);
       ctx.services.cameraRig.setTarget(focusTargetScratch, 'system');
     }

@@ -11,6 +11,10 @@ export interface CinematicGoldenSpec {
   name: string;
   url: string;
   phase: number;
+  /** Optional fixed review distance for very large-scale destination shots. */
+  cameraDistance?: number;
+  /** Sparse-on-black rows use a scene-specific radiance floor. */
+  minimumMeanLuma?: number;
   backend?: 'webgpu' | 'webgl2';
   notes: string;
 }
@@ -63,6 +67,7 @@ export const CINEMATIC_GOLDEN_SPECS: CinematicGoldenSpec[] = [
     name: 'CIN_TDE_DEBRIS',
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     phase: 0.42,
+    minimumMeanLuma: 0.1,
     notes: 'High-tier transported strand against the authoritative debris family.'
   },
   {
@@ -103,21 +108,37 @@ export async function runCinematicGoldenExpectation(
   await waitForArrival(page);
   await page.locator('input[value="cinematic"]').check();
   await page.evaluate(
-    ({ phase }) => {
+    ({ phase, cameraDistance }) => {
       const app = window.__ATLAS_APP__!;
       const host = app.host as unknown as {
         governor: { setForcedTier(tier: 'high'): void };
         time: { pause(): void; scrubTo(value: number): void };
+        cameraRig: {
+          getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
+          setOrbit(
+            azimuthDeg: number,
+            polarDeg: number,
+            distance: number,
+            source?: 'system' | 'user'
+          ): void;
+        };
         handleResize(width: number, height: number): void;
       };
       host.governor.setForcedTier('high');
       host.time.pause();
       host.time.scrubTo(phase);
+      if (cameraDistance !== null) {
+        const orbit = host.cameraRig.getOrbit();
+        // A review shot is an explicit camera takeover. It disables the
+        // destination auto-framer for this visit, just as a viewer drag does,
+        // while leaving the physical observer/model state unchanged.
+        host.cameraRig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, cameraDistance, 'user');
+      }
       const rect = document.getElementById('viewport')?.getBoundingClientRect();
       if (rect) host.handleResize(rect.width, rect.height);
       app.captureFrame();
     },
-    { phase: spec.phase }
+    { phase: spec.phase, cameraDistance: spec.cameraDistance ?? null }
   );
   await expect
     .poll(
@@ -179,6 +200,11 @@ export async function runCinematicGoldenExpectation(
       historySettleCount: temporalMetadata?.historyAge ?? 0,
       maximumHistoryFrames: temporalMetadata?.historyFrames ?? 0,
       finiteDeadlineSeconds: 15
+    },
+    reviewShot: {
+      phase: spec.phase,
+      cameraDistance: spec.cameraDistance ?? 'destination-authored/auto-framed',
+      minimumMeanLuma: spec.minimumMeanLuma ?? 0.5
     }
   };
   const suffix = spec.backend === undefined ? '' : `_${spec.backend.toUpperCase()}`;

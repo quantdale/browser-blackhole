@@ -66,10 +66,31 @@ test.describe('TDE StrandService V2', () => {
         return app.host.activeDestinationDebugSnapshot();
       });
 
+      const strandTopology = await page.evaluate(() => {
+        const names: string[] = [];
+        const scene = (
+          window.__ATLAS_APP__!.host as unknown as {
+            activePrepared?: {
+              scene: { traverse(callback: (object: { name: string }) => void): void };
+            };
+          }
+        ).activePrepared?.scene;
+        scene?.traverse((object) => {
+          if (object.name === 'StrandTube' || object.name === 'StrandCore') names.push(object.name);
+        });
+        return names;
+      });
+
       console.log(`STRAND_V2 ${backend.label}: ${JSON.stringify({ high, low })}`);
       expect(errors).toEqual([]);
       expect(high?.strandRepresentation).toBe('tube');
       expect(high?.strandQuality).toBeGreaterThanOrEqual(0.5);
+      expect(strandTopology.filter((name) => name === 'StrandTube').length).toBeGreaterThanOrEqual(
+        2
+      );
+      expect(strandTopology.filter((name) => name === 'StrandCore').length).toBeGreaterThanOrEqual(
+        2
+      );
       expect(
         (high?.spineBoundPoints as number) + (high?.spineUnboundPoints as number)
       ).toBeGreaterThan(1);
