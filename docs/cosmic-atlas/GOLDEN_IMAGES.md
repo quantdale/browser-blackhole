@@ -125,6 +125,25 @@ UPDATE_GOLDENS=1 npx playwright test visual-goldens
 npx playwright test visual-goldens
 ```
 
+## Cinematic visual-fidelity overhaul (2026-08-29)
+
+The reviewed baselines for Stellar Explosion, Compact Merger, Tidal
+Disruption, Neutron Star, Quasar/AGN, Black-Hole Merger, and Galaxy Collision
+were regenerated for the representation-layer overhaul. The reason is visual
+model change, not tolerance relief: these rows now include the shared seeded
+deep-space context, structured surface/halo/ribbon layers, the real volume
+active-step path, and the corrected destination framing. Black-hole/Kerr,
+observer, diagnostic, and transition rows were retained and passed without
+changes to their authoritative ray paths.
+
+The golden harness still forces bloom off, exposure 1, and linear tone mapping
+so physics-focused captures remain a stable radiance regression. A separate
+`tests/browser/cinematic-fidelity.spec.ts` gate verifies that the opt-in
+Cinematic finishing graph changes only presented pixels and does not mutate
+the active model/debug state. Full visual verification passed twice at 43/43
+on the production preview build; the normal browser suite also exercises the
+same representation graphs under forced WebGL2.
+
 Rules:
 
 1. NEVER widen a tolerance or regenerate a golden just to make a failing test

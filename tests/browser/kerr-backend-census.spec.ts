@@ -68,6 +68,12 @@ async function classCensus(page: Page, backend: 'webgpu' | 'webgl2'): Promise<Cl
     const host = window.__ATLAS_APP__!.host;
     host.governor.setForcedTier('medium');
     host.time.pause();
+    // Classify the raw diagnostic colors, not a user display profile. The
+    // cinematic overhaul makes Scientific's default bloom-off state explicit;
+    // this census must remain invariant to exposure/bloom/tone-map settings.
+    host.post.setBloom(false, 0);
+    host.post.setExposure(1);
+    host.post.setToneMapping('linear');
   });
   await page.waitForTimeout(WARMUP_MS);
 

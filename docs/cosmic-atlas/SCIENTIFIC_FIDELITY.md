@@ -236,3 +236,20 @@ Before a destination exits beta:
 4. misleading claims have been audited;
 5. sources/provenance are linked;
 6. visual regression cannot silently replace a physical invariant test.
+
+## 16. Representation-layer disclosure (2026-08-29)
+
+The cinematic visual-fidelity overhaul changes how resolved outputs are
+presented, not the authoritative model or data. Seeded backdrops, structured
+stellar surfaces, optically thin halos, discs, jets, marker glows, and ribbon
+halos are display representations. They are not claims of full radiative
+transfer, relativistic magnetohydrodynamics, or a live dynamical spacetime.
+
+The direct black-hole and neutron-star ray paths, compact-merger and stellar
+explosion model equations, AGN zone semantics, numerical-relativity data, and
+Galaxy Collision coordinates/interpolation remain the source of scientific
+state. Cinematic grade, vignette, and grain are opt-in display operations and
+are excluded from Scientific/Debug diagnostic graphs. Physics-focused golden
+captures continue to force a linear, bloom-off display chain, while the
+separate cinematic browser gate verifies presentation changes do not mutate
+active model/debug state.

@@ -391,7 +391,7 @@ export class BlackHoleModule implements PhenomenonModule {
     const rig = ctx.services.cameraRig;
     const orbit = rig.getOrbit();
     const azimuthDeg = (orbit.azimuthDeg + ORBIT_RATE_DEG_PER_SECOND * ctx.time.dt) % 360;
-    rig.setOrbit(azimuthDeg, orbit.polarDeg, orbit.distance);
+    rig.setOrbit(azimuthDeg, orbit.polarDeg, orbit.distance, 'system');
   }
 
   render(ctx: RenderContext): void {

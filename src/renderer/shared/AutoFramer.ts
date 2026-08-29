@@ -52,7 +52,12 @@ export interface AutoFramerOptions {
 /** Minimal rig surface the framer needs (satisfied by ICameraRig). */
 export interface AutoFramerRig {
   getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
-  setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
+  setOrbit(
+    azimuthDeg: number,
+    polarDeg: number,
+    distance: number,
+    source?: 'system' | 'user'
+  ): void;
   /** True while the rig's own arrival/preset ease is still interpolating. */
   isAnimating(): boolean;
   /** Optional viewer-input revision; separates user takeover from host writes. */
@@ -163,7 +168,7 @@ export class AutoFramer {
     const next = current + (desired - current) * blend;
     this.lastWritten = next;
     if (Math.abs(next - orbit.distance) > 1e-4) {
-      rig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, next);
+      rig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, next, 'system');
     }
     return next;
   }

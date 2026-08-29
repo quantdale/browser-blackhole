@@ -381,12 +381,18 @@ export class CameraRig implements ICameraRig {
     return this.userInteractionRevision;
   }
 
-  setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void {
+  setOrbit(
+    azimuthDeg: number,
+    polarDeg: number,
+    distance: number,
+    source: 'system' | 'user' = 'user'
+  ): void {
     this.cancelAnimation();
     this.configured = true;
     this.azimuthDeg = requireFinite(azimuthDeg, 'azimuthDeg');
     this.polarDeg = clamp(requireFinite(polarDeg, 'polarDeg'), POLAR_MIN_DEG, POLAR_MAX_DEG);
     this.distance = clamp(requireFinite(distance, 'distance'), this.minDistance, this.maxDistance);
+    if (source === 'user') this.userInteractionRevision += 1;
     this.dirty = true;
   }
 

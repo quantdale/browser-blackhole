@@ -308,6 +308,22 @@ For magnetic/dipole/coronal visualizations. Field lines are visualization geomet
 
 Must be able to wrap the existing black-hole lensing renderer and later expose reduced lensing APIs to neutron-star/lensing-lab/AGN features without weakening black-hole correctness.
 
+### Representation layer
+
+Non-fullscreen destinations resolve their validated model/data outputs into a
+shared presentation layer before the destination render pass. The
+`CinematicPrimitives` factories provide deterministic, tier-bounded
+surface, backdrop, halo, disc, and jet representations. They consume resolved
+radius, temperature, gain, axis, seed, and model-time uniforms; they do not
+own physics state, a second clock, or a replacement ray/data path.
+
+The representation layer is intentionally separate from the display profile:
+Scientific and Debug graphs keep the restrained HDR/tone-mapping path, while
+the opt-in Cinematic profile may add display-only grade, vignette, and seeded
+grain. Volume active-step budgets, static particle short-circuits, and ribbon
+core/halo updates remain governed by the shared performance tier and are
+reported through the existing debug/resource inventories.
+
 ## 7. Frame lifecycle
 
 Recommended:

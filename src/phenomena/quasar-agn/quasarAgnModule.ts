@@ -669,7 +669,7 @@ export class QuasarAgnModule implements PhenomenonModule {
       const orbit = rig.getOrbit();
       const desired = agnCameraDistance(this.activeZone, this.state.zoom01);
       if (Math.abs(orbit.distance - desired) > 1e-4) {
-        rig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, desired);
+        rig.setOrbit(orbit.azimuthDeg, orbit.polarDeg, desired, 'system');
       }
     }
     this.lastZoomInput = this.state.zoom01;

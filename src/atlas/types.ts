@@ -425,7 +425,12 @@ export interface ICameraRig {
   applyArrivalPreset(preset: CameraArrivalPreset, animateSeconds: number): void;
   /** Capture departure transform for transition interpolation. */
   captureTransform(): CameraArrivalPreset;
-  setOrbit(azimuthDeg: number, polarDeg: number, distance: number): void;
+  setOrbit(
+    azimuthDeg: number,
+    polarDeg: number,
+    distance: number,
+    source?: 'system' | 'user'
+  ): void;
   getOrbit(): { azimuthDeg: number; polarDeg: number; distance: number };
   /** True while an arrival/preset ease is still interpolating. */
   isAnimating(): boolean;

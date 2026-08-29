@@ -34,6 +34,17 @@ describe('CameraRig.update(): CAMERA_CHANGED invalidation signal', () => {
     expect(rig.update(0.016)).toBe(false); // consumed; nothing new since
   });
 
+  it('tracks viewer takeover separately from system framing writes', () => {
+    const { rig } = rigWithCamera();
+    const initialRevision = rig.getUserInteractionRevision();
+
+    rig.setOrbit(10, 90, 18, 'system');
+    expect(rig.getUserInteractionRevision()).toBe(initialRevision);
+
+    rig.setOrbit(20, 90, 24, 'user');
+    expect(rig.getUserInteractionRevision()).toBe(initialRevision + 1);
+  });
+
   it('setFov() dirties exactly one subsequent update()', () => {
     const { rig } = rigWithCamera();
     rig.update(0.016);
