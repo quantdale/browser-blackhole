@@ -47,56 +47,64 @@ const scenes = [
     preset: 'default',
     url: '/atlas/black-hole?preset=default',
     phases: [0],
-    motionPhases: [0]
+    motionPhases: [0],
+    playingStartPhase: 0
   },
   {
     id: 'neutron-star',
     preset: 'surface',
     url: '/atlas/neutron-star?preset=surface',
     phases: [0, 0.5, 0.9],
-    motionPhases: [0, 0.2, 0.4, 0.6, 0.8]
+    motionPhases: [0, 0.2, 0.4, 0.6, 0.8],
+    playingStartPhase: 0.2
   },
   {
     id: 'stellar-explosion',
     preset: 'core-collapse',
     url: '/atlas/stellar-explosion?preset=core-collapse',
     phases: [0.03, 0.24, 0.55],
-    motionPhases: [0.03, 0.18, 0.34, 0.5, 0.66]
+    motionPhases: [0.03, 0.18, 0.34, 0.5, 0.66],
+    playingStartPhase: 0.45
   },
   {
     id: 'compact-merger',
     preset: 'equal-mass-nsns',
     url: '/atlas/compact-merger?preset=equal-mass-nsns',
     phases: [0.05, 0.37, 0.7],
-    motionPhases: [0.05, 0.2, 0.37, 0.55, 0.7]
+    motionPhases: [0.05, 0.2, 0.37, 0.55, 0.7],
+    playingStartPhase: 0.37
   },
   {
     id: 'tidal-disruption',
     preset: 'solar-canonical',
     url: '/atlas/tidal-disruption?preset=solar-canonical',
     phases: [0.16, 0.36, 0.78],
-    motionPhases: [0.16, 0.28, 0.4, 0.58, 0.78]
+    motionPhases: [0.16, 0.28, 0.4, 0.58, 0.78],
+    playingStartPhase: 0.365
   },
   {
     id: 'quasar-agn',
     preset: 'quasar-reference',
     url: '/atlas/quasar-agn?preset=quasar-reference',
     phases: [0.2, 0.5, 0.8],
-    motionPhases: [0.2, 0.35, 0.5, 0.65, 0.8]
+    motionPhases: [0.2, 0.35, 0.5, 0.65, 0.8],
+    playingStartPhase: 0.5
   },
   {
     id: 'black-hole-merger',
     preset: 'sxs-bbh-0001-inspiral',
     url: '/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral',
     phases: [0.05, 0.56, 0.85],
-    motionPhases: [0.05, 0.25, 0.45, 0.65, 0.85]
+    motionPhases: [0.05, 0.25, 0.45, 0.65, 0.85],
+    playingStartPhase: 0.56
   },
   {
     id: 'galaxy-collision',
     preset: 'encounter',
     url: '/atlas/galaxy-collision?preset=encounter',
     phases: [0.1, 0.5, 0.9],
-    motionPhases: [0.1, 0.3, 0.5, 0.7, 0.9]
+    motionPhases: [0.1, 0.3, 0.5, 0.7, 0.9],
+    playingStartPhase: 0.5
   }
 ];
 
@@ -120,7 +128,7 @@ const playingMotion = process.env.BASELINE_PLAYING_MOTION === '1';
 const playingMotionFrames = Math.max(3, Number(process.env.BASELINE_MOTION_FRAMES ?? 5));
 const playingMotionIntervalMs = Math.max(
   16,
-  Number(process.env.BASELINE_MOTION_INTERVAL_MS ?? 120)
+  Number(process.env.BASELINE_MOTION_INTERVAL_MS ?? 500)
 );
 const captureKind = process.env.BASELINE_KIND ?? 'cinematic-visual-fidelity-capture';
 if (!['low', 'medium', 'high', 'ultra'].includes(captureTier)) {
@@ -436,6 +444,7 @@ for (const scene of selectedScenes) {
     id: scene.id,
     preset: scene.preset,
     url: scene.url,
+    playingStartPhase: scene.playingStartPhase ?? null,
     baseOrbit,
     backend: initialInventory?.backend ?? null,
     initialInventory,
@@ -502,7 +511,13 @@ for (const scene of selectedScenes) {
     };
 
     if (playingMotion) {
-      await selectMode(page, mode);
+      await setCaptureState(
+        page,
+        mode,
+        scene.playingStartPhase ?? scene.motionPhases[0] ?? 0,
+        1.3,
+        baseOrbit
+      );
       await page.evaluate((tier) => {
         const app = window.__ATLAS_APP__;
         if (!app) throw new Error('Atlas hook unavailable');
