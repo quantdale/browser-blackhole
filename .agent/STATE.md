@@ -1,5 +1,69 @@
 # ACTIVE CAMPAIGN OVERRIDE — 2026-08-29
 
+## 2026-08-29 session — CINEMATIC VISUAL FIDELITY OVERHAUL COMPLETE
+
+Status: **COMPLETE**. The requested campaign was absent at the planned-from
+SHA, so the scoped contract was created under
+`openspec/changes/cinematic-visual-fidelity-overhaul/` and executed in the
+prescribed order. The last implementation checkpoint is
+`2fc1b5d` (`fix(visual): separate system framing from viewer takeover`). The
+certification and checklist documentation are the final documentation
+checkpoint after that code SHA.
+
+Implementation delivered:
+
+- `CinematicPrimitives` now provides deterministic TSL surface, deep-space
+  backdrop, optically thin halo, disc, and finite-jet representations with
+  global-tier-bounded detail and explicit disposal;
+- Stellar Explosion was completed and validated first, using resolved model
+  temperature/time/seed/axis inputs while leaving density, emission, jet,
+  ejecta, and timeline equations unchanged;
+- VolumeService now uses a real active-step execution budget; ParticleService
+  exposes static/dynamic and zero-population skip semantics; RibbonService
+  renders a bounded core/halo pair with revision-gated updates;
+- Compact Merger, Tidal Disruption, Neutron Star, Quasar/AGN, Black-Hole
+  Merger, and Galaxy Collision now consume shared representation layers. The
+  Black Hole/Kerr ray paths remain non-regressed; its shared display path was
+  audited without changing the validated integrator;
+- SharedPost cinematic grade is opt-in and display-only. Scientific/Debug
+  graphs remain restrained and diagnostic. Camera auto-framing now identifies
+  actual viewer takeover separately from system/transition writes.
+
+Final evidence:
+
+- `npm run check`: **40 test files / 580 tests PASS**, formatting, lint,
+  typecheck, and production build all PASS;
+- `E2E_PORT=4299 npx playwright test --project=default --workers=1`:
+  **228/228 PASS** in 24.2 minutes, including accessibility, startup graph,
+  transitions, device-loss, resource torture, all destination suites, the
+  cinematic-fidelity probes, and forced-WebGL2 rows;
+- the visual-golden rows passed **43/43** in the final full run and in an
+  immediate final-code dedicated rerun (**43/43**, 4.6 minutes). Changed
+  baselines were manually reviewed and are documented in
+  `docs/cosmic-atlas/GOLDEN_IMAGES.md`;
+- `E2E_PORT=4299 npx playwright test --project=firefox --workers=1`:
+  **4/4 PASS** for second-engine fallback/terminal-state behavior;
+- the startup graph probe recorded 11/11 startup checks, 14 JavaScript
+  requests, and 1,339,856 decoded bytes for the Galaxy Collision route. The
+  dedicated cinematic probe passed 2/2 inside the full run;
+- matched low-tier GPU timestamp measurements were captured for all nine
+  benchmark paths at CSS 1280x800, DPR 1, and governed internal dimensions
+  (583x436, with 576x480 for Stellar Explosion/Galaxy Collision). The
+  WebGPU/WebGL2 GPU-ms table and CPU/rAF caveat are recorded in
+  `docs/VISUAL_FIDELITY_CERTIFICATION.md`. No console errors were recorded
+  in the benchmark windows.
+
+Known limits remain explicit: WebKit/real-device validation is
+`DEFERRED_ENVIRONMENT`; absolute timings are local-adapter evidence only; the
+pre-existing Kerr polar numerical-failure band remains documented; and the
+new layers do not claim full radiative transfer, GRMHD, or live dynamical
+binary-spacetime simulation. No authoritative physics/data/timeline contract
+was changed for appearance.
+
+Next action: none for this campaign. The separate whole-atlas performance
+campaign remains paused at its documented next task and is not silently
+marked complete by this visual campaign.
+
 ## 2026-08-29 session — CINEMATIC VISUAL FIDELITY OVERHAUL
 
 The user requested `openspec/changes/cinematic-visual-fidelity-overhaul/`, but

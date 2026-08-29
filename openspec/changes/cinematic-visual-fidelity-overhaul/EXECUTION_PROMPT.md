@@ -2,7 +2,7 @@
 
 Campaign: `cinematic-visual-fidelity-overhaul`
 
-Status: ACTIVE
+Status: COMPLETED
 
 Planned-From: `main@518bff7b8c14e4a22ada4c9376f166d8565c5263`
 
