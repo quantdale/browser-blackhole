@@ -45,7 +45,7 @@
  * into an internal half-res `RenderTarget` (scale shared via
  * `setInternalScale`), rendered during the main pass from the proxy mesh's
  * `onBeforeRender`; the visible proxy then composites that texture at
- * `screenUV` with linear filtering (no depth-aware upsample — disclosed below).
+ * `screenUV` with an alpha/depth-guided bilateral filter when requested.
  * Because emission is linear radiance, this target is RGBA16F by default.
  * `hdrIntermediate: false` is an explicit opt-down for an LDR-safe effect.
  *
@@ -54,9 +54,10 @@
  *   structure beyond the bounds test.
  * - Single-scattering-style emission only. NO scattering-order claims are made;
  *   multiple scattering is not modeled.
- * - No depth-aware upsampling in the half-res composite (RENDERING_SERVICES §4
- *   lists it as an optimization, not a requirement); edges may halo against
- *   high-frequency backgrounds.
+ * - Depth awareness uses a staged PREVIOUS-frame scene-depth copy owned by
+ *   SharedPost. The first frame and every invalidation conservatively fall
+ *   back to alpha-guided filtering; this avoids sampling the active depth
+ *   attachment while it is being written.
  * - The nested half-res render happens inside `onBeforeRender` of the active
  *   scene pass; this is the standard three.js hook but relies on renderer state
  *   save/restore semantics of the active backend.
@@ -147,6 +148,7 @@ class VolumeImpl implements VolumeHandle {
   private readonly intermediateType: THREE.TextureDataType | null;
   private readonly intermediateFormat: 'rgba16f' | 'rgba8' | null;
   private readonly uDetailOctaves: UniformNode<'float', number>;
+  private readonly detailOctaveCeiling: number;
   private readonly uLightingTaps: UniformNode<'float', number>;
   private readonly uJitterEnabled: UniformNode<'float', number>;
   private readonly depthTextureState: { value: THREE.Texture | null };
@@ -189,9 +191,9 @@ class VolumeImpl implements VolumeHandle {
     this.uJitterSeed = uniform(seed);
     this.uJitterFrame = uniform(0);
     this.uJitterEnabled = uniform(config.temporalJitter ? 1 : 0);
-    this.uDetailOctaves = uniform(
-      config.detail === undefined ? 1 : clampInt(config.detail.octaves ?? 3, 1, 5)
-    );
+    this.detailOctaveCeiling =
+      config.detail === undefined ? 1 : clampInt(config.detail.octaves ?? 3, 1, 5);
+    this.uDetailOctaves = uniform(this.detailOctaveCeiling);
     this.uLightingTaps = uniform(
       config.approximateSelfShadow ? clampInt(config.approximateSelfShadow ? 1 : 0, 0, 2) : 0
     );
@@ -429,7 +431,8 @@ class VolumeImpl implements VolumeHandle {
       .mul(0.5)
       .add(0.5)
       .toVar();
-    for (let octave = 2; octave <= 5; octave += 1) {
+    const maxDetailOctaves = this.detailOctaveCeiling;
+    for (let octave = 2; octave <= maxDetailOctaves; octave += 1) {
       const candidate = mx_fractal_noise_float(
         warped.mul(frequency).add(seed * 0.013),
         octave,
@@ -563,7 +566,7 @@ class VolumeImpl implements VolumeHandle {
 
   setDetailOctaves(octaves: number): void {
     if (this.disposed) return;
-    this.uDetailOctaves.value = clampInt(octaves, 1, 5);
+    this.uDetailOctaves.value = clampInt(octaves, 1, this.detailOctaveCeiling);
   }
 
   setLightingTaps(taps: number): void {
@@ -612,7 +615,7 @@ class VolumeImpl implements VolumeHandle {
             ? 4
             : 0,
       hdrIntermediate: this.intermediateType === THREE.HalfFloatType,
-      detailOctaves: this.uDetailOctaves.value,
+      detailOctaves: Math.min(this.uDetailOctaves.value, this.detailOctaveCeiling),
       lightingTaps: this.uLightingTaps.value,
       temporalJitter: this.uJitterEnabled.value > 0,
       depthAwareUpsample: this.depthTextureNode !== null

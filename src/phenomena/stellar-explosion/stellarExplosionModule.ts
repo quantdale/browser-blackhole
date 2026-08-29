@@ -94,6 +94,7 @@ import {
   createCinematicBackdrop,
   createCinematicHalo,
   createCinematicJetMaterial,
+  createCinematicShellMaterial,
   createCinematicSurfaceMaterial,
   type CinematicBackdropHandle,
   type CinematicMaterialHandle
@@ -113,10 +114,18 @@ import { STELLAR_EXPLOSION_DESCRIPTOR } from './presets.js';
 
 /** Compile-time march budget per tier (VolumeService scales length live). */
 const TIER_VOLUME_STEPS: Record<QualityTier, number> = {
-  low: 48,
-  medium: 80,
-  high: 120,
-  ultra: 168
+  low: 36,
+  medium: 56,
+  high: 80,
+  ultra: 112
+};
+
+/** Compile-time detail ceiling follows the same global tier ladder. */
+const TIER_DETAIL_OCTAVES: Record<QualityTier, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  ultra: 4
 };
 
 /** Live step-length multiplier per tier (>1 = finer sampling). */
@@ -173,9 +182,10 @@ const TIMELINE_PLAYBACK_SECONDS = 50;
  * blown-out white ball. The render path therefore scales the model output by
  * `TARGET / (peak x chord)`, leaving the validated density field itself
  * untouched (its CPU/GPU parity tests compare the MODEL, not the presented
- * alpha).
+ * alpha). The current target is deliberately 1.4 so the shell stays
+ * optically legible while retaining an opaque-looking shock edge.
  */
-const EJECTA_TARGET_OPTICAL_DEPTH = 2.8;
+const EJECTA_TARGET_OPTICAL_DEPTH = 1.4;
 
 /**
  * Lower bound applied to the PRESENTED ejecta emission gain (disclosed). The
@@ -184,6 +194,8 @@ const EJECTA_TARGET_OPTICAL_DEPTH = 2.8;
  * fading to black on screen.
  */
 const EJECTA_EMISSION_DISPLAY_FLOOR = 0.22;
+/** Additional Cinematic-only presentation lift; Scientific remains model-floor only. */
+const EJECTA_CINEMATIC_PRESENTATION_GAIN = 1.8;
 
 /** Extra fraction of the shell radius included when framing (shell width). */
 const SHELL_WIDTH_MARGIN = 0.35;
@@ -222,6 +234,8 @@ export function createStellarExplosionModule(): PhenomenonModule {
   let progenitorVisual: CinematicMaterialHandle | null = null;
   let shellHaloMesh: THREE.Mesh | null = null;
   let shellHaloVisual: CinematicMaterialHandle | null = null;
+  let shellDetailMesh: THREE.Mesh | null = null;
+  let shellDetailVisual: CinematicMaterialHandle | null = null;
   let jetGroup: THREE.Group | null = null;
   let jetTop: THREE.Mesh | null = null;
   let jetBottom: THREE.Mesh | null = null;
@@ -267,8 +281,8 @@ export function createStellarExplosionModule(): PhenomenonModule {
     const detail = CINEMATIC_DETAIL_BY_TIER[ctx.quality];
     const cinematicBackdrop = createCinematicBackdrop({
       seed: ctx.preset.seed,
-      intensity: 0.28,
-      dustColor: [0.055, 0.012, 0.045],
+      intensity: 0.32,
+      dustColor: [0.075, 0.016, 0.07],
       starColor: [0.72, 0.82, 1.0],
       segments: detail.backdropSegments,
       octaves: detail.backdropOctaves,
@@ -346,6 +360,38 @@ export function createStellarExplosionModule(): PhenomenonModule {
     shellHaloMesh = haloMesh;
     shellHaloVisual = haloVisual;
 
+    // A single structured skin makes the shock boundary readable at the
+    // half-resolution volume's silhouette. It is deliberately subordinate to
+    // the volume and consumes the same radius/time/tint state.
+    const shellDetailGeometry = new THREE.SphereGeometry(
+      1,
+      detail.haloSegments.width,
+      detail.haloSegments.height
+    );
+    const shellDetail = createCinematicShellMaterial({
+      tint: [1.0, 0.24, 0.06],
+      secondaryTint: [0.28, 0.42, 1.0],
+      seed: ctx.preset.seed ^ 0x7a11,
+      gain: 0,
+      alpha: 0.34,
+      structureScale: res.scenarioId === 'hypernova' ? 5.4 : 4.5,
+      noiseOctaves: detail.surfaceOctaves
+    });
+    const shellDetailObject = new THREE.Mesh(shellDetailGeometry, shellDetail.material);
+    shellDetailObject.name = 'stellar-explosion-structured-shock-skin';
+    shellDetailObject.visible = false;
+    shellDetailObject.renderOrder = 16;
+    destinationScene.add(shellDetailObject);
+    ctx.scope.track(
+      'geometry',
+      shellDetailGeometry,
+      () => shellDetailGeometry.dispose(),
+      16 * 12 * 32
+    );
+    ctx.scope.track('material', shellDetail.material, () => shellDetail.material.dispose(), 4096);
+    shellDetailMesh = shellDetailObject;
+    shellDetailVisual = shellDetail;
+
     // The jet density remains inside the validated volume field. These two
     // finite cones expose the same resolved front/axis/viewing response as a
     // legible engine structure at cinematic scale; they do not introduce a
@@ -421,7 +467,7 @@ export function createStellarExplosionModule(): PhenomenonModule {
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       detail: {
         seed: ctx.preset.seed ^ 0x41e7,
-        octaves: 5,
+        octaves: TIER_DETAIL_OCTAVES[ctx.quality],
         strength: res.scenarioId === 'hypernova' ? 0.32 : 0.24,
         filamentStrength: res.scenarioId === 'hypernova' ? 0.72 : 0.55,
         clumpStrength: res.scenarioId === 'hypernova' ? 0.62 : 0.48,
@@ -442,7 +488,7 @@ export function createStellarExplosionModule(): PhenomenonModule {
     volume.setVisible(false); // phase-gated: off until the flash
     volume.object3d().name = 'stellar-explosion-ejecta-volume';
     destinationScene.add(volume.object3d());
-    // Byte estimate: half-res RGBA8 target + composite material headroom.
+    // Byte estimate: half-res RGBA16F target + composite material headroom.
     const volumeBytes = Math.round(boundsRadius * 0 + 2 * 1024 * 1024);
     ctx.scope.track('renderTarget', volume, () => volume.dispose(), volumeBytes);
     volumeHandle = volume;
@@ -653,7 +699,9 @@ export function createStellarExplosionModule(): PhenomenonModule {
       // in the debug readout as `emissionGainModel`.
       configureEmissionUniforms(emissionU, {
         ...sample,
-        intensity: Math.max(sample.intensity, EJECTA_EMISSION_DISPLAY_FLOOR)
+        intensity:
+          Math.max(sample.intensity, EJECTA_EMISSION_DISPLAY_FLOOR) *
+          (ctx.experienceMode === 'cinematic' ? EJECTA_CINEMATIC_PRESENTATION_GAIN : 1)
       });
       lastEmissionGainModel = sample.intensity;
     }
@@ -730,6 +778,19 @@ export function createStellarExplosionModule(): PhenomenonModule {
       );
       shellHaloVisual.setTime(seconds * 0.00012);
     }
+    if (shellDetailMesh !== null && shellDetailVisual !== null) {
+      const shellRadius = Math.max(
+        ready.resolved.progenitorRadiusUnits,
+        densityU?.shellRadius.value ?? ready.resolved.progenitorRadiusUnits
+      );
+      shellDetailMesh.scale.setScalar(shellRadius * 1.012);
+      shellDetailMesh.visible = volumeVisible;
+      shellDetailVisual.setGain(
+        volumeVisible ? Math.min(3.2, (emissionU?.gain.value ?? 0) * 0.82) : 0
+      );
+      shellDetailVisual.setTime(seconds * 0.00012);
+    }
+    backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.58 : 0.32);
     backdrop?.setTime(seconds * 0.00002);
     backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
     if (particleHandle !== null) {
@@ -763,6 +824,7 @@ export function createStellarExplosionModule(): PhenomenonModule {
     debug['jetEnabled'] = ready.resolved.jet.enabled;
     debug['jetFrontUnits'] = jetU?.frontUnits.value ?? 0;
     debug['maxDensityFactor'] = MAX_DENSITY_FACTOR;
+    debug['shellDetailRepresentation'] = 'structured-shock-skin';
   }
 
   function render(ctx: RenderContext): void {
@@ -787,6 +849,8 @@ export function createStellarExplosionModule(): PhenomenonModule {
     progenitorVisual = null;
     shellHaloMesh = null;
     shellHaloVisual = null;
+    shellDetailMesh = null;
+    shellDetailVisual = null;
     jetGroup = null;
     jetTop = null;
     jetBottom = null;
@@ -812,7 +876,7 @@ export function createStellarExplosionModule(): PhenomenonModule {
       disposed,
       fidelity: STELLAR_EXPLOSION_DESCRIPTOR.fidelity,
       representation:
-        'seeded deep-space backdrop + resolved emissive photosphere + volume shell + GRB cones',
+        'seeded environment + resolved photosphere + V2 volume shell + structured shock skin + GRB cones',
       volumeWork: volumeHandle?.getDebugSnapshot?.() ?? null,
       particleWork: particleHandle?.getDebugSnapshot() ?? null,
       disclosure:

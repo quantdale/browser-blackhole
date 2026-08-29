@@ -134,6 +134,13 @@ const TIER_STEP_SCALE: Record<FrameContext['quality'], number> = {
   ultra: 1.6
 };
 
+const TIER_DETAIL_OCTAVES: Record<FrameContext['quality'], number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  ultra: 4
+};
+
 // ---------------------------------------------------------------------------
 // Time model (phenomena-animation campaign)
 // ---------------------------------------------------------------------------
@@ -384,7 +391,7 @@ export class QuasarAgnModule implements PhenomenonModule {
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       detail: {
         seed: ctx.preset.seed ^ 0x4c1,
-        octaves: 3,
+        octaves: TIER_DETAIL_OCTAVES[ctx.quality],
         strength: 0.12,
         filamentStrength: 0.12,
         clumpStrength: 0.28,
@@ -524,7 +531,7 @@ export class QuasarAgnModule implements PhenomenonModule {
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       detail: {
         seed: ctx.preset.seed ^ 0x4c2,
-        octaves: 5,
+        octaves: TIER_DETAIL_OCTAVES[ctx.quality],
         strength: 0.18,
         filamentStrength: 0.16,
         clumpStrength: 0.72,

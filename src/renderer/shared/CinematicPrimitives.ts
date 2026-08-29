@@ -270,6 +270,94 @@ export function createCinematicHalo(options: CinematicHaloOptions): CinematicMat
   };
 }
 
+export interface CinematicShellOptions {
+  tint: readonly [number, number, number];
+  secondaryTint?: readonly [number, number, number];
+  seed: number;
+  gain?: number;
+  alpha?: number;
+  structureScale?: number;
+  noiseOctaves?: number;
+}
+
+/**
+ * Thin structured shell skin for explosive ejecta. The VolumeService remains
+ * the authoritative density/emission path; this layer only supplies a stable
+ * high-frequency silhouette cue at the shock boundary so a thin shell does not
+ * collapse into a uniformly lit disc at reduced internal resolution.
+ */
+export function createCinematicShellMaterial(
+  options: CinematicShellOptions
+): CinematicMaterialHandle {
+  const tint = uniform(toVector3(options.tint, [1, 1, 1]));
+  const secondaryTint = uniform(toVector3(options.secondaryTint ?? options.tint, [1, 1, 1]));
+  const gain = uniform(cinematicIntensity(options.gain ?? 1));
+  const alpha = Math.max(0, Math.min(1, options.alpha ?? 0.22));
+  const phase = uniform(0);
+  const seed = uniform(cinematicSeed(options.seed));
+  const scale = Math.max(0.2, options.structureScale ?? 4.5);
+
+  const material = new MeshBasicNodeMaterial();
+  material.transparent = true;
+  material.depthWrite = false;
+  material.depthTest = false;
+  material.side = THREE.DoubleSide;
+  material.blending = THREE.AdditiveBlending;
+  material.userData['cinematicEmissive'] = true;
+  material.userData['cinematicRepresentation'] = 'structured-shock-shell';
+
+  const direction = normalize(positionLocal);
+  const noise = mx_fractal_noise_float(
+    vec3(
+      direction.x.mul(scale).add(seed.mul(0.017)),
+      direction.y.mul(scale * 1.23).sub(phase.mul(0.011)),
+      direction.z.mul(scale * 0.83).add(seed.mul(0.023))
+    ),
+    Math.max(1, Math.min(5, Math.floor(options.noiseOctaves ?? 3))),
+    2.0,
+    0.5
+  )
+    .mul(0.5)
+    .add(0.5);
+  const ridged = oneMinus(noise.mul(2).sub(1).abs()).pow(2.6);
+  const filamentArgument = direction.x
+    .mul(scale * 5.2)
+    .add(direction.z.mul(scale * 3.1))
+    .add(direction.y.mul(scale * 4.1))
+    .add(noise.mul(8.0))
+    .add(phase.mul(0.016))
+    .add(seed.mul(0.031));
+  const filamentWave = sin(filamentArgument);
+  const filaments = oneMinus(filamentWave.abs()).pow(6.8).mul(noise.mul(0.8).add(0.2));
+  const lobe = direction.y.abs().pow(1.35).mul(0.55).add(0.45);
+  const structure = ridged.mul(0.42).add(filaments.mul(0.74)).mul(lobe);
+  const color = mix(tint, secondaryTint, noise.mul(0.68).add(0.16));
+  const viewFacing = oneMinus(dot(normalLocal, normalize(cameraPosition.sub(positionWorld))).abs());
+  material.colorNode = vec4(
+    color.mul(gain).mul(structure.add(0.18)),
+    viewFacing.mul(structure).mul(alpha)
+  );
+
+  return {
+    material,
+    setTint(value) {
+      tint.value.copy(toVector3(value, [1, 1, 1]));
+    },
+    setSecondaryTint(value) {
+      secondaryTint.value.copy(toVector3(value, [1, 1, 1]));
+    },
+    setGain(value) {
+      gain.value = cinematicIntensity(value, 0);
+    },
+    setTime(value) {
+      phase.value = Number.isFinite(value) ? value : 0;
+    },
+    dispose() {
+      material.dispose();
+    }
+  };
+}
+
 export interface CinematicBackdropOptions {
   seed: number;
   intensity?: number;

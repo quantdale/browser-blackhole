@@ -120,6 +120,14 @@ import { TIDAL_DISRUPTION_DESCRIPTOR } from './presets.js';
  */
 const SHOCK_TARGET_OPTICAL_DEPTH = 1.5;
 
+/** Compile-time detail ceilings; live work budget may reduce these branches. */
+const TIER_DETAIL_OCTAVES: Record<QualityTier, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  ultra: 4
+};
+
 /** Star photosphere tint proxy (linear RGB), presentation-level. */
 const STAR_TINT_LINEAR = [1.0, 0.86, 0.72] as const;
 /** Linear-HDR radiance multiplier for the photosphere (presentation). */
@@ -466,7 +474,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       detail: {
         seed: res.seed ^ 0x77a,
-        octaves: 5,
+        octaves: TIER_DETAIL_OCTAVES[ctx.quality],
         strength: 0.16,
         filamentStrength: 0.28,
         clumpStrength: 0.7,

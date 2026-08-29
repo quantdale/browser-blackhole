@@ -40,7 +40,8 @@ import type { StellarExplosionPublicState } from './types.js';
 const PRESENTATION_DISCLOSURE =
   'Presentation: the displayed brightness carries a floor so the late nebular ' +
   'stage stays visible; the modelled luminosity decline is reported unchanged ' +
-  'in diagnostics.';
+  'in diagnostics. Cinematic mode additionally applies a bounded display lift ' +
+  'to preserve shell structure; Scientific mode does not.';
 
 /** Shared destination id. */
 const DESTINATION_ID = 'stellar-explosion';

@@ -110,6 +110,14 @@ const TRAIL_ORBITS = 1.25;
 /** Ejecta volume bounds safety margin over the capped shell radius. */
 const BOUNDS_MARGIN = 1.15;
 
+/** Compile-time detail ceilings; live work budget may reduce these branches. */
+const TIER_DETAIL_OCTAVES: Record<QualityTier, number> = {
+  low: 1,
+  medium: 2,
+  high: 3,
+  ultra: 4
+};
+
 // ---------------------------------------------------------------------------
 // Module factory
 // ---------------------------------------------------------------------------
@@ -425,7 +433,7 @@ export function createCompactMergerModule(): PhenomenonModule {
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
       detail: {
         seed: res.seed ^ 0x3a7,
-        octaves: 4,
+        octaves: TIER_DETAIL_OCTAVES[ctx.quality],
         strength: 0.14,
         filamentStrength: 0.08,
         clumpStrength: 0.34,
