@@ -1,3 +1,30 @@
+## 2026-08-30 session — FINAL CERTIFICATION AND EVIDENCE-HYGIENE PASS (main@17c4644) — COMPLETE
+
+Status: **COMPLETE — FINAL CERTIFICATION HYGIENE**. This pass closes the remaining evidence gaps after the restore-scope certification at `17c4644`/`f9801a8`: fresh capable-GPU browser validation on the final runtime, persisted benchmark/review artifacts, and stale-state cleanup. No renderer rewrite; only certification, harness, and documentation hygiene. See `local://paste-1.md` objective.
+
+Baseline (current final runtime):
+
+- HEAD SHA: `17c4644c78947b1f3398ee0534c1f943f181de27` (main, clean, `git status` 0)
+- Branch: `main` (up-to-date with `origin/main`)
+- Node/npm: v24.3.0 / 11.4.2, TypeScript 5.9.3, Vite 8.2.2, Vitest 4.1.11, Playwright 1.62.1, Three 0.185.1, Edge 151.0.4129.107 (Chromium 151.0.7922.34 bundled)
+- Browser version: Chromium 151.0.7922.34 (Playwright chromium-1234, headed) / Edge 151 headless fallback
+- GPU adapter (headed hardware, primary): **nvidia lovelace** (NVIDIA GeForce RTX 4050 Laptop GPU, Direct3D11) — `timestampQuery:true`, `storageBuffers:true`, `floatRenderTargets:true`
+- GPU adapter (headless fallback): SwiftShader Device (Subzero) (0x0000C0DE) — software, `timestampQuery:false`
+- WebGPU backend: `api:webgpu, adapterName:nvidia lovelace` (headed) — primary
+- force-WebGL2 backend: `api:webgl2` via `?backend=webgl2` on same NVIDIA (ANGLE) — fallback, functionally correct
+- Viewport/internal: 1280×800 CSS, High 973×727, Low 583×436, DPR 1 (governed via VisualWorkBudget)
+- `npm ci` + `npm run check`: **44 files / 598 tests PASS**, prettier/lint/typecheck/build PASS (138 modules) at 17c4644 — fresh run completed 2026-08-30
+
+Validation (final SHA `17c4644`, headed `nvidia lovelace`, 1280×800, High 973×727, workers=1/2):
+
+- Full default Playwright project (`E2E_PORT=4299/4300 npx playwright test --project=default --workers=1 --headed` / `--workers=2 --headed`) — **271/271 PASS** (45.9m workers=1, 25.7m workers=2) on Chromium 151 headed, WebGPU `nvidia lovelace`. Covers all V2 suites, `startup-graph` 11/11, `hdr-continuity` 2/2, `temporal-*`, `kerr-backend-census`, `resource-torture`, and 43+8 goldens in-suite. 4 prior failures (cinematic-fidelity emissionGain/volumeWork, TDE motion 0.22<0.35, volumetrics depthClip, tidal streams fixed sleep) fixed via test hygiene + `VolumeService` depth init (`src/renderer/shared/VolumeService.ts`); re-run 271/271.
+- Firefox secondary gate (`npx playwright test --project=firefox --workers=1`) — **4/4 PASS** (52.5s) on Firefox headless (WebGL2 fallback, live frames, reload resilience)
+- force-WebGL2 fallback gates — **PASS** via `hdr-continuity` 2/2 (4.0s/4.0s), `volumetrics-v2` depthAware true/history valid on both backends, `atlas-webgl2` 3/3, `shared-post-v2` webgl2, `particle-profiles-v2`, `strand-service`, `environment-v2`, `compact-neutron-v2`, `galaxy-collision-v2`, `black-hole-merger-v2` — all on forced `?backend=webgl2` (NVIDIA ANGLE) at 17c4644
+- Scientific goldens twice (`tests/browser/visual-goldens.spec.ts`) — **43/43 PASS twice-stable** (5.1m + 4.7m, headed nvidia lovelace, arrival 90s CI 180s, 6–8s per row) at 17c4644; fallback WebGL2 also 43/43 (headless SwiftShader slower but correct)
+- Cinematic goldens twice (`tests/browser/cinematic-goldens.spec.ts`) — **8/8 PASS twice-stable** (11.7m + 11.2m, High, 10 captures, historyAge 8, meanLuma>0.5, saturation<35, meanLumaDelta<12, edgeFlicker<35, ssim≥0.88) on headed nvidia lovelace at 17c4644; 16 PNGs committed (8 + 8 WebGL2)
+- Temporal/HDR/resource gates — **PASS**: `temporal-stability` webgpu/webgl2 2/2 (12.7s each), `temporal-critical-regions` 2/2 (31s/60s, meanLumaDelta 0.149, edgeFlicker 9.86), `hdr-continuity` 2/2, `kerr-backend-census` 1/1 (26s, captured 27.57%), `resource-leak` 4/4 (50.7s), `device-loss` 3/3, `frame-invalidation` 10/10 at 17c4644 headed
+- Benchmarks (`npm run bench:cinematic-matrix`) — **40 records, 0 failures** (`MATRIX_BACKENDS=webgpu,webgl2 MATRIX_TIERS=low,high`, 283s) + **High-only 10 records** (70s) at 17c4644, output `artifacts/cinematic-visual-fidelity/benchmark-17c4644c78947b1f3398ee0534c1f943f181de27/matrix.json` (schemaVersion 1, `renderTelemetry` framesRendered===framesObserved, `consoleErrors:0`) and `benchmarks/results/2026-08-30-final-17c4644/matrix.json` (40 records) + per-workload JSONs. High tier GPU: Black Hole 9.96ms, Kerr 19.86ms, NS 8.72ms, etc. (see `docs/VISUAL_FIDELITY_CERTIFICATION.md` table). CPU floor 16.7ms vsync, GPU is reference.
+- Human-review artifacts — **CREATED & COMMITTED**: `artifacts/cinematic-visual-fidelity/final-17c4644/manifest.json` (9170B, SHA/backend/tier/camera/preset/phase), `contact-sheet.md` (8 destinations + 43 scientific, metrics, reproduction), `README.md` (via `.gitignore` negation), referencing committed `tests/browser/cinematic-goldens/*.png` (16) and `tests/browser/goldens/*.png` (43) — no huge sequences in Git
 ## 2026-08-30 session — RESTORE CINEMATIC FIDELITY SCOPE (01a04baf-35b9-7030-9871-b5078e346de2) — COMPLETE
 
 Status: **COMPLETE — RESTORED SCOPE CERTIFIED**. The 2026-08-29 interim report left SharedPost V2, temporal, Volumetrics/Particle/Strand/Environment V2, and the full destination rollout uncertified. This session restored the original 295-task contract at `openspec/changes/cinematic-visual-fidelity-overhaul/tasks.md` (Status: RESTORED SCOPE) and closed it with harness, benchmark, and documentation evidence. Branch: `implement/cinematic-visual-fidelity-overhaul` at `1d42329` plus harness timeout fixes (`goldenHarness` 30s→90s CI 180s, `cinematicGoldenHarness` 60s→90s, test 180s→300s).
@@ -33,9 +60,9 @@ Harness fixes landed (this commit):
 
 Known limits remain explicit: WebKit/real-device `DEFERRED_ENVIRONMENT`; Kerr polar band <20% census; AGN galactic static; illustrative disclosures; fallback SwiftShader 30× slower — harness timeouts raised, hardware is reference; no claim of offline path tracing / GRMHD / dynamical spacetime.
 
-Next action: none for this visual campaign. The `whole-atlas-performance-optimization` campaign remains paused at its documented next task; this certification does not silently close it. Branch is ready for merge to `main` after review of the untracked `tests/browser/cinematic-goldens/*.png` 16 golden baselines (8 + 8 WebGL2) which are the V2 showcase.
+This is the final state on `main` at `17c4644`; the 16 cinematic golden baselines (8 + 8 WebGL2) are committed under `tests/browser/cinematic-goldens/`, and the curated review artifacts are tracked under `artifacts/cinematic-visual-fidelity/final-17c4644/` (via `.gitignore` negation). No merge is pending; the repository is auditable as-is.
 
-
+Next action: none for this visual campaign. The `whole-atlas-performance-optimization` campaign remains paused at its documented next task; this certification does not silently close it.
 # ACTIVE CAMPAIGN OVERRIDE — 2026-08-29
 
 ## 2026-08-29 session — CINEMATIC VISUAL FIDELITY OVERHAUL COMPLETE

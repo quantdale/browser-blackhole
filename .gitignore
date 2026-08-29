@@ -5,13 +5,17 @@ node_modules/
 dist/
 .vite/
 
-# Test/browser artifacts
-artifacts/
+# Test/browser artifacts — scratch outputs remain ignored,
+# but curated final review artifacts are tracked for certification.
+artifacts/*
+!artifacts/cinematic-visual-fidelity
+artifacts/cinematic-visual-fidelity/*
+!artifacts/cinematic-visual-fidelity/final-17c4644
+!artifacts/cinematic-visual-fidelity/final-17c4644/**
 test-results/
 playwright-report/
 blob-report/
 playwright/.cache/
-
 # Coverage
 coverage/
 

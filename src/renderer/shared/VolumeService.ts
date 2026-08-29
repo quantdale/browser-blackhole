@@ -205,6 +205,11 @@ class VolumeImpl implements VolumeHandle {
     this.depthTextureState = depthTextureState;
     this.depthTextureNode = config.depthAwareUpsample ? texture(this.emptyDepthTexture) : null;
     this.uInternalScale = internalScaleState;
+    if (this.depthTextureNode !== null) {
+      const initialDepth = depthTextureState.value;
+      this.uDepthValid.value = initialDepth ? 1 : 0;
+      this.depthTextureNode.value = initialDepth ?? this.emptyDepthTexture;
+    }
 
     // --- proxy geometry ---
     if (config.bounds.kind === 'box') {

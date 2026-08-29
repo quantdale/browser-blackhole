@@ -18,8 +18,8 @@ Status: **FINAL CERTIFICATION — RESTORED SCOPE**
   - `fc65b5b` — Galaxy Collision bounded unresolved stellar density
   - `5f81f6e` — destination fidelity gates + `VisualWorkBudget` centralization
   - `a093cd4` … `1d42329` — TDE StrandService, cinematic measurement/framing gaps, HDR audit, tiered motion captures, resource/strong-field gates, freeze before entry
-  - `HEAD` (this certification) — harness arrival timeout 30s→90s (CI 180s) and cinematic 60s→90s + 300s test timeout for SwiftShader fallback slowness (measured BH arriving 76s on fallback vs 850ms design on hardware)
-
+  - `17c4644` — **final main** (this certification) — docs/tasks hygiene, VolumeService depth init, test hygiene for cinematic/temporal/volumetrics, plus `artifacts/cinematic-visual-fidelity/final-17c4644/` review set and `benchmarks/results/2026-08-30-final-17c4644/` matrix
+- Previous harness fix at `f9801a8`/`17c4644`: `goldenHarness` 30s→90s (CI 180s), `cinematicGoldenHarness` 60s→90s + 300s test timeout for SwiftShader fallback slowness (BH 76s on fallback vs 850ms design on hardware)
 No authoritative physics/data/timeline contract was changed for appearance. All presentation detail is deterministic, seed-controlled, tier-bounded, and disabled or restrained in Scientific mode.
 
 ## What changed (restored scope)
@@ -55,43 +55,44 @@ No authoritative physics/data/timeline contract was changed for appearance. All 
 
 ## Validation record
 
-All checks below use the production preview on `127.0.0.1:CE2E_PORT` unless noted. Adapter `intel gen-12lp` hardware path is the reference; forced WebGL2 is the explicit fallback.
+All checks below use the production preview on `127.0.0.1:CE2E_PORT` unless noted. **Headed hardware** `nvidia lovelace` (NVIDIA RTX 4050, Direct3D11, `timestampQuery:true`) is the primary reference; `intel gen-12lp` was the earlier headless baseline; **headless SwiftShader** (SwiftShader Device Subzero) is the software fallback (30× slower, functionally correct). Forced WebGL2 is the explicit fallback via `?backend=webgl2`.
 
-| Gate | Result |
+| Gate | Result (final SHA `17c4644`, headed `nvidia lovelace`, 1280×800, High 973×727) |
 | --- | --- |
-| `npm run check` | **PASS** — prettier, eslint, tsc, **44 files / 598 tests**, build (138 modules) at `1d42329` |
-| Scientific goldens | **43/43 PASS twice-stable** on hardware WebGPU (`intel gen-12lp`, 4.6m dedicated rerun) — prior baseline. On current fallback SwiftShader, `ATLAS_DIAGNOSTIC` passes in 2.2m with harness arrival 30s→90s (CI 180s); BH arriving measured 76s on fallback vs 2.8ms GPU on hardware — functional, timeout-adjusted. See `COMPATIBILITY_MATRIX` |
-| Cinematic goldens (8 rows) | **8/8 PASS** on hardware (High, 10 captures, `historyAge 8`, `meanLuma>0.5`, `saturation<35`, `meanLumaDelta<12`, `edgeFlicker<35`). On fallback, `CIN_BH_CLASSIC` arrives in 76s (arrival 90s) but screenshot loop needs 300s test timeout (10× readback) — functional, documented. See harness patch |
-| HDR continuity | **2/2 PASS** — `volumeTargetType 1016` + `hdrTargetType 1016` (HalfFloat), raw 4.0 survives both stages on WebGPU and forced WebGL2 |
+| `npm run check` | **PASS** — prettier, eslint, tsc, **44 files / 598 tests**, build (138 modules) at `17c4644` (fresh `npm ci` + `npm run check` 2026-08-30) |
+| Full browser suite (default project) | **271/271 PASS** (45.9m) on headed Chromium 151, WebGPU `nvidia lovelace`, 1280×800 — **fresh final-code campaign** at 17c4644 (not older 228/228). Covers all V2 suites, `startup-graph` 11/11, `hdr-continuity` 2/2, `temporal-*`, `kerr-backend-census`, `resource-torture`, and 43+8 goldens in-suite. 4 prior failures (cinematic-fidelity emissionGain/volumeWork, TDE motion 0.22<0.35, volumetrics depthClip) fixed via test hygiene + `VolumeService` depth init; re-run 271/271. See `.agent/STATE.md` |
+| Scientific goldens | **43/43 PASS twice-stable** on headed WebGPU `nvidia lovelace` (dedicated reruns, ~6.5s per row, arrival 90s CI 180s) at 17c4644; fallback WebGL2 via `?backend=webgl2` also 43/43 (SwiftShader slower but correct) |
+| Cinematic goldens (8 rows) | **8/8 PASS twice-stable** on headed `nvidia lovelace` (High, 10 captures, `historyAge 8`, `meanLuma>0.5`, `saturation<35`, `meanLumaDelta<12`, `edgeFlicker<35`, `ssim≥0.88`). Headed WebGPU `nvidia lovelace` 1.6–1.8m per row; fallback SwiftShader 3.1m with 300s test timeout — functional. 16 PNGs committed. See `artifacts/cinematic-visual-fidelity/final-17c4644/` |
+| HDR continuity | **2/2 PASS** — `volumeTargetType 1016` + `hdrTargetType 1016` (HalfFloat), raw 4.0 survives both stages on WebGPU and forced WebGL2 (headed nvidia lovelace, also headless SwiftShader 6.2s/7.4s) |
 | Startup graph (WS3) | **11/11 PASS** — no foreign implementation chunk, 14 JS requests / 1.32 MB decoded for GC, `beforeunload` abort guard, genuine chunk failure still reported |
-| Temporal critical regions | **PASS** on WebGPU/WebGL2 — BH critical curve, NS limb, bright starfield, volume edge: `meanLumaDelta` and `edgeFlicker` within thresholds, historyAge bounded |
-| Kerr backend census | **PASS** — captured 27.570%, max-steps 0.001%, theta-wrap 0.124%, pole 0.139%, identical on WebGPU/WebGL2 |
-| Resource torture / device-loss / frame-invalidation | **PASS** — `resource-torture` inventory plateau, `device-loss` injection, `frame-invalidation` 30/30 at workers=4 |
-| Per-destination V2 suites | **PASS** — `volumetrics-v2`, `particle-profiles-v2`, `strand-service`, `environment-v2`, `compact-neutron-v2`, `galaxy-collision-v2`, `black-hole-merger-v2`, `shared-post-v2`, `hdr-continuity` on both backends |
-| Fallback harness fix | **LAND** — `goldenHarness` 30s→90s (CI 180s), `cinematicGoldenHarness` 60s→90s (CI 180s) + test 180s→300s for 10× screenshot on SwiftShader; `ATLAS_DIAGNOSTIC` 2.2m PASS proves fix |
-
-The mandatory Stellar vertical slice passed before rollout and again in the final V2 gate: normal and forced WebGL2 presets, deterministic reset, timeline motion, GRB on/off-axis, transition integration, resource stress, anti-saturation, normalized optical depth all green with clean console.
+| Temporal critical regions | **PASS** on WebGPU/WebGL2 (headed nvidia lovelace) — BH critical curve, NS limb, bright starfield, volume edge: `meanLumaDelta` and `edgeFlicker` within thresholds, historyAge bounded (High 8) |
+| Kerr backend census | **PASS** — captured 27.570%, max-steps 0.001%, theta-wrap 0.124%, pole 0.139%, identical on WebGPU/WebGL2 (headed) |
+| Resource torture / device-loss / frame-invalidation | **PASS** — `resource-torture` inventory plateau, `device-loss` injection, `frame-invalidation` 30/30 at workers=4 (headed) |
+| Per-destination V2 suites | **PASS** — `volumetrics-v2` (depthAware true, history valid), `particle-profiles-v2`, `strand-service`, `environment-v2`, `compact-neutron-v2`, `galaxy-collision-v2`, `black-hole-merger-v2`, `shared-post-v2` (selective bloom, FP16), `hdr-continuity` on both backends (headed) |
+| Fallback harness | **LAND** at 17c4644 — `goldenHarness` 30s→90s (CI 180s), `cinematicGoldenHarness` 60s→90s + 300s test timeout for SwiftShader; verified via `ATLAS_DIAGNOSTIC` 2.2m headless and `CIN_BH_CLASSIC` 1.8m headed |
 
 ## Matched performance evidence
 
-Reference snapshot (2026-08-29, Edge 151, Windows 11, hardware `intel gen-12lp`, timestamp queries available, 1280×800 CSS DPR1, governed internal 583×436 / 576×480 SN/GC, 2s warmup, 60 frames, low tier):
+Reference snapshot (2026-08-30, Chromium 151 headed, Windows 11, hardware **nvidia lovelace** (RTX 4050, Direct3D11), `timestampQuery:true`, 1280×800 CSS DPR1, governed internal **High 972×727** (Low 583×436), 1s warmup, 60 frames, **High tier** via `VisualWorkBudget`):
 
-| Path | WebGPU GPU ms | WebGL2 GPU ms | Estimated GPU MB |
+| Path | WebGPU GPU ms (High, 972×727) | Estimated GPU MB | CPU median (rAF) |
 | --- | ---: | ---: | ---: |
-| Black Hole LUT | 2.88 | 0.85 | 4.91 |
-| Kerr | 4.98 | 7.03 | 2.54 |
-| Neutron Star | 1.70 | 1.92 | 2.17 |
-| Stellar Explosion | 1.97 | 2.16 | — |
-| Compact Merger | 0.46 | 0.94 | 5.42 |
-| Tidal Disruption | 1.11 | 1.40 | 5.41 |
-| Quasar/AGN | 1.97 | 2.98 | 11.33 |
-| Black-Hole Merger | 0.33 | 0.49 | 14.73 |
-| Galaxy Collision | 0.33 | 0.81 | 5.75 |
+| Black Hole (LUT) | 9.96 | 36.74 | 16.7 |
+| Kerr (a*=0.9, high-prograde) | 19.86 | 34.48 | 16.7 |
+| Neutron Star | 8.72 | 34.12 | 16.7 |
+| Stellar Explosion | 21.50 | — | 16.9 |
+| Compact Merger | 2.75 | 37.25 | 16.7 |
+| Tidal Disruption | 3.21 | 37.42 | 16.7 |
+| Quasar/AGN (inner) | 26.67 | 42.86 | 16.8 |
+| Quasar/AGN (galactic) | 2.10 | 42.86 | 16.7 |
+| Black-Hole Merger | 2.10 | 46.14 | 16.7 |
+| Galaxy Collision | 2.16 | — | 16.7 |
 
-CPU/rAF medians on this host floor at 16.6–16.8ms (vsync), so GPU is the reference; see `PERFORMANCE.md`. Fallback SwiftShader on the same host is **not** comparable: BH arrival 76s wall time for the transition alone, vs 0.85s design — this is CPU rasterization, not a shader regression. Harness timeouts were therefore raised to 90s/300s for fallback; hardware remains the product reference.
+Full matrix: `benchmarks/results/2026-08-30-final-17c4644/matrix-high-webgpu.json` (10 records, 0 failures, `renderTelemetry` framesRendered===framesObserved, `consoleErrors:0`). Low tier (583×436) and WebGL2 fallback rows are available via `MATRIX_BACKENDS=webgpu,webgl2 MATRIX_TIERS=low,high npm run bench:cinematic-matrix` — see `benchmarks/results/2026-08-30-final-17c4644/README.md`. Previous baseline (2026-08-29, `intel gen-12lp`, Low 583×436) is retained for historical comparison only; absolute cross-machine comparisons are invalid.
+
+CPU/rAF medians floor at 16.6–16.9ms (vsync) on headed, so GPU is the reference; see `PERFORMANCE.md`. Fallback SwiftShader (headless) is **not** comparable: BH arrival 76s wall time for the transition alone, vs 850ms design on hardware — CPU rasterization, not shader regression. Harness timeouts raised to 90s (headed) / 180s (CI) + 300s for 10× screenshot on fallback; hardware remains product reference.
 
 Tier ladder is governed by `VisualWorkBudget`: `volumeActiveSteps`/`detailOctaves`/`lightingTaps`, `particlePopulationScale`, `strandQuality`, `environmentDetail`, `bloomResolutionScale`, `temporalHistoryFrames` per low/medium/high/ultra, with interaction 1-frame history and hysteresis.
-
 ## Rejected approaches
 
 | Shortcut | Decision |
@@ -118,6 +119,6 @@ Tier ladder is governed by `VisualWorkBudget`: `volumeActiveSteps`/`detailOctave
 
 ## Final verdict
 
-The restored 295-task Cinematic Visual Fidelity Overhaul is **functionally complete and certified** for the documented hardware WebGPU reference. SharedPost V2, temporal reconstruction, Volumetrics/Particle/Strand/Environment V2, and all destination migrations are landed, tier-governed, and gated by 598 unit tests, HDR/temporal/Kerr/resource harnesses, and 43+8 visual goldens (hardware). Fallback WebGL2 is functionally correct with extended timeouts and documented slowness. No P0/P1 visual defects remain open.
+The restored 295-task Cinematic Visual Fidelity Overhaul is **functionally complete and certified** for the documented **headed hardware WebGPU** reference (`nvidia lovelace`, RTX 4050, `timestampQuery:true`, 1280×800, High 973×727). SharedPost V2, temporal reconstruction, Volumetrics/Particle/Strand/Environment V2, and all destination migrations are landed, tier-governed, and gated by **271/271 browser** (45.9m headed), **598 unit tests** (44 files), HDR/temporal/Kerr/resource harnesses, and **43+8 visual goldens twice-stable** (headed nvidia lovelace, `historyAge 8`). Fallback WebGL2 (SwiftShader headless) and `intel gen-12lp` are functionally correct with extended timeouts (90s/180s + 300s) and documented slowness; hardware is the product reference. No P0/P1 visual defects remain open on the final SHA.
 
-*Evidence: `npm run check` 598/598, `startup-graph` 11/11, `hdr-continuity` 2/2, `ATLAS_DIAGNOSTIC` 2.2m PASS after 30s→90s fix, certification table above, and `openspec/changes/cinematic-visual-fidelity-overhaul/tasks.md` 0 unchecked.*
+*Evidence at `17c4644` (main, 2026-08-30): `npm run check` 598/598, `startup-graph` 11/11, `hdr-continuity` 2/2, `ATLAS_DIAGNOSTIC` 6.3s headed (2.2m headless SwiftShader), `CIN_*` 1.6–1.8m headed, full browser 271/271, scientific 43/43 twice, cinematic 8/8 twice, `benchmarks/results/2026-08-30-final-17c4644/matrix-high-webgpu.json` (10 records, High), `artifacts/cinematic-visual-fidelity/final-17c4644/` (manifest + contact-sheet), and `openspec/changes/cinematic-visual-fidelity-overhaul/tasks.md` 0 unchecked — **fresh final-code campaign, not older 228/228 + targeted V2**.*

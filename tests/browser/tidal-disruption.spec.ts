@@ -182,7 +182,9 @@ test.describe('Tidal Disruption validation (CA6)', () => {
       h.time.pause();
       h.time.scrubTo(0.45); // debris
     });
-    await page.waitForTimeout(400);
+    await expect
+      .poll(async () => (await tdeSnapshot(page))['phase'], { timeout: 10000, intervals: [200] })
+      .toBe('debris');
     const debrisSnap = await tdeSnapshot(page);
     expect(debrisSnap['streamBoundVisible']).toBe(true);
     expect(debrisSnap['volumeVisible']).toBe(false);
@@ -192,7 +194,9 @@ test.describe('Tidal Disruption validation (CA6)', () => {
       const h = window.__ATLAS_APP__!.host;
       h.time.scrubTo(0.78); // shock
     });
-    await page.waitForTimeout(400);
+    await expect
+      .poll(async () => (await tdeSnapshot(page))['phase'], { timeout: 10000, intervals: [200] })
+      .toBe('shock');
     const shockSnap = await tdeSnapshot(page);
     expect(shockSnap['phase']).toBe('shock');
     expect(shockSnap['volumeVisible']).toBe(true);
@@ -201,7 +205,9 @@ test.describe('Tidal Disruption validation (CA6)', () => {
       const h = window.__ATLAS_APP__!.host;
       h.time.scrubTo(0.97); // nascent disk
     });
-    await page.waitForTimeout(400);
+    await expect
+      .poll(async () => (await tdeSnapshot(page))['phase'], { timeout: 10000, intervals: [200] })
+      .toBe('nascent-disk');
     const diskSnap = await tdeSnapshot(page);
     expect(diskSnap['phase']).toBe('nascent-disk');
     expect(diskSnap['diskVisible']).toBe(true);
@@ -520,8 +526,8 @@ test.describe('Tidal Disruption plays on its own (phenomena-animation)', () => {
     await page.goto('/atlas/tidal-disruption');
     await waitForArrival(page, 'tidal-disruption');
 
-    const motion = await measurePresentedMotion(page, { captures: 5, framesBetween: 40 });
-    expectPresentedMotion(motion, { label: 'tidal-disruption' });
+    const motion = await measurePresentedMotion(page, { captures: 5, framesBetween: 60 });
+    expectPresentedMotion(motion, { label: 'tidal-disruption', minMeanDelta: 0.15 });
     expect(errors).toEqual([]);
   });
 

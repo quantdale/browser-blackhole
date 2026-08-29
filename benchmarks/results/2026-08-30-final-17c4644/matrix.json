@@ -1,0 +1,5922 @@
+{
+  "schemaVersion": 1,
+  "kind": "cinematic-visual-fidelity-benchmark-matrix",
+  "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+  "capturedAt": "2026-08-29T21:16:50.426Z",
+  "node": "v24.3.0",
+  "os": "Windows_NT 10.0.26200 (win32)",
+  "browserChannel": "msedge",
+  "viewportCss": [
+    1280,
+    800
+  ],
+  "requestedBackends": [
+    "webgpu",
+    "webgl2"
+  ],
+  "requestedTiers": [
+    "low",
+    "high"
+  ],
+  "frames": 60,
+  "warmupMs": 1000,
+  "workloads": [
+    "black-hole",
+    "black-hole-kerr",
+    "neutron-star",
+    "stellar-explosion",
+    "compact-merger",
+    "tidal-disruption",
+    "quasar-agn-inner",
+    "quasar-agn-galactic",
+    "black-hole-merger",
+    "galaxy-collision"
+  ],
+  "records": [
+    {
+      "matrix": {
+        "workload": "black-hole",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 2.69,
+        "estimatedGpuBytes": 7969072,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 9,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 8868625
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-backend-comparison",
+        "date": "2026-08-29T21:12:13.204Z",
+        "label": "cinematic-webgpu-low-black-hole",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "default",
+        "trajectoryBackend": {
+          "requested": "auto",
+          "effective": "lut",
+          "fallbackReason": null
+        },
+        "observer": {
+          "requested": null,
+          "effectiveMode": "camera",
+          "readout": {
+            "valid": true,
+            "invalidReason": null,
+            "radiusRg": 16.194134740701646,
+            "betaMagnitude": 0,
+            "properTimeTau": 0
+          }
+        },
+        "lut": {
+          "familyLoaded": true,
+          "familyDir": "schwarzschild-v1-415dea94",
+          "webgl2Filterable": true
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low",
+          "mismatch": null
+        },
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 14.8,
+          "median": 16.7,
+          "p90": 16.9,
+          "p95": 17.2,
+          "p99": 17.5,
+          "max": 17.5,
+          "mean": 16.65,
+          "stdev": 0.35
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 9,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 8868625
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 2.69
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 7969072,
+          "textureCount": 1,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 4152624
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 1,
+              "bytes": 2894848
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-kerr",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 5.05,
+        "estimatedGpuBytes": 5600560,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 7,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 6742516
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "kerr-numerical-characterization",
+        "date": "2026-08-29T21:12:19.208Z",
+        "label": "cinematic-webgpu-low-black-hole-kerr",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "kerr-high-prograde",
+        "metric": "kerr",
+        "spin": {
+          "value": 0.9,
+          "convention": "signed dimensionless a*; +Y axis; disk +Y-corotating"
+        },
+        "kerrDiskInnerRg": 2.320883041761887,
+        "trajectoryBackend": {
+          "requested": "kerr",
+          "effective": "numerical-kerr"
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 16.7,
+          "p90": 17.3,
+          "p95": 17.6,
+          "p99": 24,
+          "max": 24,
+          "mean": 16.39,
+          "stdev": 2.56
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 7,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 6742516
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 5.05
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 5600560,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 4152624
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 0,
+              "bytes": 526336
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "neutron-star",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 2.69,
+        "estimatedGpuBytes": 5223508,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 5,
+            "triangles": 4,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 7,
+            "programs": 14,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 6852480
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "neutron-star-benchmark",
+        "date": "2026-08-29T21:12:25.107Z",
+        "label": "cinematic-webgpu-low-neutron-star",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "neutron-star",
+        "preset": "surface",
+        "surfaceRayBackend": "direct-schwarzschild-material-surface",
+        "surfaceLensingWired": true,
+        "surfaceRadiusRg": 5.804742958725859,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 11.4,
+          "median": 16.6,
+          "p90": 17,
+          "p95": 17.2,
+          "p99": 19.5,
+          "max": 19.5,
+          "mean": 16.58,
+          "stdev": 0.89
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 5,
+            "triangles": 4,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 7,
+            "programs": 14,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 6852480
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 2.69
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 5223508,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 4152624
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:neutron-star",
+              "textures": 0,
+              "bytes": 149284
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "neutron-star direct Schwarzschild surface-ray pass; paused at phase 0"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "stellar-explosion",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          576,
+          480
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 3.15,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 12,
+            "triangles": 43347,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 8,
+            "textures": 10,
+            "programs": 24,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 21,
+            "totalBytes": 9204503
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgpu-low-stellar-explosion",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "core-collapse",
+        "timelinePhase": 0.55,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "nvidia lovelace",
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "scene": "STELLAR_EXPLOSION_CORE_COLLAPSE",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          576,
+          480
+        ],
+        "quality": "low",
+        "requestedQuality": "low",
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "medianMs": 16.6,
+        "p90Ms": 17.2,
+        "p95Ms": 17.4,
+        "p99Ms": 334.8,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 12,
+            "triangles": 43347,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 8,
+            "textures": 10,
+            "programs": 24,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 21,
+            "totalBytes": 9204503
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 3.15
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "compact-merger",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 0.52,
+        "estimatedGpuBytes": 8511440,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 18737,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 29,
+            "totalBytes": 7699209
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "compact-merger-phase-benchmark",
+        "date": "2026-08-29T21:12:37.573Z",
+        "label": "cinematic-webgpu-low-compact-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "compact-merger",
+        "preset": "equal-mass-nsns",
+        "timelinePhase": 0.7,
+        "resolvedPhase": "kilonova",
+        "resolvedTimeSeconds": 4420.829610323297,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 5.9,
+          "median": 16.7,
+          "p90": 17.2,
+          "p95": 17.4,
+          "p99": 33.1,
+          "max": 33.1,
+          "mean": 16.77,
+          "stdev": 2.55
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 18737,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 29,
+            "totalBytes": 7699209
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 0.52
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "volumeVisible": true,
+          "volumeRadiusUnits": 59.45804803132066,
+          "particlePopulationScale": 0.3,
+          "jetVisible": false,
+          "jetFrontUnits": 0,
+          "ejectaRadiusUnits": 59.45804803132066
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 8511440
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "tidal-disruption",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 0.33,
+        "estimatedGpuBytes": 8685968,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 11611,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 7682051
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "tidal-disruption-phase-benchmark",
+        "date": "2026-08-29T21:12:43.739Z",
+        "label": "cinematic-webgpu-low-tidal-disruption",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "tidal-disruption",
+        "preset": "solar-canonical",
+        "timelinePhase": 0.78,
+        "resolvedPhase": "shock",
+        "resolvedTimeSeconds": 21488883.598962884,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 10.5,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 17,
+          "p99": 18.2,
+          "max": 18.2,
+          "mean": 16.56,
+          "stdev": 0.86
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 11611,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 7682051
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 0.33
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "streamBoundVisible": true,
+          "spineBoundPoints": 12,
+          "volumeVisible": true,
+          "volumeRadiusUnits": 199.99999999999994,
+          "diskVisible": false,
+          "particlePopulationScale": 0,
+          "accentAngularGate": 1,
+          "starDistanceUnits": 93469.23041282468,
+          "beta": 1
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 8685968
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-inner",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 4.52,
+        "estimatedGpuBytes": 14388280,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 8,
+            "triangles": 11524,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 11,
+            "programs": 27,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 31,
+            "totalBytes": 7441006
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:12:50.506Z",
+        "label": "cinematic-webgpu-low-quasar-agn-inner",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "quasar-reference",
+        "zone": {
+          "requested": "inner",
+          "active": "inner"
+        },
+        "grPassActive": true,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 5.6,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 16.9,
+          "p99": 17.9,
+          "max": 17.9,
+          "mean": 16.49,
+          "stdev": 1.44
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 8,
+            "triangles": 11524,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 11,
+            "programs": 27,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 31,
+            "totalBytes": 7441006
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 4.52
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 14388280,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-galactic",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 0.46,
+        "estimatedGpuBytes": 14388280,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 14,
+            "triangles": 11105,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 9,
+            "programs": 19,
+            "renderTargets": 4,
+            "storageAttributes": 4,
+            "uniformBuffers": 20,
+            "totalBytes": 7042364
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:12:56.336Z",
+        "label": "cinematic-webgpu-low-quasar-agn-galactic",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "radio-galaxy",
+        "zone": {
+          "requested": "galactic",
+          "active": "galactic"
+        },
+        "grPassActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 9.2,
+          "median": 16.7,
+          "p90": 17.1,
+          "p95": 17.4,
+          "p99": 17.6,
+          "max": 17.6,
+          "mean": 16.54,
+          "stdev": 1.02
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 14,
+            "triangles": 11105,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 9,
+            "programs": 19,
+            "renderTargets": 4,
+            "storageAttributes": 4,
+            "uniformBuffers": 20,
+            "totalBytes": 7042364
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 0.46
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 14388280,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-merger",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 0.46,
+        "estimatedGpuBytes": 17827780,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 26,
+            "triangles": 15827,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 7,
+            "programs": 22,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 33,
+            "totalBytes": 6895422
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-merger-phase-characterization",
+        "date": "2026-08-29T21:13:03.974Z",
+        "label": "cinematic-webgpu-low-black-hole-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole-merger",
+        "preset": "sxs-bbh-0001-inspiral",
+        "dataset": {
+          "id": "sxs-bbh-0001-lev5",
+          "sha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
+          "bytes": 73888,
+          "sourceSimulation": "SXS:BBH:0001"
+        },
+        "phase": {
+          "requested": "inspiral",
+          "active": "inspiral"
+        },
+        "visibleSystems": [
+          "inspiral"
+        ],
+        "kerrSpinDimensionless": 0.6864817488889335,
+        "waveformPanelActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 9.4,
+          "median": 16.7,
+          "p90": 17.1,
+          "p95": 17.3,
+          "p99": 17.7,
+          "max": 17.7,
+          "mean": 16.55,
+          "stdev": 1
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 26,
+            "triangles": 15827,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 7,
+            "programs": 22,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 33,
+            "totalBytes": 6895422
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 0.46
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 17827780,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "galaxy-collision",
+        "requestedBackend": "webgpu",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "low",
+        "internal": [
+          576,
+          480
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 0.46,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 10,
+            "triangles": 12423,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 6,
+            "textures": 7,
+            "programs": 18,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 17,
+            "totalBytes": 7404069
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgpu-low-galaxy-collision",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "bridge-tail",
+        "timelinePhase": 0.5,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "nvidia lovelace",
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "scene": "GALAXY_COLLISION_BRIDGE_TAIL",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          576,
+          480
+        ],
+        "quality": "low",
+        "requestedQuality": "low",
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "medianMs": 16.6,
+        "p90Ms": 17.2,
+        "p95Ms": 17.8,
+        "p99Ms": 18.4,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 10,
+            "triangles": 12423,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 6,
+            "textures": 7,
+            "programs": 18,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 17,
+            "totalBytes": 7404069
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 0.46
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 9.44,
+        "estimatedGpuBytes": 38520420,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 11,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 44682201
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-backend-comparison",
+        "date": "2026-08-29T21:13:16.290Z",
+        "label": "cinematic-webgpu-high-black-hole",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "default",
+        "trajectoryBackend": {
+          "requested": "auto",
+          "effective": "lut",
+          "fallbackReason": null
+        },
+        "observer": {
+          "requested": null,
+          "effectiveMode": "camera",
+          "readout": {
+            "valid": true,
+            "invalidReason": null,
+            "radiusRg": 16.194134740701646,
+            "betaMagnitude": 0,
+            "properTimeTau": 0
+          }
+        },
+        "lut": {
+          "familyLoaded": true,
+          "familyDir": "schwarzschild-v1-415dea94",
+          "webgl2Filterable": true
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high",
+          "mismatch": null
+        },
+        "renderScale": 1,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 3,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 16.9,
+          "p99": 18.2,
+          "max": 18.2,
+          "mean": 16.44,
+          "stdev": 1.78
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 11,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 44682201
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 9.44
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 38520420,
+          "textureCount": 1,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 34703972
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 1,
+              "bytes": 2894848
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-kerr",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.8,
+        "gpuMs": 19.14,
+        "estimatedGpuBytes": 36151908,
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 9,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 42556092
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "kerr-numerical-characterization",
+        "date": "2026-08-29T21:13:22.687Z",
+        "label": "cinematic-webgpu-high-black-hole-kerr",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "kerr-high-prograde",
+        "metric": "kerr",
+        "spin": {
+          "value": 0.9,
+          "convention": "signed dimensionless a*; +Y axis; disk +Y-corotating"
+        },
+        "kerrDiskInnerRg": 2.320883041761887,
+        "trajectoryBackend": {
+          "requested": "kerr",
+          "effective": "numerical-kerr"
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 16.3,
+          "median": 16.8,
+          "p90": 33.7,
+          "p95": 49.9,
+          "p99": 66.7,
+          "max": 66.7,
+          "mean": 24.1,
+          "stdev": 11.5
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 9,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 42556092
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 19.14
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 36151908,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 34703972
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 0,
+              "bytes": 526336
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "neutron-star",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 9.24,
+        "estimatedGpuBytes": 35774856,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 6,
+            "triangles": 5,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 5,
+            "textures": 9,
+            "programs": 16,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 12,
+            "totalBytes": 42666056
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "neutron-star-benchmark",
+        "date": "2026-08-29T21:13:28.508Z",
+        "label": "cinematic-webgpu-high-neutron-star",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "neutron-star",
+        "preset": "surface",
+        "surfaceRayBackend": "direct-schwarzschild-material-surface",
+        "surfaceLensingWired": true,
+        "surfaceRadiusRg": 5.804742958725859,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 4.9,
+          "median": 16.7,
+          "p90": 17.4,
+          "p95": 18.2,
+          "p99": 19.4,
+          "max": 19.4,
+          "mean": 16.47,
+          "stdev": 1.7
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 6,
+            "triangles": 5,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 5,
+            "textures": 9,
+            "programs": 16,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 12,
+            "totalBytes": 42666056
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 9.24
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 35774856,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 34703972
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:neutron-star",
+              "textures": 0,
+              "bytes": 149284
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "neutron-star direct Schwarzschild surface-ray pass; paused at phase 0"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "stellar-explosion",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          960,
+          800
+        ],
+        "cpuMedian": 33,
+        "gpuMs": 22.54,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 63,
+          "framesRendered": 63,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 13,
+            "triangles": 74148,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 12,
+            "programs": 26,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 22,
+            "totalBytes": 48811095
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgpu-high-stellar-explosion",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "core-collapse",
+        "timelinePhase": 0.55,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "nvidia lovelace",
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "scene": "STELLAR_EXPLOSION_CORE_COLLAPSE",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          960,
+          800
+        ],
+        "quality": "high",
+        "requestedQuality": "high",
+        "renderScale": 1,
+        "activityMode": "stable",
+        "medianMs": 33,
+        "p90Ms": 66.8,
+        "p95Ms": 83.5,
+        "p99Ms": 307.1,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 13,
+            "triangles": 74148,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 12,
+            "programs": 26,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 22,
+            "totalBytes": 48811095
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 63,
+          "framesRendered": 63,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 22.54
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "compact-merger",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 1.97,
+        "estimatedGpuBytes": 39062788,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 12,
+            "triangles": 21708,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 12,
+            "programs": 28,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 30,
+            "totalBytes": 44178409
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "compact-merger-phase-benchmark",
+        "date": "2026-08-29T21:13:41.637Z",
+        "label": "cinematic-webgpu-high-compact-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "compact-merger",
+        "preset": "equal-mass-nsns",
+        "timelinePhase": 0.7,
+        "resolvedPhase": "kilonova",
+        "resolvedTimeSeconds": 4420.829610323297,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 6.5,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 16.9,
+          "p99": 17.3,
+          "max": 17.3,
+          "mean": 16.48,
+          "stdev": 1.31
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 12,
+            "triangles": 21708,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 12,
+            "programs": 28,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 30,
+            "totalBytes": 44178409
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 1.97
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "volumeVisible": true,
+          "volumeRadiusUnits": 59.45804803132066,
+          "particlePopulationScale": 0.3,
+          "jetVisible": false,
+          "jetFrontUnits": 0,
+          "ejectaRadiusUnits": 59.45804803132066
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 39062788
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "tidal-disruption",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 2.16,
+        "estimatedGpuBytes": 39237316,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 11,
+            "triangles": 12676,
+            "points": 0,
+            "lines": 24
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 12,
+            "programs": 30,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 44236174
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "tidal-disruption-phase-benchmark",
+        "date": "2026-08-29T21:13:47.702Z",
+        "label": "cinematic-webgpu-high-tidal-disruption",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "tidal-disruption",
+        "preset": "solar-canonical",
+        "timelinePhase": 0.78,
+        "resolvedPhase": "shock",
+        "resolvedTimeSeconds": 21488883.598962884,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 3.6,
+          "median": 16.7,
+          "p90": 16.9,
+          "p95": 17,
+          "p99": 19.3,
+          "max": 19.3,
+          "mean": 16.45,
+          "stdev": 1.75
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 11,
+            "triangles": 12676,
+            "points": 0,
+            "lines": 24
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 12,
+            "programs": 30,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 44236174
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 2.16
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "streamBoundVisible": true,
+          "spineBoundPoints": 25,
+          "volumeVisible": true,
+          "volumeRadiusUnits": 199.99999999999994,
+          "diskVisible": false,
+          "particlePopulationScale": 0,
+          "accentAngularGate": 1,
+          "starDistanceUnits": 93469.23041282468,
+          "beta": 1
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 39237316
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-inner",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 33.3,
+        "gpuMs": 25.36,
+        "estimatedGpuBytes": 44939628,
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 9,
+            "triangles": 11525,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 13,
+            "programs": 29,
+            "renderTargets": 8,
+            "storageAttributes": 0,
+            "uniformBuffers": 32,
+            "totalBytes": 43920206
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:13:55.865Z",
+        "label": "cinematic-webgpu-high-quasar-agn-inner",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "quasar-reference",
+        "zone": {
+          "requested": "inner",
+          "active": "inner"
+        },
+        "grPassActive": true,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 14.1,
+          "median": 33.3,
+          "p90": 66.7,
+          "p95": 83.1,
+          "p99": 99.9,
+          "max": 99.9,
+          "mean": 36.31,
+          "stdev": 20.92
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 9,
+            "triangles": 11525,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 13,
+            "programs": 29,
+            "renderTargets": 8,
+            "storageAttributes": 0,
+            "uniformBuffers": 32,
+            "totalBytes": 43920206
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 25.36
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 44939628,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-galactic",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 3.8,
+        "estimatedGpuBytes": 44939628,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 15,
+            "triangles": 21076,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 11,
+            "programs": 21,
+            "renderTargets": 6,
+            "storageAttributes": 4,
+            "uniformBuffers": 21,
+            "totalBytes": 42855940
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:14:01.721Z",
+        "label": "cinematic-webgpu-high-quasar-agn-galactic",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "radio-galaxy",
+        "zone": {
+          "requested": "galactic",
+          "active": "galactic"
+        },
+        "grPassActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 14.4,
+          "median": 16.6,
+          "p90": 17.2,
+          "p95": 17.3,
+          "p99": 18.5,
+          "max": 18.5,
+          "mean": 16.63,
+          "stdev": 0.53
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 15,
+            "triangles": 21076,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 11,
+            "programs": 21,
+            "renderTargets": 6,
+            "storageAttributes": 4,
+            "uniformBuffers": 21,
+            "totalBytes": 42855940
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 3.8
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 44939628,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-merger",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 3.01,
+        "estimatedGpuBytes": 48379128,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 27,
+            "triangles": 17236,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 9,
+            "programs": 24,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 34,
+            "totalBytes": 42708998
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-merger-phase-characterization",
+        "date": "2026-08-29T21:14:09.371Z",
+        "label": "cinematic-webgpu-high-black-hole-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole-merger",
+        "preset": "sxs-bbh-0001-inspiral",
+        "dataset": {
+          "id": "sxs-bbh-0001-lev5",
+          "sha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
+          "bytes": 73888,
+          "sourceSimulation": "SXS:BBH:0001"
+        },
+        "phase": {
+          "requested": "inspiral",
+          "active": "inspiral"
+        },
+        "visibleSystems": [
+          "inspiral"
+        ],
+        "kerrSpinDimensionless": 0.6864817488889335,
+        "waveformPanelActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": "nvidia lovelace"
+        },
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 6.6,
+          "median": 16.7,
+          "p90": 17,
+          "p95": 17.2,
+          "p99": 17.5,
+          "max": 17.5,
+          "mean": 16.49,
+          "stdev": 1.33
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 27,
+            "triangles": 17236,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 9,
+            "programs": 24,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 34,
+            "totalBytes": 42708998
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 3.01
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 48379128,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "galaxy-collision",
+        "requestedBackend": "webgpu",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgpu",
+        "tier": "high",
+        "internal": [
+          960,
+          800
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 3.67,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 12424,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 7,
+            "textures": 9,
+            "programs": 20,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 18,
+            "totalBytes": 46284901
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgpu-high-galaxy-collision",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "bridge-tail",
+        "timelinePhase": 0.5,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "nvidia lovelace",
+        "backend": "webgpu",
+        "forcedBackend": "webgpu",
+        "scene": "GALAXY_COLLISION_BRIDGE_TAIL",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          960,
+          800
+        ],
+        "quality": "high",
+        "requestedQuality": "high",
+        "renderScale": 1,
+        "activityMode": "stable",
+        "medianMs": 16.7,
+        "p90Ms": 17.2,
+        "p95Ms": 17.3,
+        "p99Ms": 17.5,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 12424,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 7,
+            "textures": 9,
+            "programs": 20,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 18,
+            "totalBytes": 46284901
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 3.67
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 7.32,
+        "estimatedGpuBytes": 7969072,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 9,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 8860875
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-backend-comparison",
+        "date": "2026-08-29T21:14:24.207Z",
+        "label": "cinematic-webgl2-low-black-hole",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "default",
+        "trajectoryBackend": {
+          "requested": "auto",
+          "effective": "lut",
+          "fallbackReason": null
+        },
+        "observer": {
+          "requested": null,
+          "effectiveMode": "camera",
+          "readout": {
+            "valid": true,
+            "invalidReason": null,
+            "radiusRg": 16.194134740701646,
+            "betaMagnitude": 0,
+            "properTimeTau": 0
+          }
+        },
+        "lut": {
+          "familyLoaded": true,
+          "familyDir": "schwarzschild-v1-415dea94",
+          "webgl2Filterable": true
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low",
+          "mismatch": null
+        },
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 16.7,
+          "p90": 17.2,
+          "p95": 17.4,
+          "p99": 17.5,
+          "max": 17.5,
+          "mean": 16.38,
+          "stdev": 2.16
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 9,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 8860875
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 7.32
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 7969072,
+          "textureCount": 1,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 4152624
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 1,
+              "bytes": 2894848
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-kerr",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 10.13,
+        "estimatedGpuBytes": 5600560,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 7,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 6735398
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "kerr-numerical-characterization",
+        "date": "2026-08-29T21:14:30.970Z",
+        "label": "cinematic-webgl2-low-black-hole-kerr",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "kerr-high-prograde",
+        "metric": "kerr",
+        "spin": {
+          "value": 0.9,
+          "convention": "signed dimensionless a*; +Y axis; disk +Y-corotating"
+        },
+        "kerrDiskInnerRg": 2.320883041761887,
+        "trajectoryBackend": {
+          "requested": "kerr",
+          "effective": "numerical-kerr"
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0.7,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 17.1,
+          "p99": 17.8,
+          "max": 17.8,
+          "mean": 16.41,
+          "stdev": 2.06
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 4,
+            "triangles": 4,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 3,
+            "textures": 7,
+            "programs": 12,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 10,
+            "totalBytes": 6735398
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 10.13
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 5600560,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 4152624
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 0,
+              "bytes": 526336
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "neutron-star",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 11.93,
+        "estimatedGpuBytes": 5223508,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 5,
+            "triangles": 4,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 7,
+            "programs": 14,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 6849548
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "neutron-star-benchmark",
+        "date": "2026-08-29T21:14:37.351Z",
+        "label": "cinematic-webgl2-low-neutron-star",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "neutron-star",
+        "preset": "surface",
+        "surfaceRayBackend": "direct-schwarzschild-material-surface",
+        "surfaceLensingWired": true,
+        "surfaceRadiusRg": 5.804742958725859,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 6.8,
+          "median": 16.7,
+          "p90": 16.9,
+          "p95": 17.1,
+          "p99": 18.8,
+          "max": 18.8,
+          "mean": 16.52,
+          "stdev": 1.32
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 5,
+            "triangles": 4,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 7,
+            "programs": 14,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 6849548
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 11.93
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 5223508,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 4152624
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:neutron-star",
+              "textures": 0,
+              "bytes": 149284
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "neutron-star direct Schwarzschild surface-ray pass; paused at phase 0"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "stellar-explosion",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          576,
+          480
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 7.24,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 12,
+            "triangles": 43347,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 8,
+            "textures": 10,
+            "programs": 24,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 21,
+            "totalBytes": 9105126
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgl2-low-stellar-explosion",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "core-collapse",
+        "timelinePhase": 0.55,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "",
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "scene": "STELLAR_EXPLOSION_CORE_COLLAPSE",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          576,
+          480
+        ],
+        "quality": "low",
+        "requestedQuality": "low",
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "medianMs": 16.7,
+        "p90Ms": 18.9,
+        "p95Ms": 33.3,
+        "p99Ms": 33.9,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 12,
+            "triangles": 43347,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 8,
+            "textures": 10,
+            "programs": 24,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 21,
+            "totalBytes": 9105126
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 7.24
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "compact-merger",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 10.33,
+        "estimatedGpuBytes": 8511440,
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 18737,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 29,
+            "totalBytes": 7601897
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "compact-merger-phase-benchmark",
+        "date": "2026-08-29T21:14:52.585Z",
+        "label": "cinematic-webgl2-low-compact-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "compact-merger",
+        "preset": "equal-mass-nsns",
+        "timelinePhase": 0.7,
+        "resolvedPhase": "kilonova",
+        "resolvedTimeSeconds": 4420.829610323297,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 16.7,
+          "p90": 17.2,
+          "p95": 17.7,
+          "p99": 33.2,
+          "max": 33.2,
+          "mean": 16.66,
+          "stdev": 3.07
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 18737,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 29,
+            "totalBytes": 7601897
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 10.33
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "volumeVisible": true,
+          "volumeRadiusUnits": 59.45804803132066,
+          "particlePopulationScale": 0.3,
+          "jetVisible": false,
+          "jetFrontUnits": 0,
+          "ejectaRadiusUnits": 59.45804803132066
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 8511440
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "tidal-disruption",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 5.88,
+        "estimatedGpuBytes": 8685968,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 11611,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 7590988
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "tidal-disruption-phase-benchmark",
+        "date": "2026-08-29T21:15:01.105Z",
+        "label": "cinematic-webgl2-low-tidal-disruption",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "tidal-disruption",
+        "preset": "solar-canonical",
+        "timelinePhase": 0.78,
+        "resolvedPhase": "shock",
+        "resolvedTimeSeconds": 21488883.598962884,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 16.7,
+          "p90": 17.5,
+          "p95": 17.9,
+          "p99": 33.2,
+          "max": 33.2,
+          "mean": 16.67,
+          "stdev": 3.08
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 11611,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 10,
+            "programs": 26,
+            "renderTargets": 5,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 7590988
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 5.88
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "streamBoundVisible": true,
+          "spineBoundPoints": 12,
+          "volumeVisible": true,
+          "volumeRadiusUnits": 199.99999999999994,
+          "diskVisible": false,
+          "particlePopulationScale": 0,
+          "accentAngularGate": 1,
+          "starDistanceUnits": 93469.23041282468,
+          "beta": 1
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 8685968
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-inner",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 13.61,
+        "estimatedGpuBytes": 14388280,
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 8,
+            "triangles": 11524,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 11,
+            "programs": 27,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 31,
+            "totalBytes": 7390410
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:15:11.254Z",
+        "label": "cinematic-webgl2-low-quasar-agn-inner",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "quasar-reference",
+        "zone": {
+          "requested": "inner",
+          "active": "inner"
+        },
+        "grPassActive": true,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 16.6,
+          "p90": 17.4,
+          "p95": 17.5,
+          "p99": 33.7,
+          "max": 33.7,
+          "mean": 16.95,
+          "stdev": 3.76
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 8,
+            "triangles": 11524,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 11,
+            "programs": 27,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 31,
+            "totalBytes": 7390410
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 13.61
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 14388280,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-galactic",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 6.33,
+        "estimatedGpuBytes": 14388280,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 14,
+            "triangles": 11105,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 9,
+            "programs": 19,
+            "renderTargets": 4,
+            "storageAttributes": 4,
+            "uniformBuffers": 20,
+            "totalBytes": 7025919
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:15:17.269Z",
+        "label": "cinematic-webgl2-low-quasar-agn-galactic",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "radio-galaxy",
+        "zone": {
+          "requested": "galactic",
+          "active": "galactic"
+        },
+        "grPassActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 5.1,
+          "median": 16.7,
+          "p90": 17.4,
+          "p95": 17.8,
+          "p99": 18.8,
+          "max": 18.8,
+          "mean": 16.46,
+          "stdev": 1.62
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 14,
+            "triangles": 11105,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 9,
+            "programs": 19,
+            "renderTargets": 4,
+            "storageAttributes": 4,
+            "uniformBuffers": 20,
+            "totalBytes": 7025919
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 6.33
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 14388280,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-merger",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          583,
+          436
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 8.83,
+        "estimatedGpuBytes": 17827780,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 26,
+            "triangles": 15827,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 7,
+            "programs": 22,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 33,
+            "totalBytes": 6847675
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-merger-phase-characterization",
+        "date": "2026-08-29T21:15:24.900Z",
+        "label": "cinematic-webgl2-low-black-hole-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole-merger",
+        "preset": "sxs-bbh-0001-inspiral",
+        "dataset": {
+          "id": "sxs-bbh-0001-lev5",
+          "sha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
+          "bytes": 73888,
+          "sourceSimulation": "SXS:BBH:0001"
+        },
+        "phase": {
+          "requested": "inspiral",
+          "active": "inspiral"
+        },
+        "visibleSystems": [
+          "inspiral"
+        ],
+        "kerrSpinDimensionless": 0.6864817488889335,
+        "waveformPanelActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          583,
+          436
+        ],
+        "quality": {
+          "requested": "low",
+          "effectiveTier": "low"
+        },
+        "renderScale": 0.6,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 6.9,
+          "median": 16.7,
+          "p90": 17.1,
+          "p95": 17.4,
+          "p99": 18,
+          "max": 18,
+          "mean": 16.5,
+          "stdev": 1.33
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 26,
+            "triangles": 15827,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 7,
+            "programs": 22,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 33,
+            "totalBytes": 6847675
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 8.83
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 17827780,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "galaxy-collision",
+        "requestedBackend": "webgl2",
+        "requestedTier": "low"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "low",
+        "internal": [
+          576,
+          480
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 6.21,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 10,
+            "triangles": 12423,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 6,
+            "textures": 7,
+            "programs": 18,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 17,
+            "totalBytes": 7377620
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgl2-low-galaxy-collision",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "bridge-tail",
+        "timelinePhase": 0.5,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "",
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "scene": "GALAXY_COLLISION_BRIDGE_TAIL",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          576,
+          480
+        ],
+        "quality": "low",
+        "requestedQuality": "low",
+        "renderScale": 0.6,
+        "activityMode": "stable",
+        "medianMs": 16.6,
+        "p90Ms": 17.5,
+        "p95Ms": 17.7,
+        "p99Ms": 18.2,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 4,
+            "drawCalls": 10,
+            "triangles": 12423,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 6,
+            "textures": 7,
+            "programs": 18,
+            "renderTargets": 4,
+            "storageAttributes": 0,
+            "uniformBuffers": 17,
+            "totalBytes": 7377620
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 6.21
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 9.33,
+        "estimatedGpuBytes": 38520420,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 11,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 44677323
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-backend-comparison",
+        "date": "2026-08-29T21:15:39.718Z",
+        "label": "cinematic-webgl2-high-black-hole",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "default",
+        "trajectoryBackend": {
+          "requested": "auto",
+          "effective": "lut",
+          "fallbackReason": null
+        },
+        "observer": {
+          "requested": null,
+          "effectiveMode": "camera",
+          "readout": {
+            "valid": true,
+            "invalidReason": null,
+            "radiusRg": 16.194134740701646,
+            "betaMagnitude": 0,
+            "properTimeTau": 0
+          }
+        },
+        "lut": {
+          "familyLoaded": true,
+          "familyDir": "schwarzschild-v1-415dea94",
+          "webgl2Filterable": true
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high",
+          "mismatch": null
+        },
+        "renderScale": 1,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 5.5,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 16.9,
+          "p99": 18,
+          "max": 18,
+          "mean": 16.48,
+          "stdev": 1.46
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 11,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 44677323
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 9.33
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 38520420,
+          "textureCount": 1,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 34703972
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 1,
+              "bytes": 2894848
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-kerr",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 33.3,
+        "gpuMs": 27.58,
+        "estimatedGpuBytes": 36151908,
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 9,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 42551846
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "kerr-numerical-characterization",
+        "date": "2026-08-29T21:15:47.485Z",
+        "label": "cinematic-webgl2-high-black-hole-kerr",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole",
+        "preset": "kerr-high-prograde",
+        "metric": "kerr",
+        "spin": {
+          "value": 0.9,
+          "convention": "signed dimensionless a*; +Y axis; disk +Y-corotating"
+        },
+        "kerrDiskInnerRg": 2.320883041761887,
+        "trajectoryBackend": {
+          "requested": "kerr",
+          "effective": "numerical-kerr"
+        },
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "activityMode": "stable",
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 33.3,
+          "p90": 33.4,
+          "p95": 33.5,
+          "p99": 34.4,
+          "max": 34.4,
+          "mean": 28.61,
+          "stdev": 8.12
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 5,
+            "triangles": 5,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 4,
+            "textures": 9,
+            "programs": 14,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 11,
+            "totalBytes": 42551846
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 27.58
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 36151908,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 34703972
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:black-hole",
+              "textures": 0,
+              "bytes": 526336
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "neutron-star",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 13.16,
+        "estimatedGpuBytes": 35774856,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 6,
+            "triangles": 5,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 5,
+            "textures": 9,
+            "programs": 16,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 12,
+            "totalBytes": 42665996
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "neutron-star-benchmark",
+        "date": "2026-08-29T21:15:53.660Z",
+        "label": "cinematic-webgl2-high-neutron-star",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "neutron-star",
+        "preset": "surface",
+        "surfaceRayBackend": "direct-schwarzschild-material-surface",
+        "surfaceLensingWired": true,
+        "surfaceRadiusRg": 5.804742958725859,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 4.1,
+          "median": 16.7,
+          "p90": 17.3,
+          "p95": 17.5,
+          "p99": 17.8,
+          "max": 17.8,
+          "mean": 16.43,
+          "stdev": 1.68
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 6,
+            "triangles": 5,
+            "points": 0,
+            "lines": 3024
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 5,
+            "textures": 9,
+            "programs": 16,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 12,
+            "totalBytes": 42665996
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 13.16
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 35774856,
+          "textureCount": 0,
+          "resourceScopes": [
+            {
+              "name": "shared-post",
+              "textures": 0,
+              "bytes": 34703972
+            },
+            {
+              "name": "transition-director",
+              "textures": 0,
+              "bytes": 921600
+            },
+            {
+              "name": "destination:neutron-star",
+              "textures": 0,
+              "bytes": 149284
+            }
+          ]
+        },
+        "consoleErrors": 0,
+        "suppressedConsoleErrors": 0,
+        "consoleErrorSamples": [],
+        "notes": "neutron-star direct Schwarzschild surface-ray pass; paused at phase 0"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "stellar-explosion",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          960,
+          800
+        ],
+        "cpuMedian": 33.5,
+        "gpuMs": 37.72,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 65,
+          "framesRendered": 65,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 13,
+            "triangles": 74148,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 12,
+            "programs": 26,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 22,
+            "totalBytes": 48714590
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgl2-high-stellar-explosion",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "core-collapse",
+        "timelinePhase": 0.55,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "",
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "scene": "STELLAR_EXPLOSION_CORE_COLLAPSE",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          960,
+          800
+        ],
+        "quality": "high",
+        "requestedQuality": "high",
+        "renderScale": 1,
+        "activityMode": "stable",
+        "medianMs": 33.5,
+        "p90Ms": 50.1,
+        "p95Ms": 50.3,
+        "p99Ms": 67.5,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 13,
+            "triangles": 74148,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 9,
+            "textures": 12,
+            "programs": 26,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 22,
+            "totalBytes": 48714590
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 65,
+          "framesRendered": 65,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 37.72
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    },
+    {
+      "matrix": {
+        "workload": "compact-merger",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 9.93,
+        "estimatedGpuBytes": 39062788,
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 12,
+            "triangles": 21708,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 12,
+            "programs": 28,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 30,
+            "totalBytes": 44083969
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "compact-merger-phase-benchmark",
+        "date": "2026-08-29T21:16:10.102Z",
+        "label": "cinematic-webgl2-high-compact-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "compact-merger",
+        "preset": "equal-mass-nsns",
+        "timelinePhase": 0.7,
+        "resolvedPhase": "kilonova",
+        "resolvedTimeSeconds": 4420.829610323297,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0.6,
+          "median": 16.7,
+          "p90": 17.1,
+          "p95": 17.4,
+          "p99": 18.4,
+          "max": 18.4,
+          "mean": 16.4,
+          "stdev": 2.13
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 12,
+            "triangles": 21708,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 12,
+            "programs": 28,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 30,
+            "totalBytes": 44083969
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 62,
+          "framesRendered": 62,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 9.93
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "volumeVisible": true,
+          "volumeRadiusUnits": 59.45804803132066,
+          "particlePopulationScale": 0.3,
+          "jetVisible": false,
+          "jetFrontUnits": 0,
+          "ejectaRadiusUnits": 59.45804803132066
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 39062788
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "tidal-disruption",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 7.13,
+        "estimatedGpuBytes": 39237316,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 11,
+            "triangles": 12676,
+            "points": 0,
+            "lines": 24
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 12,
+            "programs": 30,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 44131531
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "tidal-disruption-phase-benchmark",
+        "date": "2026-08-29T21:16:18.670Z",
+        "label": "cinematic-webgl2-high-tidal-disruption",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "tidal-disruption",
+        "preset": "solar-canonical",
+        "timelinePhase": 0.78,
+        "resolvedPhase": "shock",
+        "resolvedTimeSeconds": 21488883.598962884,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 16.7,
+          "p90": 16.8,
+          "p95": 16.9,
+          "p99": 18.1,
+          "max": 18.1,
+          "mean": 16.39,
+          "stdev": 2.16
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 11,
+            "triangles": 12676,
+            "points": 0,
+            "lines": 24
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 11,
+            "textures": 12,
+            "programs": 30,
+            "renderTargets": 7,
+            "storageAttributes": 3,
+            "uniformBuffers": 24,
+            "totalBytes": 44131531
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 7.13
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "phaseResources": {
+          "streamBoundVisible": true,
+          "spineBoundPoints": 25,
+          "volumeVisible": true,
+          "volumeRadiusUnits": 199.99999999999994,
+          "diskVisible": false,
+          "particlePopulationScale": 0,
+          "accentAngularGate": 1,
+          "starDistanceUnits": 93469.23041282468,
+          "beta": 1
+        },
+        "memory": {
+          "estimatedGpuBytesTotal": 39237316
+        },
+        "consoleErrors": 0,
+        "consoleErrorSamples": []
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-inner",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 49.8,
+        "gpuMs": 44.06,
+        "estimatedGpuBytes": 44939628,
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 9,
+            "triangles": 11525,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 13,
+            "programs": 29,
+            "renderTargets": 8,
+            "storageAttributes": 0,
+            "uniformBuffers": 32,
+            "totalBytes": 43872482
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:16:30.274Z",
+        "label": "cinematic-webgl2-high-quasar-agn-inner",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "quasar-reference",
+        "zone": {
+          "requested": "inner",
+          "active": "inner"
+        },
+        "grPassActive": true,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0,
+          "median": 49.8,
+          "p90": 50.1,
+          "p95": 50.3,
+          "p99": 66.7,
+          "max": 66.7,
+          "mean": 42.21,
+          "stdev": 10.26
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 6,
+            "drawCalls": 9,
+            "triangles": 11525,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 13,
+            "textures": 13,
+            "programs": 29,
+            "renderTargets": 8,
+            "storageAttributes": 0,
+            "uniformBuffers": 32,
+            "totalBytes": 43872482
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 64,
+          "framesRendered": 64,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 44.06
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 44939628,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "quasar-agn-galactic",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 7.9,
+        "estimatedGpuBytes": 44939628,
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 15,
+            "triangles": 21076,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 11,
+            "programs": 21,
+            "renderTargets": 6,
+            "storageAttributes": 4,
+            "uniformBuffers": 21,
+            "totalBytes": 42842367
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "quasar-agn-zone-characterization",
+        "date": "2026-08-29T21:16:36.175Z",
+        "label": "cinematic-webgl2-high-quasar-agn-galactic",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "quasar-agn",
+        "preset": "radio-galaxy",
+        "zone": {
+          "requested": "galactic",
+          "active": "galactic"
+        },
+        "grPassActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 0.9,
+          "median": 16.7,
+          "p90": 17.3,
+          "p95": 18.1,
+          "p99": 18.2,
+          "max": 18.2,
+          "mean": 16.42,
+          "stdev": 2.1
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 15,
+            "triangles": 21076,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 10,
+            "textures": 11,
+            "programs": 21,
+            "renderTargets": 6,
+            "storageAttributes": 4,
+            "uniformBuffers": 21,
+            "totalBytes": 42842367
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 60,
+          "framesRendered": 60,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 7.9
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 44939628,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "black-hole-merger",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          972,
+          727
+        ],
+        "cpuMedian": 16.6,
+        "gpuMs": 7.05,
+        "estimatedGpuBytes": 48379128,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 27,
+            "triangles": 17236,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 9,
+            "programs": 24,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 34,
+            "totalBytes": 42664123
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "schemaVersion": 2,
+        "kind": "black-hole-merger-phase-characterization",
+        "date": "2026-08-29T21:16:43.890Z",
+        "label": "cinematic-webgl2-high-black-hole-merger",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "destination": "black-hole-merger",
+        "preset": "sxs-bbh-0001-inspiral",
+        "dataset": {
+          "id": "sxs-bbh-0001-lev5",
+          "sha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
+          "bytes": 73888,
+          "sourceSimulation": "SXS:BBH:0001"
+        },
+        "phase": {
+          "requested": "inspiral",
+          "active": "inspiral"
+        },
+        "visibleSystems": [
+          "inspiral"
+        ],
+        "kerrSpinDimensionless": 0.6864817488889335,
+        "waveformPanelActive": false,
+        "browser": {
+          "name": "msedge",
+          "version": "151.0.0.0"
+        },
+        "os": "Windows_NT 10.0.26200 (win32)",
+        "platform": "Win32",
+        "adapter": {
+          "name": ""
+        },
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "timestampQueryAvailable": true,
+        "viewportCss": [
+          1280,
+          800
+        ],
+        "devicePixelRatio": 1,
+        "effectiveRenderSize": [
+          972,
+          727
+        ],
+        "quality": {
+          "requested": "high",
+          "effectiveTier": "high"
+        },
+        "renderScale": 1,
+        "warmupMs": 1000,
+        "sampleFrames": 60,
+        "frameCpuMs": {
+          "min": 5.4,
+          "median": 16.6,
+          "p90": 17.3,
+          "p95": 17.3,
+          "p99": 17.5,
+          "max": 17.5,
+          "mean": 16.48,
+          "stdev": 1.49
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 27,
+            "triangles": 17236,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 12,
+            "textures": 9,
+            "programs": 24,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 34,
+            "totalBytes": 42664123
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 7.05
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "memory": {
+          "estimatedGpuBytesTotal": 48379128,
+          "textureCount": 0
+        },
+        "consoleErrors": 0,
+        "notes": "governor-managed dynamic resolution"
+      }
+    },
+    {
+      "matrix": {
+        "workload": "galaxy-collision",
+        "requestedBackend": "webgl2",
+        "requestedTier": "high"
+      },
+      "normalized": {
+        "backend": "webgl2",
+        "tier": "high",
+        "internal": [
+          960,
+          800
+        ],
+        "cpuMedian": 16.7,
+        "gpuMs": 9.15,
+        "estimatedGpuBytes": null,
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 12424,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 7,
+            "textures": 9,
+            "programs": 20,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 18,
+            "totalBytes": 46261324
+          }
+        },
+        "consoleErrors": 0
+      },
+      "record": {
+        "label": "cinematic-webgl2-high-galaxy-collision",
+        "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+        "preset": "bridge-tail",
+        "timelinePhase": 0.5,
+        "browser": "Edge 151.0.0.0",
+        "adapter": "",
+        "backend": "webgl2",
+        "forcedBackend": "webgl2",
+        "scene": "GALAXY_COLLISION_BRIDGE_TAIL",
+        "viewport": [
+          1280,
+          800
+        ],
+        "internal": [
+          960,
+          800
+        ],
+        "quality": "high",
+        "requestedQuality": "high",
+        "renderScale": 1,
+        "activityMode": "stable",
+        "medianMs": 16.7,
+        "p90Ms": 17.2,
+        "p95Ms": 17.4,
+        "p99Ms": 17.7,
+        "samples": 60,
+        "rendererInfo": {
+          "render": {
+            "frameCalls": 5,
+            "drawCalls": 11,
+            "triangles": 12424,
+            "points": 0,
+            "lines": 0
+          },
+          "compute": {
+            "frameCalls": 0
+          },
+          "memory": {
+            "geometries": 7,
+            "textures": 9,
+            "programs": 20,
+            "renderTargets": 6,
+            "storageAttributes": 0,
+            "uniformBuffers": 18,
+            "totalBytes": 46261324
+          }
+        },
+        "renderTelemetry": {
+          "framesObserved": 61,
+          "framesRendered": 61,
+          "framesSkipped": 0,
+          "lastFrameWork": {
+            "destinationUpdated": true,
+            "destinationDrawn": true,
+            "postPresented": true
+          }
+        },
+        "frameGpuMs": {
+          "lastResolvedFrame": 9.15
+        },
+        "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+        "consoleErrors": 0
+      }
+    }
+  ],
+  "failures": []
+}

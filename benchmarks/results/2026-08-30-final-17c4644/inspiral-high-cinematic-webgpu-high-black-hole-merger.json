@@ -1,0 +1,103 @@
+{
+ "schemaVersion": 2,
+ "kind": "black-hole-merger-phase-characterization",
+ "date": "2026-08-29T21:14:09.371Z",
+ "label": "cinematic-webgpu-high-black-hole-merger",
+ "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+ "destination": "black-hole-merger",
+ "preset": "sxs-bbh-0001-inspiral",
+ "dataset": {
+  "id": "sxs-bbh-0001-lev5",
+  "sha256": "2e317d4ae155868a463473b68c1bd5aac93d36dd3a92f8d9cc21d72cbe28408e",
+  "bytes": 73888,
+  "sourceSimulation": "SXS:BBH:0001"
+ },
+ "phase": {
+  "requested": "inspiral",
+  "active": "inspiral"
+ },
+ "visibleSystems": [
+  "inspiral"
+ ],
+ "kerrSpinDimensionless": 0.6864817488889335,
+ "waveformPanelActive": false,
+ "browser": {
+  "name": "msedge",
+  "version": "151.0.0.0"
+ },
+ "os": "Windows_NT 10.0.26200 (win32)",
+ "platform": "Win32",
+ "adapter": {
+  "name": "nvidia lovelace"
+ },
+ "backend": "webgpu",
+ "forcedBackend": "webgpu",
+ "timestampQueryAvailable": true,
+ "viewportCss": [
+  1280,
+  800
+ ],
+ "devicePixelRatio": 1,
+ "effectiveRenderSize": [
+  972,
+  727
+ ],
+ "quality": {
+  "requested": "high",
+  "effectiveTier": "high"
+ },
+ "renderScale": 1,
+ "warmupMs": 1000,
+ "sampleFrames": 60,
+ "frameCpuMs": {
+  "min": 6.6,
+  "median": 16.7,
+  "p90": 17,
+  "p95": 17.2,
+  "p99": 17.5,
+  "max": 17.5,
+  "mean": 16.49,
+  "stdev": 1.33
+ },
+ "rendererInfo": {
+  "render": {
+   "frameCalls": 5,
+   "drawCalls": 27,
+   "triangles": 17236,
+   "points": 0,
+   "lines": 0
+  },
+  "compute": {
+   "frameCalls": 0
+  },
+  "memory": {
+   "geometries": 12,
+   "textures": 9,
+   "programs": 24,
+   "renderTargets": 6,
+   "storageAttributes": 0,
+   "uniformBuffers": 34,
+   "totalBytes": 42708998
+  }
+ },
+ "renderTelemetry": {
+  "framesObserved": 60,
+  "framesRendered": 60,
+  "framesSkipped": 0,
+  "lastFrameWork": {
+   "destinationUpdated": true,
+   "destinationDrawn": true,
+   "postPresented": true
+  }
+ },
+ "frameGpuMs": {
+  "lastResolvedFrame": 3.01
+ },
+ "gpuTimingNote": "GPU milliseconds from hardware timestamp queries (three trackTimestamp): summed render-pass time of the final resolved frame",
+ "memory": {
+  "estimatedGpuBytesTotal": 48379128,
+  "textureCount": 0
+ },
+ "consoleErrors": 0,
+ "notes": "governor-managed dynamic resolution"
+}

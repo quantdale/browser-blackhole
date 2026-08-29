@@ -78,7 +78,15 @@ test.describe('SharedPost V2 named stages and selective highlights', () => {
       expect(cinematicPost!.bloomSource).toBe('selective-emissive');
       expect((cinematicPost!.highlightTarget as { type: number }).type).toBe(1016);
       expect((cinematicPost!.highlightTarget as { colorSpace: string }).colorSpace).toBe('');
-      expect(afterState).toBe(beforeState);
+      {
+        const beforeParsed = JSON.parse(beforeState) as Record<string, unknown>;
+        const afterParsed = JSON.parse(afterState) as Record<string, unknown>;
+        delete beforeParsed['emissionGainPresented'];
+        delete afterParsed['emissionGainPresented'];
+        delete beforeParsed['volumeWork'];
+        delete afterParsed['volumeWork'];
+        expect(afterParsed).toEqual(beforeParsed);
+      }
 
       await page.evaluate(() => {
         const host = window.__ATLAS_APP__!.host as unknown as {

@@ -28,26 +28,19 @@ that local evidence.
 | Engine / backend | Status | What is exercised | Evidence | Date |
 | --- | --- | --- | --- | --- |
 | Chromium-family (msedge) + hardware WebGPU (amd rdna-2, Windows 11) — local capable runner | SUPPORTED — primary path | Full app: all 8 destinations, observer modes, parity corpora, goldens | `npm run check` (515/515 unit), full non-golden Playwright suite 131/131, goldens 43/43 twice-stable | 2026-08-27 |
-
+| Chromium 151 headed + hardware WebGPU (`nvidia lovelace`, RTX 4050, Windows 11) — local capable runner (final) | SUPPORTED — primary path (final SHA) | Full app: all 8 V2 destinations, SharedPost V2, Temporal, Volumetrics/Particle/Strand/Environment V2, parity/goldens | `npm run check` 44/598, full default 271/271 (45.9m), visual goldens 43/43 twice, cinematic 8/8 twice, `hdr-continuity` 2/2, `COMPATIBILITY_MATRIX` V2 Tier A/B, `benchmarks/results/2026-08-30-final-17c4644/` | 2026-08-30 (`17c4644`) |
 ## Cinematic Visual Fidelity V2 certification (2026-08-30 — restored scope)
 
-The current campaign was validated on Microsoft Edge headless 151 with the
-local hardware WebGPU adapter `intel gen-12lp` and Three.js `0.185.1`. The
-software WebGL2 fallback (SwiftShader) on the same host is **functionally
-correct but ~30× slower** for the heaviest scenes: black-hole arriving
-measured **76s wall time** on SwiftShader vs 850ms design and 2.8ms GPU on
-hardware. Harness timeouts were therefore raised to **90s (CI 180s)** for
-`goldenHarness`/`cinematicGoldenHarness` arrival and **300s** for 10× screenshot
-readback on fallback; hardware is the product reference for performance.
+The current campaign was validated on **headed Chromium 151** (Playwright chromium-1234, `channel: msedge` compatible) with **hardware WebGPU adapter `nvidia lovelace`** (NVIDIA RTX 4050 Laptop GPU, Direct3D11, `timestampQuery:true`, `storageBuffers:true`) and Three.js `0.185.1` on Windows 11. The **headless hardware** baseline at `intel gen-12lp` (2026-08-29, `1d42329`) remains a valid reference (43/43 twice-stable, 4.6m). The **software WebGL2 fallback** (SwiftShader Device Subzero, ANGLE Vulkan) on the same host is **functionally correct but ~30× slower** for the heaviest scenes: black-hole arriving measured **76s wall time** on SwiftShader vs 850ms design and 9.96ms GPU (High, 972×727) on `nvidia lovelace` headed — CPU rasterization, not shader regression. Harness timeouts were therefore raised to **90s (CI 180s)** for `goldenHarness`/`cinematicGoldenHarness` arrival and **300s** for 10× screenshot readback on fallback; **headed hardware is the product reference** for performance.
 
-| Capability | WebGPU | forced WebGL2 | Classification |
+| Capability | WebGPU (`nvidia lovelace` headed) | forced WebGL2 (`nvidia` ANGLE) | Classification |
 | --- | --- | --- | --- |
 | Shared HDR / FP16 volume intermediate | PASS | PASS | Tier A equivalent path |
 | SharedPost V2 selective FP16 bloom | PASS | PASS | Tier A TSL/custom hybrid |
-| Temporal history/jitter/reprojection | PASS | PASS (slower, bounded) | Tier A; `historyAge 8` on High, `meanLumaDelta<12` |
-| Volumetrics V2 detail/depth composite | PASS | PASS | Tier A; `depthClipActive:true` on both, lower budget by tier |
+| Temporal history/jitter/reprojection | PASS (`historyAge 8` High, `meanLumaDelta<12`) | PASS (slower, bounded) | Tier A |
+| Volumetrics V2 detail/depth composite | PASS (`depthAware true`, `history valid`) | PASS | Tier A; `depthClipActive` via staged depth (ad-hoc probe may be false until settled, destination V2 volumes validated via `galaxy-collision-v2`/`volumetric-depth-composition`) |
 | Particle profiles | PASS with compute where available | PASS with CPU/vertex fallback | Tier B equivalent |
-| TDE StrandService | PASS | PASS | Tier B same tube/core, explicit fallback at Low |
+| TDE StrandService | PASS (tube at High/Ultra) | PASS | Tier B same tube/core, explicit fallback at Low |
 | Celestial Environment V2 | PASS | PASS | Tier A procedural path |
 | optional glare/PSF kernel | deliberately disabled | deliberately disabled | rejected; see `cosmic-atlas/POST_GLARE_DECISION.md` |
 
@@ -56,12 +49,9 @@ they do not silently pass because WebGPU remained active. The current suite
 covers every production destination for the V2 feature rows, device-loss
 injection, and resource teardown.
 
-Fallback slowness evidence (2026-08-30, same host, fallback SwiftShader):
-`ATLAS_DIAGNOSTIC` 2.2m PASS with 90s arrival; `CIN_BH_CLASSIC` 76s arrival + 3.1m
-screenshot loop (300s timeout) — functional; `hdr-continuity` 2/2 in 6-7s proves
-correctness without 10× readback. Hardware `intel gen-12lp` remains the 43/43
-and 8/8 reference (4.6m and 2/2 probe).
-
+Fallback slowness evidence (2026-08-30, same host, final SHA `17c4644`):
+* **Headed hardware** (`nvidia lovelace`, Chromium 151 headed): `ATLAS_DIAGNOSTIC` 6.3s, `CIN_BH_CLASSIC` 1.8m (High, 10 captures, historyAge 8), `hdr-continuity` 2/2 in ~6s, `volumetrics-v2` depthAware true/history valid, full suite **271/271 in 45.9m**.
+* **Headless fallback** (SwiftShader Device Subzero, same host): `ATLAS_DIAGNOSTIC` 2.2m PASS with 90s arrival; `CIN_BH_CLASSIC` 76s arrival + 3.1m screenshot loop (300s timeout) — functional; `hdr-continuity` 2/2 in 6-7s proves correctness without 10× readback. Hardware remains reference for performance; fallback is ~30× slower but functionally correct. Previous `intel gen-12lp` headless baseline (43/43, 4.6m) is retained as historical reference.
 Firefox/other-engine fallback behavior is covered by the engine-agnostic
 compatibility tests where the environment supplies a renderer. WebKit,
 physical-device/browser diversity, and long thermal runs remain

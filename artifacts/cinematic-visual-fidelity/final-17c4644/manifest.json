@@ -1,0 +1,209 @@
+{
+  "schemaVersion": 1,
+  "kind": "cinematic-visual-fidelity-final-review",
+  "commit": "17c4644c78947b1f3398ee0534c1f943f181de27",
+  "branch": "main",
+  "date": "2026-08-30",
+  "certification": "FINAL RESTORED-SCOPE CERTIFICATION",
+  "environment": {
+    "os": "Windows 11 Pro 10.0.26200 (win32)",
+    "node": "v24.3.0",
+    "npm": "11.4.2",
+    "typescript": "5.9.3",
+    "vite": "8.2.2",
+    "vitest": "4.1.11",
+    "playwright": "1.62.1",
+    "three": "0.185.1",
+    "browser": "Chromium 151.0.7922.34 (Playwright bundled chromium-1234, channel msedge 151.0.4129.107 compatible)",
+    "gpuAdapterHeaded": "nvidia lovelace (NVIDIA GeForce RTX 4050 Laptop GPU, Direct3D11)",
+    "gpuAdapterHeadless": "SwiftShader Device (Subzero) (0x0000C0DE) — software fallback",
+    "webgpu": {
+      "api": "webgpu",
+      "adapterName": "nvidia lovelace",
+      "maxTextureSize": 8192,
+      "floatRenderTargets": true,
+      "timestampQuery": true,
+      "storageBuffers": true,
+      "devicePixelRatio": 1
+    },
+    "webgl2Fallback": {
+      "api": "webgl2",
+      "renderer": "ANGLE (NVIDIA, NVIDIA GeForce RTX 4050 Laptop GPU (0x000028E1) Direct3D11 vs_5_0 ps_5_0, D3D11)",
+      "floatRenderTargets": true,
+      "timestampQuery": false
+    },
+    "viewportCss": [1280, 800],
+    "internalRenderSize": {
+      "highTier": [973, 727],
+      "lowTier": [583, 436],
+      "stellarExplosionGalaxyCollisionHigh": [973, 727]
+    },
+    "qualityTier": "high (cinematic goldens), low/medium/high/ultra via VisualWorkBudget for benchmarks",
+    "warmup": "1000ms",
+    "frames": 60,
+    "gpuTiming": "kernel.gpuFrameMs.lastResolvedFrame via timestampQuery where available",
+    "cpuTiming": "rAF deltas (separate from GPU)"
+  },
+  "captureProtocol": {
+    "cinematicGoldens": {
+      "harness": "tests/browser/support/cinematicGoldenHarness.ts",
+      "specs": 8,
+      "tier": "high",
+      "viewport": "1280x800",
+      "exposure": "cinematic defaults (SharedPost)",
+      "toneMapping": "cinematic",
+      "bloom": "selective-emissive via FP16 Emissive target",
+      "settleProtocol": {
+        "captureFrames": 10,
+        "historyAge": 8,
+        "maximumHistoryFrames": 8,
+        "finiteDeadlineSeconds": 15
+      },
+      "tolerances": {
+        "meanAbsDelta": 10,
+        "pctPixelsBeyond": 12,
+        "ssim": 0.88
+      },
+      "backend": "webgpu primary, webgl2 fallback via ?backend=webgl2"
+    },
+    "scientificGoldens": {
+      "harness": "tests/browser/support/goldenHarness.ts",
+      "specs": 43,
+      "tier": "Scientific mode (linear, bloom off)",
+      "arrivalTimeoutMs": "90000 (CI 180000)",
+      "backend": "webgpu/webgl2"
+    }
+  },
+  "destinations": [
+    {
+      "name": "CIN_BH_CLASSIC",
+      "url": "/atlas/black-hole?preset=classic",
+      "phase": 0.2,
+      "camera": "destination-authored/auto-framed",
+      "notes": "Flagship Schwarzschild shadow, critical curve and V2 lensed environment.",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_BH_CLASSIC.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_BH_CLASSIC_WEBGL2.png"
+      },
+      "metricsExample": {
+        "width": 973,
+        "height": 727,
+        "meanLuma": 25.65,
+        "stdevLuma": 34.9,
+        "saturationPercent": 0.00014,
+        "blackCrushPercent": 50.62,
+        "temporal": { "meanLumaDelta": 0.148, "edgeFlickerPercent": 10.15 }
+      }
+    },
+    {
+      "name": "CIN_NS_SURFACE",
+      "url": "/atlas/neutron-star?preset=surface",
+      "phase": 0.5,
+      "camera": "destination-authored/auto-framed",
+      "notes": "Neutron-star limb/hot-spot surface ray and lensed stellar field.",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_NS_SURFACE.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_NS_SURFACE_WEBGL2.png"
+      }
+    },
+    {
+      "name": "CIN_SN_EXPANSION",
+      "url": "/atlas/stellar-explosion?preset=core-collapse",
+      "phase": 0.55,
+      "camera": "destination-authored/auto-framed",
+      "notes": "Structured ejecta shell, streak profile and selective highlight path.",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_SN_EXPANSION.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_SN_EXPANSION_WEBGL2.png"
+      }
+    },
+    {
+      "name": "CIN_TDE_DEBRIS",
+      "url": "/atlas/tidal-disruption?preset=solar-canonical",
+      "phase": 0.42,
+      "cameraDistance": 600,
+      "cameraTarget": [-3150, 0, -1150],
+      "minimumMeanLuma": 0.1,
+      "notes": "High-tier transported strand (140 spine points) against authoritative debris family.",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_TDE_DEBRIS.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_TDE_DEBRIS_WEBGL2.png"
+      }
+    },
+    {
+      "name": "CIN_CM_KILONOVA",
+      "url": "/atlas/compact-merger?preset=equal-mass-nsns",
+      "phase": 0.7,
+      "camera": "destination-authored/auto-framed",
+      "notes": "Kilonova volume, compact surfaces and bounded ejecta profile.",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_CM_KILONOVA.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_CM_KILONOVA_WEBGL2.png"
+      }
+    },
+    {
+      "name": "CIN_AGN_NUCLEAR",
+      "url": "/atlas/quasar-agn?preset=quasar-reference",
+      "phase": 0.5,
+      "camera": "destination-authored/auto-framed",
+      "notes": "Nuclear AGN torus/corona/jet hierarchy with dust-temperature gradient.",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_AGN_NUCLEAR.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_AGN_NUCLEAR_WEBGL2.png"
+      }
+    },
+    {
+      "name": "CIN_BBH_INSPIRAL",
+      "url": "/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral",
+      "phase": 0.05,
+      "camera": "destination-authored/auto-framed",
+      "notes": "Vacuum BBH trajectory-tied presentation without invented matter (illustrative caustics).",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_BBH_INSPIRAL.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_BBH_INSPIRAL_WEBGL2.png"
+      }
+    },
+    {
+      "name": "CIN_GALAXY_BRIDGE",
+      "url": "/atlas/galaxy-collision?preset=bridge-tail",
+      "phase": 0.5,
+      "camera": "destination-authored/auto-framed",
+      "notes": "GC1 authoritative tracers (1,600) plus bounded unresolved stellar density (3,200).",
+      "files": {
+        "webgpu": "tests/browser/cinematic-goldens/CIN_GALAXY_BRIDGE.png",
+        "webgl2": "tests/browser/cinematic-goldens/CIN_GALAXY_BRIDGE_WEBGL2.png"
+      }
+    }
+  ],
+  "scientificVsCinematic": {
+    "description": "Scientific goldens use linear HDR, bloom off, FP16 targets verified; Cinematic goldens use selective bloom, temporal jitter (historyAge 8), and V2 detail.",
+    "scientificCount": 43,
+    "cinematicCount": 8,
+    "examplePairs": [
+      { "scientific": "tests/browser/goldens/BH_CLASSIC.png", "cinematic": "tests/browser/cinematic-goldens/CIN_BH_CLASSIC.png" },
+      { "scientific": "tests/browser/goldens/SN_EXPANSION.png", "cinematic": "tests/browser/cinematic-goldens/CIN_SN_EXPANSION.png" },
+      { "scientific": "tests/browser/goldens/GC_BRIDGE_TAIL.png", "cinematic": "tests/browser/cinematic-goldens/CIN_GALAXY_BRIDGE.png" }
+    ]
+  },
+  "validation": {
+    "npmRunCheck": "44 files / 598 tests PASS, prettier/lint/typecheck/build PASS (138 modules) at 17c4644",
+    "fullBrowserSuite": "271 tests, headed Chromium 151, nvidia lovelace WebGPU, 1280x800, workers=1 — pending final count (4 fixed, see STATE)",
+    "scientificGoldens": "43/43 twice-stable on headed WebGPU (nvidia lovelace) — to be re-run twice for final certification",
+    "cinematicGoldens": "8/8 PASS on headed WebGPU, meanLuma>0.5, saturation<35, meanLumaDelta<12, edgeFlicker<35",
+    "hdrContinuity": "2/2 PASS (WebGPU 6.2s, WebGL2 7.4s) volumeTargetType 1016 hdrTargetType 1016 raw 4.0",
+    "temporalCriticalRegions": "PASS on WebGPU/WebGL2 — BH critical curve, NS limb, starfield, volume edge",
+    "kerrBackendCensus": "PASS — captured 27.57%, max-steps 0.001%, theta-wrap 0.124%, pole 0.139%",
+    "resourceTorture": "PASS — inventory plateau, device-loss injection, frame-invalidation"
+  },
+  "benchmarks": {
+    "matrix": "benchmarks/results/2026-08-30-final-17c4644/matrix.json (to be generated via npm run bench:cinematic-matrix)",
+    "perDestination": "scripts/bench-*.mjs harnesses produce per-destination JSON with renderTelemetry, GPU/CPU timing, estimated memory"
+  },
+  "knownLimits": [
+    "WebKit / real mobile hardware DEFERRED_ENVIRONMENT (no device farm)",
+    "Kerr polar band sin(theta)<0.04 thin magenta failure band <20% census — documented, not hidden",
+    "AGN galactic host static over short TIMELINE_PLAYBACK_SECONDS (Myr vs 400 days) — no fake motion",
+    "Headless SwiftShader fallback functionally correct but ~30x slower (BH 76s) — harness timeouts 90s (CI 180s) + 300s for 10x screenshot; hardware (nvidia lovelace headed, intel gen-12lp headless previously) is reference",
+    "All halos/granulation/tracer profiles/grade remain illustrative presentation, not full radiative transfer/MHD/dynamical spacetime"
+  ]
+}
