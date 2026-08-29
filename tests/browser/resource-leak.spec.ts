@@ -148,4 +148,62 @@ test.describe('M11-04 lifecycle/resource-leak torture', () => {
     expect(final.scopes).toBeLessThanOrEqual(baseline.scopes + 2);
     expect(errors).toEqual([]);
   });
+
+  test('quality changes keep temporal history targets bounded and reusable', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/stellar-explosion?preset=core-collapse');
+    await waitArrived(page, 'stellar-explosion');
+    const baseline = await scopes(page);
+    const records: Array<Record<string, unknown>> = [];
+    for (const tier of ['low', 'medium', 'high', 'ultra', 'high', 'medium', 'high'] as const) {
+      await page.evaluate((nextTier) => {
+        const app = window.__ATLAS_APP__!;
+        const host = app.host as unknown as {
+          governor: { setForcedTier(tier: typeof nextTier): void };
+          handleResize(width: number, height: number): void;
+        };
+        host.governor.setForcedTier(nextTier);
+        const rect = document.getElementById('viewport')?.getBoundingClientRect();
+        if (rect) host.handleResize(rect.width, rect.height);
+        app.captureFrame();
+        app.captureFrame();
+      }, tier);
+      records.push(
+        await page.evaluate(() => {
+          const app = window.__ATLAS_APP__!;
+          const inventory = app.host.debugInventory();
+          const post = (
+            app.host.post as unknown as {
+              getDebugSnapshot?(): Record<string, unknown>;
+            }
+          ).getDebugSnapshot?.();
+          return {
+            tier: inventory.governor.tier,
+            bytes: inventory.totalEstimatedGpuBytes,
+            scopes: inventory.liveScopeCount,
+            temporal: post?.temporal ?? null
+          };
+        })
+      );
+    }
+    const final = await scopes(page);
+    console.log(`QUALITY_HISTORY_TORTURE ${JSON.stringify({ baseline, records, final })}`);
+    expect(errors).toEqual([]);
+    expect(records.map((record) => record.tier)).toEqual([
+      'low',
+      'medium',
+      'high',
+      'ultra',
+      'high',
+      'medium',
+      'high'
+    ]);
+    for (const record of records) {
+      expect(record.scopes).toBeLessThanOrEqual(baseline.scopes + 2);
+      expect(record.bytes).toBeLessThanOrEqual(baseline.gpuBytes * 2 + 4_000_000);
+      expect(record.temporal).toMatchObject({ allocatedTargetCount: 2 });
+    }
+    expect(final.scopes).toBeLessThanOrEqual(baseline.scopes + 2);
+    expect(final.gpuBytes).toBeLessThanOrEqual(baseline.gpuBytes * 2 + 4_000_000);
+  });
 });

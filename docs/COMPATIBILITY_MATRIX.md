@@ -28,6 +28,32 @@ that local evidence.
 | Engine / backend | Status | What is exercised | Evidence | Date |
 | --- | --- | --- | --- | --- |
 | Chromium-family (msedge) + hardware WebGPU (amd rdna-2, Windows 11) — local capable runner | SUPPORTED — primary path | Full app: all 8 destinations, observer modes, parity corpora, goldens | `npm run check` (515/515 unit), full non-golden Playwright suite 131/131, goldens 43/43 twice-stable | 2026-08-27 |
+
+## Cinematic Visual Fidelity V2 certification (2026-08-29)
+
+The current campaign was validated on Microsoft Edge headless 151 with the
+local hardware WebGPU adapter `intel gen-12lp` and Three.js `0.185.1`.
+
+| Capability | WebGPU | forced WebGL2 | Classification |
+| --- | --- | --- | --- |
+| Shared HDR / FP16 volume intermediate | PASS | PASS | Tier A equivalent path |
+| SharedPost V2 selective FP16 bloom | PASS | PASS | Tier A TSL/custom hybrid |
+| Temporal history/jitter/reprojection | PASS | PASS | Tier A; bounded history |
+| Volumetrics V2 detail/depth composite | PASS | PASS | Tier A; lower work budget by tier |
+| Particle profiles | PASS with compute where available | PASS with CPU/vertex fallback | Tier B equivalent |
+| TDE StrandService | PASS | PASS | Tier B same tube/core, explicit fallback available |
+| Celestial Environment V2 | PASS | PASS | Tier A procedural path |
+| optional glare/PSF kernel | deliberately disabled | deliberately disabled | rejected; see `cosmic-atlas/POST_GLARE_DECISION.md` |
+
+The forced-WebGL2 rows select `debugInventory().backend.api === 'webgl2'`;
+they do not silently pass because WebGPU remained active. The current suite
+covers every production destination for the V2 feature rows, device-loss
+injection, and resource teardown.
+
+Firefox/other-engine fallback behavior is covered by the engine-agnostic
+compatibility tests where the environment supplies a renderer. WebKit,
+physical-device/browser diversity, and long thermal runs remain
+`DEFERRED_ENVIRONMENT`; no universal performance claim is made for them.
 | Chromium-family + forced WebGL2 (hosted CI + local) | SUPPORTED — fallback | Root/diagnostic boot on webgl2 with truthful backend reporting, live diagnostic frame, clean console; unsupported terminal UX; (local) black-hole/neutron-star/stellar webgl2 variants, shadow not failure-magenta | Hosted `browser-smoke` (`smoke.spec.ts` forced-webgl2 + unsupported); local `atlas-webgl2.spec.ts`, `stellar-explosion.spec.ts` | 2026-08-27 |
 | Chromium-family + unsupported backend override (hosted CI + local) | SUPPORTED — terminal UX | `?backend=unsupported` reaches the terminal unsupported state with visible explained status (never a blank canvas) | `smoke.spec.ts` "forced unsupported shows terminal unsupported UX" (hosted `browser-smoke`) | 2026-08-27 |
 | Firefox (Playwright, headless) — local capable runner | SUPPORTED — fallback logic verified (local) | Root experience boots READY on the WebGL2 fallback with live frames; atlas shell boots/arrives; reload restores a valid state; console/page channels clean. NOTE: headless Firefox on a GPU-less host (e.g. hosted CI) has no usable GL context and correctly reaches the terminal no-backend state — so this row is verified on a machine with a real GL stack, never hosted CI. | `npx playwright test --project=firefox` (4/4) on a capable local machine | 2026-08-27 |

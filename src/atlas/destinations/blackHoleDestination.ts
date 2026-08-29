@@ -579,6 +579,14 @@ export class BlackHoleModule implements PhenomenonModule {
       lutFamilyDir: this.lut?.familyDir ?? null,
       lutWebgl2Filterable: this.lut?.webgl2Filterable ?? null,
       lutFallbackReason: this.lastFallbackReason,
+      criticalRegionSampling: {
+        method: 'validated radius-aware adaptive step sizing',
+        photonSphereRg: 3,
+        horizonFloorScale: 0.02,
+        targetedSupersampling: false,
+        rationale:
+          'temporal jitter/history and the existing near-horizon step floor pass the critical-curve stability gate; extra ray bundles were not justified by the measured cost/artifact tradeoff'
+      },
       estimatedGpuMemoryMBIsEstimate: true,
       // M10 physical observer truth:
       observerMode: this.controls.observer.mode,
