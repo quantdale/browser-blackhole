@@ -263,6 +263,17 @@ export async function runCinematicGoldenExpectation(
 
 async function waitForArrival(page: Page): Promise<void> {
   await page.locator('#scene').waitFor({ state: 'attached', timeout: 30_000 });
+  // Pause as soon as the host exists, before asynchronous destination prepare
+  // and arrival can accumulate spin/flare time. TimeController.pause() is
+  // sticky across enter(), making phase-sensitive captures independent of
+  // shader compilation and transition duration.
+  await expect
+    .poll(() => page.evaluate(() => (window.__ATLAS_APP__ ? 'ready' : 'waiting')), {
+      timeout: 30_000,
+      intervals: [50]
+    })
+    .toBe('ready');
+  await page.evaluate(() => window.__ATLAS_APP__?.host.time.pause());
   await expect
     .poll(
       () => page.evaluate(() => window.__ATLAS_APP__?.host.state.atlas.transition.active === false),

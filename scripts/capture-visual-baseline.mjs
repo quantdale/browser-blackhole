@@ -153,6 +153,13 @@ function ensureDir(path) {
 
 async function waitForArrival(page) {
   await page.locator('#scene').waitFor({ state: 'attached', timeout: 30_000 });
+  // Freeze the shared clock before the async destination enter hook. This is
+  // required for phase-sensitive surfaces (NS spin/flare, compact rotation)
+  // to be reproducible across shader compilation and arrival duration.
+  await page.waitForFunction(() => Boolean(window.__ATLAS_APP__), undefined, {
+    timeout: 30_000
+  });
+  await page.evaluate(() => window.__ATLAS_APP__?.host.time.pause());
   await page.waitForFunction(
     () => window.__ATLAS_APP__?.host.state.atlas.transition.active === false,
     undefined,
