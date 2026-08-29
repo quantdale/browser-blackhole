@@ -144,16 +144,15 @@ for (const backend of backends) {
           });
           continue;
         }
-        const effectiveBackend = record.backend ?? record.backendApi ?? record?.backend?.api;
-        const effectiveTier = record.quality?.effectiveTier ?? record.quality ?? record.tier;
-        const backendString = typeof effectiveBackend === 'string' ? effectiveBackend : null;
-        const tierString = typeof effectiveTier === 'string' ? effectiveTier : null;
+        const normalized = normalizeRecord(record);
+        const backendString = normalized.backend;
+        const tierString = normalized.tier;
         if (backendString !== backend) {
           failures.push({
             backend,
             tier,
             workload: workload.id,
-            error: `effective backend ${String(effectiveBackend)}`
+            error: `effective backend ${String(normalized.backend)}`
           });
         }
         if (tierString !== null && tierString !== tier) {
@@ -164,16 +163,17 @@ for (const backend of backends) {
             error: `effective tier ${tierString}`
           });
         }
-        if (record.consoleErrors !== undefined && Number(record.consoleErrors) !== 0) {
+        if (normalized.consoleErrors !== 0) {
           failures.push({
             backend,
             tier,
             workload: workload.id,
-            error: `consoleErrors=${record.consoleErrors}`
+            error: `consoleErrors=${normalized.consoleErrors}`
           });
         }
         records.push({
           matrix: { workload: workload.id, requestedBackend: backend, requestedTier: tier },
+          normalized,
           record
         });
       } catch (error) {
@@ -248,6 +248,38 @@ function readCommit() {
 
 function usesWarmupMs(script) {
   return script === 'bench-stellar-explosion.mjs' || script === 'bench-galaxy-collision.mjs';
+}
+
+function normalizeRecord(record) {
+  const backend =
+    typeof record.backend === 'string'
+      ? record.backend
+      : typeof record.backendApi === 'string'
+        ? record.backendApi
+        : typeof record.backend?.api === 'string'
+          ? record.backend.api
+          : null;
+  const tier =
+    typeof record.quality === 'string'
+      ? record.quality
+      : typeof record.quality?.effectiveTier === 'string'
+        ? record.quality.effectiveTier
+        : typeof record.tier === 'string'
+          ? record.tier
+          : typeof record.requestedQuality === 'string'
+            ? record.requestedQuality
+            : null;
+  return {
+    backend,
+    tier,
+    internal: record.effectiveRenderSize ?? record.internal ?? null,
+    cpuMedian: record.frameCpuMs?.median ?? record.medianMs ?? null,
+    gpuMs: record.frameGpuMs?.lastResolvedFrame ?? null,
+    estimatedGpuBytes: record.memory?.estimatedGpuBytesTotal ?? null,
+    renderTelemetry: record.renderTelemetry ?? null,
+    rendererInfo: record.rendererInfo ?? null,
+    consoleErrors: Number(record.consoleErrors ?? 0)
+  };
 }
 
 /** Extract the last balanced JSON object containing a benchmark identity key. */
