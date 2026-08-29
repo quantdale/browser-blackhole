@@ -382,9 +382,21 @@ export class QuasarAgnModule implements PhenomenonModule {
       // carries the continuum factor directly (no light-travel delay at r < 20 r_g).
       emission: () => vec3(0.82, 0.88, 1.0).mul(this.uContinuum).mul(float(0.7)) as never,
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
+      detail: {
+        seed: ctx.preset.seed ^ 0x4c1,
+        octaves: 3,
+        strength: 0.12,
+        filamentStrength: 0.12,
+        clumpStrength: 0.28,
+        domainWarpStrength: 0.1,
+        frequency: 2.2
+      },
+      depthAwareUpsample: true,
+      approximateSelfShadow: true,
+      gradientShading: true,
       halfResolution: true,
       earlyAlphaTermination: true,
-      temporalJitter: false
+      temporalJitter: true
     });
     this.coronaVolume.setStepScale(TIER_STEP_SCALE[ctx.quality]);
     innerGroup.add(this.coronaVolume.object3d());
@@ -510,9 +522,21 @@ export class QuasarAgnModule implements PhenomenonModule {
           .mul(illumination) as never;
       },
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
+      detail: {
+        seed: ctx.preset.seed ^ 0x4c2,
+        octaves: 5,
+        strength: 0.18,
+        filamentStrength: 0.16,
+        clumpStrength: 0.72,
+        domainWarpStrength: 0.24,
+        frequency: 0.85
+      },
+      depthAwareUpsample: true,
+      approximateSelfShadow: true,
+      gradientShading: true,
       halfResolution: true,
       earlyAlphaTermination: true,
-      temporalJitter: false
+      temporalJitter: true
     });
     this.torusVolume.setStepScale(TIER_STEP_SCALE[ctx.quality]);
     nuclearGroup.add(this.torusVolume.object3d());
@@ -552,7 +576,9 @@ export class QuasarAgnModule implements PhenomenonModule {
       blending: 'additive',
       seed: ctx.preset.seed,
       preferCompute: false,
-      activity: 'static'
+      activity: 'static',
+      profile: 'star',
+      emissiveIntensity: 1.1
     });
     this.hostParticles.reset(ctx.preset.seed);
     galacticGroup.add(this.hostParticles.object3d());
@@ -576,7 +602,9 @@ export class QuasarAgnModule implements PhenomenonModule {
       blending: 'additive',
       seed: ctx.preset.seed + 1,
       preferCompute: false,
-      activity: 'static'
+      activity: 'static',
+      profile: 'emissive-core',
+      emissiveIntensity: 1.4
     });
     this.knotParticles.reset(ctx.preset.seed + 1);
     galacticGroup.add(this.knotParticles.object3d());
@@ -652,6 +680,9 @@ export class QuasarAgnModule implements PhenomenonModule {
     this.continuumFactor = variabilityFactor(this.timeDays, this.variability);
     this.uContinuum.value = this.continuumFactor;
     this.backdrop?.setTime(this.timeDays * 0.00002);
+    this.backdrop?.setDetail(
+      ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0
+    );
     this.nuclearEngineVisual?.setGain(this.continuumFactor * 1.4);
     this.nuclearEngineVisual?.setTime(this.timeDays * 0.02);
 

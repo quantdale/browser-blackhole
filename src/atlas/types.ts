@@ -228,6 +228,9 @@ export interface ParticleEmitterConfig {
   directionBias?: [number, number, number];
 }
 
+export type ParticleRenderProfile =
+  'generic-soft' | 'star' | 'ejecta-streak' | 'debris-streak' | 'dust-clump' | 'emissive-core';
+
 export interface ParticleSystemConfig {
   capacity: number;
   emitters: ParticleEmitterConfig[];
@@ -236,6 +239,10 @@ export interface ParticleSystemConfig {
   colorRamp: Array<{ t: number; color: [number, number, number]; alpha: number }>;
   blending: 'additive' | 'normal';
   seed: number;
+  /** Presentation profile; generic-soft is the compatibility default. */
+  profile?: ParticleRenderProfile;
+  /** Linear radiance gain for the profile, not a physics input. */
+  emissiveIntensity?: number;
   /** Use GPU compute update when available; otherwise shader/CPU fallback. */
   preferCompute: boolean;
   /** Explicit lifecycle semantics for deterministic static populations. */
@@ -249,6 +256,7 @@ export interface ParticleSystemHandle {
   /** Three.js object to add to the destination scene. */
   object3d(): THREE.Object3D;
   setPopulationScale(scale: number): void;
+  setProfileQuality?(quality: number): void;
   reset(seed: number): void;
   dispose(): void;
   /**
@@ -260,6 +268,9 @@ export interface ParticleSystemHandle {
 
 export interface IParticleService {
   createSystem(config: ParticleSystemConfig): ParticleSystemHandle;
+  /** Global population cap resolved by PerformanceGovernor. */
+  setPopulationScale(scale: number): void;
+  setProfileQuality(quality: number): void;
   readonly computeAvailable: boolean;
   dispose(): void;
 }
@@ -275,6 +286,22 @@ export interface VolumeConfig {
   baseMaxSteps: number;
   /** Keep emissive intermediates in linear FP16/HDR storage (default true). */
   hdrIntermediate?: boolean;
+  /** Optional deterministic presentation detail layered over the macro field. */
+  detail?: {
+    seed: number;
+    octaves?: number;
+    strength?: number;
+    filamentStrength?: number;
+    clumpStrength?: number;
+    domainWarpStrength?: number;
+    frequency?: number;
+  };
+  /** Use alpha/depth-guided filtering when the volume is upsampled. */
+  depthAwareUpsample?: boolean;
+  /** Enable bounded approximate extinction taps toward the camera direction. */
+  approximateSelfShadow?: boolean;
+  /** Enable bounded gradient-style front shading from the macro density. */
+  gradientShading?: boolean;
   halfResolution: boolean;
   earlyAlphaTermination: boolean;
   temporalJitter: boolean;
@@ -288,6 +315,11 @@ export interface VolumeHandle {
   getDebugSnapshot?(): Record<string, unknown>;
   /** Test/diagnostic-only access to the half-resolution target for numeric probes. */
   getIntermediateRenderTargetForTest?(): THREE.RenderTarget | null;
+  setDetailOctaves?(octaves: number): void;
+  setLightingTaps?(taps: number): void;
+  setTemporalJitter?(enabled: boolean): void;
+  setTemporalFrame?(frameIndex: number): void;
+  setSceneDepthTexture?(texture: THREE.Texture | null): void;
   dispose(): void;
 }
 
@@ -295,6 +327,13 @@ export interface IVolumeService {
   createVolume(config: VolumeConfig): VolumeHandle;
   /** Half/quarter-resolution internal target management. */
   setInternalScale(scale: number): void;
+  /** Global V2 detail budget; destinations never own a second quality controller. */
+  setStepScale(scale: number): void;
+  setDetailOctaves(octaves: number): void;
+  setLightingTaps(taps: number): void;
+  setTemporalJitter(enabled: boolean): void;
+  setTemporalFrame(frameIndex: number): void;
+  setSceneDepthTexture(texture: THREE.Texture | null): void;
   dispose(): void;
 }
 
@@ -332,6 +371,43 @@ export interface RibbonHandle {
 
 export interface IRibbonService {
   createRibbon(config: RibbonConfig): RibbonHandle;
+  dispose(): void;
+}
+
+export interface StrandConfig {
+  /** Number of longitudinal spine samples. */
+  segments: number;
+  /** Maximum radial sides in the tube mesh; bounded by the service. */
+  radialSegments?: number;
+  widthStart: number;
+  widthEnd: number;
+  /** Ellipse minor/major ratio at the start/end of the stream. */
+  aspectStart?: number;
+  aspectEnd?: number;
+  opacityStart: number;
+  opacityEnd: number;
+  colorStart: [number, number, number];
+  colorEnd: [number, number, number];
+  /** Presentation temperature ramp amplitude, not a physical temperature. */
+  temperatureVariation?: number;
+  clumpStrength?: number;
+  clumpSeed: number;
+  additive: boolean;
+}
+
+export interface StrandHandle {
+  /** Replace the authoritative spine; the centerline is never procedurally moved. */
+  setSpine(points: THREE.Vector3[]): void;
+  setQuality(quality: number): void;
+  object3d(): THREE.Object3D;
+  setVisible(visible: boolean): void;
+  getDebugSnapshot?(): Record<string, unknown>;
+  dispose(): void;
+}
+
+export interface IStrandService {
+  createStrand(config: StrandConfig): StrandHandle;
+  setQuality(quality: number): void;
   dispose(): void;
 }
 
@@ -424,6 +500,7 @@ export interface ILensingService {
   createBlackHoleLensingPass(params: LensingPassParams): {
     object3d(): THREE.Mesh;
     setUniformsFromState(state: Record<string, unknown>): void;
+    setEnvironmentDetail?(detail: number): void;
     dispose(): void;
   };
   /**
@@ -436,6 +513,7 @@ export interface ILensingService {
   createKerrLensingPass(params: KerrLensingParams): {
     object3d(): THREE.Mesh;
     setUniformsFromState(state: Record<string, unknown>): void;
+    setEnvironmentDetail?(detail: number): void;
     dispose(): void;
   };
   /**
@@ -443,6 +521,8 @@ export interface ILensingService {
    * (lensing lab, AGN). Must not weaken the black-hole path.
    */
   createThinLensDisplacement(massRg: number, impactParameterScale: number): TslDensityFn;
+  /** Set the additive cinematic environment contribution for live passes. */
+  setEnvironmentDetail(detail: number): void;
   dispose(): void;
 }
 
@@ -661,6 +741,14 @@ export interface ISharedPost {
   endTemporalFrame?(camera: THREE.PerspectiveCamera): void;
   /** Debug description of named image stages and auxiliary resources. */
   getDebugSnapshot?(): Record<string, unknown>;
+  /** Main scene depth texture, when the backend provides one. */
+  getDepthTexture?(): THREE.Texture | null;
+  /** Previous-frame staged depth, safe for volume upsampling (not same-pass sampling). */
+  getVolumeDepthTexture?(): THREE.Texture | null;
+  /** Copy the just-rendered scene depth into the staged volume-depth target. */
+  captureDepthForVolume?(): void;
+  /** Invalidate staged depth after a suppressed/handed-off destination frame. */
+  invalidateDepthHistory?(): void;
   /** Frozen outgoing frame for transitions. */
   captureSnapshot(): THREE.Texture | null;
   releaseSnapshot(): void;
@@ -857,6 +945,7 @@ export interface HostServices {
   particles: IParticleService;
   volumes: IVolumeService;
   ribbons: IRibbonService;
+  strands: IStrandService;
   trajectories: ITrajectoryService;
   fieldLines: IFieldLineService;
   lensing: ILensingService;
@@ -888,6 +977,8 @@ export interface FrameContext {
   services: HostServices;
   time: FrameTimeInfo;
   quality: QualityTier;
+  /** Current display experience; optional for synthetic module tests. */
+  experienceMode?: ExperienceMode;
   renderScale: number;
   /** One global resolved budget for all expensive presentation services. */
   workBudget: VisualWorkBudget;

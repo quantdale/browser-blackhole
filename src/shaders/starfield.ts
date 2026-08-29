@@ -47,6 +47,42 @@
 
 export type Vec3 = [number, number, number];
 
+/**
+ * Optional second-scale environment population used by the cinematic
+ * presentation.  The original StarfieldParams fields remain the scientific
+ * baseline; this block is additive and deliberately absent from
+ * `makeStarfieldParams()` so scientific parity stays exact.
+ */
+export interface CinematicEnvironmentParams {
+  /** Grid resolution per cube-face side for unresolved stars. */
+  denseCellsPerFaceSide: number;
+  /** Probability that an unresolved cell contains a star. */
+  denseStarDensity: number;
+  denseBrightnessExponent: number;
+  denseMinBrightness: number;
+  denseMaxBrightness: number;
+  denseStarAngularRadius: number;
+  /** Linear HDR diffuse galactic component, before the detail budget. */
+  diffuseRadiance: Vec3;
+  /** Linear HDR dust/nebula tint, before the detail budget. */
+  dustRadiance: Vec3;
+  galacticBandStrength: number;
+  nebulaStrength: number;
+}
+
+export const CINEMATIC_ENVIRONMENT_DEFAULTS: CinematicEnvironmentParams = {
+  denseCellsPerFaceSide: 192,
+  denseStarDensity: 0.16,
+  denseBrightnessExponent: 2.2,
+  denseMinBrightness: 0.012,
+  denseMaxBrightness: 0.85,
+  denseStarAngularRadius: 0.00135,
+  diffuseRadiance: [0.003, 0.0012, 0.006],
+  dustRadiance: [0.026, 0.008, 0.042],
+  galacticBandStrength: 1,
+  nebulaStrength: 0.55
+};
+
 export interface StarfieldParams {
   /** u32 seed; different seeds produce entirely different star layouts. */
   seed: number;
@@ -68,6 +104,8 @@ export interface StarfieldParams {
   starAngularRadius: number;
   /** Unconditional linear HDR base radiance added under the stars. */
   backgroundRadiance: Vec3;
+  /** Optional additive cinematic environment layer. */
+  cinematic?: CinematicEnvironmentParams;
 }
 
 export interface StarfieldDefaults {
@@ -125,6 +163,70 @@ export function makeStarfieldParams(overrides: Partial<StarfieldParams> = {}): S
   const p: StarfieldParams = { ...STARFIELD_DEFAULTS, ...overrides };
   validateStarfieldParams(p);
   return p;
+}
+
+/**
+ * Builds the richer environment used by Cinematic mode.  It keeps the
+ * scientific star population and background exactly intact, then appends a
+ * separately seeded unresolved population and low-amplitude diffuse/dust
+ * terms.  Callers still control its live contribution with the sampler's
+ * detail uniform.
+ */
+export function makeCinematicStarfieldParams(
+  overrides: Partial<StarfieldParams> = {},
+  environmentOverrides: Partial<CinematicEnvironmentParams> = {}
+): StarfieldParams {
+  const p = makeStarfieldParams(overrides);
+  const cinematic: CinematicEnvironmentParams = {
+    ...CINEMATIC_ENVIRONMENT_DEFAULTS,
+    ...environmentOverrides,
+    diffuseRadiance: [
+      environmentOverrides.diffuseRadiance?.[0] ??
+        CINEMATIC_ENVIRONMENT_DEFAULTS.diffuseRadiance[0],
+      environmentOverrides.diffuseRadiance?.[1] ??
+        CINEMATIC_ENVIRONMENT_DEFAULTS.diffuseRadiance[1],
+      environmentOverrides.diffuseRadiance?.[2] ?? CINEMATIC_ENVIRONMENT_DEFAULTS.diffuseRadiance[2]
+    ],
+    dustRadiance: [
+      environmentOverrides.dustRadiance?.[0] ?? CINEMATIC_ENVIRONMENT_DEFAULTS.dustRadiance[0],
+      environmentOverrides.dustRadiance?.[1] ?? CINEMATIC_ENVIRONMENT_DEFAULTS.dustRadiance[1],
+      environmentOverrides.dustRadiance?.[2] ?? CINEMATIC_ENVIRONMENT_DEFAULTS.dustRadiance[2]
+    ]
+  };
+  validateCinematicEnvironmentParams(cinematic);
+  return { ...p, cinematic };
+}
+
+function validateCinematicEnvironmentParams(p: CinematicEnvironmentParams): void {
+  if (!Number.isInteger(p.denseCellsPerFaceSide) || p.denseCellsPerFaceSide < 1) {
+    throw new RangeError(
+      `denseCellsPerFaceSide must be an integer >= 1, got ${p.denseCellsPerFaceSide}`
+    );
+  }
+  if (!(p.denseStarDensity >= 0 && p.denseStarDensity <= 1)) {
+    throw new RangeError(`denseStarDensity must be in [0, 1], got ${p.denseStarDensity}`);
+  }
+  if (!(p.denseBrightnessExponent >= 0)) {
+    throw new RangeError(`denseBrightnessExponent must be >= 0, got ${p.denseBrightnessExponent}`);
+  }
+  if (!(p.denseMinBrightness > 0 && p.denseMaxBrightness >= p.denseMinBrightness)) {
+    throw new RangeError(
+      `dense brightness bounds invalid: min=${p.denseMinBrightness} max=${p.denseMaxBrightness}`
+    );
+  }
+  if (!(p.denseStarAngularRadius > 0)) {
+    throw new RangeError(`denseStarAngularRadius must be > 0, got ${p.denseStarAngularRadius}`);
+  }
+  if (!(p.galacticBandStrength >= 0 && p.nebulaStrength >= 0)) {
+    throw new RangeError('cinematic environment strengths must be non-negative');
+  }
+  for (const color of [p.diffuseRadiance, p.dustRadiance]) {
+    if (color.some((channel) => !Number.isFinite(channel) || channel < 0)) {
+      throw new RangeError(
+        'cinematic environment radiance channels must be finite and non-negative'
+      );
+    }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -345,5 +447,81 @@ export function sampleStarfieldRadiance(direction: Vec3, p: StarfieldParams): Ve
   out[0] += b * falloff;
   out[1] += b * falloff;
   out[2] += b * falloff;
+  return out;
+}
+
+/**
+ * CPU reference for the optional cinematic layer.  This is intentionally a
+ * separate function from `sampleStarfieldRadiance`: the latter is the locked
+ * scientific parity contract, while this function documents the additive
+ * presentation layer used by the GPU sampler.
+ */
+export function sampleCinematicEnvironmentRadiance(direction: Vec3, p: StarfieldParams): Vec3 {
+  const out = sampleStarfieldRadiance(direction, p);
+  const cinematic = p.cinematic;
+  if (cinematic === undefined) return out;
+
+  const denseCell = directionToCubeCell(direction, cinematic.denseCellsPerFaceSide);
+  const band = Math.pow(Math.max(0, 1 - Math.abs(direction[1])), 2.2);
+  const diffuseGain = band * cinematic.galacticBandStrength;
+  out[0] += cinematic.diffuseRadiance[0] * diffuseGain;
+  out[1] += cinematic.diffuseRadiance[1] * diffuseGain;
+  out[2] += cinematic.diffuseRadiance[2] * diffuseGain;
+
+  // One deterministic low-frequency cell controls the dust/nebular modulation
+  // so the CPU reference remains cheap and reproduces the GPU's stable
+  // orientation/seed rule without introducing a wall-clock dependency.
+  const dustCell = directionToCubeCell(direction, 12);
+  const dustUnit =
+    dustCell === null
+      ? 0
+      : u32ToUnit(hashU32(packCellKey(dustCell.face, dustCell.i, dustCell.j) ^ 0x2a6f5d31, p.seed));
+  const dustGain = band * cinematic.nebulaStrength * (0.45 + dustUnit * 0.55);
+  out[0] += cinematic.dustRadiance[0] * dustGain;
+  out[1] += cinematic.dustRadiance[1] * dustGain;
+  out[2] += cinematic.dustRadiance[2] * dustGain;
+
+  if (
+    denseCell === null ||
+    !cellHasStar(denseCell.face, denseCell.i, denseCell.j, {
+      ...p,
+      cellsPerFaceSide: cinematic.denseCellsPerFaceSide,
+      starDensity: cinematic.denseStarDensity,
+      brightnessExponent: cinematic.denseBrightnessExponent,
+      minBrightness: cinematic.denseMinBrightness,
+      maxBrightness: cinematic.denseMaxBrightness,
+      starAngularRadius: cinematic.denseStarAngularRadius
+    })
+  ) {
+    return out;
+  }
+
+  const denseParams: StarfieldParams = {
+    ...p,
+    cellsPerFaceSide: cinematic.denseCellsPerFaceSide,
+    starDensity: cinematic.denseStarDensity,
+    brightnessExponent: cinematic.denseBrightnessExponent,
+    minBrightness: cinematic.denseMinBrightness,
+    maxBrightness: cinematic.denseMaxBrightness,
+    starAngularRadius: cinematic.denseStarAngularRadius
+  };
+  const { fu, fv } = starFaceCoords(denseCell.face, denseCell.i, denseCell.j, denseParams);
+  const starDirection = faceCoordsToDirection(denseCell.face, fu, fv);
+  const cosAngle =
+    direction[0] * starDirection[0] +
+    direction[1] * starDirection[1] +
+    direction[2] * starDirection[2];
+  const falloff = starFalloff(cosAngle, Math.cos(cinematic.denseStarAngularRadius));
+  if (falloff === 0) return out;
+  const brightness = starBrightness(denseCell.face, denseCell.i, denseCell.j, denseParams);
+  const temperature = u32ToUnit(
+    hashU32(packCellKey(denseCell.face, denseCell.i, denseCell.j) ^ 0x50f3a9d1, p.seed)
+  );
+  const warm: Vec3 = [1, 0.48, 0.2];
+  const cool: Vec3 = [0.72, 0.86, 1];
+  const gain = brightness * falloff;
+  out[0] += (warm[0] * (1 - temperature) + cool[0] * temperature) * gain;
+  out[1] += (warm[1] * (1 - temperature) + cool[1] * temperature) * gain;
+  out[2] += (warm[2] * (1 - temperature) + cool[2] * temperature) * gain;
   return out;
 }

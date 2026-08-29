@@ -35,6 +35,7 @@ import type {
   FramePlan,
   FrameTimeInfo,
   HostServices,
+  ExperienceMode,
   IPerformanceGovernor,
   IRendererKernel,
   ISharedPost,
@@ -132,6 +133,8 @@ export interface SharedRendererKernelOptions {
   post: ISharedPost;
   getTimeInfo: () => FrameTimeInfo;
   getQuality: () => QualityTier;
+  /** Current display experience for presentation-layer destination services. */
+  getExperienceMode?: () => ExperienceMode;
   /**
    * Required to drive destinations: `FrameContext.services` cannot be
    * synthesized by the kernel. renderFrame throws a descriptive error when a
@@ -561,6 +564,7 @@ export class SharedRendererKernel implements IRendererKernel {
             } finally {
               renderer.setRenderTarget(null);
             }
+            this.options.post.captureDepthForVolume?.();
             this.options.post.renderSelectiveHighlights?.(plan.scene, camera);
             this.options.post.resolveTemporal?.(camera);
           } finally {
@@ -570,10 +574,12 @@ export class SharedRendererKernel implements IRendererKernel {
         } else {
           this.options.post.clearSelectiveHighlights?.();
           this.options.post.clearTemporalOutput?.();
+          this.options.post.invalidateDepthHistory?.();
         }
       } else {
         this.options.post.clearSelectiveHighlights?.();
         this.options.post.clearTemporalOutput?.();
+        this.options.post.invalidateDepthHistory?.();
       }
 
       // Present even without an active destination so transition overlays
@@ -659,6 +665,7 @@ export class SharedRendererKernel implements IRendererKernel {
       services: getServices(),
       time: this.options.getTimeInfo(),
       quality: this.options.getQuality(),
+      experienceMode: this.options.getExperienceMode?.() ?? 'scientific',
       renderScale: this.options.governor.renderScale,
       workBudget: this.options.governor.getVisualWorkBudget(),
       trajectoryBackend: this.options.getTrajectoryBackend?.() ?? 'auto'

@@ -69,6 +69,8 @@ import {
   floor,
   max,
   min,
+  mix,
+  mx_fractal_noise_float,
   normalize,
   pow,
   select,
@@ -316,15 +318,153 @@ export function createStarfieldSamplerNode(
  *   linear-HDR vec3 radiance node.
  */
 export function createEnvironmentSamplerNode(
-  params: StarfieldParams
+  params: StarfieldParams,
+  cinematicDetail?: unknown
 ): (direction: unknown) => unknown {
   const sampleStars = createStarfieldSamplerNode(params);
+  const cinematic = params.cinematic;
+  const detail =
+    cinematicDetail === undefined
+      ? float(cinematic === undefined ? 0 : 1)
+      : (cinematicDetail as FloatNode);
+  const environmentSeed = uint(params.seed >>> 0);
+  const environmentHash = (x: UintNode): UintNode => {
+    let h: UintNode = x.bitXor(environmentSeed);
+    h = h.mul(uint(0x68bc21eb));
+    h = h.bitXor(h.shiftRight(uint(13)));
+    h = h.mul(uint(0x02e169be));
+    return h.bitXor(h.shiftRight(uint(16)));
+  };
+  const environmentUnit = (h: UintNode): FloatNode => float(h).mul(U32_TO_UNIT);
+  const environmentPackCell = (face: UintNode, i: UintNode, j: UintNode): UintNode =>
+    face.mul(uint(1024)).add(i).mul(uint(1024)).add(j);
+
+  /** Additive V2 environment terms; all values remain linear HDR. */
+  const sampleCinematicLayer = (direction: unknown): FloatNode[] => {
+    if (cinematic === undefined) return [float(0), float(0), float(0)];
+    const dir = direction as Vec3Components;
+    const dx = dir.x;
+    const dy = dir.y;
+    const dz = dir.z;
+    const ax = abs(dx);
+    const ay = abs(dy);
+    const az = abs(dz);
+    const one = float(1);
+    const zero = float(0);
+    const wX = select(ax.greaterThanEqual(ay), one, zero).mul(
+      select(ax.greaterThanEqual(az), one, zero)
+    );
+    const cY = select(ay.greaterThanEqual(az), one, zero);
+    const wY = one.sub(wX).mul(cY);
+    const wZ = one.sub(wX).mul(one.sub(cY));
+    const posX = select(dx.greaterThanEqual(0), one, zero);
+    const posY = select(dy.greaterThanEqual(0), one, zero);
+    const posZ = select(dz.greaterThanEqual(0), one, zero);
+    const f0 = wX.mul(posX);
+    const f1 = wX.mul(one.sub(posX));
+    const f2 = wY.mul(posY);
+    const f3 = wY.mul(one.sub(posY));
+    const f4 = wZ.mul(posZ);
+    const f5 = wZ.mul(one.sub(posZ));
+    const faceF = f1.add(f2.mul(2)).add(f3.mul(3)).add(f4.mul(4)).add(f5.mul(5));
+    const face = uint(faceF);
+    const u = wX.mul(dz.mul(-1)).add(wY.add(wZ).mul(dx));
+    const v = wY.mul(dz).add(wX.add(wZ).mul(dy.mul(-1)));
+    const ma = max(ax, max(ay, az));
+    const fu = u.div(ma);
+    const fv = v.div(ma);
+    const n = cinematic.denseCellsPerFaceSide;
+    const denseI = uint(clamp(floor(fu.mul(0.5).add(0.5).mul(n)), 0, n - 1));
+    const denseJ = uint(clamp(floor(fv.mul(0.5).add(0.5).mul(n)), 0, n - 1));
+    const key = environmentPackCell(face, denseI, denseJ);
+    const present = select(
+      environmentUnit(environmentHash(key)).lessThan(cinematic.denseStarDensity),
+      one,
+      zero
+    );
+    const drawI = environmentUnit(environmentHash(key.bitXor(uint(0xa5a5f00d))));
+    const drawJ = environmentUnit(environmentHash(key.bitXor(uint(0x1b3c6e97))));
+    const starFu = float(denseI).add(0.5).add(drawI.sub(0.5)).div(n).mul(2).sub(1);
+    const starFv = float(denseJ).add(0.5).add(drawJ.sub(0.5)).div(n).mul(2).sub(1);
+    const xC = f0
+      .add(f1.mul(-1))
+      .add(f2.add(f3).add(f4).mul(starFu))
+      .add(f5.mul(starFu.mul(-1)));
+    const yC = f0.add(f1).mul(starFv.mul(-1)).add(f2).add(f3.mul(-1)).add(f4.add(f5).mul(starFv));
+    const zC = f0
+      .mul(starFu.mul(-1))
+      .add(f1.mul(starFu))
+      .add(f2.mul(starFv))
+      .add(f3.mul(starFv.mul(-1)))
+      .add(f4)
+      .add(f5.mul(-1));
+    const starDir = normalize(vec3(xC, yC, zC));
+    const cosAngle = dot(vec3(dx, dy, dz), starDir);
+    const cosRadius = Math.cos(cinematic.denseStarAngularRadius);
+    const falloffT = max(cosAngle.sub(cosRadius), 0).div(float(1).sub(cosRadius));
+    const falloff = falloffT.mul(falloffT).mul(select(cosAngle.greaterThan(cosRadius), one, zero));
+    const uu = min(
+      max(environmentUnit(environmentHash(key.bitXor(uint(0x7f4a7c15)))), 0),
+      1 - 1e-9
+    );
+    const a = 1 - cinematic.denseBrightnessExponent;
+    const denseBrightness =
+      cinematic.denseBrightnessExponent === 1
+        ? float(cinematic.denseMinBrightness).mul(
+            pow(cinematic.denseMaxBrightness / cinematic.denseMinBrightness, uu)
+          )
+        : pow(
+            float(Math.pow(cinematic.denseMinBrightness, a)).add(
+              uu.mul(
+                Math.pow(cinematic.denseMaxBrightness, a) -
+                  Math.pow(cinematic.denseMinBrightness, a)
+              )
+            ),
+            float(1 / a)
+          );
+    const temperature = environmentUnit(environmentHash(key.bitXor(uint(0x50f3a9d1))));
+    const warm = vec3(1, 0.48, 0.2);
+    const cool = vec3(0.72, 0.86, 1);
+    const dense = mix(warm, cool, temperature).mul(
+      denseBrightness
+        .mul(falloff)
+        .mul(present)
+        .mul(select(ma.greaterThan(0), one, zero))
+    );
+
+    const band = one.sub(abs(dy)).clamp(0, 1).pow(2.2);
+    const diffuse = vec3(
+      cinematic.diffuseRadiance[0],
+      cinematic.diffuseRadiance[1],
+      cinematic.diffuseRadiance[2]
+    ).mul(band.mul(cinematic.galacticBandStrength));
+    const dustNoise = mx_fractal_noise_float(
+      vec3(dx.mul(2.8), dy.mul(2.8).add(params.seed * 0.00001), dz.mul(2.8)),
+      3,
+      2.0,
+      0.5
+    )
+      .mul(0.5)
+      .add(0.5);
+    const dust = vec3(
+      cinematic.dustRadiance[0],
+      cinematic.dustRadiance[1],
+      cinematic.dustRadiance[2]
+    ).mul(band.mul(dustNoise.mul(0.55).add(0.45)).mul(cinematic.nebulaStrength));
+    const layer = dense.add(diffuse).add(dust).mul(detail);
+    return [layer.x, layer.y, layer.z];
+  };
 
   return (direction: unknown) => {
     // Composition point: later environment terms append ADDITIVELY here so
     // they share the section 14 guard below. Only stars exist today.
-    const starsOnly = sampleStars(direction);
-    const radiance = starsOnly as Vec3Components;
+    const starsOnly = sampleStars(direction) as Vec3Components;
+    const cinematicLayer = sampleCinematicLayer(direction);
+    const radiance = {
+      x: starsOnly.x.add(cinematicLayer[0]!),
+      y: starsOnly.y.add(cinematicLayer[1]!),
+      z: starsOnly.z.add(cinematicLayer[2]!)
+    };
 
     // Per-channel guard: NaN (c != c holds only for IEEE NaN) -> 0, i.e. an
     // explicit black-sky numerical failure; negatives and -Inf -> 0 via

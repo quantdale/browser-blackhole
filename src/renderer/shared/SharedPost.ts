@@ -89,6 +89,11 @@ export class SharedPost implements ISharedPost {
   /** Separate selective-highlight source; never substitutes for scene radiance. */
   private highlightTarget: THREE.WebGLRenderTarget | null = null;
   private snapshotTarget: THREE.WebGLRenderTarget | null = null;
+  /** Ping-pong depth copy used one frame later by volume upsampling. */
+  private volumeDepthRead: THREE.WebGLRenderTarget | null = null;
+  private volumeDepthWrite: THREE.WebGLRenderTarget | null = null;
+  private volumeDepthValid = false;
+  private volumeDepthSource: THREE.Texture | null = null;
 
   private exposure = 1;
   private bloomEnabled = false;
@@ -113,6 +118,10 @@ export class SharedPost implements ISharedPost {
   private readonly mesh = new THREE.Mesh(this.triangleGeometry);
   private readonly presentMaterial = new MeshBasicNodeMaterial();
   private readonly copyMaterial = new MeshBasicNodeMaterial();
+  private readonly depthCopyScene = new THREE.Scene();
+  private readonly depthCopyCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+  private readonly depthCopyMaterial = new MeshBasicNodeMaterial();
+  private readonly depthCopyMesh = new THREE.Mesh(this.triangleGeometry, this.depthCopyMaterial);
 
   private disposed = false;
 
@@ -131,6 +140,13 @@ export class SharedPost implements ISharedPost {
     this.mesh.frustumCulled = false;
     this.mesh.material = this.presentMaterial;
     this.scene.add(this.mesh);
+
+    this.depthCopyMaterial.depthTest = false;
+    this.depthCopyMaterial.depthWrite = false;
+    this.depthCopyMaterial.blending = THREE.NoBlending;
+    this.depthCopyMaterial.side = THREE.DoubleSide;
+    this.depthCopyMesh.frustumCulled = false;
+    this.depthCopyScene.add(this.depthCopyMesh);
   }
 
   /** Single full-screen triangle covering clip space (mirrors QuadGeometry). */
@@ -182,6 +198,7 @@ export class SharedPost implements ISharedPost {
     }
     this.highlightRendered = false;
     this.temporal.ensureSize(width, height);
+    this.ensureVolumeDepthTargets(width, height);
     this.temporalPresentationActive = false;
     // Force graph rebuild against the new texture on the next present/capture.
     this.graphKey = null;
@@ -194,6 +211,55 @@ export class SharedPost implements ISharedPost {
   /** Current selective-highlight attachment, or null before sizing. */
   getHighlightTarget(): THREE.Texture | null {
     return this.disposed || this.highlightTarget === null ? null : this.highlightTarget.texture;
+  }
+
+  getDepthTexture(): THREE.Texture | null {
+    return this.disposed || this.hdrTarget === null ? null : this.hdrTarget.depthTexture;
+  }
+
+  getVolumeDepthTexture(): THREE.Texture | null {
+    return this.disposed || !this.volumeDepthValid || this.volumeDepthRead === null
+      ? null
+      : this.volumeDepthRead.texture;
+  }
+
+  /**
+   * Stage the current scene depth after the destination draw. Sampling the
+   * main target's depth attachment while that same target is being written is
+   * invalid on WebGPU and undefined on WebGL2; the one-frame ping-pong copy is
+   * explicit, bounded, and safe for the next frame's volume composite.
+   */
+  captureDepthForVolume(): void {
+    if (
+      this.disposed ||
+      this.hdrTarget === null ||
+      this.hdrTarget.depthTexture === null ||
+      this.volumeDepthRead === null ||
+      this.volumeDepthWrite === null
+    ) {
+      return;
+    }
+    if (this.volumeDepthSource?.id !== this.hdrTarget.depthTexture.id) {
+      this.volumeDepthSource = this.hdrTarget.depthTexture;
+      const source = texture(this.volumeDepthSource);
+      this.depthCopyMaterial.colorNode = vec4(source.r, source.r, source.r, 1);
+      this.depthCopyMaterial.needsUpdate = true;
+    }
+    const previousTarget = this.renderer.getRenderTarget();
+    try {
+      this.renderer.setRenderTarget(this.volumeDepthWrite);
+      this.renderer.render(this.depthCopyScene, this.depthCopyCamera);
+    } finally {
+      this.renderer.setRenderTarget(previousTarget as THREE.WebGLRenderTarget | null);
+    }
+    const swap = this.volumeDepthRead;
+    this.volumeDepthRead = this.volumeDepthWrite;
+    this.volumeDepthWrite = swap;
+    this.volumeDepthValid = true;
+  }
+
+  invalidateDepthHistory(): void {
+    this.volumeDepthValid = false;
   }
 
   /** Set the global bloom auxiliary resolution; takes effect immediately. */
@@ -220,6 +286,7 @@ export class SharedPost implements ISharedPost {
     const knownReason: TemporalResetReason = isTemporalResetReason(reason) ? reason : 'explicit';
     this.temporal.reset(knownReason);
     this.temporalPresentationActive = false;
+    this.invalidateDepthHistory();
     this.graphKey = null;
   }
 
@@ -350,7 +417,7 @@ export class SharedPost implements ISharedPost {
     const height = this.hdrTarget.height;
 
     if (this.snapshotTarget === null) {
-      this.snapshotTarget = this.createHdrTarget(width, height, 'SharedPost.Snapshot');
+      this.snapshotTarget = this.createHdrTarget(width, height, 'SharedPost.Snapshot', false);
     } else if (this.snapshotTarget.width !== width || this.snapshotTarget.height !== height) {
       // Same tracked handle; byte estimate drifts slightly until disposal.
       this.snapshotTarget.setSize(width, height);
@@ -530,6 +597,18 @@ export class SharedPost implements ISharedPost {
       this.snapshotTarget = null;
       this.releaseTarget(snapshot);
     }
+    if (this.volumeDepthRead !== null) {
+      const target = this.volumeDepthRead;
+      this.volumeDepthRead = null;
+      this.releaseTarget(target);
+    }
+    if (this.volumeDepthWrite !== null) {
+      const target = this.volumeDepthWrite;
+      this.volumeDepthWrite = null;
+      this.releaseTarget(target);
+    }
+    this.volumeDepthSource = null;
+    this.volumeDepthValid = false;
 
     if (this.bloomNode !== null) {
       this.bloomNode.dispose();
@@ -541,8 +620,10 @@ export class SharedPost implements ISharedPost {
     this.temporal.dispose();
     this.presentMaterial.dispose();
     this.copyMaterial.dispose();
+    this.depthCopyMaterial.dispose();
     this.triangleGeometry.dispose();
     this.scene.remove(this.mesh);
+    this.depthCopyScene.remove(this.depthCopyMesh);
   }
 
   /**
@@ -625,8 +706,14 @@ export class SharedPost implements ISharedPost {
   private createHdrTarget(
     width: number,
     height: number,
-    name = 'SharedPost.HDR'
+    name = 'SharedPost.HDR',
+    withDepth = true
   ): THREE.WebGLRenderTarget {
+    const depthTexture = withDepth ? new THREE.DepthTexture(width, height) : null;
+    if (depthTexture !== null) {
+      depthTexture.name = `${name}.Depth`;
+      depthTexture.colorSpace = THREE.NoColorSpace;
+    }
     // WebGLRenderTarget extends RenderTarget and is accepted by both
     // WebGPURenderer and WebGLRenderer. RGBA16F is natively renderable on
     // WebGPU and on WebGL2 with float-buffer extensions (required by the
@@ -634,16 +721,58 @@ export class SharedPost implements ISharedPost {
     const target = new THREE.WebGLRenderTarget(width, height, {
       type: THREE.HalfFloatType,
       format: THREE.RGBAFormat,
-      depthBuffer: true,
+      depthBuffer: withDepth,
       stencilBuffer: false,
       generateMipmaps: false,
       minFilter: THREE.LinearFilter,
       magFilter: THREE.LinearFilter,
-      colorSpace: THREE.NoColorSpace
+      colorSpace: THREE.NoColorSpace,
+      depthTexture
     });
     target.texture.name = name;
     // ~12 bytes/px: 4 channels x half float + 4-byte depth estimate.
     this.scope.track('renderTarget', target, () => target.dispose(), width * height * 12);
+    return target;
+  }
+
+  private ensureVolumeDepthTargets(width: number, height: number): void {
+    if (
+      this.volumeDepthRead !== null &&
+      this.volumeDepthWrite !== null &&
+      this.volumeDepthRead.width === width &&
+      this.volumeDepthRead.height === height &&
+      this.volumeDepthWrite.width === width &&
+      this.volumeDepthWrite.height === height
+    ) {
+      return;
+    }
+    const previousRead = this.volumeDepthRead;
+    const previousWrite = this.volumeDepthWrite;
+    this.volumeDepthRead = this.createVolumeDepthTarget(width, height, 'SharedPost.Depth.Read');
+    this.volumeDepthWrite = this.createVolumeDepthTarget(width, height, 'SharedPost.Depth.Write');
+    if (previousRead !== null) this.releaseTarget(previousRead);
+    if (previousWrite !== null) this.releaseTarget(previousWrite);
+    this.volumeDepthSource = null;
+    this.volumeDepthValid = false;
+  }
+
+  private createVolumeDepthTarget(
+    width: number,
+    height: number,
+    name: string
+  ): THREE.WebGLRenderTarget {
+    const target = new THREE.WebGLRenderTarget(width, height, {
+      type: THREE.HalfFloatType,
+      format: THREE.RGBAFormat,
+      depthBuffer: false,
+      stencilBuffer: false,
+      generateMipmaps: false,
+      minFilter: THREE.NearestFilter,
+      magFilter: THREE.NearestFilter,
+      colorSpace: THREE.NoColorSpace
+    });
+    target.texture.name = name;
+    this.scope.track('renderTarget', target, () => target.dispose(), width * height * 8);
     return target;
   }
 
@@ -701,6 +830,15 @@ export class SharedPost implements ISharedPost {
       bloomSource: this.highlightRendered ? 'selective-emissive' : 'legacy-scene-threshold',
       bloomResolutionScale: this.bloomResolutionScale,
       cinematicStyleEnabled: this.cinematicStyleEnabled,
+      volumeDepthHistory:
+        this.volumeDepthRead === null || this.volumeDepthWrite === null
+          ? null
+          : {
+              valid: this.volumeDepthValid,
+              size: [this.volumeDepthRead.width, this.volumeDepthRead.height],
+              type: this.volumeDepthRead.texture.type,
+              allocatedTargetCount: 2
+            },
       temporal: this.temporal.getDebugSnapshot()
     };
   }

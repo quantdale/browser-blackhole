@@ -36,6 +36,7 @@ import { LensingService } from '../renderer/shared/LensingService.js';
 import { ParticleService } from '../renderer/shared/ParticleService.js';
 import { RibbonService } from '../renderer/shared/RibbonService.js';
 import { SharedPost } from '../renderer/shared/SharedPost.js';
+import { StrandService } from '../renderer/shared/StrandService.js';
 import {
   SharedRendererKernel,
   type SharedRendererKernelOptions
@@ -253,6 +254,22 @@ class DeferredSharedPost implements ISharedPost {
     return this.inner?.getDebugSnapshot() ?? { stages: [], status: 'not-ready' };
   }
 
+  getDepthTexture(): Texture | null {
+    return this.inner?.getDepthTexture() ?? null;
+  }
+
+  getVolumeDepthTexture(): Texture | null {
+    return this.inner?.getVolumeDepthTexture() ?? null;
+  }
+
+  captureDepthForVolume(): void {
+    this.inner?.captureDepthForVolume();
+  }
+
+  invalidateDepthHistory(): void {
+    this.inner?.invalidateDepthHistory();
+  }
+
   dispose(): void {
     this.inner?.dispose();
     this.inner = null;
@@ -309,6 +326,7 @@ export class CosmicAtlasHost {
   private particlesService: IParticleService;
   private readonly volumesService = new VolumeService();
   private readonly ribbonService = new RibbonService();
+  private readonly strandService = new StrandService();
   private readonly trajectoryService = new TrajectoryService();
   private readonly fieldLineService = new FieldLineService();
   private readonly lensingService = new LensingService();
@@ -420,6 +438,7 @@ export class CosmicAtlasHost {
       post: this.post,
       getTimeInfo: () => this.getTimeInfo(),
       getQuality: () => this.governor.currentTier,
+      getExperienceMode: () => this.experienceModeValue,
       getServices: () => this.services,
       getCamera: () => this.camera,
       getTrajectoryBackend: () => this.trajectoryBackendValue,
@@ -660,6 +679,10 @@ export class CosmicAtlasHost {
     this.director.update(dt);
     const workBudget = this.governor.getVisualWorkBudget();
     this.volumesService.setInternalScale(workBudget.volumeInternalScale);
+    this.volumesService.setSceneDepthTexture(this.post.getVolumeDepthTexture?.() ?? null);
+    this.lensingService.setEnvironmentDetail(
+      this.experienceModeValue === 'cinematic' ? workBudget.environmentDetail : 0
+    );
     this.post.setBloomResolutionScale?.(workBudget.bloomResolutionScale);
     this.post.setTemporalPolicy?.(
       {
@@ -681,6 +704,15 @@ export class CosmicAtlasHost {
       if ((reasons & INVALIDATION_REASON[name]) !== 0) this.reasonCountsValue[name] += 1;
     }
     if (!shouldRender) return;
+
+    this.volumesService.setStepScale(workBudget.volumeActiveSteps);
+    this.volumesService.setDetailOctaves(workBudget.volumeDetailOctaves);
+    this.volumesService.setLightingTaps(workBudget.volumeLightingTaps);
+    this.volumesService.setTemporalJitter(workBudget.temporalEnabled);
+    this.volumesService.setTemporalFrame(this.framesObservedValue);
+    this.particlesService.setPopulationScale(workBudget.particlePopulationScale);
+    this.particlesService.setProfileQuality(workBudget.particleProfileQuality);
+    this.strandService.setQuality(workBudget.strandQuality);
 
     const overlay = this.director.getOverlay();
     const transition = this.director.getPublicState();
@@ -1166,6 +1198,7 @@ export class CosmicAtlasHost {
       this.particlesService,
       this.volumesService,
       this.ribbonService,
+      this.strandService,
       this.trajectoryService,
       this.fieldLineService,
       this.lensingService
@@ -1368,6 +1401,7 @@ export class CosmicAtlasHost {
       particles: this.particlesService,
       volumes: this.volumesService,
       ribbons: this.ribbonService,
+      strands: this.strandService,
       trajectories: this.trajectoryService,
       fieldLines: this.fieldLineService,
       lensing: this.lensingService,

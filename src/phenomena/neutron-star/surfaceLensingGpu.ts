@@ -80,7 +80,7 @@ import {
 } from 'three/tsl';
 import type { QualityTier } from '../../atlas/types.js';
 import { createEnvironmentSamplerNode } from '../../shaders/starfieldGpu.js';
-import { makeStarfieldParams } from '../../shaders/starfield.js';
+import { makeCinematicStarfieldParams } from '../../shaders/starfield.js';
 
 // ---------------------------------------------------------------------------
 // Local node aliases (boundary casts; mirrors schwarzschildIntegrator style)
@@ -225,6 +225,8 @@ export interface NeutronStarSurfaceMaterial {
   /** Local fullscreen-triangle geometry (consumers build their own mesh). */
   geometry: BufferGeometry;
   uniforms: NeutronStarSurfaceUniforms;
+  /** Additive V2 environment contribution; never changes surface ray state. */
+  setEnvironmentDetail(detail: number): void;
   /** Applies whitelisted state keys; unknown/wrong-typed keys ignored. */
   setUniformsFromState(state: Record<string, unknown>): void;
   dispose(): void;
@@ -297,6 +299,7 @@ export function createNeutronStarSurfaceMaterial(params: {
   const uMaxStep = uniform(100);
   const uEscapeRadiusRg = uniform(128);
   const uBackgroundIntensity = uniform(1);
+  const uEnvironmentDetail = uniform(0);
   const uDebugMode = uniform(0);
 
   // Emission block (mirrors the retired mesh graph's uniform semantics).
@@ -346,9 +349,10 @@ export function createNeutronStarSurfaceMaterial(params: {
 
   // Pinned collaborator: procedural celestial environment (escaped rays).
   // Same collaborator instance pattern as the black-hole pass.
-  const sampleEnvironment = createEnvironmentSamplerNode(makeStarfieldParams()) as (
-    dir: Vec3Node
-  ) => Vec3Node;
+  const sampleEnvironment = createEnvironmentSamplerNode(
+    makeCinematicStarfieldParams(),
+    uEnvironmentDetail
+  ) as (dir: Vec3Node) => Vec3Node;
 
   // --- Fullscreen-triangle vertex stage (pattern of src/shaders/diagnostic.ts).
   const positionAttr = attribute<'vec3'>('position', 'vec3');
@@ -666,6 +670,10 @@ export function createNeutronStarSurfaceMaterial(params: {
       if (escape !== null && escape > 0) uEscapeRadiusRg.value = escape;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const environmentDetail = readFiniteNumber(state['environmentDetail']);
+      if (environmentDetail !== null && environmentDetail >= 0) {
+        uEnvironmentDetail.value = Math.min(1, environmentDetail);
+      }
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 
@@ -680,6 +688,9 @@ export function createNeutronStarSurfaceMaterial(params: {
 
       applySpotState(uniforms.slotA, state['slotA'] as Record<string, unknown> | undefined);
       applySpotState(uniforms.slotB, state['slotB'] as Record<string, unknown> | undefined);
+    },
+    setEnvironmentDetail(detail: number): void {
+      uEnvironmentDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
     },
     dispose(): void {
       if (disposed) return;

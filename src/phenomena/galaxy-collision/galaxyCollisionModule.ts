@@ -383,6 +383,9 @@ class GalaxyCollisionModule implements PhenomenonModule {
   update(ctx: FrameContext): void {
     if (this.disposed || this.dataset === null) return;
     this.applyPhase(ctx.time.phase);
+    this.backdrop?.setDetail(
+      ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0
+    );
   }
 
   private applyPhase(phase: number): void {

@@ -94,7 +94,7 @@ import {
   RAY_NON_FINITE
 } from '../../../physics/schwarzschild.js';
 import { createEnvironmentSamplerNode } from '../../../shaders/starfieldGpu.js';
-import { makeStarfieldParams } from '../../../shaders/starfield.js';
+import { makeCinematicStarfieldParams } from '../../../shaders/starfield.js';
 import {
   makeDiskEmissionNode,
   validateDiskModelParams,
@@ -218,6 +218,8 @@ export interface KerrIntegratorUniforms {
 export interface KerrLensingMaterial {
   material: NodeMaterial;
   uniforms: KerrIntegratorUniforms;
+  /** Additive V2 environment contribution; never changes Kerr integration. */
+  setEnvironmentDetail(detail: number): void;
   /** Applies whitelisted state keys; unknown keys ignored silently. */
   setUniformsFromState(state: Record<string, unknown>): void;
   dispose(): void;
@@ -302,6 +304,7 @@ export function createKerrLensingMaterial(
   const uEscapeRadiusRg = uniform(1000);
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
+  const uEnvironmentDetail = uniform(0);
   const uDebugMode = uniform(0);
   // --- M10 observer-frame block (OBSERVER_FRAME_ADR §5) ---
   const uObserverF = uniform(0);
@@ -346,7 +349,10 @@ export function createKerrLensingMaterial(
   const uCenter = uniform(uniforms.centerRg.value);
 
   // Pinned collaborators (contracts owned by concurrent modules).
-  const sampleEnvironment = createEnvironmentSamplerNode(makeStarfieldParams());
+  const sampleEnvironment = createEnvironmentSamplerNode(
+    makeCinematicStarfieldParams(),
+    uEnvironmentDetail
+  );
   const diskModel: DiskModelParams = {
     innerRadiusRg: Math.max(innerForGraph, 2.25),
     outerRadiusRg: outerForValidate,
@@ -1092,6 +1098,10 @@ export function createKerrLensingMaterial(
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const environmentDetail = readFiniteNumber(state['environmentDetail']);
+      if (environmentDetail !== null && environmentDetail >= 0) {
+        uEnvironmentDetail.value = Math.min(1, environmentDetail);
+      }
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 
@@ -1106,6 +1116,9 @@ export function createKerrLensingMaterial(
       if (obsA3v) observerLegA3.value.set(obsA3v[0], obsA3v[1], obsA3v[2], obsA3v[3]);
       const obsFlagV = readFiniteNumber(state['observerActive']);
       if (obsFlagV !== null) uObserverF.value = obsFlagV;
+    },
+    setEnvironmentDetail(detail: number): void {
+      uEnvironmentDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
     },
     dispose(): void {
       if (disposed) return;

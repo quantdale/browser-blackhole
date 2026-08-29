@@ -278,6 +278,10 @@ export interface CinematicBackdropOptions {
   segments?: { width: number; height: number };
   octaves?: number;
   starCells?: { x: number; y: number };
+  denseStarCells?: { x: number; y: number };
+  denseStarDensity?: number;
+  galacticBandStrength?: number;
+  nebulaStrength?: number;
 }
 
 export interface CinematicBackdropHandle {
@@ -286,6 +290,8 @@ export interface CinematicBackdropHandle {
   readonly material: MeshBasicNodeMaterial;
   setTime(time: number): void;
   setIntensity(value: number): void;
+  /** Apply the global environment-detail budget without rebuilding the graph. */
+  setDetail(value: number): void;
   syncToCamera(camera: THREE.PerspectiveCamera): void;
   dispose(): void;
 }
@@ -309,10 +315,15 @@ export function createCinematicBackdrop(
 
   const modelTime = uniform(0);
   const intensity = uniform(cinematicIntensity(options.intensity ?? 1));
+  const detail = uniform(1);
   const seed = uniform(cinematicSeed(options.seed));
   const dust = options.dustColor ?? [0.045, 0.018, 0.09];
   const stars = options.starColor ?? [0.72, 0.86, 1];
   const starCells = options.starCells ?? { x: 180, y: 90 };
+  const denseStarCells = options.denseStarCells ?? { x: starCells.x * 4, y: starCells.y * 4 };
+  const denseStarDensity = Math.max(0, Math.min(1, options.denseStarDensity ?? 0.2));
+  const galacticBandStrength = Math.max(0, Math.min(2, options.galacticBandStrength ?? 1));
+  const nebulaStrength = Math.max(0, Math.min(2, options.nebulaStrength ?? 0.55));
 
   const direction = normalize(positionLocal);
   const longitude = atan(direction.z, direction.x).div(TAU).add(0.5);
@@ -326,6 +337,25 @@ export function createCinematicBackdrop(
   const starGate = step(0.975, hash(cellId.add(101.9)));
   const starShape = oneMinus(smoothstep(0, starRadius, length(local))).pow(2.4);
   const starBrightness = hash(cellId.add(151.2)).pow(5).mul(3.2).add(0.12);
+  const starTemperature = hash(cellId.add(211.8));
+  const warmStar = vec3(1.0, 0.52, 0.24);
+  const coolStar = vec3(stars[0], stars[1], stars[2]);
+  const starTint = mix(warmStar, coolStar, starTemperature);
+
+  // A second, denser unresolved population supplies low-amplitude angular
+  // structure between the sparse bright stars. Both populations are pure
+  // functions of the canonical local direction and seed.
+  const denseCells = vec2(longitude.mul(denseStarCells.x), latitude.mul(denseStarCells.y));
+  const denseCell = floor(denseCells);
+  const denseCellId = denseCell.x.add(denseCell.y.mul(denseStarCells.x)).add(seed.mul(1.37));
+  const denseJitter = vec2(hash(denseCellId.add(271.4)), hash(denseCellId.add(319.7))).sub(0.5);
+  const denseLocal = fract(denseCells).sub(0.5).sub(denseJitter.mul(0.76));
+  const denseRadius = hash(denseCellId.add(383.6)).mul(0.018).add(0.004);
+  const denseShape = oneMinus(smoothstep(0, denseRadius, length(denseLocal))).pow(1.6);
+  const denseGate = step(1 - denseStarDensity, hash(denseCellId.add(431.2)));
+  const denseBrightness = hash(denseCellId.add(479.8)).pow(3.5).mul(0.42).add(0.018);
+  const denseTemperature = hash(denseCellId.add(521.1));
+  const denseTint = mix(vec3(1.0, 0.48, 0.2), coolStar, denseTemperature);
 
   const octaves = Math.max(1, Math.min(6, Math.floor(options.octaves ?? 3)));
   const dustNoise = mx_fractal_noise_float(
@@ -340,19 +370,42 @@ export function createCinematicBackdrop(
   )
     .mul(0.5)
     .add(0.5);
-  const dustBand = smoothstep(0.34, 0.84, dustNoise)
-    .mul(smoothstep(0.04, 0.34, direction.y.abs().oneMinus()))
-    .mul(0.75);
-  const starTerm = vec3(stars[0], stars[1], stars[2]).mul(
-    starShape.mul(starGate).mul(starBrightness)
+  const fineDustNoise = mx_fractal_noise_float(
+    vec3(
+      direction.x.mul(7.4).add(seed.mul(0.009)),
+      direction.y.mul(7.4).sub(modelTime.mul(0.005)),
+      direction.z.mul(7.4).add(seed.mul(0.014))
+    ),
+    Math.max(1, Math.min(5, octaves + 1)),
+    2.0,
+    0.5
+  )
+    .mul(0.5)
+    .add(0.5);
+  const galacticBand = direction.y.abs().oneMinus().clamp(0, 1).pow(2.2);
+  const dustBand = smoothstep(0.3, 0.82, dustNoise)
+    .mul(fineDustNoise.mul(0.5).add(0.5))
+    .mul(galacticBand)
+    .mul(0.82);
+  const starTerm = starTint.mul(starShape.mul(starGate).mul(starBrightness));
+  const denseTerm = denseTint.mul(denseShape.mul(denseGate).mul(denseBrightness));
+  const dustTerm = vec3(dust[0], dust[1], dust[2]).mul(dustBand.mul(nebulaStrength));
+  const bandTerm = vec3(0.022, 0.009, 0.035).mul(
+    galacticBand.mul(dustNoise.mul(0.55).add(0.45)).mul(galacticBandStrength)
   );
-  const dustTerm = vec3(dust[0], dust[1], dust[2]).mul(dustBand);
   const deepGradient = vec3(
     direction.y.abs().oneMinus().mul(0.008),
     direction.y.abs().oneMinus().mul(0.005),
     direction.y.abs().oneMinus().mul(0.02)
   );
-  material.colorNode = vec4(deepGradient.add(dustTerm).add(starTerm).mul(intensity), 1);
+  material.colorNode = vec4(
+    deepGradient
+      .add(bandTerm.mul(detail))
+      .add(dustTerm.mul(detail))
+      .add(starTerm)
+      .add(denseTerm.mul(detail)),
+    1
+  ).mul(intensity);
 
   const mesh = new THREE.Mesh(geometry, material);
   mesh.name = 'cinematic-deep-space-backdrop';
@@ -368,6 +421,9 @@ export function createCinematicBackdrop(
     },
     setIntensity(value) {
       intensity.value = cinematicIntensity(value, 1);
+    },
+    setDetail(value) {
+      detail.value = Number.isFinite(value) ? THREE.MathUtils.clamp(value, 0, 1) : 1;
     },
     syncToCamera(camera) {
       const distance = camera.position.length();

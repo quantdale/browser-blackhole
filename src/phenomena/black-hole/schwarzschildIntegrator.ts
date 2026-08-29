@@ -105,7 +105,7 @@ import {
   RAY_NON_FINITE
 } from '../../physics/schwarzschild.js';
 import { createEnvironmentSamplerNode } from '../../shaders/starfieldGpu.js';
-import { makeStarfieldParams } from '../../shaders/starfield.js';
+import { makeCinematicStarfieldParams } from '../../shaders/starfield.js';
 import {
   makeDiskEmissionNode,
   validateDiskModelParams,
@@ -270,6 +270,8 @@ export interface SchwarzschildLensingMaterial {
   material: NodeMaterial;
   /** Live uniform block; see {@link SchwarzschildIntegratorUniforms}. */
   uniforms: SchwarzschildIntegratorUniforms;
+  /** Additive V2 environment contribution; never changes geodesic state. */
+  setEnvironmentDetail(detail: number): void;
   /** Applies whitelisted state keys; unknown keys ignored silently. */
   setUniformsFromState(state: Record<string, unknown>): void;
   /** Disposes the locally-owned geometry and material. */
@@ -363,6 +365,7 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   // capture path and this epsilon stays as the outer band.
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
+  const uEnvironmentDetail = uniform(0);
   const uDebugMode = uniform(0);
 
   // --- M10 observer-frame block (OBSERVER_FRAME_ADR §5) ---
@@ -420,7 +423,10 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
   const uWu = uniform(uniforms.observerLegWu.value);
 
   // Pinned collaborators (contracts owned by concurrent modules).
-  const sampleEnvironment = createEnvironmentSamplerNode(makeStarfieldParams());
+  const sampleEnvironment = createEnvironmentSamplerNode(
+    makeCinematicStarfieldParams(),
+    uEnvironmentDetail
+  );
   const diskModel: DiskModelParams = {
     innerRadiusRg: params.diskInnerRg,
     outerRadiusRg: params.diskOuterRg,
@@ -938,6 +944,10 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const environmentDetail = readFiniteNumber(state['environmentDetail']);
+      if (environmentDetail !== null && environmentDetail >= 0) {
+        uEnvironmentDetail.value = Math.min(1, environmentDetail);
+      }
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 
@@ -962,6 +972,9 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       if (obsActive !== null) uObserverActive.value = obsActive;
       const comoving = readFiniteNumber(state['observerFrequencyComoving']);
       if (comoving !== null) uObserverFrequencyComoving.value = comoving;
+    },
+    setEnvironmentDetail(detail: number): void {
+      uEnvironmentDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
     },
     dispose(): void {
       if (disposed) return;

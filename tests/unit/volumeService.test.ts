@@ -298,4 +298,44 @@ describe('VolumeService lifecycle and disposal ownership', () => {
     expect(volume.getDebugSnapshot?.()).toMatchObject({ activeSteps: 40 });
     service.dispose();
   });
+
+  it('exposes bounded V2 detail, lighting, jitter, and depth-composite state', () => {
+    const service = new VolumeService();
+    const volume = service.createVolume(
+      makeConfig({
+        halfResolution: true,
+        detail: {
+          seed: 17,
+          octaves: 5,
+          strength: 0.4,
+          filamentStrength: 0.7,
+          clumpStrength: 0.5,
+          domainWarpStrength: 0.25
+        },
+        depthAwareUpsample: true,
+        approximateSelfShadow: true,
+        gradientShading: true
+      })
+    );
+    volume.setDetailOctaves?.(99);
+    volume.setLightingTaps?.(99);
+    volume.setTemporalJitter?.(true);
+    volume.setTemporalFrame?.(12);
+    expect(volume.getDebugSnapshot?.()).toMatchObject({
+      detailOctaves: 5,
+      lightingTaps: 2,
+      temporalJitter: true,
+      depthAwareUpsample: true,
+      hdrIntermediate: true
+    });
+    service.setDetailOctaves(2);
+    service.setLightingTaps(0);
+    service.setTemporalJitter(false);
+    expect(volume.getDebugSnapshot?.()).toMatchObject({
+      detailOctaves: 2,
+      lightingTaps: 0,
+      temporalJitter: false
+    });
+    service.dispose();
+  });
 });

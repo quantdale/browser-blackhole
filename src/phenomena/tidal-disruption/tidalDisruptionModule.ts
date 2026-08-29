@@ -77,7 +77,8 @@ import type {
   RenderContext,
   VolumeHandle,
   ParticleSystemHandle,
-  RibbonHandle
+  RibbonHandle,
+  StrandHandle
 } from '../../atlas/types.js';
 import {
   METRES_PER_SCENE_UNIT,
@@ -251,6 +252,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   let particleHandle: ParticleSystemHandle | null = null;
   let boundRibbon: RibbonHandle | null = null;
   let unboundRibbon: RibbonHandle | null = null;
+  let boundStrand: StrandHandle | null = null;
+  let unboundStrand: StrandHandle | null = null;
 
   function assertReady(): {
     resolved: ResolvedTdeEncounter;
@@ -461,9 +464,21 @@ export function createTidalDisruptionModule(): PhenomenonModule {
         return color.mul(uShockGain.mul(1.1));
       },
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
+      detail: {
+        seed: res.seed ^ 0x77a,
+        octaves: 5,
+        strength: 0.16,
+        filamentStrength: 0.28,
+        clumpStrength: 0.7,
+        domainWarpStrength: 0.12,
+        frequency: 1.7
+      },
+      depthAwareUpsample: true,
+      approximateSelfShadow: true,
+      gradientShading: true,
       halfResolution: true,
       earlyAlphaTermination: true,
-      temporalJitter: false
+      temporalJitter: true
     });
     volume.setStepScale(TIER_STEP_SCALE[ctx.quality]);
     volume.setVisible(false); // phase-gated: off until the shock stage
@@ -502,7 +517,9 @@ export function createTidalDisruptionModule(): PhenomenonModule {
         ],
         blending: 'additive',
         seed: res.seed,
-        preferCompute: true
+        preferCompute: true,
+        profile: 'debris-streak',
+        emissiveIntensity: 1.15
       });
       system.setPopulationScale(0); // phase-gated
       system.object3d().name = 'tde-debris-particles';
@@ -541,11 +558,62 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       additive: true,
       taper: 'exponential'
     });
+    boundStrand = ctx.services.strands.createStrand({
+      segments: samples,
+      radialSegments: 12,
+      widthStart: Math.max(visualStarRadius(res) * 1.15, 3.2),
+      widthEnd: Math.max(visualStarRadius(res) * 0.28, 0.9),
+      aspectStart: 0.72,
+      aspectEnd: 0.42,
+      opacityStart: 0.78,
+      opacityEnd: 0.08,
+      colorStart: [1.0, 0.82, 0.58],
+      colorEnd: [0.78, 0.3, 0.18],
+      temperatureVariation: 0.36,
+      clumpStrength: 0.42,
+      clumpSeed: res.seed ^ 0x891,
+      additive: true
+    });
+    unboundStrand = ctx.services.strands.createStrand({
+      segments: samples,
+      radialSegments: 10,
+      widthStart: Math.max(visualStarRadius(res) * 0.9, 2.6),
+      widthEnd: Math.max(visualStarRadius(res) * 0.18, 0.65),
+      aspectStart: 0.58,
+      aspectEnd: 0.3,
+      opacityStart: 0.62,
+      opacityEnd: 0.04,
+      colorStart: [0.76, 0.86, 1.0],
+      colorEnd: [0.25, 0.38, 0.75],
+      temperatureVariation: 0.28,
+      clumpStrength: 0.3,
+      clumpSeed: res.seed ^ 0x892,
+      additive: true
+    });
     boundRibbon.setVisible(false);
     unboundRibbon.setVisible(false);
-    destinationScene.add(boundRibbon.object3d(), unboundRibbon.object3d());
+    boundStrand.setVisible(false);
+    unboundStrand.setVisible(false);
+    destinationScene.add(
+      boundRibbon.object3d(),
+      unboundRibbon.object3d(),
+      boundStrand.object3d(),
+      unboundStrand.object3d()
+    );
     ctx.scope.track('geometry', boundRibbon.object3d(), () => boundRibbon?.dispose(), 16384);
     ctx.scope.track('geometry', unboundRibbon.object3d(), () => unboundRibbon?.dispose(), 16384);
+    ctx.scope.track(
+      'geometry',
+      boundStrand.object3d(),
+      () => boundStrand?.dispose(),
+      samples * 13 * 64
+    );
+    ctx.scope.track(
+      'geometry',
+      unboundStrand.object3d(),
+      () => unboundStrand?.dispose(),
+      samples * 11 * 64
+    );
     abortGuard('streams');
 
     // --- nascent-disk annulus (procedural presentation, disclosed) ----------
@@ -699,6 +767,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
   let lastStreamTime = Number.NaN;
   let lastStreamViewDistance = Number.NaN;
   let lastStreamTier: QualityTier | null = null;
+  let lastStrandQuality = 0;
   /** Auto-framing (see AUTO_FRAME_* constants and AutoFramer). */
   const autoFramer = new AutoFramer({
     margin: AUTO_FRAME_MARGIN,
@@ -757,7 +826,10 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       spineWriteIndex += 1;
     }
     spinePoints.length = spineWriteIndex;
-    if (spinePoints.length >= 2) boundRibbon.setSpine(spinePoints);
+    if (spinePoints.length >= 2) {
+      boundRibbon.setSpine(spinePoints);
+      boundStrand?.setSpine(spinePoints);
+    }
     spineCount = spinePoints.length;
 
     const nUnbound = buildStreamSpine(
@@ -779,7 +851,10 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       spineWriteIndex += 1;
     }
     spinePoints.length = spineWriteIndex;
-    if (spinePoints.length >= 2) unboundRibbon.setSpine(spinePoints);
+    if (spinePoints.length >= 2) {
+      unboundRibbon.setSpine(spinePoints);
+      unboundStrand?.setSpine(spinePoints);
+    }
     unboundCount = spinePoints.length;
     streamExtentUnits = extent;
     streamRawExtentUnits = rawExtent;
@@ -792,6 +867,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     const snapshot = ctx.services.time.snapshot();
     const t = Number.isFinite(snapshot.physicalTime ?? NaN) ? (snapshot.physicalTime as number) : 0;
     const res = ready.resolved;
+    lastStrandQuality = ctx.workBudget.strandQuality;
     const phase = tdePhaseAt(t, res);
     const disrupts = res.disrupts;
     const tau = Math.max(0, t);
@@ -848,14 +924,17 @@ export function createTidalDisruptionModule(): PhenomenonModule {
       streamRawExtentUnits = 0;
       streamMinRadiusUnits = 0;
     }
-    boundRibbon?.setVisible(streamVisible && spineCount + unboundCount >= 2);
-    unboundRibbon?.setVisible(streamVisible && unboundCount >= 2);
+    const strandActive = streamVisible && lastStrandQuality >= 0.5;
+    boundRibbon?.setVisible(!strandActive && streamVisible && spineCount + unboundCount >= 2);
+    unboundRibbon?.setVisible(!strandActive && streamVisible && unboundCount >= 2);
+    boundStrand?.setVisible(strandActive && spineCount + unboundCount >= 2);
+    unboundStrand?.setVisible(strandActive && unboundCount >= 2);
 
     // --- particles (phase x disruption x angular gate) -------------------------
     const gate = accentGate(orbit.distance);
     const popFraction = populationFractionFor(phase);
     if (particleHandle !== null) {
-      const pop = popFraction * gate * (disrupts ? 1 : 0);
+      const pop = popFraction * gate * (disrupts ? 1 : 0) * ctx.workBudget.particlePopulationScale;
       particleHandle.setPopulationScale(pop);
       if (pop > 0 && !snapshot.paused) {
         particleHandle.update(ctx.time.dt);
@@ -899,7 +978,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     const volumeVisible = disrupts && phase === 'shock';
     const shockGain = shockGainAt(res, tau, disrupts);
     volumeHandle?.setVisible(volumeVisible);
-    volumeHandle?.setStepScale(TIER_STEP_SCALE[lastTier]);
+    volumeHandle?.setStepScale(ctx.workBudget.volumeActiveSteps);
     uShockGain.value = volumeVisible ? shockGain : 0;
     uShockRadius.value = shockRadiusUnits(res);
 
@@ -912,6 +991,7 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     }
 
     backdrop?.setTime(t * 0.00002);
+    backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
 
     // --- auto-framing (disclosed presentation behaviour) -----------------------
     const starOnly =
@@ -962,6 +1042,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
         ? null
         : Number(autoFramer.requestedDistance.toFixed(2));
     debug['ribbonWidthScale'] = Number(widthScale.toFixed(3));
+    debug['strandRepresentation'] = strandActive ? 'tube' : 'ribbon-fallback';
+    debug['strandQuality'] = lastStrandQuality;
     debug['bhMarkerScale'] = bhMarker !== null ? Number(bhMarker.scale.x.toFixed(3)) : null;
     debug['photonSphereUnits'] = res.photonSphereUnits;
     debug['orbitPhaseRad'] = Number(uOrbitPhase.value.toFixed(4));
@@ -1003,6 +1085,8 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     particleHandle = null;
     boundRibbon = null;
     unboundRibbon = null;
+    boundStrand = null;
+    unboundStrand = null;
     boundScratch = null;
     unboundScratch = null;
     lastStreamTime = Number.NaN;

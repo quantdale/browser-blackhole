@@ -4,7 +4,9 @@ import {
   directionToCubeCell,
   faceCoordsToDirection,
   hashU32,
+  makeCinematicStarfieldParams,
   makeStarfieldParams,
+  sampleCinematicEnvironmentRadiance,
   sampleBrightness,
   sampleStarfieldRadiance,
   starBrightness,
@@ -342,5 +344,27 @@ describe('direction independence sanity', () => {
       radNeg[0] > bg[0] + 1e-9 || radNeg[1] > bg[1] + 1e-9 || radNeg[2] > bg[2] + 1e-9;
     const identical = radNeg[0] === radPos[0] && radNeg[1] === radPos[1] && radNeg[2] === radPos[2];
     expect(identical && negBright).toBe(false);
+  });
+});
+
+describe('cinematic environment layer', () => {
+  it('leaves the scientific sampler contract untouched', () => {
+    const scientific = makeStarfieldParams();
+    const cinematic = makeCinematicStarfieldParams();
+    const direction = normalize([0.37, -0.41, 0.83]);
+    expect(sampleStarfieldRadiance(direction, cinematic)).toEqual(
+      sampleStarfieldRadiance(direction, scientific)
+    );
+  });
+
+  it('adds deterministic diffuse/dense radiance without changing direction order', () => {
+    const p = makeCinematicStarfieldParams({ seed: 90210 });
+    const direction = normalize([-0.22, 0.71, 0.66]);
+    const first = sampleCinematicEnvironmentRadiance(direction, p);
+    const second = sampleCinematicEnvironmentRadiance(direction, p);
+    expect(second).toEqual(first);
+    expect(first[0]).toBeGreaterThanOrEqual(sampleStarfieldRadiance(direction, p)[0]);
+    expect(first[1]).toBeGreaterThanOrEqual(sampleStarfieldRadiance(direction, p)[1]);
+    expect(first[2]).toBeGreaterThanOrEqual(sampleStarfieldRadiance(direction, p)[2]);
   });
 });

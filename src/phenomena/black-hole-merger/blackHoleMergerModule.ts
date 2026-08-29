@@ -474,6 +474,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     const clampedT = Math.min(Math.max(t, ds.tStartM), ds.ringdownEndM + REMNANT_TAIL_M);
     lastTimeM = clampedT;
     backdrop?.setTime(clampedT * 0.01);
+    backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
     const phase = phaseAt(clampedT, ds);
     lastPhase = phase;
     applySystemVisibility(phase);

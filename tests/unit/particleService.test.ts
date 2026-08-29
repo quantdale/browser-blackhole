@@ -100,6 +100,29 @@ describe('ParticleService CPU path selection', () => {
 });
 
 describe('ParticleSystem CPU integration', () => {
+  it('exposes distinct bounded presentation profiles while keeping the same state layout', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const profiles = [
+      'generic-soft',
+      'star',
+      'ejecta-streak',
+      'debris-streak',
+      'dust-clump',
+      'emissive-core'
+    ] as const;
+    for (const profile of profiles) {
+      const system = service.createSystem(makeConfig({ profile, emissiveIntensity: 2 }));
+      expect(system.getDebugSnapshot()).toMatchObject({
+        profile,
+        emissiveIntensity: 2,
+        bufferBytes: 64 * 48
+      });
+      system.setProfileQuality?.(0.5);
+      expect(system.getDebugSnapshot()).toMatchObject({ profileQuality: 0.5 });
+    }
+    service.dispose();
+  });
+
   it('moves particles along constant velocity: equal displacement per unit time', () => {
     const service = new ParticleService({ computeAvailable: false });
     const system = service.createSystem(

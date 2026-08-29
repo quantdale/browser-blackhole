@@ -75,7 +75,7 @@ import {
   RAY_NON_FINITE
 } from '../../../physics/schwarzschild.js';
 import { createEnvironmentSamplerNode } from '../../../shaders/starfieldGpu.js';
-import { makeStarfieldParams } from '../../../shaders/starfield.js';
+import { makeCinematicStarfieldParams } from '../../../shaders/starfield.js';
 import { DEFAULT_AXIS_X } from './domain.js';
 import {
   makeDiskEmissionNode,
@@ -147,6 +147,8 @@ export interface CreateLutLensingMaterialParams extends LensingPassParams {
 export interface LutLensingMaterial {
   material: NodeMaterial;
   uniforms: LutLensingUniforms;
+  /** Additive V2 environment contribution; never changes LUT classification. */
+  setEnvironmentDetail(detail: number): void;
   setUniformsFromState(state: Record<string, unknown>): void;
   dispose(): void;
 }
@@ -207,6 +209,7 @@ export function createLutLensingMaterial(
   const uEscapeRadiusRg = uniform(1000);
   const uCaptureEpsilon = uniform(0.01);
   const uBackgroundIntensity = uniform(1);
+  const uEnvironmentDetail = uniform(0);
   const uDebugMode = uniform(0);
   const uLutEnabled = uniform(0);
   const uLutDebugStatus = uniform(0);
@@ -260,7 +263,10 @@ export function createLutLensingMaterial(
   const uForward = uniform(uniforms.cameraForward.value);
   const uCenter = uniform(uniforms.centerRg.value);
 
-  const sampleEnvironment = createEnvironmentSamplerNode(makeStarfieldParams());
+  const sampleEnvironment = createEnvironmentSamplerNode(
+    makeCinematicStarfieldParams(),
+    uEnvironmentDetail
+  );
   const diskModel: DiskModelParams = {
     innerRadiusRg: params.diskInnerRg,
     outerRadiusRg: params.diskOuterRg,
@@ -939,6 +945,10 @@ export function createLutLensingMaterial(
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const environmentDetail = readFiniteNumber(state['environmentDetail']);
+      if (environmentDetail !== null && environmentDetail >= 0) {
+        uEnvironmentDetail.value = Math.min(1, environmentDetail);
+      }
       const debugRaw = readFiniteNumber(state['debugMode']);
       if (debugRaw !== null && debugRaw >= 0) uDebugMode.value = debugRaw;
 
@@ -967,6 +977,9 @@ export function createLutLensingMaterial(
       if (lutGate !== null && lutGate >= 0) uLutEnabled.value = lutGate;
       const lutDbg = readFiniteNumber(state['lutDebugStatus']);
       if (lutDbg !== null && lutDbg >= 0) uLutDebugStatus.value = lutDbg;
+    },
+    setEnvironmentDetail(detail: number): void {
+      uEnvironmentDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
     },
     dispose(): void {
       if (disposed) return;

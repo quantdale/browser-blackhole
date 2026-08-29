@@ -49,7 +49,9 @@ import {
   Fn,
   If,
   abs,
+  atan,
   attribute,
+  cameraViewMatrix,
   clamp,
   cross,
   float,
@@ -308,8 +310,13 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   private readonly rampLut: THREE.DataTexture;
 
   private readonly dtUniform: UniformNode<'float', number>;
+  private readonly profileQualityUniform: UniformNode<'float', number>;
+  private readonly emissiveIntensity: number;
+  private readonly profile: NonNullable<ParticleSystemConfig['profile']>;
   private readonly computeUpdate: ComputeNode | null;
   private drawnCount: number;
+  private requestedPopulationScale = 1;
+  private globalPopulationScale = 1;
   private simulationUpdates = 0;
   private skippedUpdates = 0;
   private lastSkipReason: 'none' | 'zero-population' | 'static' | 'zero-dt' = 'none';
@@ -320,6 +327,10 @@ class ParticleSystemImpl implements ParticleSystemHandle {
       throw new Error(`ParticleService: invalid capacity ${config.capacity}.`);
     }
     this.config = config;
+    this.profile = config.profile ?? 'generic-soft';
+    this.emissiveIntensity = Number.isFinite(config.emissiveIntensity)
+      ? Math.min(32, Math.max(0, config.emissiveIntensity!))
+      : 1;
     this.activity = config.activity ?? 'dynamic';
     this.capacity = Math.floor(config.capacity);
     this.emitters = buildEmitterBlock(config.emitters);
@@ -354,6 +365,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     // --- render object: instanced camera-facing quads through the sprite path ---
     this.geometry = buildQuadGeometry();
     this.geometry.setAttribute('aParticlePos', this.posAttr);
+    this.geometry.setAttribute('aParticleVel', this.velAttr);
     this.geometry.setAttribute('aParticleLife', this.lifeAttr);
     this.drawnCount = this.capacity;
     this.geometry.instanceCount = this.drawnCount;
@@ -371,16 +383,41 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.material.blending =
       config.blending === 'additive' ? THREE.AdditiveBlending : THREE.NormalBlending;
     this.material.userData['cinematicEmissive'] = true;
+    this.material.userData['particleProfile'] = this.profile;
+    this.profileQualityUniform = uniform(1);
 
     const posRead = attribute<'vec4'>('aParticlePos', 'vec4');
     const lifeRead = attribute<'vec4'>('aParticleLife', 'vec4');
+    const velocityRead = attribute<'vec4'>('aParticleVel', 'vec4');
     this.material.positionNode = posRead.xyz;
 
     // Per-particle size: mix(sizeMin, sizeMax, hash(seed)) in CSS pixels; the
     // material applies screen-DPR scaling and perspective attenuation itself.
     const sizeMix = gpuHash01(fract(lifeRead.z.add(0.123456)));
     const sizePx = mix(float(config.sizePx[0]), float(config.sizePx[1]), sizeMix);
-    this.material.sizeNode = vec2(sizePx, sizePx);
+    const speed = length(velocityRead.xyz);
+    const profileStretch =
+      this.profile === 'ejecta-streak'
+        ? speed.mul(0.035).add(1).clamp(1, 9)
+        : this.profile === 'debris-streak'
+          ? speed.mul(0.06).add(1).clamp(1, 14)
+          : float(1);
+    const sizeScale =
+      this.profile === 'star'
+        ? 0.8
+        : this.profile === 'dust-clump'
+          ? 1.35
+          : this.profile === 'emissive-core'
+            ? 1.1
+            : 1;
+    this.material.sizeNode = vec2(
+      sizePx.mul(sizeScale).mul(mix(float(1), profileStretch, this.profileQualityUniform)),
+      sizePx.mul(sizeScale)
+    );
+    if (this.profile === 'ejecta-streak' || this.profile === 'debris-streak') {
+      const viewVelocity = cameraViewMatrix.mul(vec4(velocityRead.xyz, 0)).xyz;
+      this.material.rotationNode = atan(viewVelocity.y, viewVelocity.x);
+    }
 
     // Color ramp sampled by age/lifetime fraction + analytic edge fade + radial mask.
     const ageFrac = clamp(lifeRead.x.div(max(lifeRead.y, 1e-5)), 0, 1);
@@ -390,7 +427,15 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     const centered = uv().sub(vec2(0.5, 0.5));
     const radial = length(centered);
     const softMask = float(1).sub(smoothstep(SOFT_EDGE_INNER, SOFT_EDGE_OUTER, radial));
-    this.material.colorNode = vec4(ramp.xyz, ramp.w.mul(fadeIn).mul(fadeOut).mul(softMask));
+    const profileMask = this.buildProfileMask(centered, radial);
+    const clusterBrightness = gpuHash01(fract(lifeRead.z.add(37.17)))
+      .mul(0.32)
+      .add(0.84);
+    const profileColor = ramp.xyz.mul(clusterBrightness).mul(this.emissiveIntensity);
+    this.material.colorNode = vec4(
+      profileColor,
+      ramp.w.mul(fadeIn).mul(fadeOut).mul(profileMask).mul(softMask)
+    );
 
     this.mesh = new THREE.Mesh(this.geometry, this.material);
     this.mesh.frustumCulled = false; // world-space population; skip bogus culling
@@ -404,6 +449,43 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.respawnRand = mulberry32((config.seed ^ 0x9e3779b9) >>> 0);
 
     this.reset(config.seed);
+  }
+
+  private buildProfileMask(centered: Node<'vec2'>, radial: TslFloat): Node<'float'> {
+    switch (this.profile) {
+      case 'star': {
+        const core = float(1).sub(smoothstep(0.04, 0.22, radial));
+        const halo = float(1)
+          .sub(smoothstep(0.12, 0.707, radial))
+          .mul(0.22);
+        return core.add(halo);
+      }
+      case 'ejecta-streak': {
+        const transverse = float(1).sub(smoothstep(0.16, 0.5, centered.y.abs()));
+        const head = float(1).sub(smoothstep(0.32, 0.5, centered.x));
+        return transverse.mul(head.mul(0.76).add(0.24));
+      }
+      case 'debris-streak': {
+        const transverse = float(1).sub(smoothstep(0.1, 0.43, centered.y.abs()));
+        const tapered = float(1).sub(smoothstep(0.2, 0.5, centered.x));
+        return transverse.mul(tapered.mul(0.88).add(0.12));
+      }
+      case 'dust-clump':
+        return float(1)
+          .sub(smoothstep(0.18, 0.707, radial))
+          .mul(0.68)
+          .add(0.14);
+      case 'emissive-core': {
+        const core = float(1).sub(smoothstep(0.03, 0.2, radial));
+        const halo = float(1)
+          .sub(smoothstep(0.16, 0.707, radial))
+          .mul(0.35);
+        return core.mul(1.15).add(halo);
+      }
+      case 'generic-soft':
+      default:
+        return float(1);
+    }
   }
 
   /** Build the TSL compute kernel: integrate, then recycle dead particles. */
@@ -703,12 +785,26 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   /** Throttle the drawn population: `scale` in [0, 1] of capacity. */
   setPopulationScale(scale: number): void {
     if (this.disposed) return;
-    const s = Math.min(Math.max(scale, 0), 1);
+    this.requestedPopulationScale = Math.min(Math.max(scale, 0), 1);
+    const s = Math.min(this.requestedPopulationScale, this.globalPopulationScale);
     const nextCount = Math.round(this.capacity * s);
     if (nextCount === this.drawnCount) return;
     this.drawnCount = nextCount;
     // Instanced equivalent of drawRange: the renderer skips the draw entirely at 0.
     this.geometry.instanceCount = this.drawnCount;
+  }
+
+  setGlobalPopulationScale(scale: number): void {
+    if (this.disposed) return;
+    this.globalPopulationScale = Number.isFinite(scale) ? Math.min(Math.max(scale, 0), 1) : 1;
+    this.setPopulationScale(this.requestedPopulationScale);
+  }
+
+  setProfileQuality(quality: number): void {
+    if (this.disposed) return;
+    this.profileQualityUniform.value = Number.isFinite(quality)
+      ? Math.min(1, Math.max(0, quality))
+      : 1;
   }
 
   object3d(): THREE.Object3D {
@@ -732,10 +828,15 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     return {
       capacity: this.capacity,
       drawnCount: this.drawnCount,
+      requestedPopulationScale: this.requestedPopulationScale,
+      globalPopulationScale: this.globalPopulationScale,
       bufferBytes: this.capacity * BYTES_PER_PARTICLE,
       updatePath: this.useCompute ? 'compute' : 'cpu',
       computeAvailable: this.useCompute,
       blending: this.config.blending,
+      profile: this.profile,
+      profileQuality: this.profileQualityUniform.value,
+      emissiveIntensity: this.emissiveIntensity,
       activity: this.activity,
       simulationUpdates: this.simulationUpdates,
       skippedUpdates: this.skippedUpdates,
@@ -863,6 +964,14 @@ export class ParticleService implements IParticleService {
     const system = new ParticleSystemImpl(config, this.rendererRef);
     this.systems.push(system);
     return system;
+  }
+
+  setProfileQuality(quality: number): void {
+    for (const system of this.systems) system.setProfileQuality(quality);
+  }
+
+  setPopulationScale(scale: number): void {
+    for (const system of this.systems) system.setGlobalPopulationScale(scale);
   }
 
   dispose(): void {

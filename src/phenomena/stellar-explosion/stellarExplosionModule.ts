@@ -419,13 +419,24 @@ export function createStellarExplosionModule(): PhenomenonModule {
           .mul(dim);
       },
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
+      detail: {
+        seed: ctx.preset.seed ^ 0x41e7,
+        octaves: 5,
+        strength: res.scenarioId === 'hypernova' ? 0.32 : 0.24,
+        filamentStrength: res.scenarioId === 'hypernova' ? 0.72 : 0.55,
+        clumpStrength: res.scenarioId === 'hypernova' ? 0.62 : 0.48,
+        domainWarpStrength: res.scenarioId === 'hypernova' ? 0.28 : 0.2,
+        frequency: res.scenarioId === 'hypernova' ? 2.8 : 2.4
+      },
+      depthAwareUpsample: true,
+      approximateSelfShadow: true,
+      gradientShading: true,
       halfResolution: true,
       earlyAlphaTermination: true,
-      // Jitter WITHOUT temporal accumulation reads as animated grain under a
-      // paused camera (measured: sample luminance flickered 51<->137 between
-      // consecutive frames). Off keeps presented frames stable and
-      // deterministic; residual banding is absorbed by the step budget.
-      temporalJitter: false
+      // The global visual budget disables this uniform at Low/Medium and
+      // enables it for High/Ultra, where TemporalService stabilizes the
+      // deterministic ray-start sequence instead of shipping animated grain.
+      temporalJitter: true
     });
     volume.setStepScale(TIER_STEP_SCALE[ctx.quality]);
     volume.setVisible(false); // phase-gated: off until the flash
@@ -478,7 +489,9 @@ export function createStellarExplosionModule(): PhenomenonModule {
         })),
         blending: fullPlan.blending,
         seed: fullPlan.seed,
-        preferCompute: true
+        preferCompute: true,
+        profile: 'ejecta-streak',
+        emissiveIntensity: 1.35
       });
       particleSystem.setPopulationScale(0); // phase-gated
       particleSystem.object3d().name = 'stellar-explosion-ejecta-particles';
@@ -718,15 +731,18 @@ export function createStellarExplosionModule(): PhenomenonModule {
       shellHaloVisual.setTime(seconds * 0.00012);
     }
     backdrop?.setTime(seconds * 0.00002);
+    backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
     if (particleHandle !== null) {
-      particleHandle.setPopulationScale(populationFractionFor(phase));
+      particleHandle.setPopulationScale(
+        populationFractionFor(phase) * ctx.workBudget.particlePopulationScale
+      );
       if (volumeVisible && !snapshot.paused) {
         particleHandle.update(ctx.time.dt);
       }
     }
 
     // --- quality response (single global governor drives everything) ----------
-    volumeHandle?.setStepScale(TIER_STEP_SCALE[lastTier]);
+    volumeHandle?.setStepScale(ctx.workBudget.volumeActiveSteps);
 
     debug['phase'] = phase;
     debug['previousPhase'] = lastPhase;

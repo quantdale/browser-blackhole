@@ -44,6 +44,7 @@ import type { LutGpuResources } from '../../phenomena/black-hole/lut/textures.js
 interface BlackHoleLensingPassHandle {
   object3d(): THREE.Mesh;
   setUniformsFromState(state: Record<string, unknown>): void;
+  setEnvironmentDetail(detail: number): void;
   dispose(): void;
 }
 
@@ -212,7 +213,11 @@ export class LensingService implements ILensingService {
 
   private wrapLensingHandle(
     material: THREE.Material,
-    delegate: { setUniformsFromState(state: Record<string, unknown>): void; dispose(): void },
+    delegate: {
+      setUniformsFromState(state: Record<string, unknown>): void;
+      setEnvironmentDetail?(detail: number): void;
+      dispose(): void;
+    },
     _params: LensingPassParams
   ) {
     const geometry = createFullscreenTriangleGeometry();
@@ -226,6 +231,9 @@ export class LensingService implements ILensingService {
       setUniformsFromState: (state: Record<string, unknown>) => {
         delegate.setUniformsFromState(state);
       },
+      setEnvironmentDetail: (detail: number) => {
+        delegate.setEnvironmentDetail?.(detail);
+      },
       dispose: () => {
         if (disposed) return;
         disposed = true;
@@ -237,6 +245,12 @@ export class LensingService implements ILensingService {
     };
     this.passes.push(handle as BlackHoleLensingPassHandle);
     return handle;
+  }
+
+  /** Apply the bounded cinematic environment contribution to every live pass. */
+  setEnvironmentDetail(detail: number): void {
+    const value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
+    for (const pass of this.passes) pass.setEnvironmentDetail(value);
   }
 
   /**

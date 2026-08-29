@@ -75,10 +75,12 @@ import {
   fract,
   max,
   min,
+  mx_fractal_noise_float,
   normalize,
   positionWorld,
   screenUV,
   sin,
+  smoothstep,
   sqrt,
   texture,
   uniform,
@@ -87,6 +89,7 @@ import {
   vec4
 } from 'three/tsl';
 import type { IVolumeService, RendererLike, VolumeConfig, VolumeHandle } from '../../atlas/types';
+import { CINEMATIC_EMISSIVE_LAYER } from './visualLayers.js';
 
 /** Any float-valued TSL shader-graph node. */
 type TslFloat = Node<'float'>;
@@ -143,6 +146,15 @@ class VolumeImpl implements VolumeHandle {
   private readonly target: THREE.RenderTarget | null;
   private readonly intermediateType: THREE.TextureDataType | null;
   private readonly intermediateFormat: 'rgba16f' | 'rgba8' | null;
+  private readonly uDetailOctaves: UniformNode<'float', number>;
+  private readonly uLightingTaps: UniformNode<'float', number>;
+  private readonly uJitterEnabled: UniformNode<'float', number>;
+  private readonly depthTextureState: { value: THREE.Texture | null };
+  private readonly emptyDepthTexture = new THREE.Texture();
+  private readonly depthTextureNode: ReturnType<typeof texture> | null;
+  private readonly compositeTexelSize: UniformNode<'vec2', THREE.Vector2> = uniform(
+    new THREE.Vector2(0.5, 0.5)
+  );
 
   private readonly uStepScale: UniformNode<'float', number>;
   private readonly uActiveSteps: UniformNode<'float', number>;
@@ -156,7 +168,12 @@ class VolumeImpl implements VolumeHandle {
 
   private disposed = false;
 
-  constructor(config: VolumeConfig, internalScaleState: { value: number }, dprCap: number) {
+  constructor(
+    config: VolumeConfig,
+    internalScaleState: { value: number },
+    dprCap: number,
+    depthTextureState: { value: THREE.Texture | null }
+  ) {
     // dprCap participates in the byte estimate only; the march itself is
     // resolution-independent world-space math.
     void dprCap;
@@ -171,6 +188,15 @@ class VolumeImpl implements VolumeHandle {
     this.uActiveSteps = uniform(this.activeStepCount);
     this.uJitterSeed = uniform(seed);
     this.uJitterFrame = uniform(0);
+    this.uJitterEnabled = uniform(config.temporalJitter ? 1 : 0);
+    this.uDetailOctaves = uniform(
+      config.detail === undefined ? 1 : clampInt(config.detail.octaves ?? 3, 1, 5)
+    );
+    this.uLightingTaps = uniform(
+      config.approximateSelfShadow ? clampInt(config.approximateSelfShadow ? 1 : 0, 0, 2) : 0
+    );
+    this.depthTextureState = depthTextureState;
+    this.depthTextureNode = config.depthAwareUpsample ? texture(this.emptyDepthTexture) : null;
     this.uInternalScale = internalScaleState;
 
     // --- proxy geometry ---
@@ -188,6 +214,7 @@ class VolumeImpl implements VolumeHandle {
     this.marchMaterial.depthWrite = false;
     this.marchMaterial.premultipliedAlpha = true;
     this.marchMaterial.blending = THREE.NormalBlending;
+    this.marchMaterial.userData['cinematicEmissive'] = true;
     this.marchMaterial.colorNode = this.buildMarchGraph(config);
 
     // --- half-res plumbing ---
@@ -222,12 +249,17 @@ class VolumeImpl implements VolumeHandle {
       compositeMaterial.depthWrite = false;
       compositeMaterial.premultipliedAlpha = true;
       compositeMaterial.blending = THREE.NormalBlending;
+      compositeMaterial.userData['cinematicEmissive'] = true;
       // Upsample: linear-filtered premultiplied RGBA straight to the canvas.
       compositeMaterial.colorNode = texture(target.texture, screenUV);
+      if (this.depthTextureNode !== null) {
+        compositeMaterial.colorNode = this.buildCompositeGraph(target.texture);
+      }
 
       marchScene = new THREE.Scene();
       const proxy = new THREE.Mesh(this.geometry, this.marchMaterial);
       proxy.position.copy(center);
+      proxy.layers.enable(CINEMATIC_EMISSIVE_LAYER);
       proxy.frustumCulled = false;
       marchScene.add(proxy);
     }
@@ -275,7 +307,7 @@ class VolumeImpl implements VolumeHandle {
 
     // Seeded temporal jitter of the start offset within the first step.
     const jitter01 = gpuHash01(this.uJitterSeed.add(this.uJitterFrame));
-    const startOffset = config.temporalJitter ? jitter01.mul(dt) : float(0);
+    const startOffset = this.uJitterEnabled.mul(jitter01).mul(dt);
 
     return Fn(() => {
       const rgbAcc = vec3(0, 0, 0).toVar();
@@ -291,14 +323,49 @@ class VolumeImpl implements VolumeHandle {
             // Contract boundary: callbacks receive plain nodes typed `unknown`
             // and are cast back exactly like LensingService.createThinLensDisplacement.
             const densityRaw = config.density({ pos, dir: rd });
-            const density = float(densityRaw as Node<'float'>).max(0);
+            let density: Node<'float'> = float(densityRaw as Node<'float'>).max(0);
+            let detailFactor: Node<'float'> = float(1);
+            if (config.detail !== undefined) {
+              detailFactor = this.buildDetailFactor(pos, config);
+              density = density.mul(detailFactor);
+            }
 
             const emissionRaw =
               config.emission !== undefined ? config.emission({ pos, dir: rd }) : null;
-            const emission =
+            let emission: Node<'vec3'> =
               emissionRaw !== null
                 ? vec3(emissionRaw as Node<'vec3'>)
                 : vec3(density, density, density);
+            if (config.detail !== undefined) {
+              // Density controls optical depth; a softer radiance response
+              // keeps detail visible without turning every structured field
+              // into a saturated white mask.
+              emission = emission.mul(detailFactor.pow(0.45));
+            }
+
+            if (config.gradientShading === true) {
+              const forwardDensity = float(
+                config.density({ pos: pos.add(rd.mul(dt)), dir: rd }) as Node<'float'>
+              ).max(0);
+              const frontFactor = forwardDensity.sub(density).mul(0.12).add(0.92).clamp(0.78, 1.16);
+              emission = emission.mul(frontFactor);
+            }
+
+            if (config.approximateSelfShadow === true) {
+              const shadow = float(1).toVar();
+              for (let tap = 1; tap <= 2; tap += 1) {
+                const shadowDensity = float(
+                  config.density({
+                    pos: pos.add(rd.mul(dt.mul(tap * 2))),
+                    dir: rd
+                  }) as Node<'float'>
+                ).max(0);
+                If(this.uLightingTaps.greaterThanEqual(tap), () => {
+                  shadow.assign(shadow.mul(expNeg(shadowDensity.mul(dt).mul(0.35))));
+                });
+              }
+              emission = emission.mul(shadow.mul(0.72).add(0.28));
+            }
 
             const aSample = float(1).sub(expNeg(density.mul(ABSORPTION_SCALE).mul(dt)));
             const sampleAlpha = aSample.mul(transmittance);
@@ -323,6 +390,130 @@ class VolumeImpl implements VolumeHandle {
   }
 
   /**
+   * Compose a bounded presentation detail factor over the destination's
+   * authoritative macro density. The octaves are selected by a uniform so the
+   * global work budget can reduce work without rebuilding the destination
+   * graph; every branch has a compile-time ceiling of five octaves.
+   */
+  private buildDetailFactor(pos: Node<'vec3'>, config: VolumeConfig): Node<'float'> {
+    const detail = config.detail;
+    if (detail === undefined) return float(1);
+    const center = config.bounds.kind === 'sphere' ? config.bounds.center : config.bounds.center;
+    const scale =
+      config.bounds.kind === 'sphere'
+        ? Math.max(config.bounds.radius, 1e-3)
+        : Math.max(...config.bounds.halfExtents, 1e-3);
+    const seed = foldSeed([detail.seed]);
+    const frequency = Number.isFinite(detail.frequency)
+      ? Math.max(0.05, Math.min(12, detail.frequency!))
+      : 2.4;
+    const local = pos.sub(vec3(center[0]!, center[1]!, center[2]!)).div(scale);
+    const warpNoise = mx_fractal_noise_float(
+      local.mul(frequency * 0.45).add(seed * 0.007),
+      2,
+      2.0,
+      0.5
+    )
+      .mul(2)
+      .sub(1);
+    const warp = detail.domainWarpStrength ?? 0;
+    const warped = local.add(
+      vec3(
+        warpNoise.mul(Math.min(Math.max(warp, 0), 0.5)),
+        warpNoise.mul(-0.63),
+        warpNoise.mul(0.41)
+      )
+    );
+
+    const octaveNoise = mx_fractal_noise_float(warped.mul(frequency).add(seed * 0.013), 1, 2.0, 0.5)
+      .mul(0.5)
+      .add(0.5)
+      .toVar();
+    for (let octave = 2; octave <= 5; octave += 1) {
+      const candidate = mx_fractal_noise_float(
+        warped.mul(frequency).add(seed * 0.013),
+        octave,
+        2.0,
+        0.5
+      )
+        .mul(0.5)
+        .add(0.5);
+      If(this.uDetailOctaves.greaterThanEqual(octave), () => {
+        octaveNoise.assign(candidate);
+      });
+    }
+
+    const ridged = float(1).sub(octaveNoise.mul(2).sub(1).abs()).pow(1.8);
+    const clumpNoise = mx_fractal_noise_float(
+      warped.mul(frequency * 0.62).add(seed * 0.031 + 17.3),
+      2,
+      2.0,
+      0.5
+    )
+      .mul(0.5)
+      .add(0.5);
+    const clumps = smoothstep(0.56, 0.86, clumpNoise);
+    const strength = Math.max(0, Math.min(1, detail.strength ?? 0.22));
+    const filamentStrength = Math.max(0, Math.min(1, detail.filamentStrength ?? 0));
+    const clumpStrength = Math.max(0, Math.min(1, detail.clumpStrength ?? 0));
+    return octaveNoise
+      .sub(0.5)
+      .mul(strength)
+      .add(ridged.mul(filamentStrength * 0.8))
+      .add(clumps.mul(clumpStrength * 0.9))
+      .add(1)
+      .clamp(0.12, 3.2);
+  }
+
+  private buildCompositeGraph(targetTexture: THREE.Texture): Node<'vec4'> {
+    const source = texture(targetTexture);
+    const offsets: Array<[number, number]> = [
+      [0, 0],
+      [-1, 0],
+      [1, 0],
+      [0, -1],
+      [0, 1]
+    ];
+    const samples = offsets.map(([x, y]) =>
+      source.sample(screenUV.add(this.compositeTexelSize.mul(vec2(x, y))))
+    );
+    const center = samples[0]!;
+    const centerAlpha = center.w;
+    let rgb = center.rgb;
+    let alpha = centerAlpha;
+    let weight: Node<'float'> = float(1);
+    for (let i = 1; i < samples.length; i += 1) {
+      const sample = samples[i]!;
+      const similarity = float(1).sub(sample.w.sub(centerAlpha).abs().mul(3)).clamp(0.15, 1);
+      rgb = rgb.add(sample.rgb.mul(similarity));
+      alpha = alpha.add(sample.w.mul(similarity));
+      weight = weight.add(similarity);
+    }
+    // A depth texture is sampled in the composite graph when supplied. The
+    // depth delta is deliberately only a weight: a missing/clear depth map
+    // falls back to the alpha-guided bilateral filter instead of hiding the
+    // volume. This is conservative at foreground boundaries.
+    if (this.depthTextureNode !== null) {
+      const depthCenter = this.depthTextureNode.sample(screenUV).r;
+      let depthWeight: Node<'float'> = float(1);
+      for (const [x, y] of offsets.slice(1)) {
+        const neighborDepth = this.depthTextureNode.sample(
+          screenUV.add(this.compositeTexelSize.mul(vec2(x, y)))
+        ).r;
+        depthWeight = depthWeight.add(
+          float(1).div(float(1).add(neighborDepth.sub(depthCenter).abs().mul(64)))
+        );
+      }
+      // The ratio is close to one in a flat-depth region and downweights
+      // cross-edge samples without changing the center sample.
+      const normalizedDepth = depthWeight.div(5);
+      rgb = rgb.mul(normalizedDepth).add(center.rgb.mul(float(1).sub(normalizedDepth)));
+      alpha = alpha.mul(normalizedDepth).add(centerAlpha.mul(float(1).sub(normalizedDepth)));
+    }
+    return vec4(rgb.div(weight), alpha.div(weight));
+  }
+
+  /**
    * Nested half-res march: resize the internal target, render the private
    * proxy scene into it, restore the previous binding. Runs inside the main
    * scene pass, just before the visible proxy composites the result.
@@ -343,9 +534,10 @@ class VolumeImpl implements VolumeHandle {
     if (this.target.width !== w || this.target.height !== h) {
       this.target.setSize(w, h);
     }
-
-    // Advance the deterministic jitter clock: one tick per marched frame.
-    this.uJitterFrame.value = (this.uJitterFrame.value + JITTER_FRAME_STRIDE) % 1;
+    this.compositeTexelSize.value.set(1 / this.target.width, 1 / this.target.height);
+    if (this.depthTextureNode !== null) {
+      this.depthTextureNode.value = this.depthTextureState.value ?? this.emptyDepthTexture;
+    }
 
     const previous = renderer.getRenderTarget();
     renderer.setRenderTarget(this.target as THREE.WebGLRenderTarget | null);
@@ -369,6 +561,35 @@ class VolumeImpl implements VolumeHandle {
     this.uActiveSteps.value = this.activeStepCount;
   }
 
+  setDetailOctaves(octaves: number): void {
+    if (this.disposed) return;
+    this.uDetailOctaves.value = clampInt(octaves, 1, 5);
+  }
+
+  setLightingTaps(taps: number): void {
+    if (this.disposed) return;
+    this.uLightingTaps.value = clampInt(taps, 0, 2);
+  }
+
+  setTemporalJitter(enabled: boolean): void {
+    if (this.disposed) return;
+    this.uJitterEnabled.value = enabled ? 1 : 0;
+  }
+
+  setTemporalFrame(frameIndex: number): void {
+    if (this.disposed) return;
+    const index = Number.isFinite(frameIndex) ? Math.max(0, Math.floor(frameIndex)) : 0;
+    this.uJitterFrame.value = (index * JITTER_FRAME_STRIDE) % 1;
+  }
+
+  setSceneDepthTexture(textureValue: THREE.Texture | null): void {
+    if (this.disposed) return;
+    this.depthTextureState.value = textureValue;
+    if (this.depthTextureNode !== null) {
+      this.depthTextureNode.value = textureValue ?? this.emptyDepthTexture;
+    }
+  }
+
   setVisible(visible: boolean): void {
     if (this.disposed) return;
     this.visible = visible;
@@ -390,7 +611,11 @@ class VolumeImpl implements VolumeHandle {
           : this.intermediateType === THREE.UnsignedByteType
             ? 4
             : 0,
-      hdrIntermediate: this.intermediateType === THREE.HalfFloatType
+      hdrIntermediate: this.intermediateType === THREE.HalfFloatType,
+      detailOctaves: this.uDetailOctaves.value,
+      lightingTaps: this.uLightingTaps.value,
+      temporalJitter: this.uJitterEnabled.value > 0,
+      depthAwareUpsample: this.depthTextureNode !== null
     };
   }
 
@@ -409,6 +634,7 @@ class VolumeImpl implements VolumeHandle {
     this.marchMaterial.dispose();
     this.compositeMaterial?.dispose();
     this.target?.dispose();
+    this.emptyDepthTexture.dispose();
   }
 }
 
@@ -483,6 +709,10 @@ function clampRange(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
 }
 
+function clampInt(v: number, lo: number, hi: number): number {
+  return Math.floor(clampRange(Number.isFinite(v) ? v : lo, lo, hi));
+}
+
 // ---------------------------------------------------------------------------
 // Service
 // ---------------------------------------------------------------------------
@@ -505,6 +735,7 @@ export class VolumeService implements IVolumeService {
   private readonly volumes: VolumeImpl[] = [];
   /** Shared internal-scale state read by every half-res handle each frame. */
   private readonly internalScaleState = { value: 0.5 };
+  private readonly sceneDepthState: { value: THREE.Texture | null } = { value: null };
   private disposed = false;
 
   constructor(options: VolumeServiceOptions = {}) {
@@ -518,7 +749,12 @@ export class VolumeService implements IVolumeService {
     if (!Number.isFinite(config.baseMaxSteps) || config.baseMaxSteps < 1) {
       throw new Error(`VolumeService: invalid baseMaxSteps ${config.baseMaxSteps}.`);
     }
-    const volume = new VolumeImpl(config, this.internalScaleState, this.dprCap);
+    const volume = new VolumeImpl(
+      config,
+      this.internalScaleState,
+      this.dprCap,
+      this.sceneDepthState
+    );
     this.volumes.push(volume);
     return volume;
   }
@@ -526,6 +762,31 @@ export class VolumeService implements IVolumeService {
   /** Global half-res factor for every half-resolution volume; clamped to [0.1, 1]. */
   setInternalScale(scale: number): void {
     this.internalScaleState.value = clampRange(scale, INTERNAL_SCALE_MIN, INTERNAL_SCALE_MAX);
+  }
+
+  setStepScale(scale: number): void {
+    for (const volume of this.volumes) volume.setStepScale(scale);
+  }
+
+  setDetailOctaves(octaves: number): void {
+    for (const volume of this.volumes) volume.setDetailOctaves(octaves);
+  }
+
+  setLightingTaps(taps: number): void {
+    for (const volume of this.volumes) volume.setLightingTaps(taps);
+  }
+
+  setTemporalJitter(enabled: boolean): void {
+    for (const volume of this.volumes) volume.setTemporalJitter(enabled);
+  }
+
+  setTemporalFrame(frameIndex: number): void {
+    for (const volume of this.volumes) volume.setTemporalFrame(frameIndex);
+  }
+
+  setSceneDepthTexture(texture: THREE.Texture | null): void {
+    this.sceneDepthState.value = texture;
+    for (const volume of this.volumes) volume.setSceneDepthTexture(texture);
   }
 
   dispose(): void {

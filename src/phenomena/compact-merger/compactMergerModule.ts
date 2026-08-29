@@ -423,11 +423,21 @@ export function createCompactMergerModule(): PhenomenonModule {
       },
       emission: () => vec3(uVolumeTint).mul(uVolumeGain),
       baseMaxSteps: TIER_VOLUME_STEPS[ctx.quality],
+      detail: {
+        seed: res.seed ^ 0x3a7,
+        octaves: 4,
+        strength: 0.14,
+        filamentStrength: 0.08,
+        clumpStrength: 0.34,
+        domainWarpStrength: 0.16,
+        frequency: 1.35
+      },
+      depthAwareUpsample: true,
+      approximateSelfShadow: true,
+      gradientShading: true,
       halfResolution: true,
       earlyAlphaTermination: true,
-      // Jitter OFF: animated grain under a paused camera reads as noise
-      // (measured on the stellar-explosion destination); determinism first.
-      temporalJitter: false
+      temporalJitter: true
     });
     volume.setStepScale(TIER_STEP_SCALE[ctx.quality]);
     volume.setVisible(false); // phase-gated: off until contact
@@ -462,7 +472,9 @@ export function createCompactMergerModule(): PhenomenonModule {
         })),
         blending: 'additive',
         seed: plan.seed,
-        preferCompute: true
+        preferCompute: true,
+        profile: 'ejecta-streak',
+        emissiveIntensity: 1.2
       });
       system.setPopulationScale(0); // phase-gated
       system.object3d().name = 'compact-merger-ejecta-particles';
@@ -585,6 +597,7 @@ export function createCompactMergerModule(): PhenomenonModule {
   function update(ctx: FrameContext): void {
     const ready = assertReady();
     lastTier = ctx.quality;
+    backdrop?.setDetail(ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0);
     const snapshot = ctx.services.time.snapshot();
     const t = Number.isFinite(snapshot.physicalTime ?? NaN) ? (snapshot.physicalTime as number) : 0;
     const res = ready.resolved;
@@ -667,7 +680,7 @@ export function createCompactMergerModule(): PhenomenonModule {
           : 0.5;
     const volumeVisible = tau > 0;
     volumeHandle?.setVisible(volumeVisible);
-    volumeHandle?.setStepScale(TIER_STEP_SCALE[lastTier]);
+    volumeHandle?.setStepScale(ctx.workBudget.volumeActiveSteps);
 
     // --- jet (scenario + phase gated; viewing response = presentation gain) --
     // Active during the jet phase; fades through kilonova; gone by afterglow.
@@ -694,7 +707,7 @@ export function createCompactMergerModule(): PhenomenonModule {
     // particle object3d was evaluated and REJECTED: sprite sizing is world-
     // space, so object scaling blows the sprites up with the shell.
     if (particleHandle !== null) {
-      const pop = populationFractionFor(phase);
+      const pop = populationFractionFor(phase) * ctx.workBudget.particlePopulationScale;
       particleHandle.setPopulationScale(pop);
       if (volumeVisible && !snapshot.paused) {
         particleHandle.update(ctx.time.dt);

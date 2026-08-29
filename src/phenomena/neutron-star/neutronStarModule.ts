@@ -676,6 +676,9 @@ export function createNeutronStarModule(): PhenomenonModule {
     if (disposed || !rt || !pass) return;
     const u = pass.uniforms;
     lastQualityTier = ctx.quality;
+    pass.setEnvironmentDetail(
+      ctx.experienceMode === 'cinematic' ? ctx.workBudget.environmentDetail : 0
+    );
 
     const snapshot = ctx.services.time.snapshot();
     const dt = Number.isFinite(ctx.time.dt) ? Math.max(0, ctx.time.dt) : 0;
