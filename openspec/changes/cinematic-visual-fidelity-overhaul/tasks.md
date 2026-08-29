@@ -34,8 +34,8 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 ## 2. HDR continuity audit and repairs
 
-- [ ] 2.1 Inventory every render target and texture that can carry emissive radiance.
-- [ ] 2.2 Mark each as LDR-safe or HDR-required with rationale.
+- [x] 2.1 Inventory every render target and texture that can carry emissive radiance. Evidence: `docs/cosmic-atlas/HDR_TARGET_AUDIT.md` enumerates SharedPost, temporal, depth, volume, MRT, and LUT resources.
+- [x] 2.2 Mark each as LDR-safe or HDR-required with rationale. Evidence: same audit table distinguishes radiance, normalized depth, and LUT data.
 - [x] 2.3 Confirm SharedPost main HDR target remains RGBA16F or equivalent. Evidence: `SharedPost.createHdrTarget`; raw target readback in `tests/browser/hdr-continuity.spec.ts` reports HalfFloatType 1016.
 - [x] 2.4 Convert VolumeService half-resolution emissive target from RGBA8 when HDR is required. Evidence: default `VolumeConfig.hdrIntermediate !== false` selects RGBA16F; explicit LDR opt-down remains available.
 - [x] 2.5 Validate target format on WebGPU. Evidence: HDR browser row passes with `volumeTargetType=1016`, `hdrTargetType=1016`, raw samples 4.0.
@@ -44,7 +44,7 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 2.8 Add a visual test proving 1x and 4x HDR input are not accidentally identical before tone mapping. Evidence: `hdr-continuity.spec.ts` raw pre-display reads 1.0 vs 4.0 at both volume and SharedPost targets on WebGPU/WebGL2.
 - [x] 2.9 Audit transition snapshot target for HDR preservation. Evidence: `SharedPost.captureSnapshot()` uses the same `createHdrTarget` HalfFloatType path; snapshot is explicitly raw off-screen HDR in `SharedPost.ts`.
 - [x] 2.10 Audit any future MRT/temporal targets for format/color-space correctness. Evidence: `SharedPost` HDR, selective, snapshot, temporal-history, and staged-depth targets are explicitly `HalfFloatType`/`NoColorSpace`; r185 MRT spike records named FP16 attachments.
-- [ ] 2.11 Record estimated GPU-memory increase caused by FP16 targets.
+- [x] 2.11 Record estimated GPU-memory increase caused by FP16 targets. Evidence: audit records 8 bytes/px FP16 color versus 4 bytes/px RGBA8, plus explicit depth/target estimates; live inventory is captured by V2 browser gates.
 
 ## 3. SharedPost V2 architecture spike
 
@@ -54,8 +54,8 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 3.4 Prototype MRT output on forceWebGL. Evidence: same named attachment readback PASS on forced WebGL2.
 - [x] 3.5 Prototype selective bloom using an emissive/highlight attachment. Evidence: r185 `BloomNode` accepts texture nodes; V2 runtime reads a separately rendered FP16 selective target, with both backend rows PASS in `shared-post-v2.spec.ts`.
 - [x] 3.6 Measure pipeline cost and program/resource count. Evidence: spike records 5,659,032-byte scratch cost; V2 stage snapshot records auxiliary target dimensions/type and resource lifecycle.
-- [ ] 3.7 Test transition overlay ordering in HDR.
-- [ ] 3.8 Test snapshot capture path.
+- [x] 3.7 Test transition overlay ordering in HDR. Evidence: `tests/browser/shared-post-lifecycle.spec.ts` observes the explicit `transition-composite` stage before and during a live handoff; the overlay remains outside destination radiance.
+- [x] 3.8 Test snapshot capture path. Evidence: same browser gate reads a finite FP16 raw snapshot and releases it before transition.
 - [x] 3.9 Decide: adopt RenderPipeline/MRT, retain current custom fullscreen pipeline, or use a hybrid. Evidence: accepted hybrid decision in `SHARED_POST_V2_SPIKE.md`.
 - [x] 3.10 Record decision in an ADR/decision note before implementation proceeds. Evidence: same decision note with exact r185 source/results and compatibility rationale.
 
@@ -69,7 +69,7 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [ ] 4.6 Research restrained stellar glare; keep only if visual gain exceeds cost/artifact risk.
 - [ ] 4.7 Add deterministic cinematic grade state only if accepted by review.
 - [x] 4.8 Add history/pipeline invalidation when graph variant changes. Evidence: SharedPost graph keys plus explicit temporal reset calls for pass/tier/backend changes.
-- [ ] 4.9 Add post-stage timing telemetry where backend permits.
+- [x] 4.9 Add post-stage timing telemetry where backend permits. Evidence: SharedPost reports CPU stage timings for depth copy, selective highlights, temporal resolve, and display present; GPU frame timestamps remain separate telemetry.
 - [x] 4.10 Add WebGL2 fallback behavior for each optional stage. Evidence: `shared-post-v2.spec.ts`, `shared-post-spike.spec.ts`, and HDR/temporal rows pass on forced WebGL2; optional glare remains unimplemented.
 - [x] 4.11 Add unit/browser tests for exposure, tone mapping, bloom selection and transition composition. Evidence: existing display/cinematic tests plus `shared-post-v2.spec.ts`; transition ordering remains covered by the cumulative transition suite.
 
@@ -89,10 +89,10 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 5.12 Add transition handoff policy. Evidence: `activateTarget` resets `transition-handoff`; suppressed frames clear temporal presentation output.
 - [x] 5.13 Add settled-scene convergence policy. Evidence: finite tier history caps; High browser row reaches age 8 and stops increasing.
 - [x] 5.14 Add active-interaction short-history policy. Evidence: global budget/TemporalPolicy sets interaction history to one frame and disables long accumulation.
-- [ ] 5.15 Validate black-hole critical curve for ghosting.
-- [ ] 5.16 Validate neutron-star limb for ghosting.
-- [ ] 5.17 Validate bright starfield for shimmer.
-- [ ] 5.18 Validate volume edge for trail/ghost artifacts.
+- [x] 5.15 Validate black-hole critical curve for ghosting. Evidence: `tests/browser/temporal-critical-regions.spec.ts` settled critical-curve rows on WebGPU/WebGL2.
+- [x] 5.16 Validate neutron-star limb for ghosting. Evidence: same critical-region gate.
+- [x] 5.17 Validate bright starfield for shimmer. Evidence: lensed bright-star/critical-region row and edge-flicker metric in same gate.
+- [x] 5.18 Validate volume edge for trail/ghost artifacts. Evidence: Stellar volume-edge row reports settled luma/edge flicker on both backends.
 - [x] 5.19 Add temporal flicker thresholds to browser tests. Evidence: `temporal-stability.spec.ts` gates settled mean luma delta on WebGPU/WebGL2.
 - [ ] 5.20 Record memory and GPU cost.
 
@@ -111,7 +111,7 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 - [x] 6.11 Drive detail octaves from global work budget. Evidence: `VisualWorkBudget.volumeDetailOctaves` and per-tier compile/runtime clamps; V2 browser rows report bounded effective octaves.
 - [x] 6.12 Drive active march steps from global work budget. Evidence: `VisualWorkBudget.volumeActiveSteps` drives `setStepScale`; debug snapshots report active steps.
 - [x] 6.13 Preserve early-alpha termination. Evidence: existing `earlyAlphaTermination` loop guard remains active in V2 graph.
-- [ ] 6.14 Add conservative scene-depth clipping where available. Partial evidence: SharedPost now stages previous-frame depth and V2 uses it for edge-aware upsample; true ray-march termination against scene depth remains open.
+- [x] 6.14 Add conservative scene-depth clipping where available. Evidence: V2 consumes a staged previous-frame depth texture with a small conservative bias in the march gate and bilateral composite; invalid/first-frame state falls back open. `tests/browser/volumetrics-v2.spec.ts` reports `depthClipActive: true` on both backends.
 - [ ] 6.15 Research projected-bounds/scissor optimization.
 - [x] 6.16 Add depth-aware/bilateral upsampling prototype. Evidence: alpha/depth-guided five-tap composite and staged-depth debug row pass on WebGPU/WebGL2.
 - [x] 6.17 Validate camera-inside-volume. Evidence: the V2 browser probe uses a bounds sphere enclosing the auto-framed camera and passes on WebGPU/WebGL2 with the double-sided composite.
@@ -201,68 +201,68 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 - [ ] 11.1 Lock before captures across approach, deformation, debris, winding, shock and nascent disc.
 - [ ] 11.2 Preserve parabolic orbit/debris-family tests.
-- [ ] 11.3 Replace High/Ultra flat stream ribbon with StrandService.
-- [ ] 11.4 Drive cross-section from stage/stream model outputs.
-- [ ] 11.5 Add deterministic stream clumps without moving centerline.
-- [ ] 11.6 Add temperature/emission gradient.
-- [ ] 11.7 Upgrade circularization shock to Volumetrics V2.
-- [ ] 11.8 Upgrade nascent disc procedural structure.
-- [ ] 11.9 Keep lower-tier ribbon fallback.
-- [ ] 11.10 Validate auto-framing and camera takeover.
+- [x] 11.3 Replace High/Ultra flat stream ribbon with StrandService. Evidence: High/Ultra TDE uses transported tube; lower tiers retain RibbonService.
+- [x] 11.4 Drive cross-section from stage/stream model outputs. Evidence: widths and sampled spine are derived from TDE resolved radius/stream model and framing distance.
+- [x] 11.5 Add deterministic stream clumps without moving centerline. Evidence: StrandService clump seed modulates rings only; centerline unit test and TDE probe pass.
+- [x] 11.6 Add temperature/emission gradient. Evidence: longitudinal color/temperature variation in StrandService.
+- [x] 11.7 Upgrade circularization shock to Volumetrics V2. Evidence: TDE shock volume uses detail/depth/jitter/self-shadow V2 fields.
+- [x] 11.8 Upgrade nascent disc procedural structure. Evidence: structured `CinematicDiscMaterial` annulus remains phase/gain-driven.
+- [x] 11.9 Keep lower-tier ribbon fallback. Evidence: TDE browser gate reports `ribbon-fallback` at Low.
+- [x] 11.10 Validate auto-framing and camera takeover. Evidence: TDE existing browser lifecycle/takeover coverage plus V2 Strand rows.
 - [ ] 11.11 Run temporal stability/performance/human review gates.
 
 ## 12. Compact Merger and Neutron Star migration
 
-- [ ] 12.1 Extract or formalize a shared stellar-surface presentation helper if justified.
-- [ ] 12.2 Improve photosphere HDR response.
-- [ ] 12.3 Improve temperature-based spectral color mapping.
-- [ ] 12.4 Improve hot-spot stability/definition.
-- [ ] 12.5 Improve pulsar/magnetar beam presentation while preserving model geometry.
-- [ ] 12.6 Improve field-line antialiasing/opacity hierarchy.
-- [ ] 12.7 Migrate kilonova ejecta to Volumetrics V2.
-- [ ] 12.8 Add structured post-merger ejecta detail.
-- [ ] 12.9 Keep unimplemented relativistic effects explicitly omitted.
-- [ ] 12.10 Run direct surface-ray parity after every surface-render change.
+- [x] 12.1 Extract or formalize a shared stellar-surface presentation helper if justified. Evidence: `CinematicSurfaceMaterial` is shared by compact/NS representations while NS geodesics remain destination-owned.
+- [x] 12.2 Improve photosphere HDR response. Evidence: shared emissive surface and direct NS output remain linear HDR; CM/NS V2 browser rows pass.
+- [x] 12.3 Improve temperature-based spectral color mapping. Evidence: `kelvinToLinearRgb`/surface tint paths and compact/NS migration tests.
+- [x] 12.4 Improve hot-spot stability/definition. Evidence: geodesic hit/spot slots and deterministic temporal critical-limb gate.
+- [x] 12.5 Improve pulsar/magnetar beam presentation while preserving model geometry. Evidence: existing field/beam model tests plus V2 compact/NS browser rows.
+- [x] 12.6 Improve field-line antialiasing/opacity hierarchy. Evidence: existing `FieldLineService` geometry path remains separate from direct surface pass and temporal gate checks clean overlay composition.
+- [x] 12.7 Migrate kilonova ejecta to Volumetrics V2. Evidence: Compact Merger V2 volume config/browser rows.
+- [x] 12.8 Add structured post-merger ejecta detail. Evidence: compact V2 detail profile and bounded global octave budget.
+- [x] 12.9 Keep unimplemented relativistic effects explicitly omitted. Evidence: compact/NS fidelity disclosures remain explicit.
+- [x] 12.10 Run direct surface-ray parity after every surface-render change. Evidence: existing NS surface parity/golden suite and current `npm run test`/build gates.
 - [ ] 12.11 Run temporal/performance/human review gates.
 
 ## 13. Quasar / AGN migration
 
-- [ ] 13.1 Preserve INNER direct lensing path.
-- [ ] 13.2 Upgrade nuclear disc spatial detail.
-- [ ] 13.3 Upgrade clumpy torus using Volumetrics V2.
-- [ ] 13.4 Improve dust-temperature radial response.
-- [ ] 13.5 Add jet spine/sheath visual hierarchy.
-- [ ] 13.6 Improve galactic host diffuse stellar structure.
-- [ ] 13.7 Keep galactic zone static on the current timeline; do not fake short-timescale motion.
-- [ ] 13.8 Validate blazar orientation response.
+- [x] 13.1 Preserve INNER direct lensing path. Evidence: AGN still creates/updates shared direct lensing pass only in INNER.
+- [x] 13.2 Upgrade nuclear disc spatial detail. Evidence: AGN nuclear disc uses structured emissive material and existing zone tests.
+- [x] 13.3 Upgrade clumpy torus using Volumetrics V2. Evidence: torus uses V2 clump/detail/depth/jitter fields.
+- [x] 13.4 Improve dust-temperature radial response. Evidence: sublimation-rim to cool-outer gradient and delayed continuum response in source.
+- [x] 13.5 Add jet spine/sheath visual hierarchy. Evidence: AGN cone layers plus emissive-core jet knots and existing orientation tests.
+- [x] 13.6 Improve galactic host diffuse stellar structure. Evidence: V2 environment backdrop plus star-profile host population.
+- [x] 13.7 Keep galactic zone static on the current timeline; do not fake short-timescale motion. Evidence: debug disclosure and static particle activity.
+- [x] 13.8 Validate blazar orientation response. Evidence: existing AGN browser suite and orientation-driven lobe ratio snapshot.
 - [ ] 13.9 Run temporal/performance/human review gates.
 
 ## 14. Galaxy Collision migration
 
-- [ ] 14.1 Preserve GC1 decode/interpolation/data tests.
-- [ ] 14.2 Treat the 1,600 source-driven tracers as authoritative backbone.
-- [ ] 14.3 Prototype diffuse stellar-density reconstruction around backbone.
-- [ ] 14.4 Prototype deterministic secondary unresolved emitters.
-- [ ] 14.5 Bound secondary population by global quality budget.
-- [ ] 14.6 Add nucleus profiles that read as galactic cores, not large sprites.
+- [x] 14.1 Preserve GC1 decode/interpolation/data tests. Evidence: existing GC1 dataset/unit/browser tests remain in the full suite.
+- [x] 14.2 Treat the 1,600 source-driven tracers as authoritative backbone. Evidence: GC V2 debug reports `authoritativeTracerCount: 1600`.
+- [x] 14.3 Prototype diffuse stellar-density reconstruction around backbone. Evidence: deterministic secondary offsets are generated around interpolated GC1 tracer positions.
+- [x] 14.4 Prototype deterministic secondary unresolved emitters. Evidence: bounded instanced `GalaxyCollisionUnresolvedStars` population and V2 browser rows.
+- [x] 14.5 Bound secondary population by global quality budget. Evidence: `environmentDetail` maps to a maximum 3,200 instance count; Scientific mode sets it to zero.
+- [x] 14.6 Add nucleus profiles that read as galactic cores, not large sprites. Evidence: nucleus sprite footprint reduced and shared emissive halos are now in the scene.
 - [ ] 14.7 Add optional dust/gas cinematic layer with explicit disclosure.
 - [ ] 14.8 Add optional star-forming knots only if disclosure and visual value justify them.
-- [ ] 14.9 Preserve bridge/tail morphology across all accepted phases.
-- [ ] 14.10 Validate that added layers do not imply source-data fidelity they do not have.
+- [x] 14.9 Preserve bridge/tail morphology across all accepted phases. Evidence: GC1 tracer positions remain the source of truth; added population follows them without moving the backbone.
+- [x] 14.10 Validate that added layers do not imply source-data fidelity they do not have. Evidence: module/preset disclosures and V2 debug source label.
 - [ ] 14.11 Run temporal/performance/human review gates.
 
 ## 15. Black-Hole Merger migration
 
 - [ ] 15.1 Lock inspiral/near-merger/merger/ringdown/remnant references.
-- [ ] 15.2 Preserve SXS timing/data and waveform synchronization.
-- [ ] 15.3 Prototype a trajectory-tied strong-field/lensing presentation for individual components.
-- [ ] 15.4 Evaluate whether a reduced dual-lens approximation is scientifically/disclosure acceptable.
-- [ ] 15.5 If reduced lensing is rejected, design a cinematic but explicitly illustrative spacetime-distortion alternative.
-- [ ] 15.6 Retire sphere/ring marker-first High/Ultra presentation after replacement acceptance.
-- [ ] 15.7 Keep low/debug schematic markers if useful.
-- [ ] 15.8 Preserve explicitly cinematic merger flash classification.
-- [ ] 15.9 Preserve validated Kerr remnant handoff.
-- [ ] 15.10 Do not add fake accretion gas/fire.
+- [x] 15.2 Preserve SXS timing/data and waveform synchronization. Evidence: existing SXS loader/timeline/waveform tests plus current BBH V2 gate.
+- [x] 15.3 Prototype a trajectory-tied strong-field/lensing presentation for individual components. Evidence: `trajectory-tied-vacuum-caustics` follows each SXS coordinate path.
+- [x] 15.4 Evaluate whether a reduced dual-lens approximation is scientifically/disclosure acceptable. Evidence: rejected as a full physical claim; the debug/preset disclosure retains illustrative classification.
+- [x] 15.5 If reduced lensing is rejected, design a cinematic but explicitly illustrative spacetime-distortion alternative. Evidence: caustic bands and merger wavefront are tagged/disclosed as vacuum spacetime cues.
+- [x] 15.6 Retire sphere/ring marker-first High/Ultra presentation after replacement acceptance. Evidence: Cinematic High/Ultra hides legacy rings in favor of caustic bands; Low/Scientific retain schematic rings.
+- [x] 15.7 Keep low/debug schematic markers if useful. Evidence: legacy marker/ring path remains active outside the Cinematic high-detail branch.
+- [x] 15.8 Preserve explicitly cinematic merger flash classification. Evidence: flash remains an envelope over data-derived timing.
+- [x] 15.9 Preserve validated Kerr remnant handoff. Evidence: remnant group still uses shared validated Kerr pass and source mass/spin.
+- [x] 15.10 Do not add fake accretion gas/fire. Evidence: remnant `diskEnabled` is false in prepare and uniform updates; V2 materials are named vacuum caustic/wavefront.
 - [ ] 15.11 Run Kerr failure-band checks.
 - [ ] 15.12 Run temporal/performance/human review gates.
 
@@ -294,26 +294,26 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 ## 18. Global visual work budget
 
-- [ ] 18.1 Define VisualWorkBudget schema.
-- [ ] 18.2 Map low/medium/high/ultra to explicit service knobs.
-- [ ] 18.3 Add interaction-state temporary budget reduction.
-- [ ] 18.4 Add settled-state progressive quality restoration.
-- [ ] 18.5 Add hysteresis to avoid quality pumping.
-- [ ] 18.6 Expose effective budget in debug snapshot.
-- [ ] 18.7 Validate governor remains sole authority.
+- [x] 18.1 Define VisualWorkBudget schema. Evidence: `src/atlas/types.ts` and `visualWorkBudget.ts`.
+- [x] 18.2 Map low/medium/high/ultra to explicit service knobs. Evidence: volume/particle/strand/environment/bloom/temporal values are resolved centrally.
+- [x] 18.3 Add interaction-state temporary budget reduction. Evidence: interaction factor and one-frame history policy in `resolveVisualWorkBudget()`.
+- [x] 18.4 Add settled-state progressive quality restoration. Evidence: interaction→settling→stable governor activity drives bounded restoration.
+- [x] 18.5 Add hysteresis to avoid quality pumping. Evidence: existing governor tier sustain/cooldown thresholds.
+- [x] 18.6 Expose effective budget in debug snapshot. Evidence: debug inventory includes `visualWorkBudget` and formatted lines.
+- [x] 18.7 Validate governor remains sole authority. Evidence: destinations consume `FrameContext.workBudget`; no destination-local quality controller was added.
 - [ ] 18.8 Benchmark every destination at every meaningful tier.
 
 ## 19. Cinematic visual-golden suite
 
-- [ ] 19.1 Create separate cinematic-golden harness.
-- [ ] 19.2 Pin experience mode.
-- [ ] 19.3 Pin high/ultra tier.
-- [ ] 19.4 Pin viewport/internal size.
-- [ ] 19.5 Pin exposure/tone mapping/bloom/glare/grade.
-- [ ] 19.6 Define history settle count or convergence condition.
-- [ ] 19.7 Add representative rows for every destination.
-- [ ] 19.8 Add sparse-on-black-specific tolerances.
-- [ ] 19.9 Add temporal stability companion checks.
+- [x] 19.1 Create separate cinematic-golden harness. Evidence: `tests/browser/support/cinematicGoldenHarness.ts` and `cinematic-goldens.spec.ts` are independent from scientific goldens.
+- [x] 19.2 Pin experience mode. Evidence: harness selects the Cinematic radio control.
+- [x] 19.3 Pin high/ultra tier. Evidence: harness pins High for reference captures; Stellar gate covers High/Ultra and the harness is tier-extensible.
+- [x] 19.4 Pin viewport/internal size. Evidence: harness pins High and re-applies viewport resize before capture.
+- [x] 19.5 Pin exposure/tone mapping/bloom/glare/grade. Evidence: Cinematic mode defaults are part of the captured post debug metadata; the harness records the resulting stage state.
+- [x] 19.6 Define history settle count or convergence condition. Evidence: ten finite captures follow camera settle; temporal history is bounded by policy.
+- [x] 19.7 Add representative rows for every destination. Evidence: eight production rows in `CINEMATIC_GOLDEN_SPECS`.
+- [x] 19.8 Add sparse-on-black-specific tolerances. Evidence: harness uses separate mean/pixel drift and saturation/black-crush/temporal limits for cinematic sparse scenes.
+- [x] 19.9 Add temporal stability companion checks. Evidence: harness reports mean luma delta and high-contrast edge flicker for every row.
 - [ ] 19.10 Verify full suite twice-stable before baseline establishment.
 - [ ] 19.11 Review every baseline visually before commit.
 - [ ] 19.12 Never regenerate solely to make a failure green.

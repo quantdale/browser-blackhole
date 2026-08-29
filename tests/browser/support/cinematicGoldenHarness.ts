@@ -30,7 +30,13 @@ export interface CinematicGoldenResult {
   status: 'pass' | 'updated' | 'missing' | 'fail';
   file: string;
   metrics: CinematicMetrics;
-  comparison?: { meanAbsDelta: number; pctPixelsBeyond: number; maxChannelDelta: number };
+  metadata: Record<string, unknown>;
+  comparison?: {
+    meanAbsDelta: number;
+    pctPixelsBeyond: number;
+    maxChannelDelta: number;
+    ssim: number;
+  };
   message?: string;
 }
 
@@ -122,6 +128,42 @@ export async function runCinematicGoldenExpectation(
   }
   const current = frames[frames.length - 1]!;
   const metrics = await captureMetrics(page, frames);
+  const runtimeMetadata = await page.evaluate(() => {
+    const app = window.__ATLAS_APP__!;
+    const post =
+      (
+        app.host.post as unknown as {
+          getDebugSnapshot?(): Record<string, unknown>;
+        }
+      ).getDebugSnapshot?.() ?? {};
+    const inventory = app.host.debugInventory?.() ?? null;
+    const state = app.host.state as unknown as {
+      sharedVisual: {
+        exposure: number;
+        toneMapping: string;
+        bloomEnabled: boolean;
+        bloomStrength: number;
+      };
+    };
+    const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
+    return {
+      backend: inventory?.backend ?? null,
+      browser: navigator.userAgent,
+      viewportCss: [window.innerWidth, window.innerHeight],
+      internalRenderSize: [canvas?.width ?? 0, canvas?.height ?? 0],
+      tier: inventory?.governor?.tier ?? null,
+      exposure: state.sharedVisual.exposure,
+      toneMapping: state.sharedVisual.toneMapping,
+      bloomEnabled: state.sharedVisual.bloomEnabled,
+      bloomStrength: state.sharedVisual.bloomStrength,
+      temporal: post.temporal ?? null,
+      stages: post.stages ?? []
+    };
+  });
+  const metadata: Record<string, unknown> = {
+    ...runtimeMetadata,
+    commit: process.env.CINEMATIC_GOLDEN_COMMIT ?? 'uncommitted'
+  };
   const suffix = spec.backend === undefined ? '' : `_${spec.backend.toUpperCase()}`;
   const fileName = `${spec.name}${suffix}.png`;
   const file = join(GOLDEN_DIR, fileName);
@@ -129,23 +171,26 @@ export async function runCinematicGoldenExpectation(
   if (update) {
     mkdirSync(dirname(file), { recursive: true });
     writeFileSync(file, current);
-    return { status: 'updated', file, metrics };
+    return { status: 'updated', file, metrics, metadata };
   }
   if (!existsSync(file)) {
     return {
       status: 'missing',
       file,
       metrics,
+      metadata,
       message: 'Run with UPDATE_CINEMATIC_GOLDENS=1 after review.'
     };
   }
 
   const comparison = await comparePngs(page, current, readFileSync(file));
-  const pass = comparison.meanAbsDelta <= 10 && comparison.pctPixelsBeyond <= 12;
+  const pass =
+    comparison.meanAbsDelta <= 10 && comparison.pctPixelsBeyond <= 12 && comparison.ssim >= 0.88;
   const result: CinematicGoldenResult = {
     status: pass ? 'pass' : 'fail',
     file,
     metrics,
+    metadata,
     comparison
   };
   if (!pass) result.message = `cinematic golden drift exceeds tolerance for ${spec.name}`;
@@ -313,11 +358,13 @@ async function comparePngs(page: Page, current: Buffer, golden: Buffer) {
       const a = await decode(currentBase64);
       const b = await decode(goldenBase64);
       if (a.width !== b.width || a.height !== b.height) {
-        return { meanAbsDelta: Infinity, pctPixelsBeyond: 100, maxChannelDelta: 255 };
+        return { meanAbsDelta: Infinity, pctPixelsBeyond: 100, maxChannelDelta: 255, ssim: 0 };
       }
       let sum = 0;
       let beyond = 0;
       let max = 0;
+      let ssimSum = 0;
+      let ssimBlocks = 0;
       for (let i = 0; i < a.width * a.height; i += 1) {
         const offset = i * 4;
         let pixelMax = 0;
@@ -329,10 +376,56 @@ async function comparePngs(page: Page, current: Buffer, golden: Buffer) {
         }
         if (pixelMax > 32) beyond += 1;
       }
+      const c1 = 6.5025;
+      const c2 = 58.5225;
+      for (let by = 0; by < a.height; by += 8) {
+        for (let bx = 0; bx < a.width; bx += 8) {
+          const valuesA: number[] = [];
+          const valuesB: number[] = [];
+          for (let y = by; y < Math.min(a.height, by + 8); y += 1) {
+            for (let x = bx; x < Math.min(a.width, bx + 8); x += 1) {
+              const offset = (y * a.width + x) * 4;
+              valuesA.push(
+                0.2126 * (a.data[offset] ?? 0) +
+                  0.7152 * (a.data[offset + 1] ?? 0) +
+                  0.0722 * (a.data[offset + 2] ?? 0)
+              );
+              valuesB.push(
+                0.2126 * (b.data[offset] ?? 0) +
+                  0.7152 * (b.data[offset + 1] ?? 0) +
+                  0.0722 * (b.data[offset + 2] ?? 0)
+              );
+            }
+          }
+          const count = valuesA.length;
+          if (count === 0) continue;
+          const meanA = valuesA.reduce((sum, value) => sum + value, 0) / count;
+          const meanB = valuesB.reduce((sum, value) => sum + value, 0) / count;
+          let varianceA = 0;
+          let varianceB = 0;
+          let covariance = 0;
+          for (let i = 0; i < count; i += 1) {
+            const da = valuesA[i]! - meanA;
+            const db = valuesB[i]! - meanB;
+            varianceA += da * da;
+            varianceB += db * db;
+            covariance += da * db;
+          }
+          const divisor = Math.max(1, count - 1);
+          varianceA /= divisor;
+          varianceB /= divisor;
+          covariance /= divisor;
+          ssimSum +=
+            ((2 * meanA * meanB + c1) * (2 * covariance + c2)) /
+            ((meanA * meanA + meanB * meanB + c1) * (varianceA + varianceB + c2));
+          ssimBlocks += 1;
+        }
+      }
       return {
         meanAbsDelta: sum / (a.width * a.height * 3),
         pctPixelsBeyond: (beyond / (a.width * a.height)) * 100,
-        maxChannelDelta: max
+        maxChannelDelta: max,
+        ssim: ssimBlocks > 0 ? ssimSum / ssimBlocks : 1
       };
     },
     { currentBase64: current.toString('base64'), goldenBase64: golden.toString('base64') }

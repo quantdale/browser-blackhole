@@ -21,6 +21,11 @@ for (const spec of CINEMATIC_GOLDEN_SPECS) {
     const expected = process.env.UPDATE_CINEMATIC_GOLDENS === '1' ? 'updated' : 'pass';
     console.log(`CINEMATIC_GOLDEN ${spec.name}: ${JSON.stringify(result)}`);
     expect(result.status, JSON.stringify(result)).toBe(expected);
+    expect(result.metadata.tier, `${spec.name} tier metadata`).toBe('high');
+    expect(
+      (result.metadata.temporal as { historyAge: number }).historyAge,
+      `${spec.name} settle`
+    ).toBe(8);
     expect(result.metrics.meanLuma, `${spec.name} should have visible radiance`).toBeGreaterThan(
       0.5
     );

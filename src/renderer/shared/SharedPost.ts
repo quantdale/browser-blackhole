@@ -108,6 +108,12 @@ export class SharedPost implements ISharedPost {
   private bloomResolutionScale = 0.5;
   private temporalPresentationActive = false;
   private temporalProjectionBackup: THREE.Matrix4 | null = null;
+  private readonly lastStageTimingMs = {
+    depthCopy: 0,
+    selectiveHighlights: 0,
+    temporalResolve: 0,
+    displayPresent: 0
+  };
 
   private readonly overlayOpacityU = uniform(0);
 
@@ -230,6 +236,7 @@ export class SharedPost implements ISharedPost {
    * explicit, bounded, and safe for the next frame's volume composite.
    */
   captureDepthForVolume(): void {
+    const started = nowMs();
     if (
       this.disposed ||
       this.hdrTarget === null ||
@@ -237,6 +244,7 @@ export class SharedPost implements ISharedPost {
       this.volumeDepthRead === null ||
       this.volumeDepthWrite === null
     ) {
+      this.lastStageTimingMs.depthCopy = 0;
       return;
     }
     if (this.volumeDepthSource?.id !== this.hdrTarget.depthTexture.id) {
@@ -256,6 +264,7 @@ export class SharedPost implements ISharedPost {
     this.volumeDepthRead = this.volumeDepthWrite;
     this.volumeDepthWrite = swap;
     this.volumeDepthValid = true;
+    this.lastStageTimingMs.depthCopy = nowMs() - started;
   }
 
   invalidateDepthHistory(): void {
@@ -308,10 +317,15 @@ export class SharedPost implements ISharedPost {
   }
 
   resolveTemporal(camera: THREE.PerspectiveCamera): void {
-    if (this.hdrTarget === null) return;
+    const started = nowMs();
+    if (this.hdrTarget === null) {
+      this.lastStageTimingMs.temporalResolve = 0;
+      return;
+    }
     this.temporal.resolve(this.hdrTarget.texture, camera);
     this.temporalPresentationActive = this.temporal.getResolvedTexture() !== null;
     this.graphKey = null;
+    this.lastStageTimingMs.temporalResolve = nowMs() - started;
   }
 
   clearTemporalOutput(): void {
@@ -366,9 +380,13 @@ export class SharedPost implements ISharedPost {
    * and may use the whole-image bloom source for compatibility.
    */
   renderSelectiveHighlights(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
+    const started = nowMs();
     this.highlightRendered = false;
     this.graphKey = null;
-    if (this.disposed || this.highlightTarget === null || !this.bloomEnabled) return;
+    if (this.disposed || this.highlightTarget === null || !this.bloomEnabled) {
+      this.lastStageTimingMs.selectiveHighlights = 0;
+      return;
+    }
 
     let marked = 0;
     scene.traverse((object) => {
@@ -381,7 +399,10 @@ export class SharedPost implements ISharedPost {
         marked += 1;
       }
     });
-    if (marked === 0) return;
+    if (marked === 0) {
+      this.lastStageTimingMs.selectiveHighlights = nowMs() - started;
+      return;
+    }
 
     const previousTarget = this.renderer.getRenderTarget();
     const previousMask = camera.layers.mask;
@@ -394,6 +415,7 @@ export class SharedPost implements ISharedPost {
       this.renderer.setRenderTarget(previousTarget as THREE.WebGLRenderTarget | null);
       camera.layers.mask = previousMask;
     }
+    this.lastStageTimingMs.selectiveHighlights = nowMs() - started;
   }
 
   clearSelectiveHighlights(): void {
@@ -402,7 +424,11 @@ export class SharedPost implements ISharedPost {
   }
 
   present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void {
-    if (this.disposed || this.hdrTarget === null) return;
+    const started = nowMs();
+    if (this.disposed || this.hdrTarget === null) {
+      this.lastStageTimingMs.displayPresent = 0;
+      return;
+    }
 
     this.overlayTexture = transitionOverlay;
     this.overlayOpacityU.value = clamp01(transitionOpacity);
@@ -412,6 +438,7 @@ export class SharedPost implements ISharedPost {
     this.mesh.material = this.presentMaterial;
     this.renderer.setRenderTarget(null);
     this.renderer.render(this.scene, this.camera);
+    this.lastStageTimingMs.displayPresent = nowMs() - started;
   }
 
   captureSnapshot(): THREE.Texture | null {
@@ -843,6 +870,7 @@ export class SharedPost implements ISharedPost {
               type: this.volumeDepthRead.texture.type,
               allocatedTargetCount: 2
             },
+      stageTimingMs: { ...this.lastStageTimingMs },
       temporal: this.temporal.getDebugSnapshot()
     };
   }
@@ -861,6 +889,10 @@ export class SharedPost implements ISharedPost {
 function clamp01(value: number): number {
   if (!Number.isFinite(value)) return 0;
   return value < 0 ? 0 : value > 1 ? 1 : value;
+}
+
+function nowMs(): number {
+  return typeof performance !== 'undefined' ? performance.now() : Date.now();
 }
 
 const TEMPORAL_RESET_REASONS: ReadonlySet<string> = new Set([

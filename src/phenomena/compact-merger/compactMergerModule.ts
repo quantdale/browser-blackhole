@@ -812,6 +812,10 @@ export function createCompactMergerModule(): PhenomenonModule {
       ...debug,
       disposed,
       fidelity: COMPACT_MERGER_DESCRIPTOR.fidelity,
+      representation:
+        'temperature-mapped compact surfaces + V2 kilonova volume + ejecta-streak particles',
+      volumeWork: volumeHandle?.getDebugSnapshot?.() ?? null,
+      particleWork: particleHandle?.getDebugSnapshot() ?? null,
       disclosure:
         'PROCEDURAL_SCIENTIFIC: closed-form quadrupole inspiral (DIRECT reduced) + disclosed reduced ' +
         'post-merger models with presentation-compressed expansion. Not NR, not hydrodynamics.'

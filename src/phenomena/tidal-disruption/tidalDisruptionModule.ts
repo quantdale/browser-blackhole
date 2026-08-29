@@ -1064,6 +1064,12 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     debug['tier'] = lastTier;
     debug['observerInclinationDeg'] = res.observerInclinationDeg;
     debug['verdictReason'] = ready.verdict.reason;
+    debug['volumeWork'] = volumeHandle?.getDebugSnapshot?.() ?? null;
+    debug['particleWork'] = particleHandle?.getDebugSnapshot() ?? null;
+    debug['strandWork'] = {
+      bound: boundStrand?.getDebugSnapshot?.() ?? null,
+      unbound: unboundStrand?.getDebugSnapshot?.() ?? null
+    };
   }
 
   function render(ctx: RenderContext): void {

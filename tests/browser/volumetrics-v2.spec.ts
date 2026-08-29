@@ -107,6 +107,9 @@ test.describe('Volumetrics V2 detail and composition', () => {
         volume.setTemporalJitter?.(true);
         scene.add(volume.object3d());
         app.captureFrame();
+        // The first frame stages depth; the second frame consumes it in the
+        // conservative ray-march depth gate and bilateral composite.
+        app.captureFrame();
         const snapshot = volume.getDebugSnapshot?.() ?? {};
         scene.remove(volume.object3d());
         volume.dispose();
@@ -132,6 +135,7 @@ test.describe('Volumetrics V2 detail and composition', () => {
           allocatedTargetCount: 2
         }
       });
+      expect(result.volume.depthClipActive).toBe(true);
     });
   }
 });

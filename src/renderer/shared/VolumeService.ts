@@ -71,7 +71,9 @@ import {
   Fn,
   If,
   Loop,
+  cameraProjectionMatrix,
   cameraPosition,
+  cameraViewMatrix,
   float,
   fract,
   max,
@@ -80,6 +82,7 @@ import {
   normalize,
   positionWorld,
   screenUV,
+  select,
   sin,
   smoothstep,
   sqrt,
@@ -151,6 +154,7 @@ class VolumeImpl implements VolumeHandle {
   private readonly detailOctaveCeiling: number;
   private readonly uLightingTaps: UniformNode<'float', number>;
   private readonly uJitterEnabled: UniformNode<'float', number>;
+  private readonly uDepthValid: UniformNode<'float', number>;
   private readonly depthTextureState: { value: THREE.Texture | null };
   private readonly emptyDepthTexture = new THREE.Texture();
   private readonly depthTextureNode: ReturnType<typeof texture> | null;
@@ -191,6 +195,7 @@ class VolumeImpl implements VolumeHandle {
     this.uJitterSeed = uniform(seed);
     this.uJitterFrame = uniform(0);
     this.uJitterEnabled = uniform(config.temporalJitter ? 1 : 0);
+    this.uDepthValid = uniform(0);
     this.detailOctaveCeiling =
       config.detail === undefined ? 1 : clampInt(config.detail.octaves ?? 3, 1, 5);
     this.uDetailOctaves = uniform(this.detailOctaveCeiling);
@@ -343,6 +348,21 @@ class VolumeImpl implements VolumeHandle {
               // keeps detail visible without turning every structured field
               // into a saturated white mask.
               emission = emission.mul(detailFactor.pow(0.45));
+            }
+
+            if (this.depthTextureNode !== null) {
+              // Conservative previous-frame depth clip. The staged map is
+              // explicitly invalidated on discontinuities, and a small depth
+              // bias keeps the volume from disappearing at coplanar edges.
+              const clipPosition = cameraProjectionMatrix.mul(cameraViewMatrix.mul(vec4(pos, 1)));
+              const sampleDepth = clipPosition.z.div(clipPosition.w.max(1e-6)).mul(0.5).add(0.5);
+              const sceneDepth = this.depthTextureNode.sample(screenUV).r;
+              const depthGate = select(
+                this.uDepthValid.greaterThan(0.5),
+                select(sampleDepth.lessThan(sceneDepth.add(0.003)), float(1), float(0)),
+                float(1)
+              );
+              density = density.mul(depthGate);
             }
 
             if (config.gradientShading === true) {
@@ -588,6 +608,7 @@ class VolumeImpl implements VolumeHandle {
   setSceneDepthTexture(textureValue: THREE.Texture | null): void {
     if (this.disposed) return;
     this.depthTextureState.value = textureValue;
+    this.uDepthValid.value = textureValue === null ? 0 : 1;
     if (this.depthTextureNode !== null) {
       this.depthTextureNode.value = textureValue ?? this.emptyDepthTexture;
     }
@@ -618,7 +639,8 @@ class VolumeImpl implements VolumeHandle {
       detailOctaves: Math.min(this.uDetailOctaves.value, this.detailOctaveCeiling),
       lightingTaps: this.uLightingTaps.value,
       temporalJitter: this.uJitterEnabled.value > 0,
-      depthAwareUpsample: this.depthTextureNode !== null
+      depthAwareUpsample: this.depthTextureNode !== null,
+      depthClipActive: this.depthTextureNode !== null && this.uDepthValid.value > 0
     };
   }
 
