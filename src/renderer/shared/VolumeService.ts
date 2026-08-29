@@ -46,6 +46,8 @@
  * `setInternalScale`), rendered during the main pass from the proxy mesh's
  * `onBeforeRender`; the visible proxy then composites that texture at
  * `screenUV` with linear filtering (no depth-aware upsample — disclosed below).
+ * Because emission is linear radiance, this target is RGBA16F by default.
+ * `hdrIntermediate: false` is an explicit opt-down for an LDR-safe effect.
  *
  * FIDELITY DISCLOSURE (CINEMATIC-class visual infrastructure):
  * - Constant step length; no adaptive sampling, no empty-region acceleration
@@ -139,6 +141,8 @@ class VolumeImpl implements VolumeHandle {
   /** Private scene holding the proxy for the nested half-res march render. */
   private readonly marchScene: THREE.Scene | null;
   private readonly target: THREE.RenderTarget | null;
+  private readonly intermediateType: THREE.TextureDataType | null;
+  private readonly intermediateFormat: 'rgba16f' | 'rgba8' | null;
 
   private readonly uStepScale: UniformNode<'float', number>;
   private readonly uActiveSteps: UniformNode<'float', number>;
@@ -190,8 +194,13 @@ class VolumeImpl implements VolumeHandle {
     let compositeMaterial: MeshBasicNodeMaterial | null = null;
     let marchScene: THREE.Scene | null = null;
     let target: THREE.RenderTarget | null = null;
+    let intermediateType: THREE.TextureDataType | null = null;
+    let intermediateFormat: 'rgba16f' | 'rgba8' | null = null;
 
     if (config.halfResolution) {
+      const hdrIntermediate = config.hdrIntermediate !== false;
+      intermediateType = hdrIntermediate ? THREE.HalfFloatType : THREE.UnsignedByteType;
+      intermediateFormat = hdrIntermediate ? 'rgba16f' : 'rgba8';
       target = new THREE.RenderTarget(2, 2, {
         depthBuffer: false,
         stencilBuffer: false,
@@ -199,11 +208,16 @@ class VolumeImpl implements VolumeHandle {
         minFilter: THREE.LinearFilter,
         magFilter: THREE.LinearFilter,
         format: THREE.RGBAFormat,
-        type: THREE.UnsignedByteType
+        type: intermediateType,
+        colorSpace: THREE.NoColorSpace
       });
 
       compositeMaterial = new MeshBasicNodeMaterial();
-      compositeMaterial.side = THREE.BackSide;
+      // The nested march intentionally uses BackSide so a camera outside the
+      // bounds shades the far surface. The visible composite must also work
+      // when the camera is inside the volume; culling its front-facing proxy
+      // would drop the otherwise-valid HDR texture before SharedPost.
+      compositeMaterial.side = THREE.DoubleSide;
       compositeMaterial.transparent = true;
       compositeMaterial.depthWrite = false;
       compositeMaterial.premultipliedAlpha = true;
@@ -221,6 +235,8 @@ class VolumeImpl implements VolumeHandle {
     this.compositeMaterial = compositeMaterial;
     this.marchScene = marchScene;
     this.target = target;
+    this.intermediateType = intermediateType;
+    this.intermediateFormat = intermediateFormat;
 
     // --- visible object ---
     this.mesh = new THREE.Mesh(this.geometry, compositeMaterial ?? this.marchMaterial);
@@ -365,8 +381,22 @@ class VolumeImpl implements VolumeHandle {
       activeSteps: this.activeStepCount,
       internalScale: this.uInternalScale.value,
       visible: this.visible,
-      halfResolution: this.target !== null
+      halfResolution: this.target !== null,
+      intermediateFormat: this.intermediateFormat,
+      intermediateType: this.intermediateType,
+      intermediateBytesPerPixel:
+        this.intermediateType === THREE.HalfFloatType
+          ? 8
+          : this.intermediateType === THREE.UnsignedByteType
+            ? 4
+            : 0,
+      hdrIntermediate: this.intermediateType === THREE.HalfFloatType
     };
+  }
+
+  /** Numeric HDR probe hook; ordinary destinations use object3d() instead. */
+  getIntermediateRenderTargetForTest(): THREE.RenderTarget | null {
+    return this.target;
   }
 
   dispose(): void {

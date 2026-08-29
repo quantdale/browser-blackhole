@@ -49,6 +49,15 @@ Maintain scene radiance in HDR (prefer half-float render targets where supported
 
 `physical radiance -> temporal reconstruction -> bloom -> exposure/tone mapping -> output color space`
 
+Every intermediate that carries emissive volume radiance is part of the HDR
+contract, not only the final SharedPost target. SharedPost and emissive
+half-resolution volumes use RGBA16F/HalfFloatType with `NoColorSpace` (linear
+storage); an effect may opt down to RGBA8 only when its `VolumeConfig` marks
+`hdrIntermediate: false` and its bounded range has been reviewed. The numeric
+probe in `tests/browser/hdr-continuity.spec.ts` reads the raw half-float
+samples before display conversion and proves a constant value of 4 survives
+both the volume target and SharedPost on WebGPU and forced WebGL2.
+
 Bloom is post-processing. It must not alter physics calculations or be necessary for the lensing to exist.
 
 For Cosmic Atlas destinations that are not already full-screen ray images, the

@@ -38,6 +38,7 @@
     "bench:neutron-star": "node scripts/bench-neutron-star.mjs",
     "bench:stellar-explosion": "node scripts/bench-stellar-explosion.mjs",
     "bench:galaxy-collision": "node scripts/bench-galaxy-collision.mjs",
+    "capture:visual-baseline": "node scripts/capture-visual-baseline.mjs",
     "mcp:preflight": "node scripts/mcp-preflight.mjs",
     "mcp:preflight:online": "node scripts/mcp-preflight.mjs --online"
   },

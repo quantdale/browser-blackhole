@@ -251,6 +251,8 @@ export interface VolumeConfig {
   emission?: TslDensityFn;
   /** Base step count at 'high' tier; governor scales it. */
   baseMaxSteps: number;
+  /** Keep emissive intermediates in linear FP16/HDR storage (default true). */
+  hdrIntermediate?: boolean;
   halfResolution: boolean;
   earlyAlphaTermination: boolean;
   temporalJitter: boolean;
@@ -262,6 +264,8 @@ export interface VolumeHandle {
   setVisible(visible: boolean): void;
   /** Bounded local work/residency snapshot for debug and benchmark probes. */
   getDebugSnapshot?(): Record<string, unknown>;
+  /** Test/diagnostic-only access to the half-resolution target for numeric probes. */
+  getIntermediateRenderTargetForTest?(): THREE.RenderTarget | null;
   dispose(): void;
 }
 

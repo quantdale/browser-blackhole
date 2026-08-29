@@ -163,6 +163,9 @@ describe('VolumeService half-resolution path', () => {
     expect(target).not.toBeNull();
     expect(target!.width).toBe(400);
     expect(target!.height).toBe(300);
+    expect(target!.texture.type).toBe(THREE.HalfFloatType);
+    expect(target!.texture.colorSpace).toBe(THREE.NoColorSpace);
+    expect((mesh.material as THREE.MeshBasicMaterial).side).toBe(THREE.DoubleSide);
 
     // Ownership contract: bind private target -> march -> restore previous.
     expect(fake.calls.map((c) => c.op)).toEqual(['setRenderTarget', 'render', 'setRenderTarget']);
@@ -172,6 +175,22 @@ describe('VolumeService half-resolution path', () => {
     const renderedScene = fake.calls[1]!.arg as THREE.Scene;
     expect(renderedScene.children).toHaveLength(1);
 
+    service.dispose();
+  });
+
+  it('permits an explicitly LDR-safe half-resolution volume to use RGBA8', () => {
+    const service = new VolumeService();
+    const volume = service.createVolume(
+      makeConfig({ halfResolution: true, hdrIntermediate: false })
+    );
+    const target = volume.getIntermediateRenderTargetForTest?.();
+    expect(target).not.toBeNull();
+    expect(target!.texture.type).toBe(THREE.UnsignedByteType);
+    expect(volume.getDebugSnapshot?.()).toMatchObject({
+      intermediateFormat: 'rgba8',
+      hdrIntermediate: false,
+      intermediateBytesPerPixel: 4
+    });
     service.dispose();
   });
 

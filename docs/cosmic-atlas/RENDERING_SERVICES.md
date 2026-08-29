@@ -364,6 +364,16 @@ VolumeService:
 - target bytes;
 - GPU time.
 
+Emissive half-resolution volume targets are RGBA16F/HalfFloatType by default
+and carry linear `NoColorSpace` samples into the shared HDR target. A caller
+must explicitly set `hdrIntermediate: false` to request the cheaper RGBA8
+path, and only for a measured LDR-safe effect. `getIntermediateRenderTargetForTest`
+is a numeric-probe hook, not a production destination dependency; the browser
+HDR gate proves the default target preserves radiance 4.0 through SharedPost
+on WebGPU and forced WebGL2. The target remains premultiplied RGBA and the
+visible half-resolution composite is double-sided so camera-inside-volume
+cases do not discard a valid intermediate.
+
 The live `VolumeHandle.getDebugSnapshot()` also reports the compile-time upper
 bound and current `activeSteps`; `setStepScale()` guards the density/emission
 work itself, so a quality reduction is measurable rather than a spacing-only

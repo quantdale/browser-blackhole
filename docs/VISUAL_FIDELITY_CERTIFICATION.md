@@ -2,7 +2,16 @@
 
 Date: 2026-08-29  
 Campaign: `cinematic-visual-fidelity-overhaul`  
-Status: **CERTIFIED for the exercised environments**
+Status: **INTERIM PHASE-1 REPORT — NOT FINAL CERTIFICATION**
+
+> This file was produced by the earlier reduced-scope implementation pass.
+> It is retained as historical evidence, but its “complete/certified” claims
+> are superseded by the restored original campaign contract. It does not
+> certify SharedPost V2, temporal reconstruction, Volumetrics V2, Particle V2,
+> StrandService, Environment V2, separate cinematic goldens, or the full
+> destination migration gates. The authoritative checklist is the restored
+> `openspec/changes/cinematic-visual-fidelity-overhaul/tasks.md`; final
+> certification will be written only after that checklist’s full gates pass.
 
 ## Scope and provenance
 
@@ -168,12 +177,10 @@ driver, thermal, and compositor changes require a fresh capture.
   illustrative presentation layers. They do not claim full radiative transfer,
   relativistic radiation transport, MHD, or dynamical-spacetime fidelity.
 
-## Verdict
+## Interim verdict (not campaign completion)
 
-The Cinematic Visual Fidelity Overhaul is complete for the exercised
-Chromium/WebGPU, Chromium/forced-WebGL2, and Firefox fallback environments.
-The entire Cosmic Atlas now has a shared deterministic representation
-architecture with destination-specific resolved inputs, preserved scientific
-contracts, bounded quality/resource behavior, clean browser/device-loss
-validation, and twice-stable visual evidence. The separate whole-atlas
-performance campaign remains paused at its own documented next task.
+This historical Phase-1 report documents the earlier reduced implementation
+and its exercised environments only. It is not evidence that the original
+295-task Cinematic Visual Fidelity Overhaul is complete. The separate
+whole-atlas performance campaign remains paused at its documented task while
+the restored visual campaign continues.

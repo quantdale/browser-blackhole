@@ -5,44 +5,44 @@ Execution rule: complete workstreams in dependency order unless measured evidenc
 
 ## 0. Campaign bootstrap and baseline
 
-- [ ] 0.1 Record starting SHA, branch, browser, backend, adapter and dependency versions.
-- [ ] 0.2 Run npm run check and record result.
-- [ ] 0.3 Run the current scientific visual-golden suite twice and record exact result.
-- [ ] 0.4 Run all per-destination browser suites and record exact result.
-- [ ] 0.5 Capture current Cinematic-mode reference frames for every production destination at reviewed phases/presets.
-- [ ] 0.6 Capture Scientific-mode counterparts for the same views.
-- [ ] 0.7 Capture short motion sequences for every destination, not only still images.
-- [ ] 0.8 Build a visual defect ledger with one row per destination and defect category.
-- [ ] 0.9 Build a shared-renderer defect ledger for HDR, bloom, volume, particles, ribbons, environment, temporal stability and antialiasing.
-- [ ] 0.10 Record current GPU/CPU timing, internal resolution, draw/compute counts and memory for each baseline.
-- [ ] 0.11 Freeze these artifacts as the campaign before-state; do not overwrite them later.
+- [x] 0.1 Record starting SHA, branch, browser, backend, adapter and dependency versions. Evidence: `acf0694` plan checkpoint; `docs/cosmic-atlas/VISUAL_FIDELITY_BASELINE_2026-08-29.md`; start-gate Node v24.3.0/npm 11.4.2/Three.js 0.185.1.
+- [x] 0.2 Run npm run check and record result. Evidence: start gate at the restored-plan checkpoint; format/lint/typecheck/580 unit tests/build PASS.
+- [x] 0.3 Run the current scientific visual-golden suite twice and record exact result. Evidence: `npx playwright test tests/browser/visual-goldens.spec.ts --project=default --workers=1` twice; 43/43 each run.
+- [x] 0.4 Run all per-destination browser suites and record exact result. Evidence: `npx playwright test --project=default --workers=1`; 228/228 PASS.
+- [ ] 0.5 Capture current Cinematic-mode reference frames for every production destination at reviewed phases/presets. Partial evidence: `scripts/capture-visual-baseline.mjs` covers all eight destinations and representative default/phase/shot views; the full alternate-preset matrix remains open.
+- [ ] 0.6 Capture Scientific-mode counterparts for the same views. Partial evidence: the same capture covers the matched representative views; alternate-preset completeness remains open.
+- [ ] 0.7 Capture short motion sequences for every destination, not only still images. Partial evidence: five-frame deterministic phase strips exist for all eight destinations in the frozen artifact root; true playing-motion captures remain open.
+- [x] 0.8 Build a visual defect ledger with one row per destination and defect category. Evidence: `docs/cosmic-atlas/VISUAL_FIDELITY_BASELINE_2026-08-29.md` reviewed ledger.
+- [x] 0.9 Build a shared-renderer defect ledger for HDR, bloom, volume, particles, ribbons, environment, temporal stability and antialiasing. Evidence: same Phase-0 ledger and source audit.
+- [ ] 0.10 Record current GPU/CPU timing, internal resolution, draw/compute counts and memory for each baseline. Partial evidence: the frozen manifest records internal size, GPU timestamp, renderer/resource inventory and zero errors; matched CPU/rAF benchmark records are still required.
+- [x] 0.11 Freeze these artifacts as the campaign before-state; do not overwrite them later. Evidence: non-overwriting `scripts/capture-visual-baseline.mjs`, manifest SHA recorded in `docs/cosmic-atlas/VISUAL_FIDELITY_BASELINE_2026-08-29.md`.
 
 ## 1. Visual measurement infrastructure
 
-- [ ] 1.1 Add a cinematic capture harness independent from scientific goldens.
-- [ ] 1.2 Add deterministic fixed-camera/fixed-phase capture helpers.
-- [ ] 1.3 Add a temporal settle protocol with a finite maximum history length.
-- [ ] 1.4 Add frame-to-frame luma flicker metric.
-- [ ] 1.5 Add saturation percentage metric.
-- [ ] 1.6 Add black-crush percentage metric.
-- [ ] 1.7 Add luminance histogram / percentile reporting.
-- [ ] 1.8 Add edge-flicker sampling for sparse high-contrast content.
+- [x] 1.1 Add a cinematic capture harness independent from scientific goldens. Evidence: `scripts/capture-visual-baseline.mjs` and the frozen Phase-0 manifest.
+- [x] 1.2 Add deterministic fixed-camera/fixed-phase capture helpers. Evidence: fixed route/preset/phase/camera/tier capture functions in the script.
+- [ ] 1.3 Add a temporal settle protocol with a finite maximum history length. Partial evidence: the baseline helper waits for three stable camera polls with a 15-second finite deadline; a history-age/convergence postcondition remains open.
+- [x] 1.4 Add frame-to-frame luma flicker metric. Evidence: `temporalMetrics()` in the capture harness.
+- [x] 1.5 Add saturation percentage metric. Evidence: screenshot metric reports channel ≥250 percentage.
+- [x] 1.6 Add black-crush percentage metric. Evidence: screenshot metric reports luma ≤3/255 percentage.
+- [x] 1.7 Add luminance histogram / percentile reporting. Evidence: p01/p05/p50/p90/p99/p999 plus mean/stdev in the manifest.
+- [x] 1.8 Add edge-flicker sampling for sparse high-contrast content. Evidence: gradient-difference `edgeFlickerPercent` in motion records.
 - [ ] 1.9 Evaluate SSIM or another structural similarity metric using a reproducible dependency or in-repo implementation.
 - [ ] 1.10 Decide whether an LPIPS-like offline metric is worth the dependency/runtime cost; document keep/reject.
-- [ ] 1.11 Add a human-review capture manifest: wide, medium, detail, timeline strip, Scientific-vs-Cinematic.
+- [x] 1.11 Add a human-review capture manifest: wide, medium, detail, timeline strip, Scientific-vs-Cinematic. Evidence: frozen JSON manifest and tracked ledger; representative contact sheets are in the artifact root.
 - [ ] 1.12 Add visual-test metadata: commit, backend, adapter, browser, viewport, internal dimensions, tier, exposure, tone mapping, bloom state, history settle count.
 
 ## 2. HDR continuity audit and repairs
 
 - [ ] 2.1 Inventory every render target and texture that can carry emissive radiance.
 - [ ] 2.2 Mark each as LDR-safe or HDR-required with rationale.
-- [ ] 2.3 Confirm SharedPost main HDR target remains RGBA16F or equivalent.
-- [ ] 2.4 Convert VolumeService half-resolution emissive target from RGBA8 when HDR is required.
-- [ ] 2.5 Validate target format on WebGPU.
-- [ ] 2.6 Validate equivalent/fallback target format on forceWebGL.
-- [ ] 2.7 Add a numeric HDR probe proving radiance >1 survives volume intermediate and reaches SharedPost.
-- [ ] 2.8 Add a visual test proving 1x and 4x HDR input are not accidentally identical before tone mapping.
-- [ ] 2.9 Audit transition snapshot target for HDR preservation.
+- [x] 2.3 Confirm SharedPost main HDR target remains RGBA16F or equivalent. Evidence: `SharedPost.createHdrTarget`; raw target readback in `tests/browser/hdr-continuity.spec.ts` reports HalfFloatType 1016.
+- [x] 2.4 Convert VolumeService half-resolution emissive target from RGBA8 when HDR is required. Evidence: default `VolumeConfig.hdrIntermediate !== false` selects RGBA16F; explicit LDR opt-down remains available.
+- [x] 2.5 Validate target format on WebGPU. Evidence: HDR browser row passes with `volumeTargetType=1016`, `hdrTargetType=1016`, raw samples 4.0.
+- [x] 2.6 Validate equivalent/fallback target format on forceWebGL. Evidence: HDR browser row passes with the same target types/raw samples on forced WebGL2.
+- [x] 2.7 Add a numeric HDR probe proving radiance >1 survives volume intermediate and reaches SharedPost. Evidence: `tests/browser/hdr-continuity.spec.ts` reads `[4,4,4,1]` at both stages on both backends.
+- [x] 2.8 Add a visual test proving 1x and 4x HDR input are not accidentally identical before tone mapping. Evidence: `hdr-continuity.spec.ts` raw pre-display reads 1.0 vs 4.0 at both volume and SharedPost targets on WebGPU/WebGL2.
+- [x] 2.9 Audit transition snapshot target for HDR preservation. Evidence: `SharedPost.captureSnapshot()` uses the same `createHdrTarget` HalfFloatType path; snapshot is explicitly raw off-screen HDR in `SharedPost.ts`.
 - [ ] 2.10 Audit any future MRT/temporal targets for format/color-space correctness.
 - [ ] 2.11 Record estimated GPU-memory increase caused by FP16 targets.
 
