@@ -67,7 +67,7 @@ for (const spec of runSpecs) {
       `${spec.name} settle`
     ).toBe(8);
     expect(result.metrics.meanLuma, `${spec.name} should have visible radiance`).toBeGreaterThan(
-      0.5
+      spec.minimumMeanLuma ?? 0.5
     );
     expect(result.metrics.saturationPercent, `${spec.name} saturation headroom`).toBeLessThan(35);
     expect(result.metrics.temporal.meanLumaDelta, `${spec.name} temporal flicker`).toBeLessThan(12);
