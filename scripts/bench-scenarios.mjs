@@ -235,7 +235,9 @@ const INSTALL_HELPERS = () => {
         ticks,
         renderFrameCalls: runtimeState.renderFrameCalls,
         framesObserved: telemetry.framesObserved,
-        framesRendered: telemetry.framesRendered
+        framesRendered: telemetry.framesRendered,
+        lastReasonNames: telemetry.lastReasonNames,
+        reasonCounts: telemetry.reasonCounts
       };
     }
   };

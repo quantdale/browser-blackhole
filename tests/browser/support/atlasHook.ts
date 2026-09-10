@@ -115,6 +115,14 @@ interface AtlasHook {
   host: {
     state: AtlasStateView;
     debugInventory(): InventoryView;
+    /**
+     * Renderer kernel surface. Specs patch `renderFrame` for instrumentation
+     * and read the WS2 precompile counters; the real object carries more.
+     */
+    kernel: {
+      renderFrame(plan: unknown): boolean;
+      readonly precompileCounts: { requested: number; completed: number; failed: number };
+    };
     /** Live perspective camera; callers must read basis through evaluate. */
     camera: AtlasCameraView;
     /** SharedPost front-end owning exposure/bloom/tone-mapping presentation. */

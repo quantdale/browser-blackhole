@@ -1,3 +1,46 @@
+## 2026-09-10 session — WS2 TRANSITION OCCLUSION + WARMUP COMPLETE (tasks.md §4), IDLE-RENDER DEFECT FIXED
+
+Status: **§4 COMPLETE; a real production defect found by the new §0 scenario
+coverage is fixed.** Continued from `8f9798b`.
+
+Implemented:
+
+- `SharedRendererKernel.precompileScene()` warms the incoming visible subgraph
+  with `compileAsync` once per scene during the fully-opaque window; completions
+  from a superseded generation are discarded, failures fall back to first-use
+  compile, and `precompileCounts` exposes requested/completed/failed. The
+  occlusion browser row now also compares ACCUMULATED `renderer.info` draw
+  counts: suppressed frame draws strictly fewer than a normally drawn frame.
+- **Defect (found by §0 scenario matrix):** `CameraRig.setTarget()` and
+  `setOrbit()` set `dirty` unconditionally, so Tidal Disruption — whose
+  AutoFramer + focus target re-assert identical system framing every frame —
+  never went idle (`stationary idle issued 30/30 orchestrated frames` on both
+  backends). Both mutators are now idempotent for unchanged system writes;
+  viewer writes always dirty and still bump the takeover revision. After the
+  fix TDE stationary idle is 0/30 orchestrated frames, 0 rendered.
+- New `scripts/bench-scenarios.mjs` (tasks.md §0): cold/warm navigation,
+  stationary idle+forced cost, active timeline, camera interaction, settling,
+  transition in/out, four-tier ladder for all 8 destinations on WebGPU and
+  forced WebGL2; idempotent in-page instrument install, pageerror capture,
+  per-window `renderTelemetry` with zero-render refusal.
+
+Evidence:
+
+- `npm run check` PASS: 45 files / 618 tests (+9: 4 camera-rig idempotence,
+  and the earlier §3 set), format/lint/typecheck/build clean.
+- Browser headed (chromium, nvidia lovelace): `frame-invalidation` occlusion
+  row (draw-count + precompile) PASS; `golden: ATLAS_HYPERSPACE_BH_NS` PASS;
+  compact-merger + black-hole-merger reduced-motion rows 2/2 PASS.
+- §0 matrix at 75a8df9: 16 records, 2 refusals (both the TDE idle defect),
+  now fixed and re-verified with a focused probe; the clean matrix is re-run as
+  the recorded §0 artifact `benchmarks/results/2026-09-10-scenarios/matrix.json`.
+- `tasks.md` §4 all rows checked (hyperspace lower-res is explicitly NOT
+  shipped, with the rejection rationale recorded); §0 cold/warm + non-stationary
+  rows checked.
+
+Next action: commit this checkpoint, re-run the scenario matrix clean, then
+§6 black-hole active-pass lifecycle (the first heavy optimization workstream).
+
 ## 2026-09-10 session — WS3 VISIBILITY LIFECYCLE COMPLETE (tasks.md §3)
 
 Status: **§3 COMPLETE.** Continued the active performance campaign; §1/§2

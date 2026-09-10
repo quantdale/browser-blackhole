@@ -349,15 +349,24 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
 
     await page.evaluate(() => {
       const app = window.__ATLAS_APP__!;
-      const kernel = (app.host as unknown as RenderFrameCounterSurface['host'])
-        .kernel as unknown as {
+      const kernel = app.host.kernel as unknown as {
         renderFrame(plan: unknown): boolean;
+        renderer: {
+          info: {
+            autoReset: boolean;
+            reset(): void;
+            render: { frameCalls: number; drawCalls: number; triangles: number };
+          };
+        } | null;
         lastFrameWork: {
           destinationUpdated: boolean;
           destinationDrawn: boolean;
           postPresented: boolean;
         };
+        precompileCounts: { requested: number; completed: number; failed: number };
       };
+      const renderer = kernel.renderer;
+      if (renderer === null) throw new Error('no renderer for draw-count instrumentation');
       const original = kernel.renderFrame.bind(kernel);
       const runtime = window as unknown as {
         __transitionOcclusionObservations?: Array<{
@@ -366,21 +375,54 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
           destinationUpdated: boolean;
           destinationDrawn: boolean;
           postPresented: boolean;
+          drawCalls: number;
+          triangles: number;
+          frameCalls: number;
         }>;
+        __visibleFrameCounts?: {
+          drawCalls: number;
+          triangles: number;
+          frameCalls: number;
+        } | null;
+        __captureVisibleFrame?: () => void;
       };
       runtime.__transitionOcclusionObservations = [];
+      runtime.__visibleFrameCounts = null;
+      let captureVisible = false;
+      runtime.__captureVisibleFrame = () => {
+        captureVisible = true;
+      };
+      const countsOf = () => ({
+        drawCalls: renderer.info.render.drawCalls,
+        triangles: renderer.info.render.triangles,
+        frameCalls: renderer.info.render.frameCalls
+      });
       kernel.renderFrame = (plan: unknown): boolean => {
-        const result = original(plan);
         const candidate = plan as {
           destinationDrawSuppressed?: boolean;
-          transitionOpacity?: number;
+          destination?: unknown;
         };
-        if (candidate.destinationDrawSuppressed === true) {
+        const suppressed = candidate.destinationDrawSuppressed === true;
+        const wantVisible = captureVisible && candidate.destination != null;
+        if (suppressed || wantVisible) {
+          // Accumulate across every render pass in this frame so the counts
+          // describe the whole frame rather than only the last pass.
+          renderer.info.autoReset = false;
+          renderer.info.reset();
+        }
+        const result = original(plan);
+        if (suppressed) {
           runtime.__transitionOcclusionObservations!.push({
             destinationDrawSuppressed: true,
             destinationOccluded: app.host.state.atlas.transition.destinationOccluded,
-            ...kernel.lastFrameWork
+            ...kernel.lastFrameWork,
+            ...countsOf()
           });
+          renderer.info.autoReset = true;
+        } else if (wantVisible) {
+          runtime.__visibleFrameCounts = countsOf();
+          renderer.info.autoReset = true;
+          captureVisible = false;
         }
         return result;
       };
@@ -402,27 +444,61 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
       )
       .toBeGreaterThan(0);
 
-    const observations = await page.evaluate(
-      () =>
-        (
-          window as unknown as {
-            __transitionOcclusionObservations?: Array<{
-              destinationDrawSuppressed: boolean;
-              destinationOccluded: boolean;
-              destinationUpdated: boolean;
-              destinationDrawn: boolean;
-              postPresented: boolean;
-            }>;
-          }
-        ).__transitionOcclusionObservations ?? []
-    );
-    expect(observations[0]).toEqual({
+    // Capture one ordinary drawn frame after arrival for the draw-count
+    // comparison, then read everything including the precompile counters.
+    await waitForArrival(page);
+    await page.evaluate(() => {
+      (window as unknown as { __captureVisibleFrame?: () => void }).__captureVisibleFrame?.();
+    });
+    await waitForAnimationFrames(page, WAKE_FRAMES);
+
+    const diagnostics = await page.evaluate(() => {
+      const runtime = window as unknown as {
+        __transitionOcclusionObservations?: Array<{
+          destinationDrawSuppressed: boolean;
+          destinationOccluded: boolean;
+          destinationUpdated: boolean;
+          destinationDrawn: boolean;
+          postPresented: boolean;
+          drawCalls: number;
+          triangles: number;
+          frameCalls: number;
+        }>;
+        __visibleFrameCounts?: { drawCalls: number; triangles: number; frameCalls: number } | null;
+      };
+      return {
+        suppressed: runtime.__transitionOcclusionObservations ?? [],
+        visible: runtime.__visibleFrameCounts ?? null,
+        precompile: window.__ATLAS_APP__!.host.kernel.precompileCounts
+      };
+    });
+
+    expect(diagnostics.suppressed[0]).toMatchObject({
       destinationDrawSuppressed: true,
       destinationOccluded: true,
       destinationUpdated: true,
       destinationDrawn: false,
       postPresented: true
     });
+    // The occluded frame really issued fewer draws than the same scene drawn
+    // normally: this is the draw-count form of the suppression claim, not just
+    // the stage flag the kernel writes about itself.
+    expect(diagnostics.suppressed[0]!.drawCalls).toBeGreaterThan(0);
+    expect(diagnostics.visible).not.toBeNull();
+    expect(diagnostics.visible!.drawCalls).toBeGreaterThan(diagnostics.suppressed[0]!.drawCalls);
+
+    // WS2 §7.3: the opaque window scheduled a compile for the incoming visible
+    // subgraph and it resolved (or fell back safely) without stalling frames.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const counts = window.__ATLAS_APP__!.host.kernel.precompileCounts;
+            return counts.requested > 0 && counts.completed + counts.failed > 0;
+          }),
+        { timeout: 30_000, intervals: [250] }
+      )
+      .toBe(true);
   });
 
   test('hide freezes hidden time and polling; resume re-seeds timing and wakes one frame', async ({

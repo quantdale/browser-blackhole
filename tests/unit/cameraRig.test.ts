@@ -159,3 +159,61 @@ describe('CameraRig: clip range follows orbit distance without ratcheting', () =
     expect(rig.getDistanceLimits()).toEqual({ min: 1, max: 100 });
   });
 });
+
+/**
+ * WS1 idle-render regression found by the §0 scenario matrix: destinations
+ * re-assert the same system framing every frame (AutoFramer + focus target),
+ * and that must not count as camera motion once settled — otherwise a paused
+ * scene renders forever. Viewer writes are deliberately exempt.
+ */
+describe('CameraRig: idempotent system writes do not dirty the camera', () => {
+  function rigWithCamera(): { rig: CameraRig; camera: PerspectiveCamera } {
+    const rig = new CameraRig({});
+    const camera = new PerspectiveCamera(60, 1, 0.05, 5000);
+    rig.attach(camera);
+    return { rig, camera };
+  }
+
+  it('repeated identical system setOrbit writes stay quiet after the first', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016); // settle from attach()
+    rig.setOrbit(33, 88, 42, 'system');
+    expect(rig.update(0.016)).toBe(true);
+    for (let i = 0; i < 5; i += 1) {
+      rig.setOrbit(33, 88, 42, 'system');
+      expect(rig.update(0.016)).toBe(false);
+    }
+  });
+
+  it('repeated identical system setTarget writes stay quiet after the first', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016);
+    rig.setTarget(new Vector3(1, 2, 3), 'system');
+    expect(rig.update(0.016)).toBe(true);
+    for (let i = 0; i < 5; i += 1) {
+      rig.setTarget(new Vector3(1, 2, 3), 'system');
+      expect(rig.update(0.016)).toBe(false);
+    }
+  });
+
+  it('a changed system value still dirties exactly once', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016);
+    rig.setOrbit(33, 88, 42, 'system');
+    rig.update(0.016);
+    rig.setOrbit(33, 88, 43, 'system');
+    expect(rig.update(0.016)).toBe(true);
+    expect(rig.update(0.016)).toBe(false);
+  });
+
+  it('user writes always dirty and bump the takeover revision, even unchanged', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016);
+    rig.setOrbit(33, 88, 42, 'system');
+    rig.update(0.016);
+    const revision = rig.getUserInteractionRevision();
+    rig.setOrbit(33, 88, 42, 'user');
+    expect(rig.getUserInteractionRevision()).toBe(revision + 1);
+    expect(rig.update(0.016)).toBe(true);
+  });
+});

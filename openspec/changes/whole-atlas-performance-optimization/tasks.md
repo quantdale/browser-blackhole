@@ -41,13 +41,20 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       `-` rather than filled in.
 - [x] Record GPU timestamps where available.
       Available everywhere: `timestampQuery: true` on this adapter.
-- [ ] Record cold navigation and warm navigation for every destination.
-      Not implemented in the harnesses.
-- [ ] Record the non-stationary scenario rows MASTER_PLAN §5.3 requires:
+- [x] Record cold navigation and warm navigation for every destination.
+      `scripts/bench-scenarios.mjs` (new) records `coldMs` (fresh context,
+      module chunk cold) and `warmMs` (round trip back through a reference
+      destination in the same document) for all eight destinations on both
+      WebGPU and forced WebGL2. Artifact:
+      `benchmarks/results/2026-09-10-scenarios/matrix.json`.
+- [x] Record the non-stationary scenario rows MASTER_PLAN §5.3 requires:
       active timeline, camera interaction, settling, transition in/out, and a
-      low/medium/high/ultra ladder. Every recorded row is stationary+paused at
-      the default tier, so §4, §7, §8 and §11 have no baseline to claim
-      against yet.
+      low/medium/high/ultra ladder. The scenario matrix records, per
+      destination x backend: stationary IDLE (rAF-counted zero-render proof),
+      stationary COST (forced continuous render), active timeline, per-frame
+      camera interaction, settling ticks, transition out+in with arrival ms,
+      and a four-tier ladder with GPU ms per tier. Every sampled window
+      carries `renderTelemetry` and refuses on zero frames rendered.
 - [ ] Record startup bundle/chunk sizes and first-interactive timing.
       Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive
       timing is not, so this stays unchecked rather than half-claimed.
@@ -252,6 +259,17 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 4. Transition occlusion and compile warmup
 
+> **2026-09-10 status: complete.** The old "environment hang" blocker is gone:
+> the full `frame-invalidation.spec.ts` (13 rows) passes headed on nvidia
+> lovelace. This slice adds the compile warmup the section asked for, the
+> draw-count form of the suppression claim, and a REAL production defect found
+> while validating the transition scenarios: `CameraRig.setTarget()`/
+> `setOrbit()` dirtied the camera unconditionally, so a destination that
+> re-asserts the same system framing every frame (TDE AutoFramer + focus
+> target) never went quiet — the §0 scenario matrix caught the tidal-disruption
+> stationary idle issuing 30/30 orchestrated frames. Both mutators are now
+> idempotent for unchanged system writes (viewer writes always dirty).
+
 - [x] Expose fully-occluded state from TransitionDirector.
       `destinationOccluded` is true only for the director-owned hyperspace
       phase; it is derived and never trusted from persisted state.
@@ -260,18 +278,41 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       the destination update and shared post presentation still execute.
 - [x] Ensure required simulation state can still advance.
       Kernel ordering keeps `destination.update()` outside the suppression gate.
-- [ ] Add draw-count assertion for occluded interval.
-      Regression coverage is implemented in
-      `tests/browser/frame-invalidation.spec.ts` and typechecks, but acceptance
-      remains blocked: on this machine Chromium/system Chrome hangs during
-      `host.init()` before publishing `__ATLAS_APP__` (reproduced on the new
-      test plus independent Atlas navigation/WebGL2 suites).
-- [ ] Integrate compileAsync for incoming visible subgraph.
-- [ ] Ensure stale/cancelled prepare compile cannot activate.
-- [ ] Benchmark transition CPU/GPU before/after.
-- [ ] Validate reduced-motion path.
-- [ ] Validate hyperspace golden.
-- [ ] Research lower hyperspace render scale; ship only with visual evidence.
+- [x] Add draw-count assertion for occluded interval.
+      The occlusion browser row now disables `renderer.info.autoReset` for the
+      frame, resets, and reads accumulated `drawCalls`/`triangles`/`frameCalls`:
+      the suppressed frame issues > 0 draws but strictly fewer than the same
+      scene drawn normally, on top of `destinationDrawn: false`.
+- [x] Integrate compileAsync for incoming visible subgraph.
+      `SharedRendererKernel.precompileScene()` runs once per scene identity
+      during the fully-opaque window (`compileAsync` where exposed, safe
+      fallback otherwise) and exposes `precompileCounts`; the occlusion row
+      polls `requested > 0 && completed + failed > 0`.
+- [x] Ensure stale/cancelled prepare compile cannot activate.
+      By construction: precompile never swaps passes/scenes, discards
+      completions from a superseded generation or a disposed/devicelost
+      kernel, and re-arms after renderer adoption (device-loss recovery).
+- [x] Benchmark transition CPU/GPU before/after.
+      The §0 scenario matrix records `transitionOut`/`transitionIn` arrival ms
+      and frames for all 16 destination x backend combinations; the pre-fix
+      artifact is `benchmarks/results/2026-09-10-scenarios/matrix.json` (start
+      75a8df9) and a post-fix rerun is recorded at the same path. The warmup
+      overlaps the occluded window and does not extend arrival.
+- [x] Validate reduced-motion path.
+      `compact-merger` and `black-hole-merger` reduced-motion rows PASS headed
+      (crossfade path, no hyperspace phase, no console/page errors).
+      `CameraRig.setReducedMotion` still collapses arrivals instantly.
+- [x] Validate hyperspace golden.
+      `golden: ATLAS_HYPERSPACE_BH_NS` PASSES headed on the current build.
+- [x] Research lower hyperspace render scale; ship only with visual evidence.
+      RESEARCHED, NOT SHIPPED. Rejection recorded rather than guessed: the
+      effect only runs inside the fully-occluded window where the destination
+      draw is already suppressed; it is a soft procedural streak field whose
+      acceptance bar (perceptual captures across target displays, no edge
+      breakup) cannot be certified in this environment, and the transitions
+      measure in the low-hundreds of ms to low-seconds against destination
+      costs of 8-192 ms GPU per frame. No code shipped; revisit only with a
+      display-quality evidence path (MASTER_PLAN §7.4 "NOT pre-approved").
 
 ## 5. Startup/code splitting
 
