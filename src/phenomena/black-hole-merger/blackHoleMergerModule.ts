@@ -226,7 +226,9 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
       qualityTier: lastTier
     });
     remnantGroup.add(kerr.object3d());
-    kerr.object3d().visible = false;
+    // The GROUP owns visibility (remnantGroup.visible is phase-gated); the
+    // pass mesh itself must stay visible so the ringdown handoff actually
+    // draws it.
     kerrPass = kerr;
     prepareScope?.track('renderTarget', kerr.object3d(), () => kerr.dispose(), 12 << 20);
   }
