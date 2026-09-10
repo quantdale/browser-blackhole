@@ -1,3 +1,25 @@
+## 2026-09-10 session — PARTICLE PREFIX SIM, SHAREDPOST/GOVERNOR EVIDENCE, BHM LAZY KERR (§8/§10/§11/§20 partial)
+
+Status: **§8, §10, §11 complete for justified rows; §20 Kerr-remnant lifecycle
+landed; §9 already landed earlier this session.**
+
+- `ParticleService` CPU fallback advances only the active prefix and uploads
+  partial ranges; growth respawns the newly drawn tail deterministically.
+- `BlackHoleMergerModule` creates the validated Kerr remnant pass lazily: an
+  inspiral boot creates it during the merger phase and prewarms it with a
+  visibility-flip `compileAsync` (restored synchronously), a ringdown/remnant
+  deep link creates it at prepare, and an inspiral-only visit never pays for
+  it. `remnantPassCreated` exposes the lifecycle truth; new browser row asserts
+  inspiral=false -> merger=true -> remnant=true.
+- Evidence: `npm run check` 46 files / 631 tests PASS; black-hole-merger lazy
+  row PASS; particle-profiles-v2 and particle-temporal-stability PASS on both
+  backends; quasar-agn-v2 PASS both backends with static AGN systems; CM 15/15,
+  BHM 15/15 (before the lazy change) plus the focused rerun after it.
+
+Next action: final certification — full default suite, both golden suites
+(twice-stable), Firefox, forced-WebGL2, resource/torture, benchmarks, census,
+then write `docs/PERFORMANCE_CERTIFICATION.md` and close the ledger.
+
 ## 2026-09-10 session — WS4/WS5/WS6 PARTIAL: ACTIVE-PASS LIFECYCLE, VOLUME CULLING, RIBBON REVISIONING (§6, §7, §9)
 
 Status: **§6 and §9 complete; §7 complete except the four deferred golden rows;

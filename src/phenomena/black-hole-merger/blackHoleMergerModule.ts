@@ -39,6 +39,7 @@ import type {
   EnterContext,
   ExitContext,
   FrameContext,
+  ILensingService,
   PhenomenonModule,
   PrepareContext,
   PreparedPhenomenon,
@@ -148,6 +149,10 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     setUniformsFromState(state: Record<string, unknown>): void;
     dispose(): void;
   } | null = null;
+  /** Prepare-time construction dependencies captured for lazy Kerr creation. */
+  let lensingService: ILensingService | null = null;
+  let prepareScope: PrepareContext['scope'] | null = null;
+  let kerrPrewarmScheduled = false;
 
   // Scratch basis vectors for the Kerr uniform-state record (no allocation).
   const basisRight = new THREE.Vector3();
@@ -194,6 +199,68 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     if (remnantGroup !== null) {
       remnantGroup.visible = phase === 'ringdown' || phase === 'remnant';
     }
+  }
+
+  /**
+   * Lazily create the validated Kerr remnant pass (WS9 §13.1). A visit that
+   * only ever shows the inspiral/merger never pays for the Kerr pipeline; a
+   * deep link that BOOTS into ringdown/remnant creates it during prepare; an
+   * inspiral boot creates it on the approach to the handoff ('merger') and
+   * prewarms the pipeline so the compile overlaps the flash rather than the
+   * first visible remnant frame.
+   */
+  function ensureKerrPass(): void {
+    if (kerrPass !== null || dataset === null || lensingService === null || remnantGroup === null) {
+      return;
+    }
+    const kerr = lensingService.createKerrLensingPass({
+      massRg: dataset.remnantMassOverM,
+      spinDimensionless: dataset.remnantChiZ,
+      backgroundEquirect: null,
+      // Vacuum BBH: the validated Kerr handoff carries no accretion matter.
+      // The inspiral/merger caustic and wavefront layers are presentation-only
+      // spacetime cues, never a hidden disk or gas proxy.
+      diskEnabled: false,
+      diskInnerRg: 4,
+      diskOuterRg: 14,
+      qualityTier: lastTier
+    });
+    remnantGroup.add(kerr.object3d());
+    kerr.object3d().visible = false;
+    kerrPass = kerr;
+    prepareScope?.track('renderTarget', kerr.object3d(), () => kerr.dispose(), 12 << 20);
+  }
+
+  /**
+   * Compile the hidden remnant pipeline once, during the merger flash. three's
+   * compile traversal skips invisible objects, so visibility is flipped for
+   * the SYNCHRONOUS render-list build inside `compileAsync` and restored in a
+   * finally block; no draw can observe the flip (no rAF can run between those
+   * two synchronous statements), and the async compilation continues after.
+   */
+  function prewarmKerr(ctx: RenderContext): void {
+    if (kerrPrewarmScheduled || kerrPass === null || remnantGroup === null) return;
+    const renderer = ctx.renderer as unknown as {
+      compileAsync?: (object: unknown, camera: unknown, targetScene: unknown) => Promise<unknown>;
+    };
+    if (typeof renderer.compileAsync !== 'function') return;
+    kerrPrewarmScheduled = true;
+    const groupWasVisible = remnantGroup.visible;
+    const passMesh = kerrPass.object3d();
+    const passWasVisible = passMesh.visible;
+    remnantGroup.visible = true;
+    passMesh.visible = true;
+    let promise: Promise<unknown>;
+    try {
+      promise = renderer.compileAsync.call(renderer, passMesh, ctx.camera, ctx.scene);
+    } finally {
+      remnantGroup.visible = groupWasVisible;
+      passMesh.visible = passWasVisible;
+    }
+    // Compile failure falls back to the normal first-use compile at handoff.
+    void promise.catch(() => {
+      kerrPrewarmScheduled = false;
+    });
   }
 
   async function prepare(ctx: PrepareContext): Promise<PreparedPhenomenon> {
@@ -466,32 +533,21 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     abortGuard('inspiral');
 
     // --- REMNANT system (validated Kerr reuse; CA8-14) -----------------------
-    ctx.reportProgress(0.8, 'Preparing remnant Kerr backend');
-    const kerr = ctx.services.lensing.createKerrLensingPass({
-      massRg: ds.remnantMassOverM,
-      spinDimensionless: ds.remnantChiZ,
-      backgroundEquirect: null,
-      // Vacuum BBH: the validated Kerr handoff carries no accretion matter.
-      // The inspiral/merger caustic and wavefront layers are presentation-only
-      // spacetime cues, never a hidden disk or gas proxy.
-      diskEnabled: false,
-      diskInnerRg: 4,
-      diskOuterRg: 14,
-      qualityTier: ctx.quality
-    });
     remnantGroup = new THREE.Group();
     remnantGroup.name = 'bbm-remnant';
-    remnantGroup.add(kerr.object3d());
     remnantGroup.visible = false;
     destinationScene.add(remnantGroup);
-    kerrPass = kerr;
-    ctx.scope.track('renderTarget', kerr.object3d(), () => kerr.dispose(), 12 << 20);
+    lensingService = ctx.services.lensing;
+    prepareScope = ctx.scope;
 
     scene = destinationScene;
     lastTier = ctx.quality;
 
-    // Boot into the preset's documented phase.
-    applySystemVisibility(phaseAt(ctx.preset.timelineInitialPhase, ds));
+    // Boot into the preset's documented phase. A ringdown/remnant deep link
+    // needs the Kerr pass immediately; an inspiral boot does not.
+    const initialPhase = phaseAt(ctx.preset.timelineInitialPhase, ds);
+    applySystemVisibility(initialPhase);
+    if (initialPhase === 'ringdown' || initialPhase === 'remnant') ensureKerrPass();
 
     ctx.reportProgress(1, 'Black-Hole Merger ready');
     return { module: moduleObject, scope: ctx.scope, scene: destinationScene, preset: ctx.preset };
@@ -548,6 +604,9 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     const phase = phaseAt(clampedT, ds);
     lastPhase = phase;
     applySystemVisibility(phase);
+    // Lazily create the Kerr remnant on the approach to the handoff (WS9
+    // §13.1); an inspiral-only visit never pays for the Kerr pipeline.
+    if (phase === 'merger' || phase === 'ringdown' || phase === 'remnant') ensureKerrPass();
     sampleBbmAt(ds, Math.min(clampedT, 0), sample);
     const amplitudeNormalized = Math.max(
       0,
@@ -647,10 +706,14 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     debug['lensingRepresentation'] = cinematicCaustic
       ? 'trajectory-tied-vacuum-caustics'
       : phase === 'ringdown' || phase === 'remnant'
-        ? 'validated-kerr-remnant'
+        ? kerrPass !== null
+          ? 'validated-kerr-remnant'
+          : 'validated-kerr-remnant-pending'
         : 'schematic-marker-fallback';
     debug['wavefrontRepresentation'] = mergerWave ? 'illustrative-spacetime-wavefront' : 'off';
     debug['remnantDiskEnabled'] = false;
+    // WS9 §13.1 lifecycle truth: whether the Kerr remnant pass exists yet.
+    debug['remnantPassCreated'] = kerrPass !== null;
   }
 
   /**
@@ -696,6 +759,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
   function render(ctx: RenderContext): void {
     if (ctx.scene !== null && ctx.camera !== null) {
       backdrop?.syncToCamera(ctx.camera);
+      if (kerrPass !== null && !kerrPrewarmScheduled) prewarmKerr(ctx);
       if (remnantGroup !== null && remnantGroup.visible) {
         pushKerrUniforms(ctx.camera, ctx.temporalJitterNdc);
       }

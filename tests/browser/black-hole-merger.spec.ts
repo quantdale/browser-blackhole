@@ -76,6 +76,7 @@ interface BbmSnapshot {
   doubleRenderGuard?: string;
   datasetId?: string;
   kerrSpinDimensionless?: number;
+  remnantPassCreated?: boolean;
   disclosure?: string;
 }
 
@@ -161,6 +162,32 @@ test.describe('Black-Hole Merger validation (CA8)', () => {
     await scrubAndAwaitDestination(page, 0.9, 'timeM');
     const snap = await bbmSnapshot(page);
     expect(snap.kerrSpinDimensionless ?? null).toBeCloseTo(0.6864817488889335, 9);
+    expect(errors).toEqual([]);
+  });
+
+  test('the remnant Kerr pass is created lazily on the approach to ringdown', async ({ page }) => {
+    // WS9 §13.1: an inspiral-only visit must not pay for the Kerr pipeline,
+    // ringdown/remnant deep links must have it immediately, and an inspiral
+    // boot creates it during the merger so the compile overlaps the flash.
+    const errors = collectErrors(page);
+    await page.goto('/atlas/black-hole-merger?preset=sxs-bbh-0001-inspiral');
+    await waitForArrival(page, 'black-hole-merger', 'sxs-bbh-0001-inspiral');
+    await page.evaluate(() => window.__ATLAS_APP__!.host.time.pause());
+
+    await scrubAndAwaitDestination(page, 0.05, 'timeM');
+    const inspiral = await bbmSnapshot(page);
+    expect(inspiral.phase).toBe('inspiral');
+    expect(inspiral.remnantPassCreated).toBe(false);
+
+    await scrubAndAwaitDestination(page, 0.56, 'timeM');
+    const merger = await bbmSnapshot(page);
+    expect(merger.phase).toBe('merger');
+    expect(merger.remnantPassCreated).toBe(true);
+
+    await scrubAndAwaitDestination(page, 0.9, 'timeM');
+    const remnant = await bbmSnapshot(page);
+    expect(remnant.phase).toBe('remnant');
+    expect(remnant.remnantPassCreated).toBe(true);
     expect(errors).toEqual([]);
   });
 
