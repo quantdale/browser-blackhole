@@ -57,15 +57,22 @@ interface ScopeView {
   scopes: number;
   gpuBytes: number;
   textures: number;
+  programs: number;
+  renderTargets: number;
+  rendererBytes: number;
 }
 
 async function scopes(page: Page): Promise<ScopeView> {
   return page.evaluate(() => {
     const inv = window.__ATLAS_APP__!.host.debugInventory();
+    const memory = inv.rendererInfo?.memory ?? null;
     return {
       scopes: inv.liveScopeCount,
       gpuBytes: inv.totalEstimatedGpuBytes,
-      textures: inv.totalResourceCounts.texture
+      textures: inv.totalResourceCounts.texture,
+      programs: memory?.programs ?? 0,
+      renderTargets: memory?.renderTargets ?? 0,
+      rendererBytes: memory?.totalBytes ?? 0
     };
   });
 }
@@ -99,6 +106,16 @@ test.describe('M11-04 lifecycle/resource-leak torture', () => {
     );
     expect(final.gpuBytes).toBeLessThanOrEqual(baseline.gpuBytes * 1.15 + 1_000_000);
     expect(Math.abs(final.textures - baseline.textures)).toBeLessThanOrEqual(4);
+    // renderer.info mirror (WS9 §14.3): three.js's own live memory accounting
+    // must plateau too — programs/targets within a small churn band and total
+    // bytes bounded relative to the same-destination baseline.
+    expect(final.programs, 'programs must not accumulate').toBeLessThanOrEqual(
+      baseline.programs + 6
+    );
+    expect(final.renderTargets, 'render targets must not accumulate').toBeLessThanOrEqual(
+      baseline.renderTargets + 4
+    );
+    expect(final.rendererBytes).toBeLessThanOrEqual(baseline.rendererBytes * 1.25 + 2_000_000);
     expect(errors).toEqual([]);
   });
 

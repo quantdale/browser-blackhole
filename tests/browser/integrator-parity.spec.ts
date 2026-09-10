@@ -335,6 +335,11 @@ test.describe('Schwarzschild integrator CPU/GPU parity corpus', () => {
       test(`selected rays agree with the binary64 reference (${backend}, ${trajectory})`, async ({
         page
       }) => {
+        test.skip(
+          backend === 'webgl2' && trajectory === 'lut',
+          'LUT acceleration is WebGPU-only (lut-webgl2-unsupported on this stack); ' +
+            'forced WebGL2 uses the numerical reference'
+        );
         test.setTimeout(process.env.CI ? 600_000 : 120_000);
         await runParityCorpus(page, backend, trajectory);
       });

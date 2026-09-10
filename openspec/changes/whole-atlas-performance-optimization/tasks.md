@@ -882,17 +882,41 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 22. WebGL2 and constrained hardware
 
-- [ ] Repeat each shared-service change on forced WebGL2.
-- [ ] Check shader compile time and first-frame latency.
-- [ ] Check dynamic-loop compiler behavior.
-- [ ] Check ParticleService CPU fallback.
+> **2026-09-10: complete for the reachable rows; the WebGL2 gate found and
+> contained a real LUT-material failure (see §6).**
+
+- [x] Repeat each shared-service change on forced WebGL2.
+      The §0 scenario matrix records all eight destinations on forced WebGL2
+      (navigation/idle/cost/tiers); `volumetrics-v2`, `particle-profiles-v2`,
+      `quasar-agn-v2`, `strand-service` and `atlas-webgl2` all pass on the
+      forced backend in this session.
+- [x] Check shader compile time and first-frame latency.
+      Measured cold-vs-warm on the matrix: forced-WebGL2 black-hole cold boot
+      27.4 s (first numerical pipeline/ANGLE compile) vs 2.4 s warm; every
+      other destination cold boot is 2.5-7.1 s. Recorded as a cold-compile
+      cost, not a steady-state regression.
+- [x] Check dynamic-loop compiler behavior.
+      The volume runtime active-step uniform compiles and executes on WebGL2
+      (`volumetrics-v2` webgl2: activeSteps 21/24 with depth-aware upsample).
+- [x] Check ParticleService CPU fallback.
+      `quasar-agn-v2` webgl2 exercises the CPU fallback with static host/knot
+      systems; unit tests cover the active-prefix simulation and upload
+      ranges.
 - [ ] Check memory counts.
+      Covered by the resource certification run below (resource-leak suite +
+      the matrix's ResourceScope totals); recorded in §23.
 - [ ] Run compatibility matrix.
+      Firefox project runs as the final certification gate below.
 - [ ] Run software-render smoke where practical, but do not treat GPU-less hosted performance as target hardware.
+      DEFERRED_ENVIRONMENT: hosted CI already runs the cheap smoke gate on
+      SwiftShader; no local software-render performance claim is made.
 
 ## 23. Resource/memory certification
 
 - [ ] Add renderer.info memory snapshot to resource-leak tests.
+      Wave 0: the suite currently asserts ResourceScope counters and plateau
+      stability; the renderer.info memory mirror is added in the final
+      certification pass below.
 - [ ] Repeatedly navigate all eight destinations.
 - [ ] Repeatedly toggle black-hole backends.
 - [ ] Repeatedly scrub AGN zones and BHM phases.
