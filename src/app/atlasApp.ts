@@ -891,30 +891,49 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     });
   };
   let controlPollTimer: ReturnType<typeof setInterval> | null = null;
-  if (pendingControlTargets.size > 0) {
-    controlPollTimer = setInterval(() => {
-      for (const [id, entry] of pendingControlTargets) {
-        if (appliedControlTargets.has(id)) continue;
-        if (host.state.atlas.activeDestination !== id) continue;
-        if (!controlPayloadMatches(id, entry.state)) {
-          host.setDestinationControl(id, entry.state);
-          if (controlPayloadMatches(id, entry.state)) appliedControlTargets.add(id);
-          continue;
-        }
-        appliedControlTargets.add(id);
+  let controlPollBudgetTimer: ReturnType<typeof setTimeout> | null = null;
+  let controlPollDeadlineMs = 0;
+  let controlPollDeadlineSet = false;
+  const stopControlPolling = (): void => {
+    if (controlPollTimer !== null) {
+      clearInterval(controlPollTimer);
+      controlPollTimer = null;
+    }
+    if (controlPollBudgetTimer !== null) {
+      clearTimeout(controlPollBudgetTimer);
+      controlPollBudgetTimer = null;
+    }
+  };
+  const pollControlTargets = (): void => {
+    for (const [id, entry] of pendingControlTargets) {
+      if (appliedControlTargets.has(id)) continue;
+      if (host.state.atlas.activeDestination !== id) continue;
+      if (!controlPayloadMatches(id, entry.state)) {
+        host.setDestinationControl(id, entry.state);
+        if (controlPayloadMatches(id, entry.state)) appliedControlTargets.add(id);
+        continue;
       }
-      if (appliedControlTargets.size >= pendingControlTargets.size && controlPollTimer !== null) {
-        clearInterval(controlPollTimer);
-        controlPollTimer = null;
-      }
-    }, 200);
-    // Hard budget: stop polling after ~30 s regardless.
-    setTimeout(() => {
-      if (controlPollTimer !== null) {
-        clearInterval(controlPollTimer);
-        controlPollTimer = null;
-      }
-    }, 30_000);
+      appliedControlTargets.add(id);
+    }
+    if (appliedControlTargets.size >= pendingControlTargets.size) stopControlPolling();
+  };
+  const startControlPolling = (): void => {
+    if (pendingControlTargets.size === 0) return;
+    if (appliedControlTargets.size >= pendingControlTargets.size) return;
+    if (!controlPollDeadlineSet) {
+      controlPollDeadlineMs = performance.now() + 30_000;
+      controlPollDeadlineSet = true;
+    }
+    if (controlPollTimer === null) controlPollTimer = setInterval(pollControlTargets, 200);
+    if (controlPollBudgetTimer === null) {
+      // Hard wall budget measured from the FIRST visible start, preserved
+      // across visibility stops so a hidden tab cannot extend it.
+      const remainingMs = controlPollDeadlineMs - performance.now();
+      controlPollBudgetTimer = setTimeout(stopControlPolling, Math.max(0, remainingMs));
+    }
+  };
+  if (pendingControlTargets.size > 0 && !document.hidden) {
+    startControlPolling();
   }
 
   refreshNav();
@@ -1003,11 +1022,22 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // one), and WS1's on-demand skip needs a one-shot nudge in case a resize or
   // other externally-driven change happened while no frames were rendering.
   const onVisibilityChange = (): void => {
-    if (document.hidden) return;
+    if (document.hidden) {
+      // Nonessential work off while hidden: the deep-link control poller is the
+      // only timer outside the rAF loop, and the timeline must not advance from
+      // hidden wall time (see TimeController.markHidden).
+      stopControlPolling();
+      host.time.markHidden();
+      return;
+    }
+    host.time.markVisible();
+    host.governor.resetTiming?.();
+    startControlPolling();
     lastMs = performance.now();
     host.invalidate(INVALIDATION_REASON.FORCED_CAPTURE);
   };
   document.addEventListener('visibilitychange', onVisibilityChange);
+  if (document.hidden) host.time.markHidden();
 
   // --- page teardown (WS3, whole-atlas performance campaign) ---------------
   // Destination implementations are lazy chunks, so a reload can interrupt a

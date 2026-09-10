@@ -132,6 +132,12 @@ interface AtlasHook {
       scrubTo(phase01: number): void;
       /** Deterministic reset to the given (or preset initial) phase. */
       reset(initialPhase?: number): void;
+      /** Advance the deterministic timeline by a frame dt (hidden-time tests). */
+      update(dtSeconds: number): void;
+      /** Internal simulation coordinate (hidden-time assertions). */
+      readonly internalCoordinate: number;
+      /** True while the shell has marked the document hidden. */
+      readonly hidden: boolean;
       snapshot(): {
         paused: boolean;
         simulationPhase: number;
@@ -154,6 +160,8 @@ interface AtlasHook {
       /** Hard tier pin used by the golden harness (overrides auto mode). */
       setForcedTier(tier: 'low' | 'medium' | 'high' | 'ultra'): void;
       readonly currentTier: 'low' | 'medium' | 'high' | 'ultra';
+      /** Smoothed fps of the governor's sample window (0 before a sample). */
+      readonly smoothedFps: number;
     };
     /** Re-applies canvas sizing from the given CSS viewport size. */
     handleResize(cssWidth: number, cssHeight: number): void;

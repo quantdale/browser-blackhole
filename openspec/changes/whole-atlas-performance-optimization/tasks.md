@@ -216,23 +216,39 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 3. Visibility lifecycle
 
-> **2026-08-28 status (updated):** partial — `visibilitychange` listener +
-> resume nudge in `src/app/atlasApp.ts` (landed in `acdd8e6`). The
-> "genuine unresolved flakiness" recorded here previously is explained: the
-> `frame-invalidation.spec.ts` visibility test measured its idle window in
-> wall time, which under load can be shorter than a single rAF interval on
-> this host. It now counts rAF ticks and passes 3/3 under `--workers=4`.
-> Page teardown is additionally handled as of the WS3 work below
-> (`beforeunload`/`pagehide` -> `host.abandonPendingTransition()`).
-> "Stop nonessential polling while hidden" and explicit documented
-> hidden-time semantics are still NOT done.
+> **2026-09-10 status (complete):** the remaining §3 gaps are closed.
+> `atlasApp`'s visibility handler now has an explicit hidden branch: it stops
+> the ONLY timer outside the rAF loop (the bounded 200 ms deep-link control
+> poller, whose 30 s budget is now measured from first visible start and
+> preserved across hide/resume) and marks the timeline hidden.
+> `TimeController.markHidden()/markVisible()` make hidden-time semantics
+> explicit and testable: the controller is dt-driven with no wall-clock reads,
+> `update()` is a no-op while hidden (a throttled tick cannot advance it), and
+> resume advances by exactly one ordinary frame dt — never the hidden wall
+> time. The resume branch re-seeds governor timing
+> (`PerformanceGovernor.resetTiming()`: drops the FPS EMA sample/refresh
+> window/hysteresis and re-arms grace without touching tier), resets the rAF
+> `lastMs` baseline, restarts the poller, and issues the one-shot
+> FORCED_CAPTURE wake.
 
-- [ ] Add document visibilitychange policy.
-- [ ] Stop nonessential atlas polling/work while hidden.
-- [ ] Reset frame/governor timing on resume.
-- [ ] Invalidate one frame on resume.
-- [ ] Define TimeController hidden-time semantics explicitly.
-- [ ] Add hide/resume browser test.
+- [x] Add document visibilitychange policy.
+      `onVisibilityChange` branches on `document.hidden`; `document.hidden`
+      at boot is honored too (`markHidden()` on init).
+- [x] Stop nonessential atlas polling/work while hidden.
+      Deep-link control poller stopped on hide, restarted on resume; the rAF
+      loop is engine-suspended and hidden-time freezing is now explicit.
+- [x] Reset frame/governor timing on resume.
+      `lastMs = performance.now()` + `governor.resetTiming()`
+      (`governor.test.ts` 3 new tests).
+- [x] Invalidate one frame on resume.
+      `host.invalidate(FORCED_CAPTURE)`; pinned by the hide/resume browser row.
+- [x] Define TimeController hidden-time semantics explicitly.
+      `markHidden`/`markVisible`/`hidden` + docs;
+      `timeController.test.ts` 4 new hidden-time tests (no advance while
+      hidden, one-frame resume, playback state preserved, pause composition).
+- [x] Add hide/resume browser test.
+      `frame-invalidation.spec.ts` "hide freezes hidden time and polling;
+      resume re-seeds timing and wakes one frame".
 
 ## 4. Transition occlusion and compile warmup
 

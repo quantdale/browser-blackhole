@@ -596,6 +596,13 @@ export interface IPerformanceGovernor {
   readonly activityMode: GovernorActivityMode;
   getVisualWorkBudget(): VisualWorkBudget;
   onTierChanged(cb: (tier: QualityTier) => void): () => void;
+  /**
+   * Reset frame-timing history after a visibility resume (tasks.md §3): drops
+   * the current FPS sample window and sustained-threshold accumulators and
+   * re-arms the startup grace window, without changing the tier. Optional for
+   * test doubles.
+   */
+  resetTiming?(): void;
   dispose(): void;
 }
 

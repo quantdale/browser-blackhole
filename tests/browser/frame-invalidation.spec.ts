@@ -425,6 +425,71 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     });
   });
 
+  test('hide freezes hidden time and polling; resume re-seeds timing and wakes one frame', async ({
+    page
+  }) => {
+    // WS3 (tasks.md §3). This overrides `document.hidden` so the APP's own
+    // hidden/resume policy is exercised without depending on the engine
+    // suspending rAF (which it does, but which no in-page dispatch can prove).
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+    await pauseAndSettle(page);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
+    expect(await renderFrameCalls(page)).toBe(0);
+
+    await page.evaluate(() => {
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => true });
+      document.dispatchEvent(new Event('visibilitychange'));
+    });
+    const hiddenState = await page.evaluate(() => {
+      const host = window.__ATLAS_APP__!.host;
+      // Even if a throttled tick sneaks through, hidden time must not advance
+      // the coordinate.
+      host.time.play();
+      const before = host.time.internalCoordinate;
+      host.time.update(5);
+      return {
+        hidden: host.time.hidden,
+        before,
+        after: host.time.internalCoordinate
+      };
+    });
+    expect(hiddenState.hidden).toBe(true);
+    expect(hiddenState.after).toBe(hiddenState.before);
+
+    // Resume dispatch, the one-frame advance check, and the re-pause all run
+    // in ONE synchronous evaluate: a rAF tick between these steps would render
+    // the visible timeline and consume the resume invalidation before the test
+    // looks for it, which would measure the harness's timing, not the policy.
+    const resumeState = await page.evaluate(() => {
+      const host = window.__ATLAS_APP__!.host;
+      Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
+      document.dispatchEvent(new Event('visibilitychange'));
+      host.time.play();
+      const before = host.time.internalCoordinate;
+      host.time.update(1 / 60);
+      const delta = host.time.internalCoordinate - before;
+      host.time.pause();
+      return {
+        hidden: host.time.hidden,
+        delta,
+        smoothedFps: host.governor.smoothedFps
+      };
+    });
+    expect(resumeState.hidden).toBe(false);
+    // One ordinary frame step, never the hidden wall time.
+    expect(resumeState.delta).toBeCloseTo(1 / 60, 8);
+    // resetTiming dropped the stale sample window; nothing has sampled since.
+    expect(resumeState.smoothedFps).toBe(0);
+
+    await resetRenderFrameCalls(page);
+    await waitForAnimationFrames(page, WAKE_FRAMES);
+    expect(await renderFrameCalls(page)).toBeGreaterThan(0);
+    await resetRenderFrameCalls(page);
+    await waitForAnimationFrames(page, IDLE_FRAMES);
+    expect(await renderFrameCalls(page)).toBe(0);
+  });
+
   test('renderer.info telemetry reports live counts once a scene is drawn', async ({ page }) => {
     await page.goto('/atlas/black-hole');
     await waitForArrival(page);

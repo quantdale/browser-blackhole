@@ -335,3 +335,57 @@ describe('TimeController: arrival autoplay respects an explicit pause', () => {
     expect(time.resumeUnlessExplicitlyPaused()).toBe(true);
   });
 });
+
+/**
+ * WS3 visibility lifecycle (tasks.md §3): hidden-time semantics. The
+ * controller is dt-driven with no wall-clock reads, so the policy under test
+ * is that hidden time CANNOT advance the coordinate even if a throttled rAF
+ * tick still fires, and that resume advances by exactly one ordinary frame —
+ * never by the elapsed hidden duration.
+ */
+describe('TimeController: hidden-time semantics', () => {
+  it('does not advance while hidden, even when update() is called', () => {
+    const time = new TimeController();
+    time.consumeDirty();
+    time.markHidden();
+    expect(time.hidden).toBe(true);
+
+    const before = time.internalCoordinate;
+    time.update(5); // a throttled tick with a huge dt must not move anything
+    expect(time.internalCoordinate).toBe(before);
+    expect(time.consumeDirty()).toBe(false);
+  });
+
+  it('resumes with one ordinary frame step, never a catch-up jump', () => {
+    const time = new TimeController();
+    time.consumeDirty();
+    time.markHidden();
+    time.update(300); // simulated hidden wall time
+    const before = time.internalCoordinate;
+
+    time.markVisible();
+    expect(time.hidden).toBe(false);
+    time.update(1 / 60);
+    expect(time.internalCoordinate).toBeCloseTo(before + 1 / 60, 10);
+  });
+
+  it('leaves playback state untouched across hide/resume', () => {
+    const time = new TimeController();
+    expect(time.paused).toBe(false);
+    time.markHidden();
+    expect(time.paused).toBe(false);
+    time.markVisible();
+    time.update(1 / 60);
+    expect(time.paused).toBe(false);
+  });
+
+  it('composes with pause: hidden takes no precedence once visible again', () => {
+    const time = new TimeController();
+    time.markHidden();
+    time.markVisible();
+    time.pause();
+    const before = time.internalCoordinate;
+    time.update(1);
+    expect(time.internalCoordinate).toBe(before);
+  });
+});

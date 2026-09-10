@@ -1,3 +1,40 @@
+## 2026-09-10 session — WS3 VISIBILITY LIFECYCLE COMPLETE (tasks.md §3)
+
+Status: **§3 COMPLETE.** Continued the active performance campaign; §1/§2
+landed in `75a8df9`. This slice is visibility-policy only; no rendering path
+change.
+
+Implemented:
+
+- `atlasApp` visibility handler now branches explicitly: on hidden it stops
+  the only non-rAF timer (the bounded 200 ms deep-link control poller) and
+  calls `host.time.markHidden()`; on resume it calls `markVisible()`,
+  `governor.resetTiming()`, restarts the poller, resets `lastMs`, and issues
+  the one-shot FORCED_CAPTURE wake. The poller's 30 s budget now starts at
+  first VISIBLE start and is preserved across hide/resume; a boot-hidden
+  document starts no poller.
+- `TimeController.markHidden()/markVisible()/hidden` make hidden-time
+  semantics explicit: dt-driven, no wall-clock reads, `update()` a no-op while
+  hidden, resume advances by one ordinary frame dt (never hidden wall time),
+  playback state untouched.
+- `PerformanceGovernor.resetTiming()` drops the FPS EMA sample (reports 0
+  until re-seeded), clears the refresh window and sustain accumulators, and
+  re-arms grace, without changing tier or render scale.
+
+Evidence:
+
+- `npm run check` PASS: 45 files / 609 tests (+7 new: 4 TimeController
+  hidden-time, 3 governor resetTiming), format/lint/typecheck/build clean.
+- `frame-invalidation.spec.ts` hide/resume row PASS headed (chromium, nvidia
+  lovelace): hidden `update(5)` leaves the coordinate unchanged, resume
+  `update(1/60)` advances exactly 1/60, `smoothedFps` reports 0 after
+  resetTiming, and resume wakes exactly one orchestrated frame then goes quiet.
+- `tasks.md` §3 all six rows checked with evidence.
+
+Next action: §0 scenario matrix is running (`scripts/bench-scenarios.mjs`);
+then §4 transition occlusion/warmup (compileAsync, reduced-motion, hyperspace
+golden) and the black-hole pass-lifecycle workstream (§6).
+
 ## 2026-09-10 session — WS0 TELEMETRY COMPLETE (whole-atlas-performance-optimization, tasks.md §1 + §2 evidence)
 
 Status: **§1 COMPLETE, §2 evidence closed.** Resumed the active performance

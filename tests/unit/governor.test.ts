@@ -218,3 +218,41 @@ describe('PerformanceGovernor manual modes and forced tiers', () => {
     expect(governor.currentTier).toBe('medium');
   });
 });
+
+/**
+ * WS3 visibility lifecycle (tasks.md §3): `resetTiming()` drops frame-timing
+ * history without touching the tier, so a resume frame cannot poison the FPS
+ * EMA or sustain counters with a multi-second begin/end gap.
+ */
+describe('PerformanceGovernor: resetTiming on visibility resume', () => {
+  it('re-seeds the smoothed fps sample window', () => {
+    const governor = new PerformanceGovernor();
+    governor.configure({ qualityMode: 'auto' });
+    stepFrames(governor, 60, VSYNC_60_MS);
+    expect(governor.smoothedFps).toBeGreaterThan(0);
+
+    governor.resetTiming();
+    expect(governor.smoothedFps).toBe(0);
+
+    // The next real frame seeds the EMA rather than blending with stale state.
+    step(governor, VSYNC_120_MS);
+    expect(governor.smoothedFps).toBeCloseTo(120, 0);
+  });
+
+  it('does not change the tier or render scale', () => {
+    const governor = new PerformanceGovernor();
+    governor.configure({ qualityMode: 'auto' });
+    stepFrames(governor, 60, VSYNC_60_MS);
+    const tier = governor.currentTier;
+    const scale = governor.renderScale;
+    governor.resetTiming();
+    expect(governor.currentTier).toBe(tier);
+    expect(governor.renderScale).toBe(scale);
+  });
+
+  it('is a no-op after dispose', () => {
+    const governor = new PerformanceGovernor();
+    governor.dispose();
+    expect(() => governor.resetTiming()).not.toThrow();
+  });
+});

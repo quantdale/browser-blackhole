@@ -137,6 +137,8 @@ export class TimeController {
   private pacingValue: 'internal' | 'phase' = 'internal';
   /** True when an external caller paused (sticky across arrivals). */
   private explicitPauseValue = false;
+  /** Document visibility, marked explicitly by the app shell (tasks.md §3). */
+  private hiddenValue = false;
 
   /**
    * Sticky "coordinate changed since last consumed" flag (whole-atlas
@@ -178,6 +180,30 @@ export class TimeController {
     const discontinuity = this.discontinuityValue;
     this.discontinuityValue = false;
     return discontinuity;
+  }
+
+  /**
+   * Hidden-document policy (tasks.md §3). The controller is purely dt-driven —
+   * it never reads a wall clock and has no catch-up path — so hidden wall time
+   * cannot leak into the simulation by construction. The shell marks
+   * hidden/visible explicitly so the policy is testable and so a throttled rAF
+   * tick that still fires while hidden cannot advance the timeline: that first
+   * post-resume `update(dt)` advances by exactly one ordinary frame dt, never
+   * by the elapsed hidden time. Playback state is deliberately NOT changed:
+   * a tab that was playing resumes playing from the same coordinate.
+   */
+  markHidden(): void {
+    this.hiddenValue = true;
+  }
+
+  /** See {@link markHidden}; the first visible update is a normal frame step. */
+  markVisible(): void {
+    this.hiddenValue = false;
+  }
+
+  /** Whether the shell has marked the document hidden (diagnostics/tests). */
+  get hidden(): boolean {
+    return this.hiddenValue;
   }
 
   // --- Mapping registry ----------------------------------------------------
@@ -314,10 +340,12 @@ export class TimeController {
    *
    * At the mapping's endpoints the timeline either holds (default) or wraps
    * to the opposite end when the mapping sets `loop` — never auto-pauses.
-   * Paused controllers are a no-op. Non-finite dt is treated as 0.
+   * Paused controllers are a no-op, and so are hidden documents (see
+   * {@link markHidden}: hidden time must never advance the coordinate).
+   * Non-finite dt is treated as 0.
    */
   update(dtSeconds: number): void {
-    if (this.pausedValue) return;
+    if (this.pausedValue || this.hiddenValue) return;
     const dt = finiteOrNull(dtSeconds) ?? 0;
     const rate = this.baseRateValue * this.rateValue;
     if (dt === 0 || rate === 0) return;

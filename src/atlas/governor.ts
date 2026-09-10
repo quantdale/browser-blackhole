@@ -253,6 +253,29 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     this.evaluateAutoTier(durationMs);
   }
 
+  /**
+   * Reset frame-timing history after a visibility resume (tasks.md §3).
+   * Browsers stop (or heavily throttle) rAF while hidden, so the first frame
+   * after a resume would otherwise be evaluated against stale timing state —
+   * a huge begin/end gap is clamped to MAX_SAMPLED_FRAME_MS but still biases
+   * the FPS EMA/refresh window, and the grace window was armed for an
+   * uninterrupted session. This drops the sample flag (the EMA re-seeds from
+   * the first real post-resume frame), clears the refresh window and the
+   * sustained-threshold accumulators, and re-arms grace so tier decisions do
+   * not react to the pause itself. The tier and render scale are untouched.
+   */
+  resetTiming(): void {
+    if (this.disposed) return;
+    this.sampling = false;
+    this.frameStartMs = -1;
+    this.hasFpsSample = false;
+    this.fpsEmaValue = 0;
+    this.frameWindowCount = 0;
+    this.frameWindowCursor = 0;
+    this.resetHysteresis();
+    this.restartGrace();
+  }
+
   notifyInteraction(): void {
     if (this.disposed) return;
     this.msSinceInteraction = 0;
