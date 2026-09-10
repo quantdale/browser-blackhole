@@ -94,3 +94,51 @@ describe('StrandService', () => {
     b.dispose();
   });
 });
+
+describe('StrandService revision gating and conservative bounds (WS6 §11.2)', () => {
+  it('skips rebuild/upload for a value-identical spine and uploads on change', () => {
+    const service = new StrandService();
+    const strand = service.createStrand(config());
+    const mesh = strand.object3d().children[0] as THREE.Mesh;
+    const positionAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+    const startVersion = positionAttr.version;
+
+    const spine = [
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(1, 0.2, 0.4),
+      new THREE.Vector3(2, 0.7, 0.5)
+    ];
+    strand.setSpine(spine);
+    expect(positionAttr.version).toBe(startVersion + 1);
+
+    strand.setSpine(spine.map((p) => p.clone()));
+    expect(positionAttr.version).toBe(startVersion + 1);
+
+    spine[2]!.x = 2.5;
+    strand.setSpine(spine);
+    expect(positionAttr.version).toBe(startVersion + 2);
+    service.dispose();
+  });
+
+  it('maintains conservative bounds and enables culling for tube and core', () => {
+    const service = new StrandService();
+    const strand = service.createStrand(config());
+    const mesh = strand.object3d().children[0] as THREE.Mesh;
+    const core = strand.object3d().children[1] as THREE.Line;
+    expect(mesh.frustumCulled).toBe(true);
+    expect(core.frustumCulled).toBe(true);
+
+    const spine = [
+      new THREE.Vector3(5, 0, 0),
+      new THREE.Vector3(6, 1, 0),
+      new THREE.Vector3(7, 0, 1)
+    ];
+    strand.setSpine(spine);
+    const sphere = mesh.geometry.boundingSphere;
+    expect(sphere).not.toBeNull();
+    for (const point of spine) {
+      expect(sphere!.containsPoint(point)).toBe(true);
+    }
+    service.dispose();
+  });
+});

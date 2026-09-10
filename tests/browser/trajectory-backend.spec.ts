@@ -23,6 +23,9 @@ interface TrajectorySnapshot {
   trajectoryBackendEffective?: unknown;
   lutFallbackReason?: unknown;
   lutFamilyLoaded?: unknown;
+  activePassKind?: unknown;
+  lensingResidentPassCount?: unknown;
+  lensingResidentPassKinds?: unknown;
 }
 
 async function waitForArrival(page: Page, destinationId: string): Promise<void> {
@@ -180,6 +183,39 @@ test.describe('trajectory backend selection (M8-09)', () => {
     expect(pref).toBe('lut');
     const snap = await trajectorySnapshot(page);
     expect(snap.trajectoryBackendEffective).toBe('lut');
+    expect(errors).toEqual([]);
+  });
+
+  test('default arrival builds only the selected pass; alternates are lazy and bounded', async ({
+    page
+  }) => {
+    // WS4 §9.2 acceptance: the eager numerical+LUT+Kerr tuple is gone. Auto
+    // resolves to LUT, so arrival must create exactly one pass; each switch
+    // creates at most one more, and a switch back reuses the cached alternate
+    // instead of building a third pass.
+    const errors = collectErrors(page);
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page, 'black-hole');
+    expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
+
+    const initial = await trajectorySnapshot(page);
+    expect(initial.trajectoryBackendEffective).toBe('lut');
+    expect(initial.activePassKind).toBe('lut');
+    expect(initial.lensingResidentPassCount).toBe(1);
+    expect(initial.lensingResidentPassKinds).toEqual(['lut']);
+
+    await page.evaluate(() => window.__ATLAS_APP__!.host.setTrajectoryBackend('numerical'));
+    expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
+    const switched = await trajectorySnapshot(page);
+    expect(switched.activePassKind).toBe('numerical');
+    expect(switched.lensingResidentPassCount).toBe(2);
+    expect(switched.lensingResidentPassKinds).toEqual(['lut', 'numerical']);
+
+    await page.evaluate(() => window.__ATLAS_APP__!.host.setTrajectoryBackend('lut'));
+    expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
+    const back = await trajectorySnapshot(page);
+    expect(back.activePassKind).toBe('lut');
+    expect(back.lensingResidentPassCount).toBe(2);
     expect(errors).toEqual([]);
   });
 });

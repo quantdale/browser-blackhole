@@ -1,3 +1,49 @@
+## 2026-09-10 session — WS4/WS5/WS6 PARTIAL: ACTIVE-PASS LIFECYCLE, VOLUME CULLING, RIBBON REVISIONING (§6, §7, §9)
+
+Status: **§6 and §9 complete; §7 complete except the four deferred golden rows;
+§0/§4 clean matrix recorded.**
+
+Implemented:
+
+- **§6 black-hole active-pass lifecycle:** `BlackHoleModule` replaced the eager
+  numerical+LUT+Kerr tuple with a lazy active-pass manager: `desiredPassKind`
+  resolves the single arrival pass, `createPass` builds/tracks it in a per-pass
+  CHILD scope, one bounded two-entry resident cache reuses a toggled-back pass,
+  eviction disposes the child scope, creation failure keeps the visible pass
+  and records `alternate-pass-creation-failed`, and activation is an atomic
+  visibility swap. New debug counters `lensingResidentPassKinds`/
+  `lensingResidentPassCount`.
+- **§7 VolumeService:** conservative frustum culling enabled on the visible
+  volume proxy (authored bounding sphere; nested march proxy stays
+  uncullable); projected scissor/ROI explicitly rejected with rationale. The
+  V2 runtime active-step budget, normalization and scratch reuse were already
+  present and are now evidenced.
+- **§9 ribbon/strand revisioning:** value-identical `setSpine` early-out in
+  `RibbonService`/`StrandService`, conservative rebuild-time bounding spheres,
+  and frustum culling enabled with those bounds.
+- **§0 scenario matrix (clean):** `benchmarks/results/2026-09-10-scenarios/matrix.json`
+  — 16/16 records, 0 failures, commit 68aaab9, eight destinations x
+  WebGPU/forced-WebGL2, covering cold/warm navigation, stationary idle+forced
+  cost, active timeline, camera interaction, settling, transition in/out and a
+  four-tier ladder.
+
+Evidence:
+
+- `npm run check` PASS: **46 files / 626 tests**, format/lint/typecheck/build
+  clean (new ribbon tests, volume culling tests, hidden-time/governor tests).
+- Browser headed (chromium, nvidia lovelace): trajectory-backend 8/8 (incl. the
+  new lifecycle row), kerr-integration 7/7, strand-service V2 2/2,
+  volumetrics-v2 webgpu+webgl2 2/2, compact-merger 15/15, black-hole-merger
+  15/15, BH/KERR/observer goldens **10/10 unchanged**.
+- TDE probe evidence: phase-hidden volume `visibleVolumes: 0, internalWidth: 0`
+  (no march); tier ladder 97 vs 55 active steps.
+- `tasks.md` §6/§7/§9 updated with per-row evidence; §7's four destination
+  golden rows are explicitly deferred to the campaign final golden gate.
+
+Next action: §8 ParticleService static/dynamic + AGN static conversions, then
+§10 SharedPost bloom scale, §11 Governor WorkBudget wiring, then §12-§21
+optimizations and §22-§24 certification (including the full golden gate).
+
 ## 2026-09-10 session — WS2 TRANSITION OCCLUSION + WARMUP COMPLETE (tasks.md §4), IDLE-RENDER DEFECT FIXED
 
 Status: **§4 COMPLETE; a real production defect found by the new §0 scenario

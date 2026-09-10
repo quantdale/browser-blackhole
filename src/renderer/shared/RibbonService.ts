@@ -141,6 +141,9 @@ class RibbonHandleImpl implements RibbonHandle {
   private released = false;
   /** Live multiplier on the configured widths (see RibbonHandle.setWidthScale). */
   private widthScale = 1;
+  /** Last applied spine coordinates (value compare before any rebuild). */
+  private readonly lastSpine: number[] = [];
+  private lastSpinePointCount = -1;
 
   constructor(config: RibbonConfig, onRelease: () => void) {
     this.cfg = {
@@ -176,9 +179,9 @@ class RibbonHandleImpl implements RibbonHandle {
     material.userData['cinematicEmissive'] = true;
 
     this.mesh = new THREE.Mesh(geometry, material);
-    // Vertices are rewritten wholesale on setSpine; maintaining a bounding sphere
-    // across partial rewrites is not worth it for ribbon-sized vertex counts.
-    this.mesh.frustumCulled = false;
+    // Bounds are maintained per rebuild from the ACTUAL drawn vertices plus
+    // the halo, so ordinary frustum culling is conservative (WS6 §11.2).
+    this.mesh.frustumCulled = true;
 
     // A wider, lower-alpha companion strip supplies an actual spatial halo
     // around the ribbon. It is separate geometry, not a screen-space blur, so
@@ -199,7 +202,7 @@ class RibbonHandleImpl implements RibbonHandle {
     });
     haloMaterial.userData['cinematicEmissive'] = true;
     this.haloMesh = new THREE.Mesh(haloGeometry, haloMaterial);
-    this.haloMesh.frustumCulled = false;
+    this.haloMesh.frustumCulled = true;
     this.haloMesh.renderOrder = -1;
     this.mesh.renderOrder = 0;
     this.root = new THREE.Group();
@@ -228,6 +231,10 @@ class RibbonHandleImpl implements RibbonHandle {
     const spine =
       points.length > this.capacityPoints ? resamplePolyline(points, this.capacityPoints) : points;
     const n = spine.length;
+    // Value-identical spines skip the whole rebuild and all four uploads; the
+    // destinations gate on their own model-time revisions, and this guards
+    // every other caller (WS6 §11.2 "avoid needsUpdate when unchanged").
+    if (this.spineUnchanged(spine, n)) return;
 
     this.computeTangents(spine, n);
     this.seedLateralFrame();
@@ -302,6 +309,69 @@ class RibbonHandleImpl implements RibbonHandle {
     this.colorAttr.needsUpdate = true;
     this.haloPositionAttr.needsUpdate = true;
     this.haloColorAttr.needsUpdate = true;
+    this.updateBounds(n);
+    this.rememberSpine(spine, n);
+  }
+
+  /** Exact value compare against the last applied spine (cheap O(n)). */
+  private spineUnchanged(spine: readonly THREE.Vector3[], n: number): boolean {
+    if (n !== this.lastSpinePointCount) return false;
+    const last = this.lastSpine;
+    for (let i = 0; i < n; i += 1) {
+      const p = spine[i]!;
+      const o = i * 3;
+      if (p.x !== last[o] || p.y !== last[o + 1] || p.z !== last[o + 2]) return false;
+    }
+    return true;
+  }
+
+  private rememberSpine(spine: readonly THREE.Vector3[], n: number): void {
+    this.lastSpinePointCount = n;
+    this.lastSpine.length = n * 3;
+    for (let i = 0; i < n; i += 1) {
+      const p = spine[i]!;
+      this.lastSpine[i * 3] = p.x;
+      this.lastSpine[i * 3 + 1] = p.y;
+      this.lastSpine[i * 3 + 2] = p.z;
+    }
+  }
+
+  /**
+   * Conservative geometry-local bounding sphere over the drawn strip AND its
+   * halo (vertices are authored in world space; the mesh is untransformed).
+   * Rebuild-time allocation only — never in the steady-state frame path.
+   */
+  private updateBounds(n: number): void {
+    const vertexCount = n * 2;
+    let cx = 0;
+    let cy = 0;
+    let cz = 0;
+    let samples = 0;
+    for (let i = 0; i < vertexCount; i += 1) {
+      const o = i * 3;
+      cx += this.positions[o]! + this.haloPositions[o]!;
+      cy += this.positions[o + 1]! + this.haloPositions[o + 1]!;
+      cz += this.positions[o + 2]! + this.haloPositions[o + 2]!;
+      samples += 2;
+    }
+    cx /= samples;
+    cy /= samples;
+    cz /= samples;
+    let maxR2 = 0;
+    for (let i = 0; i < vertexCount; i += 1) {
+      const o = i * 3;
+      const dx = this.positions[o]! - cx;
+      const dy = this.positions[o + 1]! - cy;
+      const dz = this.positions[o + 2]! - cz;
+      maxR2 = Math.max(maxR2, dx * dx + dy * dy + dz * dz);
+      const hx = this.haloPositions[o]! - cx;
+      const hy = this.haloPositions[o + 1]! - cy;
+      const hz = this.haloPositions[o + 2]! - cz;
+      maxR2 = Math.max(maxR2, hx * hx + hy * hy + hz * hz);
+    }
+    const sphere = new THREE.Sphere(new THREE.Vector3(cx, cy, cz), Math.sqrt(maxR2));
+    this.mesh.geometry.boundingSphere = sphere;
+    this.haloMesh.geometry.boundingSphere = sphere.clone();
   }
 
   object3d(): THREE.Object3D {

@@ -99,6 +99,9 @@ class StrandHandleImpl implements StrandHandle {
   private quality = 1;
   private pointCount = 0;
   private released = false;
+  /** Last applied spine coordinates (value compare before any rebuild). */
+  private readonly lastSpine: number[] = [];
+  private lastSpinePointCount = -1;
 
   constructor(config: StrandConfig, onRelease: () => void) {
     this.config = {
@@ -158,7 +161,7 @@ class StrandHandleImpl implements StrandHandle {
     this.coreMaterial.userData['cinematicEmissive'] = true;
     this.coreMaterial.userData['strandRepresentation'] = 'authoritative-spine-core';
     this.coreMesh = new THREE.Line(this.coreGeometry, this.coreMaterial);
-    this.coreMesh.frustumCulled = false;
+    this.coreMesh.frustumCulled = true;
     this.coreMesh.renderOrder = 1;
     this.coreMesh.name = 'StrandCore';
     this.coreMesh.layers.enable(CINEMATIC_EMISSIVE_LAYER);
@@ -179,7 +182,7 @@ class StrandHandleImpl implements StrandHandle {
     this.material.userData['cinematicEmissive'] = true;
     this.material.userData['strandRepresentation'] = 'tube';
     this.mesh = new THREE.Mesh(this.geometry, this.material);
-    this.mesh.frustumCulled = false;
+    this.mesh.frustumCulled = true;
     this.mesh.layers.enable(CINEMATIC_EMISSIVE_LAYER);
     this.mesh.name = 'StrandTube';
     this.root = new THREE.Group();
@@ -200,6 +203,8 @@ class StrandHandleImpl implements StrandHandle {
     }
     const capacity = this.tangents.length;
     const spine = points.length > capacity ? resamplePolyline(points, capacity) : points;
+    // Value-identical spines skip the rebuild and all four uploads (WS6 §11.2).
+    if (this.spineUnchanged(spine)) return;
     this.pointCount = spine.length;
     this.computeFrames(spine);
 
@@ -262,6 +267,65 @@ class StrandHandleImpl implements StrandHandle {
     this.colorAttribute.needsUpdate = true;
     this.corePositionAttribute.needsUpdate = true;
     this.coreColorAttribute.needsUpdate = true;
+    this.updateBounds(spine.length, radial);
+    this.rememberSpine(spine);
+  }
+
+  /** Exact value compare against the last applied spine (cheap O(n)). */
+  private spineUnchanged(spine: readonly THREE.Vector3[]): boolean {
+    if (spine.length !== this.lastSpinePointCount) return false;
+    const last = this.lastSpine;
+    for (let i = 0; i < spine.length; i += 1) {
+      const p = spine[i]!;
+      const o = i * 3;
+      if (p.x !== last[o] || p.y !== last[o + 1] || p.z !== last[o + 2]) return false;
+    }
+    return true;
+  }
+
+  private rememberSpine(spine: readonly THREE.Vector3[]): void {
+    this.lastSpinePointCount = spine.length;
+    this.lastSpine.length = spine.length * 3;
+    for (let i = 0; i < spine.length; i += 1) {
+      const p = spine[i]!;
+      this.lastSpine[i * 3] = p.x;
+      this.lastSpine[i * 3 + 1] = p.y;
+      this.lastSpine[i * 3 + 2] = p.z;
+    }
+  }
+
+  /**
+   * Conservative geometry-local bounding spheres for the tube and its core,
+   * computed from the written vertices only (WS6 §11.2). Rebuild-time
+   * allocation only — never in the steady-state frame path.
+   */
+  private updateBounds(pointCount: number, radial: number): void {
+    const tubeVertexCount = pointCount * (radial + 1);
+    let cx = 0;
+    let cy = 0;
+    let cz = 0;
+    for (let i = 0; i < tubeVertexCount; i += 1) {
+      const o = i * 3;
+      cx += this.positions[o]!;
+      cy += this.positions[o + 1]!;
+      cz += this.positions[o + 2]!;
+    }
+    cx /= tubeVertexCount;
+    cy /= tubeVertexCount;
+    cz /= tubeVertexCount;
+    let maxR2 = 0;
+    for (let i = 0; i < tubeVertexCount; i += 1) {
+      const o = i * 3;
+      const dx = this.positions[o]! - cx;
+      const dy = this.positions[o + 1]! - cy;
+      const dz = this.positions[o + 2]! - cz;
+      maxR2 = Math.max(maxR2, dx * dx + dy * dy + dz * dz);
+    }
+    this.geometry.boundingSphere = new THREE.Sphere(
+      new THREE.Vector3(cx, cy, cz),
+      Math.sqrt(maxR2)
+    );
+    this.coreGeometry.boundingSphere = this.geometry.boundingSphere.clone();
   }
 
   setQuality(quality: number): void {

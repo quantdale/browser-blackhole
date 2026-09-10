@@ -112,7 +112,7 @@ describe('VolumeService proxy construction', () => {
     const mesh = volume.object3d() as Mesh;
     expect(mesh.position).toEqual(new THREE.Vector3(...CENTER));
     expect((mesh.geometry as THREE.SphereGeometry).parameters.radius).toBe(4);
-    expect(mesh.frustumCulled).toBe(false);
+    expect(mesh.frustumCulled).toBe(true);
     expect(mesh.renderOrder).toBe(10);
     expect(mesh.name).toBe('VolumeProxy');
 
@@ -399,6 +399,51 @@ describe('VolumeService WS0 aggregate telemetry', () => {
       internalHeight: 300,
       internalScale: 0.5
     });
+    service.dispose();
+  });
+});
+
+describe('VolumeService conservative frustum culling (WS5 §10.3)', () => {
+  function frustumFor(camera: THREE.PerspectiveCamera): THREE.Frustum {
+    camera.updateMatrixWorld();
+    camera.updateProjectionMatrix();
+    const frustum = new THREE.Frustum();
+    frustum.setFromProjectionMatrix(
+      new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse)
+    );
+    return frustum;
+  }
+
+  it('culls a volume fully outside the frustum and keeps one that intersects', () => {
+    const service = new VolumeService();
+    const volume = service.createVolume(
+      makeConfig({ bounds: { kind: 'sphere', center: [1000, 0, 0], radius: 4 } })
+    );
+    const mesh = volume.object3d() as Mesh;
+    expect(mesh.frustumCulled).toBe(true);
+    mesh.updateMatrixWorld(true); // the renderer does this each frame
+
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 5000);
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1); // volume is 1000 units behind the view
+    expect(frustumFor(camera).intersectsObject(mesh)).toBe(false);
+
+    camera.lookAt(1000, 0, 0);
+    expect(frustumFor(camera).intersectsObject(mesh)).toBe(true);
+    service.dispose();
+  });
+
+  it('keeps a volume the camera is inside (bounding sphere straddles the frustum)', () => {
+    const service = new VolumeService();
+    const volume = service.createVolume(
+      makeConfig({ bounds: { kind: 'sphere', center: [0, 0, 0], radius: 500 } })
+    );
+    const mesh = volume.object3d() as Mesh;
+    mesh.updateMatrixWorld(true);
+    const camera = new THREE.PerspectiveCamera(60, 1, 0.1, 5000);
+    camera.position.set(0, 0, 0);
+    camera.lookAt(0, 0, -1);
+    expect(frustumFor(camera).intersectsObject(mesh)).toBe(true);
     service.dispose();
   });
 });

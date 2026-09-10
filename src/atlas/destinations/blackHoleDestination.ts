@@ -115,16 +115,32 @@ export function createBlackHoleModule(): PhenomenonModule {
 
 type PassKind = 'numerical' | 'lut' | 'kerr';
 
-interface PreparedPasses {
-  numerical: LensingHandle;
-  lut: LensingHandle | null;
-  kerr: LensingHandle;
+/**
+ * Bounded recent-pass cache (WS4 §9.2): the active pass plus at most one
+ * alternate. A control toggle back and forth reuses the resident alternate;
+ * a third pass evicts the least-recently-used non-active one. Everything is
+ * also tracked by the prepare scope, so eviction releases the scope entries
+ * rather than leaving them to double-dispose at visit end.
+ */
+const MAX_RESIDENT_PASSES = 2;
+
+/** Construction context captured at prepare time for lazy alternate passes. */
+interface LensingPassContext {
+  lensing: ILensingService;
+  scope: PrepareContext['scope'];
 }
 
 export class BlackHoleModule implements PhenomenonModule {
   readonly descriptor = blackHoleDescriptor;
 
-  private passes: PreparedPasses | null = null;
+  // WS4 §9.2 active-pass lifecycle: passes are created on demand, never as an
+  // eager numerical+LUT+Kerr set. Draw-time visibility still selects exactly
+  // one pass per frame.
+  private readonly passHandles = new Map<PassKind, LensingHandle>();
+  /** Child scope per created pass, so eviction disposes exactly its resources. */
+  private readonly passScopes = new Map<PassKind, PrepareContext['scope']>();
+  private activePass: { kind: PassKind; handle: LensingHandle } | null = null;
+  private passContext: LensingPassContext | null = null;
   private fallbackPass: DiagnosticPass | null = null;
   private scene: Scene | null = null;
   /** Canonical control record (the ONLY authority is the normalizer). */
@@ -205,6 +221,151 @@ export class BlackHoleModule implements PhenomenonModule {
     }
   }
 
+  /**
+   * Which pass kind this frame/arrival should show (WS4 §9.2). Metric 'kerr'
+   * always selects the numerical Kerr pass; Schwarzschild resolves through the
+   * ONE documented trajectory policy (URL override > preference > auto +
+   * capability) plus actual LUT asset availability.
+   */
+  private desiredPassKind(): PassKind {
+    if (this.controls.metric === 'kerr') return 'kerr';
+    const resolution = resolveTrajectoryBackend({
+      preference: this.frameTrajectoryBackend,
+      urlOverride: this.urlTrajectoryOverride,
+      lutAssetsReady: this.lut !== null && this.lut.webgl2Filterable,
+      lutUnavailableReason:
+        this.lut === null
+          ? 'lut-assets-unavailable'
+          : this.lut.webgl2Filterable
+            ? null
+            : 'lut-format-not-filterable-on-backend',
+      autoDefaultLut: LUT_AUTO_DEFAULT
+    });
+    return resolution.effective === 'lut' && this.lut !== null ? 'lut' : 'numerical';
+  }
+
+  /**
+   * Lazily create (and scope-track) the pass for `kind`, or null when it
+   * cannot be created — a missing LUT family, a backend without the LUT pass
+   * factory, or a construction failure. Creation failure NEVER destroys the
+   * currently visible pass; the caller keeps the old metric and records a
+   * truthful fallback reason.
+   */
+  private createPass(kind: PassKind): LensingHandle | null {
+    const existing = this.passHandles.get(kind);
+    if (existing !== undefined) return existing;
+    const context = this.passContext;
+    if (context === null) return null;
+
+    const baseParams = {
+      massRg: 1,
+      backgroundEquirect: null,
+      diskEnabled: true,
+      qualityTier: this.lastQualityTier
+    };
+    let handle: LensingHandle;
+    try {
+      if (kind === 'numerical') {
+        handle = context.lensing.createBlackHoleLensingPass({
+          ...baseParams,
+          diskInnerRg: DISK_INNER_RG,
+          diskOuterRg: DISK_OUTER_RG
+        });
+      } else if (kind === 'lut') {
+        if (this.lut === null) return null;
+        const lutSvc = context.lensing as ILensingService & {
+          createBlackHoleLutPass?: (
+            p: Parameters<ILensingService['createBlackHoleLensingPass']>[0],
+            l: {
+              resources: LutGpuResources;
+              storedSpanRad: number;
+              bCriticalRg: number;
+              hybridBandHalfWidthX: number;
+            }
+          ) => LensingHandle & { lutMaterial?: () => unknown };
+        };
+        if (typeof lutSvc.createBlackHoleLutPass !== 'function') return null;
+        handle = lutSvc.createBlackHoleLutPass(
+          { ...baseParams, diskInnerRg: DISK_INNER_RG, diskOuterRg: DISK_OUTER_RG },
+          {
+            resources: this.lut.resources,
+            storedSpanRad: this.lut.storedSpanRad,
+            bCriticalRg: this.lut.bCriticalRg,
+            hybridBandHalfWidthX: this.lut.hybridBandHalfWidthX
+          }
+        );
+      } else {
+        const kerrSpin = Math.min(0.998, Math.max(-0.998, effectiveSpin(this.controls)));
+        const kerrParams: KerrLensingParams = {
+          ...baseParams,
+          diskInnerRg: Math.max(kerrIscoRadius(kerrSpin), KERR_DISK_INNER_FLOOR_RG),
+          diskOuterRg: DISK_OUTER_RG,
+          spinDimensionless: kerrSpin
+        };
+        handle = context.lensing.createKerrLensingPass(kerrParams);
+      }
+    } catch (error) {
+      console.warn(`[BlackHoleModule] creating the '${kind}' lensing pass failed:`, error);
+      return null;
+    }
+
+    this.passHandles.set(kind, handle);
+    this.scene?.add(handle.object3d());
+    // A child scope per pass (WS4 §9.2) keeps eviction accountable: disposal
+    // releases exactly this pass's geometry/material and detaches it from the
+    // destination scope's counters.
+    const childScope = context.scope.createChild(`lensing-${kind}`);
+    this.passScopes.set(kind, childScope);
+    trackLensingHandle(childScope, handle);
+    handle.object3d().visible = false;
+    return handle;
+  }
+
+  /** Make `kind` the only visible pass and enforce the bounded cache. */
+  private activatePass(kind: PassKind, handle: LensingHandle): void {
+    for (const [passKind, pass] of this.passHandles) {
+      pass.object3d().visible = passKind === kind;
+    }
+    this.activePass = { kind, handle };
+    this.activePassKind = kind;
+    this.enforcePassCache();
+  }
+
+  /** Evict least-recently-used non-active passes beyond the cache bound. */
+  private enforcePassCache(): void {
+    while (this.passHandles.size > MAX_RESIDENT_PASSES) {
+      let evicted: { kind: PassKind; handle: LensingHandle } | null = null;
+      for (const [kind, handle] of this.passHandles) {
+        if (this.activePass !== null && this.activePass.handle === handle) continue;
+        evicted = { kind, handle };
+        break;
+      }
+      if (evicted === null) return;
+      this.evictPass(evicted.kind, evicted.handle);
+    }
+  }
+
+  /** Dispose every non-active resident pass (visit teardown still keeps the active one). */
+  private disposeAlternates(): void {
+    for (const [kind, handle] of [...this.passHandles]) {
+      if (this.activePass !== null && this.activePass.handle === handle) continue;
+      this.evictPass(kind, handle);
+    }
+  }
+
+  private evictPass(kind: PassKind, handle: LensingHandle): void {
+    this.passHandles.delete(kind);
+    handle.object3d().removeFromParent();
+    const childScope = this.passScopes.get(kind);
+    if (childScope !== undefined) {
+      // The child's tracked disposers release the geometry and the handle.
+      this.passScopes.delete(kind);
+      childScope.disposeAll();
+      return;
+    }
+    handle.dispose();
+  }
+
   async prepare(ctx: PrepareContext): Promise<{
     module: PhenomenonModule;
     scope: PrepareContext['scope'];
@@ -213,15 +374,15 @@ export class BlackHoleModule implements PhenomenonModule {
   }> {
     if (this.disposed) throw new Error('[BlackHoleModule] prepare() called after dispose().');
 
-    ctx.reportProgress(0.15, 'Creating strong-field lensing passes');
+    ctx.reportProgress(0.15, 'Creating strong-field lensing pass');
     throwIfAborted(ctx.signal);
     const scene = new Scene();
+    this.scene = scene;
 
     // Preset state flows through the ONE normalizer before anything consumes it.
     this.controls = normalizeBlackHoleControls(ctx.preset.state);
     this.observerTau = 0;
     this.syncObserverSeed();
-    const presetSpin = effectiveSpin(this.controls);
 
     // --- LUT family load (M8-06): best-effort, never blocks the numerical
     // paths. Any failure records a truthful reason and continues numerical.
@@ -258,71 +419,18 @@ export class BlackHoleModule implements PhenomenonModule {
     }
 
     try {
-      const baseParams = {
-        massRg: 1,
-        backgroundEquirect: null,
-        diskEnabled: true,
-        qualityTier: ctx.quality
-      };
-
-      // --- Pass 1: numerical Schwarzschild (always available) ---
-      const numerical = ctx.services.lensing.createBlackHoleLensingPass({
-        ...baseParams,
-        diskInnerRg: DISK_INNER_RG,
-        diskOuterRg: DISK_OUTER_RG
-      });
-      trackLensingHandle(ctx, numerical);
-      scene.add(numerical.object3d());
-
-      // --- Pass 2: LUT Schwarzschild (only when assets are usable) ---
-      let lut: LensingHandle | null = null;
-      if (
-        this.lut !== null &&
-        typeof (
-          ctx.services.lensing as {
-            createBlackHoleLutPass?: unknown;
-          }
-        ).createBlackHoleLutPass === 'function'
-      ) {
-        const lutSvc = ctx.services.lensing as ILensingService & {
-          createBlackHoleLutPass: (
-            p: Parameters<ILensingService['createBlackHoleLensingPass']>[0],
-            l: {
-              resources: LutGpuResources;
-              storedSpanRad: number;
-              bCriticalRg: number;
-              hybridBandHalfWidthX: number;
-            }
-          ) => LensingHandle & { lutMaterial?: () => unknown };
-        };
-        lut = lutSvc.createBlackHoleLutPass(
-          { ...baseParams, diskInnerRg: DISK_INNER_RG, diskOuterRg: DISK_OUTER_RG },
-          {
-            resources: this.lut.resources,
-            storedSpanRad: this.lut.storedSpanRad,
-            bCriticalRg: this.lut.bCriticalRg,
-            hybridBandHalfWidthX: this.lut.hybridBandHalfWidthX
-          }
-        );
-        trackLensingHandle(ctx, lut);
-        scene.add(lut.object3d());
+      this.passContext = { lensing: ctx.services.lensing, scope: ctx.scope };
+      // WS4 §9.2: instantiate ONLY the pass this arrival will actually show.
+      // The default Schwarzschild auto policy selects LUT when the family is
+      // ready, so a default arrival builds the LUT pass and nothing else;
+      // numerical/Kerr are created lazily on an actual switch.
+      const desired = this.desiredPassKind();
+      const handle = this.createPass(desired);
+      if (handle === null) {
+        throw new Error(`initial '${desired}' lensing pass could not be created`);
       }
-
-      // --- Pass 3: numerical Kerr (M9; distinct strong-field backend) ---
-      const kerrSpin = Math.min(0.998, Math.max(-0.998, presetSpin));
-      const kerrInner = Math.max(kerrIscoRadius(kerrSpin), KERR_DISK_INNER_FLOOR_RG);
-      const kerrParams: KerrLensingParams = {
-        ...baseParams,
-        diskInnerRg: kerrInner,
-        diskOuterRg: DISK_OUTER_RG,
-        spinDimensionless: kerrSpin
-      };
-      const kerr = ctx.services.lensing.createKerrLensingPass(kerrParams);
-      trackLensingHandle(ctx, kerr);
-      scene.add(kerr.object3d());
-
-      this.passes = { numerical, lut, kerr };
-      ctx.reportProgress(0.5, 'Strong-field passes ready');
+      this.activatePass(desired, handle);
+      ctx.reportProgress(0.5, 'Strong-field pass ready');
     } catch {
       // Honest degraded path: deterministic fullscreen pattern, flagged in
       // the debug snapshot. Never presented as geodesic lensing.
@@ -347,8 +455,6 @@ export class BlackHoleModule implements PhenomenonModule {
 
     ctx.reportProgress(0.85, 'Registering pass resources in scope');
     throwIfAborted(ctx.signal);
-
-    this.scene = scene;
 
     ctx.reportProgress(1, 'Black hole ready');
     return { module: this, scope: ctx.scope, scene, preset: ctx.preset };
@@ -396,114 +502,127 @@ export class BlackHoleModule implements PhenomenonModule {
 
   render(ctx: RenderContext): void {
     if (this.disposed || this.scene === null) return;
-    if (this.passes !== null) {
-      const { numerical, lut, kerr } = this.passes;
-      const useKerr = this.controls.metric === 'kerr';
-      let selected: LensingHandle;
-      let kind: PassKind;
+    const useKerr = this.controls.metric === 'kerr';
+    if (this.passContext !== null) {
+      // WS4 §9.2: lazily create the requested pass and keep the currently
+      // visible one if an alternate cannot be built. Activation is synchronous
+      // with the frame that requests the switch, so no wrong-metric or
+      // half-configured intermediate frame can ever be presented.
+      const desired = this.desiredPassKind();
+      let creationFailed = false;
+      if (this.activePass === null || this.activePass.kind !== desired) {
+        const next = this.createPass(desired);
+        if (next !== null) this.activatePass(desired, next);
+        else creationFailed = this.activePass !== null;
+      }
 
-      if (useKerr) {
-        selected = kerr;
-        kind = 'kerr';
-        // Backend policy truth (ADR §1.21): Kerr runs numerical Kerr; the
-        // Schwarzschild trajectory preference/LUT policy is INAPPLICABLE —
-        // true regardless of whether a LUT family happens to be loaded (it
-        // is intentionally skipped while Kerr is the entry metric; see the
-        // backend-conditional load note in prepare()).
-        this.lastRequestedBackend = 'auto';
-        this.lastEffectiveTrajectoryBackend = 'numerical';
-        this.lastFallbackReason = 'lut-inapplicable-while-kerr-active';
-      } else {
-        const resolution = resolveTrajectoryBackend({
-          preference: this.frameTrajectoryBackend,
-          urlOverride: this.urlTrajectoryOverride,
-          lutAssetsReady: lut !== null && this.lut !== null && this.lut.webgl2Filterable,
-          lutUnavailableReason:
-            this.lut === null || lut === null
-              ? 'lut-assets-unavailable'
-              : this.lut.webgl2Filterable
-                ? null
-                : 'lut-format-not-filterable-on-backend',
-          autoDefaultLut: LUT_AUTO_DEFAULT
+      if (this.activePass !== null) {
+        const selected = this.activePass.handle;
+        const kind = this.activePass.kind;
+        if (useKerr) {
+          // Backend policy truth (ADR §1.21): Kerr runs numerical Kerr; the
+          // Schwarzschild trajectory preference/LUT policy is INAPPLICABLE.
+          this.lastRequestedBackend = 'auto';
+          this.lastEffectiveTrajectoryBackend = 'numerical';
+          this.lastFallbackReason = 'lut-inapplicable-while-kerr-active';
+        } else {
+          const resolution = resolveTrajectoryBackend({
+            preference: this.frameTrajectoryBackend,
+            urlOverride: this.urlTrajectoryOverride,
+            lutAssetsReady: this.lut !== null && this.lut.webgl2Filterable,
+            lutUnavailableReason:
+              this.lut === null
+                ? 'lut-assets-unavailable'
+                : this.lut.webgl2Filterable
+                  ? null
+                  : 'lut-format-not-filterable-on-backend',
+            autoDefaultLut: LUT_AUTO_DEFAULT
+          });
+          this.lastRequestedBackend = resolution.requested;
+          // Effective truth comes from the pass that is ACTUALLY active, not
+          // from the resolution: if the requested alternate could not be built
+          // we keep rendering the previous metric and say so.
+          this.lastEffectiveTrajectoryBackend = kind === 'lut' ? 'lut' : 'numerical';
+          this.lastFallbackReason =
+            kind === 'lut'
+              ? resolution.fallbackReason
+              : creationFailed
+                ? 'alternate-pass-creation-failed'
+                : resolution.fallbackReason;
+        }
+
+        const spin = effectiveSpin(this.controls);
+        const baseState = useKerr
+          ? {
+              ...cameraLensingState(
+                ctx.camera,
+                Math.max(kerrIscoRadius(spin), KERR_DISK_INNER_FLOOR_RG),
+                DISK_OUTER_RG
+              ),
+              maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
+              spinDimensionless: spin
+            }
+          : {
+              ...cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG),
+              maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
+              lutEnabled: kind === 'lut' ? 1 : 0
+            };
+
+        // M10 physical observer: per-frame tetrad payload from the canonical
+        // snapshot builder. Moving modes also OVERRIDE the ray origin with the
+        // worldline position (the camera keeps supplying only LOOK axes).
+        this.syncObserverSeed();
+        const cameraAxes = currentCameraBasis(ctx.camera);
+        const observerPayload = buildObserverUniformPayload({
+          controls: this.controls,
+          cameraPositionWorld: [
+            ctx.camera.position.x,
+            ctx.camera.position.y,
+            ctx.camera.position.z
+          ],
+          cameraAxes,
+          tau: this.observerTau,
+          geodesicWorldline: this.geodesicWorldline,
+          seedFailureReason: this.lastObserverSeedFailure
         });
-        selected = resolution.effective === 'lut' && lut !== null ? lut : numerical;
-        kind = resolution.effective === 'lut' && lut !== null ? 'lut' : 'numerical';
-        this.lastRequestedBackend = resolution.requested;
-        this.lastEffectiveTrajectoryBackend = resolution.effective;
-        this.lastFallbackReason = resolution.fallbackReason;
-      }
-      this.activePassKind = kind;
+        this.lastObserverReadout = observerPayload.readout;
+        const lensingState: Record<string, unknown> = {
+          ...baseState,
+          ...observerPayload.stateKeys
+        };
+        lensingState['temporalJitterNdc'] = ctx.temporalJitterNdc ?? [0, 0];
+        const obsMode = this.controls.observer.mode;
+        const movingMode = obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
+        if (
+          movingMode &&
+          observerPayload.readout.valid &&
+          Number.isFinite(observerPayload.readout.positionWorld[0])
+        ) {
+          lensingState['cameraPositionRg'] = observerPayload.readout.positionWorld;
+        }
+        // M11: moving-observer Kerr rays traverse deeper potentials at E < 1
+        // with theta-motion — measured census for the kerr-circular-observer
+        // reference: median ~215 / p95 ~1260 / max ~2600 policy steps vs the
+        // static-camera workload. Scale the tier budget so the tier ladder
+        // keeps its meaning; the pass hard-clamps to its compile bound.
+        if (useKerr && movingMode && observerPayload.readout.valid) {
+          lensingState['maxSteps'] = Math.min(6144, TIER_STEP_BUDGETS[this.lastQualityTier] * 3);
+        }
 
-      // Visibility gate: exactly one strong-field pass renders per frame.
-      numerical.object3d().visible = kind === 'numerical';
-      if (lut !== null) lut.object3d().visible = kind === 'lut';
-      kerr.object3d().visible = kind === 'kerr';
-
-      const spin = effectiveSpin(this.controls);
-      const baseState = useKerr
-        ? {
-            ...cameraLensingState(
-              ctx.camera,
-              Math.max(kerrIscoRadius(spin), KERR_DISK_INNER_FLOOR_RG),
-              DISK_OUTER_RG
-            ),
-            maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
-            spinDimensionless: spin
-          }
-        : {
-            ...cameraLensingState(ctx.camera, DISK_INNER_RG, DISK_OUTER_RG),
-            maxSteps: TIER_STEP_BUDGETS[this.lastQualityTier],
-            lutEnabled: kind === 'lut' ? 1 : 0
-          };
-
-      // M10 physical observer: per-frame tetrad payload from the canonical
-      // snapshot builder. Moving modes also OVERRIDE the ray origin with the
-      // worldline position (the camera keeps supplying only LOOK axes).
-      this.syncObserverSeed();
-      const cameraAxes = currentCameraBasis(ctx.camera);
-      const observerPayload = buildObserverUniformPayload({
-        controls: this.controls,
-        cameraPositionWorld: [ctx.camera.position.x, ctx.camera.position.y, ctx.camera.position.z],
-        cameraAxes,
-        tau: this.observerTau,
-        geodesicWorldline: this.geodesicWorldline,
-        seedFailureReason: this.lastObserverSeedFailure
-      });
-      this.lastObserverReadout = observerPayload.readout;
-      const lensingState: Record<string, unknown> = {
-        ...baseState,
-        ...observerPayload.stateKeys
-      };
-      lensingState['temporalJitterNdc'] = ctx.temporalJitterNdc ?? [0, 0];
-      const obsMode = this.controls.observer.mode;
-      const movingMode = obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
-      if (
-        movingMode &&
-        observerPayload.readout.valid &&
-        Number.isFinite(observerPayload.readout.positionWorld[0])
-      ) {
-        lensingState['cameraPositionRg'] = observerPayload.readout.positionWorld;
+        if (this.controls.debugParity) {
+          lensingState['diskEnabled'] = false;
+          lensingState['debugMode'] = 1;
+        }
+        if (!useKerr && this.lutDebugView) {
+          lensingState['lutDebugStatus'] = 1;
+        }
+        if (useKerr && this.kerrStatusView) {
+          lensingState['debugMode'] = 2;
+        }
+        selected.setUniformsFromState(lensingState);
+      } else if (this.fallbackPass !== null) {
+        applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
       }
-      // M11: moving-observer Kerr rays traverse deeper potentials at E < 1
-      // with theta-motion — measured census for the kerr-circular-observer
-      // reference: median ~215 / p95 ~1260 / max ~2600 policy steps vs the
-      // static-camera workload. Scale the tier budget so the tier ladder
-      // keeps its meaning; the pass hard-clamps to its compile bound.
-      if (useKerr && movingMode && observerPayload.readout.valid) {
-        lensingState['maxSteps'] = Math.min(6144, TIER_STEP_BUDGETS[this.lastQualityTier] * 3);
-      }
-
-      if (this.controls.debugParity) {
-        lensingState['diskEnabled'] = false;
-        lensingState['debugMode'] = 1;
-      }
-      if (!useKerr && this.lutDebugView) {
-        lensingState['lutDebugStatus'] = 1;
-      }
-      if (useKerr && this.kerrStatusView) {
-        lensingState['debugMode'] = 2;
-      }
-      selected.setUniformsFromState(lensingState);
     } else if (this.fallbackPass !== null) {
       applyCameraBasis(this.fallbackPass.uniforms, ctx.camera);
     }
@@ -511,14 +630,20 @@ export class BlackHoleModule implements PhenomenonModule {
   }
 
   exit(_ctx: ExitContext): void {
-    // Freeze handled by the director's SharedPost snapshot.
+    // Freeze handled by the director's SharedPost snapshot. Alternates are
+    // presentation-only and safe to release now; the active pass stays until
+    // the visit scope is disposed.
+    this.disposeAlternates();
   }
 
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
     // GPU objects are owned by the prepare scope; drop references only.
-    this.passes = null;
+    this.passHandles.clear();
+    this.passScopes.clear();
+    this.activePass = null;
+    this.passContext = null;
     this.fallbackPass = null;
     this.scene = null;
     this.controls = { ...DEFAULT_BLACK_HOLE_CONTROLS };
@@ -548,7 +673,7 @@ export class BlackHoleModule implements PhenomenonModule {
   }
 
   getDebugSnapshot(): Record<string, unknown> {
-    const wired = this.passes !== null;
+    const wired = this.activePass !== null;
     const pattern = wired
       ? this.activePassKind === 'kerr'
         ? 'kerr geodesic lensing + accretion disk (numerical)'
@@ -571,6 +696,10 @@ export class BlackHoleModule implements PhenomenonModule {
           : null,
       schwarzschildDiskInnerRg: DISK_INNER_RG,
       activePassKind: this.activePassKind,
+      // WS4 §9.2 active-pass lifecycle evidence: exactly the resident passes,
+      // created lazily and bounded to the active plus one alternate.
+      lensingResidentPassKinds: [...this.passHandles.keys()],
+      lensingResidentPassCount: this.passHandles.size,
       // M8-06/M8-09 backend/fallback truth, extended by ADR §1.21:
       trajectoryBackendRequested: this.lastRequestedBackend,
       trajectoryBackendEffective:
@@ -606,14 +735,14 @@ function throwIfAborted(signal: AbortSignal): void {
   }
 }
 
-function trackLensingHandle(ctx: PrepareContext, handle: LensingHandle): void {
-  ctx.scope.track(
+function trackLensingHandle(scope: PrepareContext['scope'], handle: LensingHandle): void {
+  scope.track(
     'geometry',
     handle.object3d().geometry,
     () => handle.object3d().geometry.dispose(),
     GEOMETRY_ESTIMATED_BYTES
   );
-  ctx.scope.track(
+  scope.track(
     'material',
     handle.object3d().material,
     () => handle.dispose(),

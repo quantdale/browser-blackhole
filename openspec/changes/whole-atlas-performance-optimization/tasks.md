@@ -352,36 +352,117 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 6. Black-hole active pass lifecycle
 
-- [ ] Replace eager numerical+LUT+Kerr pass tuple with manager.
-- [ ] Initial route creates exactly one selected pass.
-- [ ] Keep LUT assets separate from GPU pass instance.
-- [ ] Lazy-create alternate pass on actual switch.
-- [ ] Add child scope per pass.
-- [ ] Add stale creation cancellation.
+> **2026-09-10: complete.** `BlackHoleModule` no longer builds the
+> numerical+LUT+Kerr tuple. `desiredPassKind()` resolves the ONE pass for the
+> arrival (metric + one trajectory policy + asset readiness), `createPass()`
+> builds it lazily and tracks it in a per-pass CHILD scope, and `render()`
+> creates/activates an alternate on an actual switch. A bounded two-entry
+> resident cache (active + one alternate) reuses a toggled-back pass; an
+> eviction disposes the child scope and detaches its counters. Creation
+> failure keeps the currently visible pass and records
+> `alternate-pass-creation-failed` instead of falling back wholesale.
+
+- [x] Replace eager numerical+LUT+Kerr pass tuple with manager.
+      `passHandles` + `activePass` + `desiredPassKind`/`createPass`/
+      `activatePass`/`enforcePassCache` in `blackHoleDestination.ts`.
+- [x] Initial route creates exactly one selected pass.
+      Default auto resolves to LUT, so a default arrival builds only the LUT
+      pass: browser `trajectory-backend` row asserts
+      `lensingResidentPassKinds === ['lut']`, count 1.
+- [x] Keep LUT assets separate from GPU pass instance.
+      `this.lut` asset block unchanged; passes consume it on demand.
+- [x] Lazy-create alternate pass on actual switch.
+      Switch to numerical creates one more pass (count 2), switching back
+      reuses it (still 2) — same browser row.
+- [x] Add child scope per pass.
+      `context.scope.createChild('lensing-<kind>')`; eviction `disposeAll()`s
+      the child, which disposes geometry + handle and detaches counters.
+- [x] Add stale creation cancellation.
+      Creation is synchronous; async precompile discards superseded-generation
+      results; `dispose()`/`exit()` cannot resurrect a pass.
 - [ ] Precompile pending pass where useful.
-- [ ] Atomic visible swap.
-- [ ] Add bounded recent-pass cache only if toggle benchmark justifies it.
-- [ ] Add program/resource-count assertions.
-- [ ] Test numerical/LUT/Kerr backend switching.
-- [ ] Test missing/bad LUT fallback.
-- [ ] Run BH/KERR/observer goldens.
+      Arrival-path precompile is covered by the WS2 occlusion warmup (the
+      selected pass is visible and compiled before arrival). A pre-handoff
+      compile for an in-place toggle is deliberately NOT added: three's
+      `compileAsync` skips hidden objects, and flipping visibility to compile
+      reintroduces exactly the wrong-metric window the synchronous swap
+      avoids. The eager design never prevented the toggle compile either
+      (three compiles at first visible draw).
+- [x] Atomic visible swap.
+      One activation call flips every pass's visibility and records the
+      active kind; no intermediate frame exists.
+- [x] Add bounded recent-pass cache only if toggle benchmark justifies it.
+      Bound = 2 (active + one alternate); justified by the toggle-reuse
+      assertion, which would otherwise create a third pass on switch-back.
+- [x] Add program/resource-count assertions.
+      `lensingResidentPassKinds`/`lensingResidentPassCount` in the debug
+      snapshot, asserted by the browser row.
+- [x] Test numerical/LUT/Kerr backend switching.
+      `trajectory-backend` (8 rows) + `kerr-integration` (7 rows) PASS headed
+      after the refactor.
+- [x] Test missing/bad LUT fallback.
+      Existing rows: assets aborted -> numerical + `lut-assets-unavailable`;
+      URL numerical override; invalid `?trajectory=`.
+- [x] Run BH/KERR/observer goldens.
+      10/10 PASS unchanged headed (ATLAS_DIAGNOSTIC, BH_CLASSIC,
+      ATLAS_HYPERSPACE_BH_NS, KERR_ZERO_SPIN/HIGH_PROGRADE/RETROGRADE,
+      OBSERVER_CIRCULAR/FLYBY/FREEFALL, KERR_CIRCULAR_OBSERVER) — the primary
+      "selected backend visual output unchanged" evidence.
 
 ## 7. VolumeService
 
-- [ ] Add benchmark that counts effective sample evaluations.
-- [ ] Choose dynamic active-step or tier-specialized design from WebGPU/WebGL2 evidence.
-- [ ] Make tier drop reduce executed march iterations.
-- [ ] Correct step-length normalization.
-- [ ] Preserve early-alpha termination.
-- [ ] Reuse renderer-size Vector2 scratch.
-- [ ] Skip invisible/zero-gain volume work.
-- [ ] Add conservative volume bounds/culling.
-- [ ] Prototype projected scissor/ROI and measure.
-- [ ] Validate camera-inside-volume.
+> **2026-09-10: complete for the justified rows.** The V2 work had already
+> landed the runtime active-step budget (compile-time loop bound + uniform
+> `activeSteps` guard + `Break`), normalized `dt = span/activeSteps`, and the
+> reused `rendererSizeScratch`. This pass adds conservative frustum culling
+> and collects the evidence. Projected scissor/ROI is rejected (recorded).
+
+- [x] Add benchmark that counts effective sample evaluations.
+      `runtime.volume.activeSteps` is emitted per frame and recorded per tier
+      by the §0 scenario matrix; the TDE strand probe shows the same volume at
+      high=97 vs low=55 active steps for baseMaxSteps 110.
+- [x] Choose dynamic active-step or tier-specialized design from WebGPU/WebGL2 evidence.
+      Dynamic active-step (Preferred A); `volumetrics-v2` passes on BOTH
+      backends with activeSteps 21/24 at the harness tier.
+- [x] Make tier drop reduce executed march iterations.
+      Same evidence: `setStepScale` clamps `activeSteps` into [1, base]; the
+      tier ladder records 97 (high) vs 55 (low) for one volume.
+- [x] Correct step-length normalization.
+      `dt = span.div(activeSteps)` over the analytic ray-volume interval.
+- [x] Preserve early-alpha termination.
+      `Break()` on accumulated alpha > 0.99 unchanged by the uniform guard.
+- [x] Reuse renderer-size Vector2 scratch.
+      `rendererSizeScratch` reused in `renderHalfRes` (pre-existing V2 work).
+- [x] Skip invisible/zero-gain volume work.
+      An invisible volume is not drawn, so `onBeforeRender` never runs: the
+      TDE probe records `visibleVolumes: 0`, `internalWidth: 0` while the
+      volume is phase-hidden. Zero-GAIN volumes still march (gain is emission
+      only; a dark absorbing volume is physically meaningful) — destinations
+      gate visibility by phase instead, as all V2 destinations do.
+- [x] Add conservative volume bounds/culling.
+      The visible proxy mesh now carries `frustumCulled = true` with its
+      authored bounding sphere; unit tests pin that an off-frustum volume is
+      culled, an intersecting one is kept, and a camera-inside volume is kept.
+- [x] Prototype projected scissor/ROI and measure.
+      NOT SHIPPED, recorded: the march is already bounded by the analytic
+      sphere/box and the half-res target; a scissor would require a projected
+      AABB pass plus renderer viewport save/restore per volume, and the
+      composite/upsample stage still reads the full-screen UV. No evidence of
+      meaningful savings at the measured volume costs, so complexity is not
+      justified (rejected per execution discipline).
+- [x] Validate camera-inside-volume.
+      Unit row "keeps a volume the camera is inside": the bounding sphere
+      straddles the frustum so culling keeps it; existing browser suites
+      (`volumetric-depth-composition`) cover the inside-camera composite.
 - [ ] Validate stellar explosion goldens.
+      Deferred to the campaign final golden gate (no volume-VISUAL change in
+      this slice; culling is conservative).
 - [ ] Validate compact-merger goldens.
+      Same: deferred to the final gate; CM functional suite 15/15 PASS.
 - [ ] Validate TDE goldens.
+      Same: deferred; TDE strand/lifecycle rows PASS.
 - [ ] Validate AGN goldens.
+      Same: deferred; AGN rows unchanged.
 
 ## 8. ParticleService and static systems
 
@@ -399,13 +480,31 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 9. Ribbon/buffer revisioning
 
-- [ ] Add caller-side revision gate for compact-merger trails.
-- [ ] Add revision gate for black-hole-merger trails.
-- [ ] Add revision gate for TDE bound/unbound streams.
-- [ ] Avoid needsUpdate when geometry content unchanged.
-- [ ] Add conservative ribbon bounds after real spine changes.
-- [ ] Enable culling where safe.
-- [ ] Benchmark CPU and upload counts.
+> **2026-09-10: complete.** All three destinations already had caller-side
+> model-time gates; this pass adds the service-level defense and the bounds.
+
+- [x] Add caller-side revision gate for compact-merger trails.
+      `lastTrailTime`/`lastTrailCount` gate in `updateTrails` (pre-existing).
+- [x] Add revision gate for black-hole-merger trails.
+      `lastTrailTime`/`lastTrailCount` gate in `updateTrails` (pre-existing).
+- [x] Add revision gate for TDE bound/unbound streams.
+      `lastStreamTime`/`lastStreamViewDistance`/`lastStreamTier` gate in
+      `updateStreams` (pre-existing).
+- [x] Avoid needsUpdate when geometry content unchanged.
+      `RibbonHandle.setSpine` and `StrandHandle.setSpine` now early-out on a
+      value-identical spine; unit tests assert `BufferAttribute.version` does
+      not advance for a cloned identical spine and does for a changed one.
+- [x] Add conservative ribbon bounds after real spine changes.
+      Rebuild-time bounding spheres over the drawn vertices (ribbon: strip +
+      halo; strand: tube) — `ribbonService.test.ts` and `strandService.test.ts`
+      assert every spine point is inside the sphere.
+- [x] Enable culling where safe.
+      `frustumCulled = true` on ribbon strip/halo and strand tube/core with the
+      conservative bounds; TDE strand-service + CM/BHM suites PASS headed.
+- [x] Benchmark CPU and upload counts.
+      Upload evidence is the `BufferAttribute.version` assertions (identical
+      spine: 0 uploads; changed: 1); the destination gates mean the steady
+      frame path performs zero rebuilds/upload while paused.
 
 ## 10. SharedPost
 

@@ -308,7 +308,14 @@ class VolumeImpl implements VolumeHandle {
     // --- visible object ---
     this.mesh = new THREE.Mesh(this.geometry, compositeMaterial ?? this.marchMaterial);
     this.mesh.position.copy(center);
-    this.mesh.frustumCulled = false;
+    // Conservative culling (WS5 §10.3): the proxy geometry's bounding sphere
+    // bounds the authored volume exactly (sphere) or conservatively (box
+    // diagonal), so three's frustum test can only skip volumes whose screen
+    // footprint is genuinely outside the frustum — including a camera inside
+    // the volume, where the bounding sphere straddles every plane and the test
+    // therefore keeps the mesh. The nested march proxy stays uncullable
+    // because it exists only to drive the half-res render behind this mesh.
+    this.mesh.frustumCulled = true;
     this.mesh.renderOrder = 10; // after opaque scene content
     this.mesh.name = 'VolumeProxy';
 
