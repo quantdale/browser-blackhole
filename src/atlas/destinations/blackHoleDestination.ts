@@ -172,6 +172,16 @@ export class BlackHoleModule implements PhenomenonModule {
     readTrajectoryUrlOverride();
   private readonly lutDebugView: boolean =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('lutdebug');
+  /**
+   * Live backend API captured at prepare (WS4 §9.2). The LUT acceleration is a
+   * WebGPU-only path: under forced WebGL2 on this stack the LUT material
+   * renders black even with a core-filterable RGBA16F family (measured: the
+   * LUT pass ALONE produces a black frame on both the pre-lifecycle and
+   * lifecycle builds, while the numerical reference renders correctly).
+   * WebGL2 therefore always uses the numerical Schwarzschild reference and
+   * reports `lut-webgl2-unsupported` instead of presenting a black frame.
+   */
+  private backendApiValue: 'webgpu' | 'webgl2' | null = null;
   /** M11 Kerr classification view (?kerrstatus): per-ray terminal classes. */
   private readonly kerrStatusView: boolean =
     typeof window !== 'undefined' && new URLSearchParams(window.location.search).has('kerrstatus');
@@ -229,19 +239,26 @@ export class BlackHoleModule implements PhenomenonModule {
    */
   private desiredPassKind(): PassKind {
     if (this.controls.metric === 'kerr') return 'kerr';
-    const resolution = resolveTrajectoryBackend({
+    const resolution = this.resolveSchwarzschildTrajectory();
+    return resolution.effective === 'lut' && this.lut !== null ? 'lut' : 'numerical';
+  }
+
+  /** Shared Schwarzschild trajectory resolution for lifecycle + render truth. */
+  private resolveSchwarzschildTrajectory(): ReturnType<typeof resolveTrajectoryBackend> {
+    return resolveTrajectoryBackend({
       preference: this.frameTrajectoryBackend,
       urlOverride: this.urlTrajectoryOverride,
       lutAssetsReady: this.lut !== null && this.lut.webgl2Filterable,
       lutUnavailableReason:
-        this.lut === null
-          ? 'lut-assets-unavailable'
-          : this.lut.webgl2Filterable
-            ? null
-            : 'lut-format-not-filterable-on-backend',
+        this.backendApiValue === 'webgl2'
+          ? 'lut-webgl2-unsupported'
+          : this.lut === null
+            ? 'lut-assets-unavailable'
+            : this.lut.webgl2Filterable
+              ? null
+              : 'lut-format-not-filterable-on-backend',
       autoDefaultLut: LUT_AUTO_DEFAULT
     });
-    return resolution.effective === 'lut' && this.lut !== null ? 'lut' : 'numerical';
   }
 
   /**
@@ -383,6 +400,7 @@ export class BlackHoleModule implements PhenomenonModule {
     this.controls = normalizeBlackHoleControls(ctx.preset.state);
     this.observerTau = 0;
     this.syncObserverSeed();
+    this.backendApiValue = ctx.services.kernel.backend?.api ?? null;
 
     // --- LUT family load (M8-06): best-effort, never blocks the numerical
     // paths. Any failure records a truthful reason and continues numerical.
@@ -398,7 +416,9 @@ export class BlackHoleModule implements PhenomenonModule {
     // `lut-assets-unavailable` fallback — the same honest path already
     // exercised whenever the network fetch itself fails.
     const lutCouldBeSelected =
-      this.controls.metric !== 'kerr' && this.urlTrajectoryOverride !== 'numerical';
+      this.backendApiValue !== 'webgl2' &&
+      this.controls.metric !== 'kerr' &&
+      this.urlTrajectoryOverride !== 'numerical';
     ctx.reportProgress(0.2, 'Loading Schwarzschild LUT family');
     if (lutCouldBeSelected) {
       try {
@@ -526,18 +546,7 @@ export class BlackHoleModule implements PhenomenonModule {
           this.lastEffectiveTrajectoryBackend = 'numerical';
           this.lastFallbackReason = 'lut-inapplicable-while-kerr-active';
         } else {
-          const resolution = resolveTrajectoryBackend({
-            preference: this.frameTrajectoryBackend,
-            urlOverride: this.urlTrajectoryOverride,
-            lutAssetsReady: this.lut !== null && this.lut.webgl2Filterable,
-            lutUnavailableReason:
-              this.lut === null
-                ? 'lut-assets-unavailable'
-                : this.lut.webgl2Filterable
-                  ? null
-                  : 'lut-format-not-filterable-on-backend',
-            autoDefaultLut: LUT_AUTO_DEFAULT
-          });
+          const resolution = this.resolveSchwarzschildTrajectory();
           this.lastRequestedBackend = resolution.requested;
           // Effective truth comes from the pass that is ACTUALLY active, not
           // from the resolution: if the requested alternate could not be built

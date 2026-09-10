@@ -1,3 +1,34 @@
+## 2026-09-10 session — FULL-SUITE TRIAGE: LUT/WebGL2 BLACK CONTAINED, RIBBON WIDTH-KEY FIXED
+
+Status: **two real regressions found by the first full-suite run were fixed;
+the suite is re-run as the final certification gate.**
+
+First full default-suite run (headed chromium, workers=2): **253 passed / 3
+failed / 20 did not run** (the run then aborted). Triage:
+
+- `kerr-backend-census` WebGL2 100% captured-black: contention artifact —
+  passes 1/1 in isolation at workers=1.
+- `atlas-webgl2` black-hole deep link uniform frame: REAL. Root cause is the
+  LUT material under forced WebGL2: with the LUT pass ALONE in the scene the
+  frame is black in BOTH the pre-lifecycle and lifecycle builds (bisected by
+  rebuilding each variant and probing pixels); the pre-lifecycle eager scene
+  masked it — its non-black frame did not come from the LUT. Containment: LUT
+  acceleration is gated to WebGPU (`lut-webgl2-unsupported`, assets skipped on
+  WebGL2) and WebGL2 always boots the numerical reference. `atlas-webgl2`
+  4/4 PASS and `trajectory-backend` 8/8 PASS (WebGPU still selects LUT).
+- `golden: TDE_SHOCK` (meanAbsDelta 4.14 > tolerance): REAL, caused by the
+  §9 ribbon early-out ignoring `widthScale` — a framing change with identical
+  spine points (paused TDE + AutoFramer distance) skipped the rebuild. Fixed
+  with `lastAppliedWidthScale` in the change key; TDE_SHOCK/WINDING/DEBRIS
+  goldens 3/3 PASS. New unit test covers the width-keyed rebuild.
+
+Evidence: `npm run check` 46 files / 632 tests PASS; atlas-webgl2 4/4;
+trajectory-backend 8/8; TDE goldens 3/3; docs updated
+(`COMPATIBILITY_MATRIX.md` backend semantics, `PERFORMANCE_CERTIFICATION.md`).
+
+Next action: re-run the full default suite and both golden suites on the final
+SHA, then Firefox, then close the ledger and push.
+
 ## 2026-09-10 session — PARTICLE PREFIX SIM, SHAREDPOST/GOVERNOR EVIDENCE, BHM LAZY KERR (§8/§10/§11/§20 partial)
 
 Status: **§8, §10, §11 complete for justified rows; §20 Kerr-remnant lifecycle

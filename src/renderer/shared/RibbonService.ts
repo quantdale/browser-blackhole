@@ -144,6 +144,8 @@ class RibbonHandleImpl implements RibbonHandle {
   /** Last applied spine coordinates (value compare before any rebuild). */
   private readonly lastSpine: number[] = [];
   private lastSpinePointCount = -1;
+  /** Width multiplier applied by the last rebuild (part of the change key). */
+  private lastAppliedWidthScale = Number.NaN;
 
   constructor(config: RibbonConfig, onRelease: () => void) {
     this.cfg = {
@@ -233,8 +235,10 @@ class RibbonHandleImpl implements RibbonHandle {
     const n = spine.length;
     // Value-identical spines skip the whole rebuild and all four uploads; the
     // destinations gate on their own model-time revisions, and this guards
-    // every other caller (WS6 §11.2 "avoid needsUpdate when unchanged").
-    if (this.spineUnchanged(spine, n)) return;
+    // every other caller (WS6 §11.2 "avoid needsUpdate when unchanged"). The
+    // width multiplier is part of the key: a framing change (same points,
+    // different on-screen width) still requires the rebuild.
+    if (this.spineUnchanged(spine, n) && this.widthScale === this.lastAppliedWidthScale) return;
 
     this.computeTangents(spine, n);
     this.seedLateralFrame();
@@ -311,6 +315,7 @@ class RibbonHandleImpl implements RibbonHandle {
     this.haloColorAttr.needsUpdate = true;
     this.updateBounds(n);
     this.rememberSpine(spine, n);
+    this.lastAppliedWidthScale = this.widthScale;
   }
 
   /** Exact value compare against the last applied spine (cheap O(n)). */

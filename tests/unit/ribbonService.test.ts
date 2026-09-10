@@ -75,3 +75,46 @@ describe('RibbonService revision gating and conservative bounds', () => {
     service.dispose();
   });
 });
+
+describe('RibbonService width-keyed rebuilds', () => {
+  it('rebuilds when only the width multiplier changed', () => {
+    const service = new RibbonService();
+    const ribbon = service.createRibbon(config());
+    const meshes = (ribbon.object3d() as THREE.Group).children.filter(
+      (child) => child instanceof THREE.Mesh
+    ) as THREE.Mesh[];
+    // root.add(haloMesh, mesh): the strip is the last mesh child.
+    const mesh = meshes[meshes.length - 1]!;
+    const positionAttr = mesh.geometry.getAttribute('position') as THREE.BufferAttribute;
+
+    const spine = [
+      new THREE.Vector3(0, 0, 0),
+      new THREE.Vector3(1, 0, 0),
+      new THREE.Vector3(2, 0, 0)
+    ];
+    ribbon.setSpine(spine);
+    const afterFirst = positionAttr.version;
+
+    // Same points, identical width scale: no rebuild.
+    ribbon.setSpine(spine.map((p) => p.clone()));
+    expect(positionAttr.version).toBe(afterFirst);
+
+    // Same points, different framing width: the rebuild must happen even
+    // though the spine values are unchanged.
+    ribbon.setWidthScale(2.5);
+    ribbon.setSpine(spine.map((p) => p.clone()));
+    expect(positionAttr.version).toBe(afterFirst + 1);
+
+    // The widened geometry differs from the narrow one: the FULL-width end
+    // (first spine point, s = 0 with a linear taper) spans
+    // 2 * (0.5 * widthStart * widthScale).
+    const positions = positionAttr.array as Float32Array;
+    const width = Math.hypot(
+      positions[3]! - positions[0]!,
+      positions[4]! - positions[1]!,
+      positions[5]! - positions[2]!
+    );
+    expect(width).toBeCloseTo(2 * 0.5 * 2 * 2.5, 5);
+    service.dispose();
+  });
+});

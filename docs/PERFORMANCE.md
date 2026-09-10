@@ -197,3 +197,42 @@ height). Provably identical trajectories (term-for-term operation order);
 kerr/integrator/ray parity corpora and all 40 goldens unchanged. Its frame-time
 effect sits below this environment's quantized measurement floor; it is kept as
 strictly-less-work with zero drift risk.
+
+## Whole-atlas performance campaign mechanisms (2026-09)
+
+The `whole-atlas-performance-optimization` campaign landed the following
+runtime mechanisms; their measured evidence lives in
+`docs/PERFORMANCE_CERTIFICATION.md` and `benchmarks/results/`.
+
+- **On-demand rendering (WS1).** A host-owned invalidation bitset wakes frames
+  only for a real reason (time/camera/control/resize/quality/post/transition/
+  destination) or while the shared timeline is playing; a paused, settled
+  scene issues zero orchestrated frames. Stage flags and reason counters are
+  exposed through `debugInventory().frame`.
+- **Visibility lifecycle (WS2).** Hidden documents stop the non-rAF deep-link
+  poller and freeze the timeline explicitly (`TimeController.markHidden`);
+  resume advances by one ordinary frame dt, re-seeds governor timing and
+  issues a one-shot render wake.
+- **Transition occlusion + warmup (WS3).** The destination draw is suppressed
+  during the mathematically opaque hyperspace window while updates continue;
+  the incoming visible subgraph is precompiled with `compileAsync` in that
+  window (generation-checked, safe fallback).
+- **Black-hole active-pass lifecycle (WS4).** Only the selected lensing pass is
+  created for an arrival; alternates are created lazily in per-pass child
+  scopes with a bounded two-entry resident cache and an atomic visibility swap.
+  Black-Hole Merger likewise creates and prewarms its Kerr remnant pass on the
+  approach to ringdown.
+- **Service-level work elimination (WS5/WS6).** Volumes execute a runtime
+  active-step budget with conservative frustum culling; particles advance only
+  their active prefix and upload partial ranges; ribbons/strands skip rebuilds
+  and uploads for value-identical spines and cull against conservative bounds.
+- **Runtime telemetry (WS0).** `debugInventory().runtime` reports drawing-buffer
+  size, transition phase/occlusion, live volume march configuration, particle
+  activity, and the active lensing pass kind plus its LIVE per-frame step
+  budget — configuration and counters, never wall-clock timings.
+
+Scenario coverage for cold/warm navigation, active timeline, camera
+interaction, settling, transitions and the tier ladder is produced by
+`scripts/bench-scenarios.mjs` for all eight destinations on WebGPU and forced
+WebGL2. The matrix records `renderTelemetry` in every window and refuses to
+emit a record whose sampled window rendered nothing.

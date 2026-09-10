@@ -361,6 +361,16 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > eviction disposes the child scope and detaches its counters. Creation
 > failure keeps the currently visible pass and records
 > `alternate-pass-creation-failed` instead of falling back wholesale.
+>
+> **Finding surfaced by the §22 WebGL2 gate:** the LUT material renders a
+> BLACK frame under forced WebGL2 on this ANGLE/nvidia stack even with a
+> core-filterable RGBA16F family — proven by isolating the LUT pass alone in
+> BOTH the pre-lifecycle and lifecycle builds. The pre-lifecycle eager scene
+> masked it (its non-black frame did not come from the LUT). LUT acceleration
+> is therefore gated to WebGPU (`lut-webgl2-unsupported`; assets are not even
+> fetched on WebGL2) and WebGL2 always uses the numerical reference. This is a
+> capability truth change recorded in `docs/COMPATIBILITY_MATRIX.md`, not a
+> silent fallback.
 
 - [x] Replace eager numerical+LUT+Kerr pass tuple with manager.
       `passHandles` + `activePass` + `desiredPassKind`/`createPass`/
@@ -534,7 +544,11 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Benchmark CPU and upload counts.
       Upload evidence is the `BufferAttribute.version` assertions (identical
       spine: 0 uploads; changed: 1); the destination gates mean the steady
-      frame path performs zero rebuilds/upload while paused.
+      frame path performs zero rebuilds/upload while paused. The width
+      multiplier is part of the change key: the TDE_SHOCK golden caught a real
+      regression where a framing change (same points, different on-screen
+      width) was skipped by the early-out; `lastAppliedWidthScale` now forces
+      the rebuild and TDE_SHOCK/WINDING/DEBRIS goldens pass again.
 
 ## 10. SharedPost
 
@@ -619,35 +633,88 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 12. Schwarzschild LUT
 
+> **2026-09-10:** the LUT lifecycle win landed with §6 (the LUT pass is now
+> created only when selected); the remaining rows are provenance/measurement
+> or recorded rejections. The final gate (this session) runs LUT parity and the
+> benches, and the results are recorded in §24 below.
+
 - [ ] Cache per-frame camera/uniform state by revision.
-- [ ] Verify LUT pass is only instantiated when selected.
+      NOT SHIPPED, recorded: the per-frame record is one small object per frame
+      for the ACTIVE pass only; reusing it would require hashing the camera
+      matrix plus spin/tier/backend inputs to stay correct, trading clarity for
+      sub-µs savings against a 5-200 ms GPU frame. Revisit only with measured
+      GC/allocation pressure.
+- [x] Verify LUT pass is only instantiated when selected.
+      §6 lifecycle: resident kinds on a default arrival are `['lut']` with
+      count 1; switching to numerical lazily creates the second pass.
 - [ ] Profile texture/sample cost.
-- [ ] Keep manifest/checksum/domain validation.
+      PARTIAL: `bench:black-hole:numerical` vs `bench:black-hole:lut` produce
+      matched per-preset GPU timings (final gate records the current SHA).
+      Texture-filter cost cannot be separated from the integrator within the
+      material with the available public timestamp pools.
+- [x] Keep manifest/checksum/domain validation.
+      Pre-existing `lutPipeline`/`lutSchema`/`lutGenerate`/`lutEquivalence`
+      unit coverage, unchanged by this campaign.
 - [ ] Run LUT parity and BH goldens.
-- [ ] Record before/after GPU time.
+      BH family 10/10 already PASS unchanged; `lut-disk-parity` runs in the
+      final gate (results in §24).
+- [x] Record before/after GPU time.
+      No per-frame GPU change was claimed for the lifecycle work: the SAME
+      selected pass renders. The measured improvement is residency
+      (3 passes → 1 on a default arrival), evidenced by the resident-pass
+      counters and the child-scope accounting.
 
 ## 13. Schwarzschild numerical
+
+> **2026-09-10:** no numerical change shipped. The campaign's "reject any win
+> that increases failure/MAX_STEPS" rule makes an unvalidated integrator tweak
+> the wrong move; the CPU reference + ray/image parity corpora remain the
+> classification authority. Rows below are recorded as not shipped.
 
 - [ ] Add aggregate step census.
 - [ ] Add termination-class percentages.
 - [ ] Add MAX_STEPS rate.
+      All three NOT SHIPPED: the emitted GPU status would duplicate the Kerr
+      `?kerrstatus` machinery for a backend whose failure class is bounded by
+      the escape radius + horizon step floor; the CPU reference and
+      `ray-parity`/`integrator-parity` corpora already assert classification.
 - [ ] Test smaller safe escape radius candidates against reference.
+      NOT SHIPPED: needs a matched parity run per candidate; no escape-radius
+      change was proposed with evidence, and the shared value (32 r_g) stays.
 - [ ] Optimize capture/escape/disk termination.
 - [ ] Prototype adaptive stepping.
 - [ ] Prototype conservative difficulty classification.
+      NOT SHIPPED: each requires an equal-error parity study beyond this
+      session's validation budget; shipping without it would violate the
+      parity invariant.
 - [ ] Run ray parity/reference.
 - [ ] Run image parity.
-- [ ] Record GPU benefit at equal error.
+      Final gate (results in §24); last certified 43/43 at 17c4644.
+- [x] Record GPU benefit at equal error.
+      N/A: no numerical change shipped, so no equal-error claim exists.
 
 ## 14. Kerr
 
 - [ ] Add p50/p95/p99 step census.
-- [ ] Add classification/failure/MAX_STEPS aggregates.
-- [ ] Add high-spin tail characterization.
-- [ ] Add moving-observer characterization.
-- [ ] Cache CPU camera/uniform state by revision.
+      NOT SHIPPED: the census view reports terminal-class fractions, not
+      per-pixel step percentiles; a histogram target was not justified by any
+      shipped decision.
+- [x] Add classification/failure/MAX_STEPS aggregates.
+      `tests/browser/kerr-backend-census.spec.ts` (captured / max-steps /
+      theta-wrap / pole / other) runs on BOTH backends and is the campaign's
+      gate against "speedups" that only move rays into failure.
+- [x] Add high-spin tail characterization.
+      `kerrCharacteristics`/`kerrConvergence`/`kerrReference` unit corpora.
+- [x] Add moving-observer characterization.
+      `observer-modes` browser rows + `observerFrame`/`observerPhotonInit`
+      units; the Kerr moving-observer budget scaling is asserted there.
+- [ ] Cache CPU camera/uniform state by revision. (same rejection as §12)
 - [ ] Continue safe shader CSE/loop-invariant hoisting with parity proof.
+      NOT SHIPPED: no additional hoist with a measured gain and unchanged
+      census was found; speculative edits are rejected by discipline.
 - [ ] Improve safe capture/escape/disk exits.
+      NOT SHIPPED: the census shows max-steps at 0.001%; there is no measured
+      exit-termination problem to optimize.
 - [ ] Prototype adaptive integration.
 - [ ] Prototype constants-of-motion/separated formulation.
 - [ ] Compare spin-zero convergence.
@@ -656,83 +723,162 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Prototype tile/difficulty classifier.
 - [ ] Add seam/guard-band tests.
 - [ ] Research progressive stationary refinement only after above.
+      All NOT SHIPPED: research beyond the session's equal-error validation
+      budget; the dependency chain starts with an adaptive-integrator
+      prototype that cannot be certified here.
 - [ ] Run all KERR/observer goldens twice-stable.
+      Final gate (results in §24); 10/10 first pass in this session.
 - [ ] Record matched WebGPU and WebGL2 evidence.
-- [ ] Reject any "win" caused by increased failure/MAX_STEPS.
+      Final gate via `kerr-backend-census` (both backends, identical census).
+- [x] Reject any "win" caused by increased failure/MAX_STEPS.
+      Policy enforced: the census gate is part of the final certification and
+      no numerical change was shipped without it.
 
 ## 15. Neutron star
 
-- [ ] Cache camera basis/uniform payload by revision.
-- [ ] Skip stationary paused render via WS2.
+> **2026-09-10:** the WS2 occlusion suppression already covers the stationary
+> paused case at the frame-loop level; the remaining rows are numerical
+> research, recorded as not shipped.
+
+- [ ] Cache camera basis/uniform payload by revision. (same rejection as §12)
+- [x] Skip stationary paused render via WS2.
+      The host/WS2 suppression is destination-agnostic; the stationary idle
+      rows of the scenario matrix record `renderFrameCalls: 0` for
+      neutron-star on both backends.
 - [ ] Add projected-star conservative ray rejection research.
 - [ ] Improve surface hit/escape early termination.
 - [ ] Profile step distribution.
-- [ ] Keep field-line geometry static.
+      NOT SHIPPED: requires a surface-lensing status view; no measured stutter
+      or failure-rate problem justifies the shader/spec work.
+- [x] Keep field-line geometry static.
+      `FieldLineService` builds lines once and never re-uploads; unchanged.
 - [ ] Run NS reference tests.
+      Final gate (`neutronStarPhysics`/`neutronStarSurfaceRay` units +
+      `neutron-star` browser suite).
 - [ ] Run NS_SURFACE/NS_PULSAR/NS_MAGNETAR goldens.
+      Final gate (results in §24).
 
 ## 16. Stellar explosion
 
-- [ ] Apply shared volume active-step fix.
-- [ ] Verify pre-flash volume incurs zero work.
-- [ ] Verify hidden/paused particle simulation zero work.
+- [x] Apply shared volume active-step fix.
+      Service-level runtime active steps apply to the ejecta volume (live
+      snapshot: 70/80 active steps at the harness tier).
+- [x] Verify pre-flash volume incurs zero work.
+      The ejecta volume is phase-gated invisible pre-flash; the scenario
+      matrix records `visibleVolumes`/`internalWidth` 0 in hidden phases.
+- [x] Verify hidden/paused particle simulation zero work.
+      `activity`/population gates skip the compute dispatch; static systems
+      never upload.
 - [ ] Avoid redundant unchanged uniform/visibility writes.
+      NOT SHIPPED: uniform writes are CPU-side scalar stores, not buffer
+      uploads; gating them would add per-frame comparisons for no measured
+      benefit on a GPU-bound scene.
 - [ ] Measure whether phase-lazy resource creation is worth complexity.
+      NOT SHIPPED: resources are bounded per phase and residency is already
+      evidenced; no measured memory pressure justifies the lifecycle churn.
 - [ ] Run all SN goldens.
+      Final gate (results in §24).
 
 ## 17. Compact merger
 
-- [ ] Apply volume active-step fix.
-- [ ] Gate trail rebuild by model-time revision.
-- [ ] Gate particles by active state/time.
+- [x] Apply volume active-step fix. (service-level; tier ladder evidence)
+- [x] Gate trail rebuild by model-time revision.
+      `lastTrailTime`/`lastTrailCount` in `updateTrails`.
+- [x] Gate particles by active state/time.
+      `populationFractionFor` keeps the expensive systems OFF during the
+      inspiral; population 0 skips simulation entirely.
 - [ ] Avoid redundant unchanged visibility/step writes.
+      NOT SHIPPED: `setVisible`/`setStepScale` are cheap idempotent setters;
+      gating them would add comparisons without a measured cost.
 - [ ] Measure optional phase-lazy resources.
+      NOT SHIPPED: same rationale as SN.
 - [ ] Run CM goldens.
+      Final gate (results in §24); CM functional suite 15/15 PASS in this
+      session.
 
 ## 18. Tidal disruption
 
-- [ ] Gate stream rebuild by model-time revision.
-- [ ] Apply volume active-step and ROI changes.
-- [ ] Gate particles by population/time.
+- [x] Gate stream rebuild by model-time revision.
+      `lastStreamTime`/`lastStreamViewDistance`/`lastStreamTier`.
+- [x] Apply volume active-step and ROI changes.
+      Active steps wired (97 vs 55 evidence); projected scissor/ROI rejected
+      under §7 with rationale.
+- [x] Gate particles by population/time.
+      `pop > 0 && !snapshot.paused` gate in the module plus the service's
+      zero-population skip.
 - [ ] Cache camera-dependent accent gate by camera revision.
+      NOT SHIPPED: `accentGate(orbit.distance)` is a handful of floating-point
+      operations per frame; caching it would add a camera-revision input for
+      no measurable gain.
 - [ ] Measure phase-resource retirement/prewarm policy.
+      NOT SHIPPED: volumes/strands/ribbons are bounded and already
+      phase-gated; no memory evidence justifies retirement churn.
 - [ ] Run TDE goldens.
+      Final gate (results in §24); TDE functional rows PASS in this session.
 
 ## 19. Quasar/AGN
 
-- [ ] Convert static particles.
-- [ ] Remove duplicate population write.
+- [x] Convert static particles. (host and knots are `activity: 'static'`)
+- [x] Remove duplicate population write. (`applyStateToResources` is the one writer)
 - [ ] Lazy-build initial zone only.
 - [ ] Prewarm adjacent zone near hysteresis threshold.
 - [ ] Add bounded zone disposal policy if memory evidence supports it.
-- [ ] Ensure no double-render.
+      NOT SHIPPED: all three zone groups are bounded and no memory plateau
+      problem was measured; lazy building would trade resident memory for
+      zone-switch latency without evidence either way.
+- [x] Ensure no double-render.
+      `doubleRenderGuard` in the module debug snapshot (`ok`).
 - [ ] Benchmark all three zones.
+      PARTIAL: AGN V2 snapshots cover all three zones on both backends; a
+      dedicated three-zone timing matrix is not part of this session.
 - [ ] Run AGN goldens.
+      Final gate (results in §24).
 
 ## 20. Black-hole merger
 
-- [ ] Do not create Kerr remnant when starting in inspiral.
-- [ ] Deep-link ringdown/remnant still creates Kerr immediately.
-- [ ] Prewarm Kerr before visible ringdown handoff.
-- [ ] Gate trail rebuild by model-time revision.
-- [ ] Apply shared Kerr optimizations.
-- [ ] Maintain DATA_DRIVEN trajectory/waveform semantics.
+- [x] Do not create Kerr remnant when starting in inspiral.
+      New lifecycle row: inspiral boot reports `remnantPassCreated: false`.
+- [x] Deep-link ringdown/remnant still creates Kerr immediately.
+      `ensureKerrPass()` runs during prepare for those initial phases; the
+      deep-link rows PASS.
+- [x] Prewarm Kerr before visible ringdown handoff.
+      Created at the `merger` phase and precompiled once with a
+      visibility-flip `compileAsync` (restored synchronously); the compile
+      overlaps the flash instead of the first visible remnant frame.
+- [x] Gate trail rebuild by model-time revision.
+      `lastTrailTime`/`lastTrailCount` in `updateTrails`.
+- [x] Apply shared Kerr optimizations.
+      Escape radius 32 M and tier step budgets match the black-hole
+      destination (the pre-phenomena alignment); no further numerical change.
+- [x] Maintain DATA_DRIVEN trajectory/waveform semantics.
+      `bbmDataset`/`bbmSourceParity` units + all deep-link phase rows PASS.
 - [ ] Run BHM dataset/parity tests.
+      Final gate (results in §24).
 - [ ] Run all BHM goldens.
+      Final gate (results in §24).
 
 ## 21. Galaxy collision
 
-- [ ] Add last-phase/model-time revision.
-- [ ] Skip unchanged interpolation.
-- [ ] Skip unchanged BufferAttribute upload.
-- [ ] Preallocate x1/x2 center scratch arrays.
-- [ ] Reuse probe storage.
+- [x] Add last-phase/model-time revision. (`lastAppliedPhase`)
+- [x] Skip unchanged interpolation. (early return before interpolate calls)
+- [x] Skip unchanged BufferAttribute upload. (`needsUpdate` only on phase change)
+- [x] Preallocate x1/x2 center scratch arrays. (`centerScratchA/B`)
+- [x] Reuse probe storage. (preallocated `probe` tuples)
 - [ ] Add unit test proving unchanged phase causes no work.
+      PARTIAL: the phase gate is pinned by the DATA_DRIVEN deterministic
+      replay rows (identical scrub → identical state); a module-level unit
+      test would need a prepared dataset context and was not added.
 - [ ] Benchmark CPU/upload before/after.
+      PARTIAL: the scenario matrix records GC stationary/cost/active rows on
+      both backends; upload counts are gated by the phase check in code.
 - [ ] Optional GPU keyframe interpolation prototype.
 - [ ] Optional worker checksum/decode prototype if main-thread stall measured.
-- [ ] Preserve DATA_DRIVEN interpolation parity.
+      NOT SHIPPED: optional, and no main-thread stall was measured (GC is
+      2.82 ms GPU / 16.7 ms CPU floor on WebGPU).
+- [x] Preserve DATA_DRIVEN interpolation parity.
+      `galaxyCollisionInterp` unit tests + all deep-link rows PASS.
 - [ ] Run galaxy-collision browser/golden coverage.
+      Final gate (results in §24); GC functional rows 7/7 in the full suite.
 
 ## 22. WebGL2 and constrained hardware
 

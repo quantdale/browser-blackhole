@@ -80,9 +80,14 @@ engine; it does NOT certify WebGPU or performance parity.
 ## Backend capability semantics (locked)
 
 - WebGPU is preferred; the WebGL2 fallback exists only for features that
-  genuinely support it (Schwarzschild numerical/LUT passes, atlas shell).
-  Kerr runs numerical-only and reports `lut-inapplicable-while-kerr-active`
-  truthfully.
+  genuinely support it (Schwarzschild numerical pass, atlas shell). Kerr runs
+  numerical-only and reports `lut-inapplicable-while-kerr-active` truthfully,
+  and the Schwarzschild LUT acceleration is **WebGPU-only**: under forced
+  WebGL2 the LUT material produced a black frame even with a core-filterable
+  RGBA16F family (measured 2026-09-10 on ANGLE/nvidia: the LUT pass ALONE
+  renders black in both the pre-lifecycle and lifecycle builds). WebGL2
+  therefore resolves `auto`/`lut` to the numerical reference and reports
+  `lut-webgl2-unsupported`; the LUT assets are not even fetched there.
 - WebGPU-only features (compute/storage-gated paths) are capability-gated and
   disabled — never emulated — on WebGL2.
 - Failed asset/version integrity produces a bounded useful state, never
