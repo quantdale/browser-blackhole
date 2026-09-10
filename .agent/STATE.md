@@ -1,3 +1,32 @@
+## 2026-09-10 session — GC GOLDEN ROOT-CAUSED: COMPILEASYNC WARMUP REMOVED; CAMERARIG CONTRACT RESTORED
+
+Status: **second full-suite run had ONE failure — `golden: GC_ENCOUNTER` —
+now root-caused and fixed with the compile warmup rejected on visual evidence.**
+
+Bisect (throwaway worktree at 17c4644, clean resets, unique preview ports):
+17c4644 and 75a8df9 pass; 68aaab9 and 16e45c4 fail. Selecting/disabling the
+§4 occlusion `compileAsync` scheduler at 68aaab9 flips GC_ENCOUNTER from
+meanAbsDelta 3.89 / 5.2% beyond to 0.145 / 0 — i.e. three's `compileAsync`
+re-creates node-material pipelines with a different first-render result (GC's
+nuclei sprite/halo compositing visibly changed). The warmup is REMOVED:
+`SharedRendererKernel.precompileScene`/`precompileCounts` deleted, the
+occlusion draw suppression kept, and the browser assertion trimmed to the
+draw-count form. Recorded in `tasks.md` §4 as researched-and-rejected.
+
+Consequence for the TDE idle fix: a clean worktree bisect showed the rig
+idempotence was NOT required once the real cause (compile warmup) was gone,
+and the certification-era CameraRig contract (any system write re-applies the
+transform) is observable through goldens. `CameraRig` is restored to its
+pre-campaign behavior and Tidal Disruption now only calls `setTarget` when
+the focus target actually CHANGED — TDE stationary idle stays 0/30 orchestrated
+frames, verified with the §0 scenario probe.
+
+Evidence: `npm run check` 46 files / 629 tests PASS; all 14 GC/TDE/BHM goldens
+PASS; occlusion + hide/resume rows 2/2; TDE idle probe 0 frames, 0 failures.
+
+Next action: commit this batch, re-run the full default suite + both golden
+suites (twice-stable), Firefox, and the benchmarks on the final SHA.
+
 ## 2026-09-10 session — FULL-SUITE TRIAGE: LUT/WebGL2 BLACK CONTAINED, RIBBON WIDTH-KEY FIXED
 
 Status: **two real regressions found by the first full-suite run were fixed;

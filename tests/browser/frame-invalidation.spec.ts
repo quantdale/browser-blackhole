@@ -468,8 +468,7 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
       };
       return {
         suppressed: runtime.__transitionOcclusionObservations ?? [],
-        visible: runtime.__visibleFrameCounts ?? null,
-        precompile: window.__ATLAS_APP__!.host.kernel.precompileCounts
+        visible: runtime.__visibleFrameCounts ?? null
       };
     });
 
@@ -486,19 +485,6 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     expect(diagnostics.suppressed[0]!.drawCalls).toBeGreaterThan(0);
     expect(diagnostics.visible).not.toBeNull();
     expect(diagnostics.visible!.drawCalls).toBeGreaterThan(diagnostics.suppressed[0]!.drawCalls);
-
-    // WS2 §7.3: the opaque window scheduled a compile for the incoming visible
-    // subgraph and it resolved (or fell back safely) without stalling frames.
-    await expect
-      .poll(
-        async () =>
-          page.evaluate(() => {
-            const counts = window.__ATLAS_APP__!.host.kernel.precompileCounts;
-            return counts.requested > 0 && counts.completed + counts.failed > 0;
-          }),
-        { timeout: 30_000, intervals: [250] }
-      )
-      .toBe(true);
   });
 
   test('hide freezes hidden time and polling; resume re-seeds timing and wakes one frame', async ({

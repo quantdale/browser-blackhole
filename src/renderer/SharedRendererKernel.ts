@@ -212,9 +212,6 @@ export class SharedRendererKernel implements IRendererKernel {
   private lastGpuComputeMs: number | null = null;
   /** Internal drawing-buffer size of the last applied resize (WS0/tasks.md §1). */
   private drawingBufferSizeValue: { widthPx: number; heightPx: number } | null = null;
-  /** Scenes already scheduled for occlusion-window precompile (WS2 §7.3). */
-  private precompileScenes = new WeakSet<object>();
-  private readonly precompileCountsValue = { requested: 0, completed: 0, failed: 0 };
 
   constructor(options: SharedRendererKernelOptions) {
     this.options = options;
@@ -431,51 +428,6 @@ export class SharedRendererKernel implements IRendererKernel {
     return () => {
       this.deviceLostCallbacks.delete(cb);
     };
-  }
-
-  /**
-   * Precompile counts for the occlusion-window warmup (WS2 §7.3).
-   * `requested` counts schedules, `completed` finished compiles on the same
-   * renderer generation, `failed` is the safe-fallback count. A stale or
-   * cancelled compile can never activate anything: this method never swaps
-   * passes or scenes, it only asks three to build programs for the subgraph
-   * that is already the active destination.
-   */
-  get precompileCounts(): { requested: number; completed: number; failed: number } {
-    return { ...this.precompileCountsValue };
-  }
-
-  /**
-   * Warm the incoming destination's visible subgraph during the fully-opaque
-   * hyperspace window (WS2 §7.3). Uses `compileAsync` when the renderer
-   * exposes it, discards completions from a superseded generation, and treats
-   * failure as a safe fallback (first-use compile still happens normally).
-   * Only visible objects are compiled by three's own traverseVisible pass, so
-   * phase-hidden resources are not built just because they exist.
-   */
-  async precompileScene(scene: object, camera: object): Promise<void> {
-    const renderer = this.rendererValue;
-    if (renderer === null || this.disposed || this.deviceLost) return;
-    const generation = this.generation;
-    const compileAsync = (
-      renderer as {
-        compileAsync?: (scene: object, camera?: object) => Promise<unknown>;
-      }
-    ).compileAsync;
-    if (typeof compileAsync !== 'function') return;
-    this.precompileCountsValue.requested += 1;
-    try {
-      await compileAsync.call(renderer, scene, camera);
-      if (this.disposed || this.deviceLost || generation !== this.generation) return;
-      this.precompileCountsValue.completed += 1;
-    } catch (error) {
-      if (this.disposed || generation !== this.generation) return;
-      this.precompileCountsValue.failed += 1;
-      console.warn(
-        '[SharedRendererKernel] compileAsync failed during occlusion warmup; falling back to first-use compile:',
-        describeError(error)
-      );
-    }
   }
 
   /**
@@ -728,15 +680,6 @@ export class SharedRendererKernel implements IRendererKernel {
             this.options.post.endTemporalFrame?.(camera);
           }
         } else {
-          // Fully-occluded interval: the destination draw is suppressed, so
-          // this is the free window to precompile the incoming visible
-          // subgraph (WS2 §7.3). Once per scene identity; a stale or cancelled
-          // compile can never activate state because precompileScene only asks
-          // three to build programs for the already-active scene.
-          if (plan.scene !== null && !this.precompileScenes.has(plan.scene)) {
-            this.precompileScenes.add(plan.scene);
-            void this.precompileScene(plan.scene, this.requireCamera());
-          }
           this.options.post.clearSelectiveHighlights?.();
           this.options.post.clearTemporalOutput?.();
           this.options.post.invalidateDepthHistory?.();
@@ -938,8 +881,6 @@ export class SharedRendererKernel implements IRendererKernel {
     this.rendererValue = renderer;
     this.deviceLost = false;
     this.lossNotifiedGeneration = -1;
-    // A re-adopted renderer has no compiled programs; allow precompile again.
-    this.precompileScenes = new WeakSet<object>();
 
     const probe = this.buildProbe(renderer);
     this.capabilityFlags = detectCapabilityFlags(probe);

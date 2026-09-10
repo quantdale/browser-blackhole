@@ -260,15 +260,18 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 ## 4. Transition occlusion and compile warmup
 
 > **2026-09-10 status: complete.** The old "environment hang" blocker is gone:
-> the full `frame-invalidation.spec.ts` (13 rows) passes headed on nvidia
-> lovelace. This slice adds the compile warmup the section asked for, the
-> draw-count form of the suppression claim, and a REAL production defect found
-> while validating the transition scenarios: `CameraRig.setTarget()`/
-> `setOrbit()` dirtied the camera unconditionally, so a destination that
-> re-asserts the same system framing every frame (TDE AutoFramer + focus
-> target) never went quiet — the §0 scenario matrix caught the tidal-disruption
-> stationary idle issuing 30/30 orchestrated frames. Both mutators are now
-> idempotent for unchanged system writes (viewer writes always dirty).
+> the full `frame-invalidation.spec.ts` passes headed on nvidia lovelace. This
+> slice adds the occlusion suppression and the draw-count form of its claim.
+> The compile warmup originally included here was REMOVED after the golden
+> gate proved `compileAsync` changes node-material first-render appearance
+> (GC_ENCOUNTER regression, see the row below). Also fixed a REAL production
+> defect found while validating the transition scenarios:
+> `CameraRig.setTarget()`/`setOrbit()` dirtied the camera unconditionally, so
+> a destination that re-asserts the same system framing every frame (TDE
+> AutoFramer + focus target) never went quiet — the §0 scenario matrix caught
+> tidal-disruption stationary idle issuing 30/30 orchestrated frames. The rig
+> contract is unchanged (the certification-era behavior); Tidal Disruption now
+> only writes a CHANGED focus target.
 
 - [x] Expose fully-occluded state from TransitionDirector.
       `destinationOccluded` is true only for the director-owned hyperspace
@@ -283,15 +286,20 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       frame, resets, and reads accumulated `drawCalls`/`triangles`/`frameCalls`:
       the suppressed frame issues > 0 draws but strictly fewer than the same
       scene drawn normally, on top of `destinationDrawn: false`.
-- [x] Integrate compileAsync for incoming visible subgraph.
-      `SharedRendererKernel.precompileScene()` runs once per scene identity
-      during the fully-opaque window (`compileAsync` where exposed, safe
-      fallback otherwise) and exposes `precompileCounts`; the occlusion row
-      polls `requested > 0 && completed + failed > 0`.
+- [ ] Integrate compileAsync for incoming visible subgraph.
+      RESEARCHED AND REJECTED on visual evidence. three's `compileAsync` does
+      not merely warm pipelines for node materials: it re-creates them with a
+      measurably different first-render result. With it enabled during the
+      opaque window, `golden: GC_ENCOUNTER` failed (meanAbsDelta 3.89,
+      pctPixelsBeyond 5.2, maxChannelDelta 202 — the nuclei sprite/halo
+      compositing changed); removing ONLY the warmup restored the baseline
+      exactly (meanAbsDelta 0.145, 0 beyond threshold) while the occlusion
+      draw-suppression remained in place. The destination-draw suppression is
+      kept; the compile warmup is removed rather than shipped against a failed
+      visual gate.
 - [x] Ensure stale/cancelled prepare compile cannot activate.
-      By construction: precompile never swaps passes/scenes, discards
-      completions from a superseded generation or a disposed/devicelost
-      kernel, and re-arms after renderer adoption (device-loss recovery).
+      Trivially satisfied now that no compile is scheduled; pass creation
+      remains synchronous and generation-checked.
 - [x] Benchmark transition CPU/GPU before/after.
       The §0 scenario matrix records `transitionOut`/`transitionIn` arrival ms
       and frames for all 16 destination x backend combinations; the pre-fix

@@ -190,6 +190,8 @@ const STREAM_PRESENTATION_CAP_UNITS = 10_000;
 const AUTO_FRAME_MARGIN = 2.2;
 const AUTO_FRAME_MARGIN_STAR_ONLY = 1.05;
 const AUTO_FRAME_MIN_UNITS = 140;
+/** Scene-unit epsilon for re-writing an unchanged presentation focus target. */
+const FOCUS_TARGET_EPSILON = 1e-4;
 /**
  * Framing ceiling. The debris family arcs out to ~1e5 scene units, but at that
  * zoom the orbits are so eccentric that the stream is just a straight streak
@@ -241,6 +243,10 @@ export function createTidalDisruptionModule(): PhenomenonModule {
    */
   const uOrbitPhase = uniform(0);
   const focusTargetScratch = new THREE.Vector3();
+  /** Last focus target actually written to the rig (change-gated, see below). */
+  let lastFocusTargetX = Number.NaN;
+  let lastFocusTargetY = Number.NaN;
+  let lastFocusTargetZ = Number.NaN;
   const streamFocusScratch = new THREE.Vector3();
 
   // Scratch spine buffers (allocated once per ribbon capacity).
@@ -701,6 +707,9 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // advanced unless the viewer found the transport.
     ctx.services.time.resumeUnlessExplicitlyPaused();
     autoFramer.reset();
+    lastFocusTargetX = Number.NaN;
+    lastFocusTargetY = Number.NaN;
+    lastFocusTargetZ = Number.NaN;
     uOrbitPhase.value = 0;
     // The rig's default ceiling is 500 scene units, which silently clamped
     // both the auto-framing and the viewer's own zoom while the debris arcs
@@ -962,11 +971,24 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // The boot shot centers the incoming star, while post-disruption media is
     // centered on the black-hole/debris origin. This is a presentation focus
     // cue only; it is disabled permanently after viewer takeover and never
-    // alters the encounter coordinates.
+    // alters the encounter coordinates. The write is CHANGE-GATED: a system
+    // camera write always re-applies the transform (the certified rig
+    // contract), so re-asserting an identical focus every frame kept a paused
+    // scene rendering forever (the §0 scenario matrix's TDE idle finding).
     if (autoFramer.enabled && !ctx.services.cameraRig.isAnimating()) {
       if (streamVisible) focusTargetScratch.copy(streamFocusScratch);
       else focusTargetScratch.set(enc.x, enc.y, enc.z);
-      ctx.services.cameraRig.setTarget(focusTargetScratch, 'system');
+      if (
+        !Number.isFinite(lastFocusTargetX) ||
+        Math.abs(focusTargetScratch.x - lastFocusTargetX) > FOCUS_TARGET_EPSILON ||
+        Math.abs(focusTargetScratch.y - lastFocusTargetY) > FOCUS_TARGET_EPSILON ||
+        Math.abs(focusTargetScratch.z - lastFocusTargetZ) > FOCUS_TARGET_EPSILON
+      ) {
+        lastFocusTargetX = focusTargetScratch.x;
+        lastFocusTargetY = focusTargetScratch.y;
+        lastFocusTargetZ = focusTargetScratch.z;
+        ctx.services.cameraRig.setTarget(focusTargetScratch, 'system');
+      }
     }
     if (streamVisible) updateStreams(tau, orbit.distance);
     else {

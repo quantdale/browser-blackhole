@@ -83,9 +83,13 @@ reference where available; they are labelled as such.
 - Draw-count assertion: the suppressed frame disables `renderer.info.autoReset`
   and accumulates counts across passes; it draws strictly fewer calls than the
   same scene drawn normally.
-- `SharedRendererKernel.precompileScene()` compiles the incoming visible
-  subgraph once per scene during the occluded window (`compileAsync`, safe
-  fallback, generation-checked) and exposes `precompileCounts`.
+- **Rejected on evidence:** the `compileAsync` occlusion warmup was implemented
+  and then REMOVED. three's `compileAsync` re-creates node-material pipelines
+  with a different first-render result: with it enabled, `golden: GC_ENCOUNTER`
+  failed (meanAbsDelta 3.89, 5.2% pixels beyond threshold; the nuclei
+  sprite/halo compositing changed). Removing only the warmup restored the
+  baseline exactly (meanAbsDelta 0.145, 0 beyond threshold) while keeping the
+  draw suppression. The warmup is not shipped.
 
 ### WS4 — startup/code splitting (tasks.md §5)
 
