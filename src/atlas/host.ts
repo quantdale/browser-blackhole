@@ -82,6 +82,8 @@ import type {
   RenderContext,
   RendererLike,
   ResourceScope,
+  RuntimeTelemetry,
+  ParticleTelemetry,
   VersionedDestinationState
 } from './types.js';
 import {
@@ -309,6 +311,17 @@ const NO_FRAME_WORK: FrameWorkTelemetry = {
   destinationUpdated: false,
   destinationDrawn: false,
   postPresented: false
+};
+
+/** Reported when a particle service does not expose its WS0 aggregate. */
+const EMPTY_PARTICLE_TELEMETRY: ParticleTelemetry = {
+  liveSystems: 0,
+  capacity: 0,
+  drawn: 0,
+  updatePath: 'none',
+  simulationUpdates: 0,
+  skippedUpdates: 0,
+  lastSkipReason: null
 };
 
 export class CosmicAtlasHost {
@@ -1170,10 +1183,42 @@ export class CosmicAtlasHost {
       governor: this.governor,
       backend: this.kernel.backend,
       gpuFrameMs: this.kernel.gpuFrameMs,
+      gpuComputeMs: this.kernel.gpuComputeMs,
       frame: this.frameTelemetry(),
       rendererInfo: this.kernel.readRendererInfo(),
-      visualWorkBudget: this.governor.getVisualWorkBudget()
+      visualWorkBudget: this.governor.getVisualWorkBudget(),
+      runtime: this.runtimeTelemetry()
     });
+  }
+
+  /**
+   * WS0/tasks.md §1 aggregated runtime telemetry (MASTER_PLAN §5.1): internal
+   * render size, transition phase/occlusion, and live service work summaries.
+   * Configuration and work counters only — never timings — so the values mean
+   * the same thing on every machine, unlike a millisecond delta.
+   */
+  runtimeTelemetry(): RuntimeTelemetry {
+    const size = this.kernel.effectiveSize?.() ?? null;
+    const dpr =
+      typeof window !== 'undefined' && Number.isFinite(window.devicePixelRatio)
+        ? window.devicePixelRatio
+        : 1;
+    return {
+      size:
+        size === null
+          ? null
+          : {
+              widthPx: size.widthPx,
+              heightPx: size.heightPx,
+              effectivePixels: size.widthPx * size.heightPx,
+              devicePixelRatio: dpr > 0 ? dpr : 1,
+              renderScale: this.effectiveRenderScale()
+            },
+      transition: this.director.getPublicState(),
+      volume: this.volumesService.getDebugSnapshot(),
+      particles: this.particlesService.getDebugSnapshot?.() ?? EMPTY_PARTICLE_TELEMETRY,
+      lensing: this.lensingService.getDebugSnapshot()
+    };
   }
 
   /**
@@ -1182,6 +1227,16 @@ export class CosmicAtlasHost {
    */
   flushGpuTimestamps(): Promise<number | null> {
     return this.kernel.flushGpuTimestamps();
+  }
+
+  /**
+   * WS0/tasks.md §1: force a compute timestamp-pool resolve and return the
+   * compute-pass GPU ms (null when the backend lacks timestamps or no compute
+   * pass has run). The render pool covers destination+nested volumes+post+
+   * present; this pool is the separately-attributable particle/compute work.
+   */
+  flushGpuComputeTimestamps(): Promise<number | null> {
+    return this.kernel.flushGpuComputeTimestamps?.() ?? Promise.resolve(null);
   }
 
   /** Ordered teardown: director → modules/scopes → services → post → manager → kernel. */

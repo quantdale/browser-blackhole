@@ -92,11 +92,32 @@ import {
   vec3,
   vec4
 } from 'three/tsl';
-import type { IVolumeService, RendererLike, VolumeConfig, VolumeHandle } from '../../atlas/types';
+import type {
+  IVolumeService,
+  RendererLike,
+  VolumeConfig,
+  VolumeHandle,
+  VolumeTelemetry
+} from '../../atlas/types';
 import { CINEMATIC_EMISSIVE_LAYER } from './visualLayers.js';
 
 /** Any float-valued TSL shader-graph node. */
 type TslFloat = Node<'float'>;
+
+/** Per-volume fields folded by {@link VolumeService.getDebugSnapshot}. */
+export type VolumeTelemetryFields = {
+  readonly disposed: boolean;
+  readonly visible: boolean;
+  readonly baseMaxSteps: number;
+  readonly activeSteps: number;
+  readonly internalScale: number;
+  readonly internalWidth: number;
+  readonly internalHeight: number;
+  readonly detailOctaves: number;
+  readonly lightingTaps: number;
+  readonly temporalJitter: boolean;
+  readonly depthClipActive: boolean;
+};
 
 /**
  * Disclosure string for destinations composing this service. Describes the
@@ -171,6 +192,8 @@ class VolumeImpl implements VolumeHandle {
   private activeStepCount: number;
   private visible = true;
   private readonly rendererSizeScratch = new THREE.Vector2();
+  /** Internal march-target size of the last executed march (null before one). */
+  private marchTargetSize: { width: number; height: number } | null = null;
 
   private disposed = false;
 
@@ -562,6 +585,7 @@ class VolumeImpl implements VolumeHandle {
     if (this.target.width !== w || this.target.height !== h) {
       this.target.setSize(w, h);
     }
+    this.marchTargetSize = { width: this.target.width, height: this.target.height };
     this.compositeTexelSize.value.set(1 / this.target.width, 1 / this.target.height);
     if (this.depthTextureNode !== null) {
       this.depthTextureNode.value = this.depthTextureState.value ?? this.emptyDepthTexture;
@@ -625,11 +649,31 @@ class VolumeImpl implements VolumeHandle {
     this.mesh.visible = visible;
   }
 
+  /** Per-volume fields folded by {@link VolumeService.getDebugSnapshot}. */
+  telemetryFields(): VolumeTelemetryFields {
+    return {
+      disposed: this.disposed,
+      visible: this.visible,
+      baseMaxSteps: this.baseMaxSteps,
+      activeSteps: this.activeStepCount,
+      internalScale: this.uInternalScale.value,
+      internalWidth: this.marchTargetSize?.width ?? 0,
+      internalHeight: this.marchTargetSize?.height ?? 0,
+      detailOctaves: Math.min(this.uDetailOctaves.value, this.detailOctaveCeiling),
+      lightingTaps: this.uLightingTaps.value,
+      temporalJitter: this.uJitterEnabled.value > 0,
+      depthClipActive: this.depthTextureNode !== null && this.uDepthValid.value > 0
+    };
+  }
+
   getDebugSnapshot(): Record<string, unknown> {
     return {
       baseMaxSteps: this.baseMaxSteps,
       activeSteps: this.activeStepCount,
       internalScale: this.uInternalScale.value,
+      internalWidth: this.marchTargetSize?.width ?? 0,
+      internalHeight: this.marchTargetSize?.height ?? 0,
+      disposed: this.disposed,
       visible: this.visible,
       halfResolution: this.target !== null,
       intermediateFormat: this.intermediateFormat,
@@ -817,6 +861,55 @@ export class VolumeService implements IVolumeService {
   setSceneDepthTexture(texture: THREE.Texture | null): void {
     this.sceneDepthState.value = texture;
     for (const volume of this.volumes) volume.setSceneDepthTexture(texture);
+  }
+
+  /**
+   * WS0/tasks.md §1 aggregate over live volumes: march budget, internal
+   * targets and the service-wide detail uniforms. Disposed handles are
+   * excluded so a destination that retired a volume cannot inflate the
+   * counters; `activeSteps`/`baseMaxSteps` fold by MAX because they describe
+   * the heaviest live march, not a sum of budgets.
+   */
+  getDebugSnapshot(): VolumeTelemetry {
+    let liveVolumes = 0;
+    let visibleVolumes = 0;
+    let baseMaxSteps = 0;
+    let activeSteps = 0;
+    let internalWidth = 0;
+    let internalHeight = 0;
+    let detailOctaves = 0;
+    let lightingTaps = 0;
+    let temporalJitter = false;
+    let depthClipActive = false;
+
+    for (const volume of this.volumes) {
+      const fields = volume.telemetryFields();
+      if (fields.disposed) continue;
+      liveVolumes += 1;
+      if (fields.visible) visibleVolumes += 1;
+      baseMaxSteps = Math.max(baseMaxSteps, fields.baseMaxSteps);
+      activeSteps = Math.max(activeSteps, fields.activeSteps);
+      internalWidth = Math.max(internalWidth, fields.internalWidth);
+      internalHeight = Math.max(internalHeight, fields.internalHeight);
+      detailOctaves = Math.max(detailOctaves, fields.detailOctaves);
+      lightingTaps = Math.max(lightingTaps, fields.lightingTaps);
+      temporalJitter = temporalJitter || fields.temporalJitter;
+      depthClipActive = depthClipActive || fields.depthClipActive;
+    }
+
+    return {
+      liveVolumes,
+      visibleVolumes,
+      baseMaxSteps,
+      activeSteps,
+      internalScale: this.internalScaleState.value,
+      internalWidth,
+      internalHeight,
+      detailOctaves,
+      lightingTaps,
+      temporalJitter,
+      depthClipActive
+    };
   }
 
   dispose(): void {

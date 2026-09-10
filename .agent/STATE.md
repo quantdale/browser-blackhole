@@ -1,3 +1,45 @@
+## 2026-09-10 session — WS0 TELEMETRY COMPLETE (whole-atlas-performance-optimization, tasks.md §1 + §2 evidence)
+
+Status: **§1 COMPLETE, §2 evidence closed.** Resumed the active performance
+campaign from clean `main@bed06ab` (baseline `npm run check` at start: 44 files
+/ 598 tests PASS, build clean). This slice is measurement/telemetry only — no
+rendering path change, post sizing preserved exactly.
+
+Implemented:
+
+- `debugInventory().runtime` (typed `RuntimeTelemetry`) now carries: `size`
+  (drawing-buffer pixels, `floor(css*ratio)`, read back from the renderer when
+  available), `transition` (director phase/progress/occlusion), `volume`
+  (max-folded live budget + real half-res march target + detail/lighting/
+  jitter/depth flags), `particles` (summed capacity/drawn + cumulative
+  simulation/skip counters + update path), `lensing` (per-pass kind/tier and
+  the LIVE `uniforms.maxSteps` budget).
+- New service aggregates: `VolumeService.getDebugSnapshot()`,
+  `ParticleService.getDebugSnapshot()` (both exclude disposed handles),
+  `LensingService.getDebugSnapshot()` reworked to pass records.
+- Compute timestamp pool resolved asynchronously on the existing bounded
+  cadence: `kernel.gpuComputeMs`, `host.flushGpuComputeTimestamps()`,
+  `debugInventory().gpuComputeMs`. Finer per-pass attribution than the two
+  public three pools is rejected (not available via the public timestamp API).
+
+Evidence:
+
+- `npm run check` PASS: **45 files / 609 tests**, format/lint/typecheck/build
+  clean (was 44/598 at baseline).
+- Browser `tests/browser/frame-invalidation.spec.ts` **12/12 PASS** headed on
+  Playwright Chromium (nvidia lovelace, E2E_PORT=4299, workers=1), including
+  two new runtime-telemetry rows asserting inventory size == `canvas.width/`
+  `height`, the live lensing budget, live volume march target + drawn particle
+  population, and honest null-vs-finite compute attribution.
+- `tasks.md` §1 all five rows checked with evidence; §2 checked except the
+  per-destination continuous-animation declaration (covered by the shared
+  playing-transport trigger by design) and the all-goldens confirmation
+  (deferred to the campaign final gate; render path untouched).
+
+Next action: §0's remaining scenario rows (cold/warm navigation, active-timeline
+and tier-ladder benchmark rows), then §3 hidden-time semantics (stop polling
+while hidden + explicit TimeController hidden-time policy), then §4 warmup.
+
 ## 2026-08-30 session — FINAL CERTIFICATION AND EVIDENCE-HYGIENE PASS (main@17c4644) — COMPLETE
 
 Status: **COMPLETE — FINAL CERTIFICATION HYGIENE**. This pass closes the remaining evidence gaps after the restore-scope certification at `17c4644`/`f9801a8`: fresh capable-GPU browser validation on the final runtime, persisted benchmark/review artifacts, and stale-state cleanup. No renderer rewrite; only certification, harness, and documentation hygiene. See `local://paste-1.md` objective.

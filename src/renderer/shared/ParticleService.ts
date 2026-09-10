@@ -80,12 +80,24 @@ import type {
   ParticleEmitterConfig,
   ParticleSystemConfig,
   ParticleSystemHandle,
+  ParticleTelemetry,
   RendererLike
 } from '../../atlas/types';
 import { CINEMATIC_EMISSIVE_LAYER } from './visualLayers.js';
 
 /** Any float-valued TSL shader-graph node. */
 type TslFloat = Node<'float'>;
+
+/** Per-system fields folded by {@link ParticleService.getDebugSnapshot}. */
+export type ParticleTelemetryFields = {
+  readonly disposed: boolean;
+  readonly capacity: number;
+  readonly drawn: number;
+  readonly updatePath: 'compute' | 'cpu';
+  readonly simulationUpdates: number;
+  readonly skippedUpdates: number;
+  readonly lastSkipReason: string | null;
+};
 
 /**
  * Disclosure string for destinations that compose this service. Describes the actual
@@ -820,6 +832,19 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     this.rampLut.dispose();
   }
 
+  /** Per-system fields folded by {@link ParticleService.getDebugSnapshot}. */
+  telemetryFields(): ParticleTelemetryFields {
+    return {
+      disposed: this.disposed,
+      capacity: this.capacity,
+      drawn: this.drawnCount,
+      updatePath: this.useCompute ? 'compute' : 'cpu',
+      simulationUpdates: this.simulationUpdates,
+      skippedUpdates: this.skippedUpdates,
+      lastSkipReason: this.lastSkipReason === 'none' ? null : this.lastSkipReason
+    };
+  }
+
   /**
    * Bounded debug metadata (RENDERING_SERVICES.md §16): active/capacity, buffer
    * bytes, update path. No GPU readback is performed.
@@ -972,6 +997,56 @@ export class ParticleService implements IParticleService {
 
   setPopulationScale(scale: number): void {
     for (const system of this.systems) system.setGlobalPopulationScale(scale);
+  }
+
+  /**
+   * WS0/tasks.md §1 aggregate over live systems: population, update path and
+   * the cumulative simulation/skip counters §8 measures work elimination
+   * against. Disposed systems are excluded; sums are honest for populations
+   * and work counters, and `updatePath` degrades to 'mixed'/'none' rather
+   * than silently picking one system's path.
+   */
+  getDebugSnapshot(): ParticleTelemetry {
+    let liveSystems = 0;
+    let capacity = 0;
+    let drawn = 0;
+    let compute = 0;
+    let cpu = 0;
+    let simulationUpdates = 0;
+    let skippedUpdates = 0;
+    let lastSkipReason: string | null = null;
+
+    for (const system of this.systems) {
+      const fields = system.telemetryFields();
+      if (fields.disposed) continue;
+      liveSystems += 1;
+      capacity += fields.capacity;
+      drawn += fields.drawn;
+      if (fields.updatePath === 'compute') compute += 1;
+      else cpu += 1;
+      simulationUpdates += fields.simulationUpdates;
+      skippedUpdates += fields.skippedUpdates;
+      if (fields.lastSkipReason !== null) lastSkipReason = fields.lastSkipReason;
+    }
+
+    const updatePath: ParticleTelemetry['updatePath'] =
+      liveSystems === 0
+        ? 'none'
+        : compute > 0 && cpu > 0
+          ? 'mixed'
+          : compute > 0
+            ? 'compute'
+            : 'cpu';
+
+    return {
+      liveSystems,
+      capacity,
+      drawn,
+      updatePath,
+      simulationUpdates,
+      skippedUpdates,
+      lastSkipReason
+    };
   }
 
   dispose(): void {

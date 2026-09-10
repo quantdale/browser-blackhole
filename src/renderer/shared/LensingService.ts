@@ -30,6 +30,8 @@ import type {
   ILensingService,
   KerrLensingParams,
   LensingPassParams,
+  LensingTelemetry,
+  QualityTier,
   TslDensityFn
 } from '../../atlas/types';
 import { createLensingMaterial } from '../../phenomena/black-hole/schwarzschildIntegrator';
@@ -46,6 +48,19 @@ interface BlackHoleLensingPassHandle {
   setUniformsFromState(state: Record<string, unknown>): void;
   setEnvironmentDetail(detail: number): void;
   dispose(): void;
+}
+
+/** Which strong-field backend a live pass renders (WS0/tasks.md §1). */
+type LensingPassKind = 'numerical' | 'lut' | 'kerr';
+
+/** Bookkeeping row so the debug snapshot can report active passes honestly. */
+interface LiveLensingPass {
+  readonly kind: LensingPassKind;
+  readonly qualityTier: QualityTier;
+  /** Live per-frame step budget from the material's own uniform, if exposed. */
+  readonly liveMaxSteps: () => number | null;
+  /** Public handle, so service-wide loops can forward to live passes. */
+  readonly handle: BlackHoleLensingPassHandle;
 }
 
 /**
@@ -143,7 +158,7 @@ export function lensingCameraUniformState(
 
 export class LensingService implements ILensingService {
   /** Live passes, so dispose() releases every created GPU resource. */
-  private readonly passes: BlackHoleLensingPassHandle[] = [];
+  private readonly passes: LiveLensingPass[] = [];
   private environmentDetail = 0;
 
   /**
@@ -161,7 +176,7 @@ export class LensingService implements ILensingService {
     dispose(): void;
   } {
     const delegate = createLensingMaterial(params);
-    return this.wrapLensingHandle(delegate.material, delegate, params);
+    return this.wrapLensingHandle(delegate.material, delegate, params, 'numerical');
   }
 
   /**
@@ -177,7 +192,7 @@ export class LensingService implements ILensingService {
     dispose(): void;
   } {
     const delegate = createKerrLensingMaterial(params);
-    return this.wrapLensingHandle(delegate.material, delegate, params);
+    return this.wrapLensingHandle(delegate.material, delegate, params, 'kerr');
   }
 
   /**
@@ -207,7 +222,7 @@ export class LensingService implements ILensingService {
       bCriticalRg: lut.bCriticalRg,
       hybridBandHalfWidthX: lut.hybridBandHalfWidthX
     });
-    const wrapped = this.wrapLensingHandle(delegate.material, delegate, params);
+    const wrapped = this.wrapLensingHandle(delegate.material, delegate, params, 'lut');
     return {
       ...wrapped,
       lutMaterial: () => delegate
@@ -219,17 +234,19 @@ export class LensingService implements ILensingService {
     delegate: {
       setUniformsFromState(state: Record<string, unknown>): void;
       setEnvironmentDetail?(detail: number): void;
+      uniforms?: { maxSteps?: { value?: number } };
       dispose(): void;
     },
-    _params: LensingPassParams
-  ) {
+    params: LensingPassParams,
+    kind: LensingPassKind
+  ): BlackHoleLensingPassHandle {
     const geometry = createFullscreenTriangleGeometry();
     const mesh: THREE.Mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = false;
     mesh.name = 'black-hole-lensing-pass';
 
     let disposed = false;
-    const handle = {
+    const handle: BlackHoleLensingPassHandle = {
       object3d: () => mesh,
       setUniformsFromState: (state: Record<string, unknown>) => {
         delegate.setUniformsFromState(state);
@@ -240,13 +257,23 @@ export class LensingService implements ILensingService {
       dispose: () => {
         if (disposed) return;
         disposed = true;
-        const index = this.passes.indexOf(handle as BlackHoleLensingPassHandle);
+        const index = this.passes.indexOf(record);
         if (index >= 0) this.passes.splice(index, 1);
         geometry.dispose();
         delegate.dispose();
       }
     };
-    this.passes.push(handle as BlackHoleLensingPassHandle);
+
+    const record: LiveLensingPass = {
+      kind,
+      qualityTier: params.qualityTier,
+      liveMaxSteps: () => {
+        const value = delegate.uniforms?.maxSteps?.value;
+        return typeof value === 'number' && Number.isFinite(value) ? value : null;
+      },
+      handle
+    };
+    this.passes.push(record);
     return handle;
   }
 
@@ -254,13 +281,23 @@ export class LensingService implements ILensingService {
   setEnvironmentDetail(detail: number): void {
     const value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;
     this.environmentDetail = value;
-    for (const pass of this.passes) pass.setEnvironmentDetail(value);
+    for (const pass of this.passes) pass.handle.setEnvironmentDetail(value);
   }
 
-  getDebugSnapshot(): Record<string, unknown> {
+  /**
+   * WS0/tasks.md §1 active lensing pass kind + live step budget. The budget
+   * is read from each material's own `uniforms.maxSteps` uniform, so tier
+   * changes that write the uniform are reflected without a second authority.
+   */
+  getDebugSnapshot(): LensingTelemetry {
     return {
+      livePasses: this.passes.length,
+      passes: this.passes.map((pass) => ({
+        kind: pass.kind,
+        qualityTier: pass.qualityTier,
+        maxSteps: pass.liveMaxSteps()
+      })),
       environmentDetail: this.environmentDetail,
-      livePassCount: this.passes.length,
       environmentLayer: 'cinematic-diffuse+dense-stars+dust'
     };
   }
@@ -313,8 +350,8 @@ export class LensingService implements ILensingService {
 
   /** Dispose every still-live lensing pass created by this service. */
   dispose(): void {
-    for (const handle of this.passes.slice()) {
-      handle.dispose();
+    for (const pass of this.passes.slice()) {
+      pass.handle.dispose();
     }
     this.passes.length = 0;
   }

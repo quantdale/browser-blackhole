@@ -35,7 +35,7 @@ interface InventoryView {
   totalResourceCounts: { texture: number };
   pendingPrepares: number;
   /** Present when a backend engaged; null during boot or before first frame. */
-  backend: { api: string; adapterName: string } | null;
+  backend: { api: string; adapterName: string; timestampQuery: boolean } | null;
   /** Monotonic renderer generation (bumped on device loss / re-init). */
   rendererGeneration: number;
   /** Quality governor view (tier + live dynamic-resolution scale). */
@@ -45,6 +45,56 @@ interface InventoryView {
     render: { frameCalls: number; drawCalls: number; triangles: number };
     compute: { frameCalls: number };
     memory: { textures: number; programs: number; renderTargets: number; totalBytes: number };
+  } | null;
+  /** Compute-pool GPU ms of the last resolved frame (null = unavailable). */
+  gpuComputeMs: number | null;
+  /** WS0/tasks.md §1 aggregated runtime telemetry (size/transition/services). */
+  runtime: {
+    size: {
+      widthPx: number;
+      heightPx: number;
+      effectivePixels: number;
+      devicePixelRatio: number;
+      renderScale: number;
+    } | null;
+    transition: {
+      active: boolean;
+      phase: string | null;
+      progress: number;
+      destinationOccluded: boolean;
+    };
+    volume: {
+      liveVolumes: number;
+      visibleVolumes: number;
+      baseMaxSteps: number;
+      activeSteps: number;
+      internalScale: number;
+      internalWidth: number;
+      internalHeight: number;
+      detailOctaves: number;
+      lightingTaps: number;
+      temporalJitter: boolean;
+      depthClipActive: boolean;
+    };
+    particles: {
+      liveSystems: number;
+      capacity: number;
+      drawn: number;
+      updatePath: 'compute' | 'cpu' | 'mixed' | 'none';
+      simulationUpdates: number;
+      skippedUpdates: number;
+      lastSkipReason: string | null;
+    };
+    lensing: {
+      livePasses: number;
+      passes: Array<{
+        kind: 'numerical' | 'lut' | 'kerr';
+        qualityTier: string;
+        maxSteps: number | null;
+      }>;
+      environmentDetail: number;
+      environmentLayer: string;
+    };
   } | null;
 }
 
@@ -133,6 +183,8 @@ interface AtlasHook {
     };
     /** Resets the cumulative frame counters (measurement window). */
     resetFrameTelemetry(): void;
+    /** Force a compute timestamp-pool resolve (null when unsupported/absent). */
+    flushGpuComputeTimestamps(): Promise<number | null>;
     /** Manual render-scale override (null = governor-managed). */
     renderScaleOverride: number | null;
     /** True once the rendering device was lost (terminal for the session). */

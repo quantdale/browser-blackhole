@@ -272,6 +272,8 @@ export interface IParticleService {
   setPopulationScale(scale: number): void;
   setProfileQuality(quality: number): void;
   readonly computeAvailable: boolean;
+  /** WS0/tasks.md §1 aggregate over live systems; optional for test doubles. */
+  getDebugSnapshot?(): ParticleTelemetry;
   dispose(): void;
 }
 
@@ -334,6 +336,8 @@ export interface IVolumeService {
   setTemporalJitter(enabled: boolean): void;
   setTemporalFrame(frameIndex: number): void;
   setSceneDepthTexture(texture: THREE.Texture | null): void;
+  /** WS0/tasks.md §1 aggregate over live volumes; optional for test doubles. */
+  getDebugSnapshot?(): VolumeTelemetry;
   dispose(): void;
 }
 
@@ -527,7 +531,8 @@ export interface ILensingService {
   createThinLensDisplacement(massRg: number, impactParameterScale: number): TslDensityFn;
   /** Set the additive cinematic environment contribution for live passes. */
   setEnvironmentDetail(detail: number): void;
-  getDebugSnapshot?(): Record<string, unknown>;
+  /** WS0/tasks.md §1 active pass kinds + live step budgets; optional for doubles. */
+  getDebugSnapshot?(): LensingTelemetry;
   dispose(): void;
 }
 
@@ -685,6 +690,83 @@ export interface RendererInfoTelemetry {
     readonly totalBytes: number;
   };
 }
+
+/**
+ * Internal render size + effective pixel count (WS0/tasks.md §1 /
+ * MASTER_PLAN §5.1). This is the DRAWING BUFFER actually rendered into, not
+ * the CSS viewport; effective pixels is the honest workload denominator.
+ */
+export type RuntimeSizeTelemetry = {
+  readonly widthPx: number;
+  readonly heightPx: number;
+  readonly effectivePixels: number;
+  readonly devicePixelRatio: number;
+  readonly renderScale: number;
+};
+
+/**
+ * Volume march configuration aggregated over live volumes (WS0/tasks.md §1 /
+ * MASTER_PLAN §5.1). Per-volume resolution targets are already the march
+ * targets, so they are the honest "internal size" for volume work.
+ */
+export type VolumeTelemetry = {
+  readonly liveVolumes: number;
+  readonly visibleVolumes: number;
+  readonly baseMaxSteps: number;
+  readonly activeSteps: number;
+  readonly internalScale: number;
+  readonly internalWidth: number;
+  readonly internalHeight: number;
+  readonly detailOctaves: number;
+  readonly lightingTaps: number;
+  readonly temporalJitter: boolean;
+  readonly depthClipActive: boolean;
+};
+
+/**
+ * Particle population/activity aggregated over live systems (WS0/tasks.md §1
+ * / MASTER_PLAN §5.1). `drawn` is the instanced population the renderer would
+ * actually submit; `simulationUpdates`/`skippedUpdates` are cumulative and are
+ * the work-elimination evidence for §8.
+ */
+export type ParticleTelemetry = {
+  readonly liveSystems: number;
+  readonly capacity: number;
+  readonly drawn: number;
+  readonly updatePath: 'compute' | 'cpu' | 'mixed' | 'none';
+  readonly simulationUpdates: number;
+  readonly skippedUpdates: number;
+  readonly lastSkipReason: string | null;
+};
+
+/** One live lensing pass: kind, tier and the live per-frame step budget. */
+export type LensingPassTelemetry = {
+  readonly kind: 'numerical' | 'lut' | 'kerr';
+  readonly qualityTier: QualityTier;
+  readonly maxSteps: number | null;
+};
+
+/** Active lensing passes + environment contribution (WS0/tasks.md §1). */
+export type LensingTelemetry = {
+  readonly livePasses: number;
+  readonly passes: readonly LensingPassTelemetry[];
+  readonly environmentDetail: number;
+  /** Model disclosure for the environment contribution; not a metric. */
+  readonly environmentLayer: string;
+};
+
+/**
+ * Aggregated runtime telemetry exposed through the debug inventory
+ * (WS0/tasks.md §1 / MASTER_PLAN §5.1). These are configuration and work
+ * counters, never timings, so they mean the same thing on every machine.
+ */
+export type RuntimeTelemetry = {
+  readonly size: RuntimeSizeTelemetry | null;
+  readonly transition: TransitionPublicState;
+  readonly volume: VolumeTelemetry;
+  readonly particles: ParticleTelemetry;
+  readonly lensing: LensingTelemetry;
+};
 
 /**
  * Host frame-invalidation telemetry (WS0/tasks.md §1).
@@ -1081,6 +1163,8 @@ export interface IRendererKernel {
   readonly lastFrameWork: FrameWorkTelemetry;
   /** Renderer.info mirror, or null when no renderer is live. */
   readRendererInfo(): RendererInfoTelemetry | null;
+  /** Internal drawing-buffer size, or null before the first resize. */
+  effectiveSize?(): { widthPx: number; heightPx: number } | null;
   capabilities(): CapabilityRequirement[] & { satisfied(id: CapabilityId): boolean };
   /**
    * BH-121: GPU milliseconds per orchestrated frame from the most recent
@@ -1089,7 +1173,11 @@ export interface IRendererKernel {
    * resolved yet. Never inferred from CPU timing.
    */
   readonly gpuFrameMs: number | null;
+  /** Compute-pass GPU ms of the last resolved frame; null when unavailable. */
+  readonly gpuComputeMs?: number | null;
   /** Force a GPU timestamp-pool resolve; resolves to the window mean or null. */
   flushGpuTimestamps(): Promise<number | null>;
+  /** Force a compute timestamp-pool resolve; null when unsupported/absent. */
+  flushGpuComputeTimestamps?(): Promise<number | null>;
   dispose(): void;
 }

@@ -65,6 +65,24 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > and resettable, so a measurement window is a difference of two reads — no
 > timing involved, which means the numbers mean the same thing on every
 > machine.
+>
+> **2026-09-10: all §1 rows complete.** The missing pieces were the typed
+> aggregate and its evidence, not the counters. `debugInventory().runtime` now
+> carries `size` (true drawing-buffer pixels, floor-matched to `canvas.width`),
+> `transition` (phase/progress/occlusion), `volume` (max-folded budget,
+> internal march target, service uniforms), `particles` (summed population +
+> cumulative simulation/skip counters + update path), and `lensing` (per-pass
+> kind/tier + the LIVE `uniforms.maxSteps` budget). The kernel also resolves
+> the separate `compute` timestamp pool asynchronously on the same bounded
+> cadence (`gpuComputeMs` / `flushGpuComputeTimestamps()`); finer per-pass
+> attribution (destination vs nested volume vs post vs present) is not
+> available through the public three timestamp API and is recorded as a
+> rejected scope, never claimed. Evidence: unit tests `volumeService` (3
+> aggregate), `particleService` (3), `lensingService` (4), `frameTelemetry`
+> transport+format; browser `frame-invalidation.spec.ts` runtime rows assert
+> inventory size == `canvas.width/height`, the live pass budget, live volume
+> march target + visible population, and honest null-vs-finite compute
+> attribution (whole file 12/12 headed, nvidia lovelace).
 
 - [x] Extend performance snapshot schema.
       `DebugInventoryView.frame` + `.rendererInfo`; types
@@ -82,17 +100,25 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Add renderer.info memory/program/target/storage metrics.
       Both via `SharedRendererKernel.readRendererInfo()`, read straight from
       `renderer.info` rather than re-derived so they cannot drift.
-- [ ] Add volume active-step/internal-size telemetry.
-- [ ] Add particle active/drawn/simulation telemetry.
-- [ ] Add active lensing pass/max-step telemetry.
-- [ ] Add transition phase/occlusion telemetry.
-      Implementation exists: `TransitionDirector.getPublicState()` exposes the
-      derived `destinationOccluded` semantic and host frame plans carry it to
-      the renderer. Browser execution evidence remains blocked by the current
-      `host.init()` environment hang, so this stays uncertified.
-- [ ] Add async nonblocking GPU timestamp attribution where supported.
-      A bounded-cadence whole-frame resolve already exists (`gpuFrameMs`,
-      BH-121); PER-PASS attribution does not.
+- [x] Add volume active-step/internal-size telemetry.
+      `VolumeService.getDebugSnapshot()` max-folds live volumes (disposed
+      excluded) and `VolumeImpl.telemetryFields()` reports the real half-res
+      march target size only after a march executed.
+- [x] Add particle active/drawn/simulation telemetry.
+      `ParticleService.getDebugSnapshot()` sums capacity/drawn and cumulative
+      simulation/skip counters, degrades `updatePath` to mixed/none, and
+      excludes disposed systems.
+- [x] Add active lensing pass/max-step telemetry.
+      Per-pass kind + tier, with `maxSteps` read from each material's own
+      `uniforms.maxSteps` (no second authority).
+- [x] Add transition phase/occlusion telemetry.
+      `runtime.transition` mirrors `TransitionDirector.getPublicState()`
+      (phase/progress/destinationOccluded) and the occlusion semantics are
+      asserted by the transition row of `frame-invalidation.spec.ts`.
+- [x] Add async nonblocking GPU timestamp attribution where supported.
+      Render pool unchanged, compute pool added on the same bounded,
+      non-blocking cadence. Per-pass attribution beyond the two public pools
+      is rejected with the reason recorded above.
 - [x] Update benchmark JSON schema and scripts.
       Record `schemaVersion` 2 adds `renderTelemetry`
       (framesObserved/Rendered/Skipped + lastFrameWork) for the sampled
@@ -132,26 +158,61 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > phase sweep 6/6 (was failing 1/3), the three affected specs 30/30 at
 > `--workers=4`, frame-invalidation 21/21 at `--workers=4 --repeat-each=3`.
 >
-> Boxes below still require the §0/§1 baseline + telemetry evidence this
-> campaign demands; the code is no longer suspect, but it is not yet measured.
+> **2026-09-10 status:** §1 telemetry is complete, so the §0/§1 evidence this
+> section demanded now exists. Every row below is checked except the
+> per-destination continuous-animation declaration (deliberately replaced by
+> the shared "render while the transport is playing" trigger — destinations
+> key continuous integration to playback, and no second declaration authority
+> was wanted) and the all-goldens confirmation, which belongs to the campaign
+> final gate and is not claimed here.
 
-- [ ] Define invalidation reason bitset in atlas types.
-- [ ] Add host revision/invalidation state.
-- [ ] Wire TimeController changes.
-- [ ] Wire CameraRig changes/settling.
-- [ ] Wire control changes.
-- [ ] Wire resize.
-- [ ] Wire quality changes.
-- [ ] Wire post/display changes.
-- [ ] Wire async asset-ready events.
-- [ ] Wire transition changes.
+- [x] Define invalidation reason bitset in atlas types.
+      `INVALIDATION_REASON` + `describeInvalidationReasons()`; every bit is
+      asserted distinct/non-overlapping by `frameTelemetry.test.ts`.
+- [x] Add host revision/invalidation state.
+      `pendingInvalidationMask`, `frameTelemetry()`, `resetFrameTelemetry()`.
+- [x] Wire TimeController changes.
+      `consumeDirty()`/`consumeDiscontinuity()` -> `TIME_ADVANCED`,
+      `timeController.test.ts` (10 tests).
+- [x] Wire CameraRig changes/settling.
+      `CameraRig.update()` boolean -> `CAMERA_CHANGED`, `cameraRig.test.ts`.
+- [x] Wire control changes.
+      `setDestinationControl` -> `CONTROL_CHANGED` (wake-then-quiet browser
+      row passes).
+- [x] Wire resize.
+      `handleResize` -> `RESIZE` + temporal invalidation.
+- [x] Wire quality changes.
+      Governor tier subscription -> `QUALITY_CHANGED`.
+- [x] Wire post/display changes.
+      `setVisual` exposure/bloom/tone -> `POST_CHANGED`.
+- [x] Wire async asset-ready events.
+      Lazy destination completion and disposal both invalidate
+      `DESTINATION_CHANGED` after the async prepare resolves
+      (`completeArrival`/`disposeActive`), so an in-flight chunk that lands
+      mid-pause still wakes exactly one frame.
+- [x] Wire transition changes.
+      Any active director state -> `TRANSITION_CHANGED` every frame until
+      idle; occlusion row asserts the suppressed-draw plan.
 - [ ] Add destination continuous-animation declaration where needed.
-- [ ] Skip destination update/render when no reason exists and scene is static.
-- [ ] Skip SharedPost present on unchanged frame.
-- [ ] Add forceFrame test/debug path.
-- [ ] Add wake-on-input tests.
-- [ ] Add paused-stationary no-draw test.
+      Not implemented as a per-destination API by design; the shared
+      unconditional trigger while `!time.paused` covers the real cases and is
+      pinned by "an active (unpaused) timeline keeps rendering every tick".
+- [x] Skip destination update/render when no reason exists and scene is static.
+      `frame-invalidation.spec.ts` idle row: zero orchestrated frames across
+      30 rAF ticks against an independent `renderFrame` counter.
+- [x] Skip SharedPost present on unchanged frame.
+      A host-skipped frame never reaches the kernel, so update/render/present
+      are all skipped together; the stage-flag assertions pin all-false.
+- [x] Add forceFrame test/debug path.
+      `frame(dt,{force:true})` + `forceContinuousRenderForTest`;
+      `captureFrame()` row asserts exactly one forced render while idle.
+- [x] Add wake-on-input tests.
+      Control/resize/quality/visibility rows in `frame-invalidation.spec.ts`.
+- [x] Add paused-stationary no-draw test.
+      The idle zero-frame row plus host telemetry cross-check row.
 - [ ] Confirm all goldens pass.
+      Deferred to the campaign final gate; §1 added telemetry surfaces only
+      (render path untouched, post sizing preserved exactly).
 
 ## 3. Visibility lifecycle
 

@@ -339,3 +339,66 @@ describe('VolumeService lifecycle and disposal ownership', () => {
     service.dispose();
   });
 });
+
+describe('VolumeService WS0 aggregate telemetry', () => {
+  it('reports an empty aggregate before any volume exists', () => {
+    const service = new VolumeService();
+    expect(service.getDebugSnapshot()).toEqual({
+      liveVolumes: 0,
+      visibleVolumes: 0,
+      baseMaxSteps: 0,
+      activeSteps: 0,
+      internalScale: 0.5,
+      internalWidth: 0,
+      internalHeight: 0,
+      detailOctaves: 0,
+      lightingTaps: 0,
+      temporalJitter: false,
+      depthClipActive: false
+    });
+    service.dispose();
+  });
+
+  it('folds live volumes by max, counts visibility, and excludes disposed handles', () => {
+    const service = new VolumeService();
+    const a = service.createVolume(makeConfig({ baseMaxSteps: 80 }));
+    const b = service.createVolume(
+      makeConfig({ baseMaxSteps: 24, detail: { seed: 1, octaves: 2 } })
+    );
+    a.setStepScale(0.5); // 80 -> 40
+    b.setVisible(false);
+
+    expect(service.getDebugSnapshot()).toMatchObject({
+      liveVolumes: 2,
+      visibleVolumes: 1,
+      baseMaxSteps: 80,
+      activeSteps: 40,
+      detailOctaves: 2
+    });
+
+    a.dispose();
+    expect(service.getDebugSnapshot()).toMatchObject({
+      liveVolumes: 1,
+      visibleVolumes: 0,
+      baseMaxSteps: 24,
+      activeSteps: 24
+    });
+    service.dispose();
+  });
+
+  it('reports the half-resolution march target size after a resize', () => {
+    const service = new VolumeService();
+    const volume = service.createVolume(makeConfig({ halfResolution: true }));
+    const mesh = volume.object3d() as Mesh;
+    expect(service.getDebugSnapshot()).toMatchObject({ internalWidth: 0, internalHeight: 0 });
+
+    const fake = fakeRenderer(800, 600, 2);
+    invokeOnBeforeRender(mesh, fake);
+    expect(service.getDebugSnapshot()).toMatchObject({
+      internalWidth: 400,
+      internalHeight: 300,
+      internalScale: 0.5
+    });
+    service.dispose();
+  });
+});

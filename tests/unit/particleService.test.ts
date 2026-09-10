@@ -418,3 +418,60 @@ describe('ParticleService lifecycle and disposal ownership', () => {
     service.dispose(); // second service dispose is idempotent
   });
 });
+
+describe('ParticleService WS0 aggregate telemetry', () => {
+  it('reports an empty aggregate before any system exists', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    expect(service.getDebugSnapshot()).toEqual({
+      liveSystems: 0,
+      capacity: 0,
+      drawn: 0,
+      updatePath: 'none',
+      simulationUpdates: 0,
+      skippedUpdates: 0,
+      lastSkipReason: null
+    });
+    service.dispose();
+  });
+
+  it('sums live populations/counters and excludes disposed systems', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const a = service.createSystem(makeConfig({ capacity: 100 }));
+    const b = service.createSystem(makeConfig({ capacity: 50 }));
+    a.setPopulationScale(0.5); // drawn 50
+    a.update(0.5);
+    b.update(0.5);
+
+    expect(service.getDebugSnapshot()).toMatchObject({
+      liveSystems: 2,
+      capacity: 150,
+      drawn: 100,
+      updatePath: 'cpu',
+      simulationUpdates: 2,
+      skippedUpdates: 0,
+      lastSkipReason: null
+    });
+
+    a.dispose();
+    expect(service.getDebugSnapshot()).toMatchObject({
+      liveSystems: 1,
+      capacity: 50,
+      drawn: 50
+    });
+    service.dispose();
+  });
+
+  it('reports a skip reason and a zeroed drawn count for a zero-population system', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const system = service.createSystem(makeConfig());
+    system.setPopulationScale(0);
+    system.update(0.5);
+    expect(service.getDebugSnapshot()).toMatchObject({
+      liveSystems: 1,
+      drawn: 0,
+      skippedUpdates: 1,
+      lastSkipReason: 'zero-population'
+    });
+    service.dispose();
+  });
+});

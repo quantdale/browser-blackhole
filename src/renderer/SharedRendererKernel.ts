@@ -191,6 +191,8 @@ export class SharedRendererKernel implements IRendererKernel {
   private static readonly GPU_RESOLVE_INTERVAL_FRAMES = 90;
   /** Shared promise so an explicit benchmark flush waits for an auto resolve. */
   private gpuResolvePromise: Promise<void> | null = null;
+  /** Same, for the compute timestamp pool (particle/compute passes). */
+  private gpuComputeResolvePromise: Promise<void> | null = null;
   private gpuFramesSinceResolve = 0;
 
   /**
@@ -206,6 +208,10 @@ export class SharedRendererKernel implements IRendererKernel {
   };
   /** Render-pass GPU ms of the most recently resolved frame. */
   private lastGpuFrameMs: number | null = null;
+  /** Compute-pass GPU ms of the most recently resolved frame (null when none). */
+  private lastGpuComputeMs: number | null = null;
+  /** Internal drawing-buffer size of the last applied resize (WS0/tasks.md §1). */
+  private drawingBufferSizeValue: { widthPx: number; heightPx: number } | null = null;
 
   constructor(options: SharedRendererKernelOptions) {
     this.options = options;
@@ -344,44 +350,74 @@ export class SharedRendererKernel implements IRendererKernel {
   }
 
   /**
+   * GPU milliseconds spent in compute passes of the most recently resolved
+   * frame (particle simulation), from the renderer's separate compute
+   * timestamp pool. Null when the backend lacks timestamp queries, no compute
+   * pass ran, or nothing has resolved yet. Never inferred from CPU timing.
+   */
+  get gpuComputeMs(): number | null {
+    const value = this.lastGpuComputeMs;
+    return value !== null && Number.isFinite(value) && value >= 0 ? value : null;
+  }
+
+  /**
    * Force an immediate timestamp-pool resolve (benchmarks/debug tooling);
-   * resolves to the last resolved frame's GPU ms or null when unsupported.
-   * Safe to call concurrently — overlapping calls share one in-flight resolve.
+   * resolves to the last resolved frame's render GPU ms, or null when
+   * unsupported. Safe to call concurrently — overlapping calls share one
+   * in-flight resolve per pool.
    */
   async flushGpuTimestamps(): Promise<number | null> {
     await this.resolveGpuTimestamps();
     return this.gpuFrameMs;
   }
 
-  /** Best-effort async resolve of the shared render timestamp pool. */
-  private resolveGpuTimestamps(): Promise<void> {
+  /** Force a resolve of BOTH timestamp pools; resolves to the compute ms. */
+  async flushGpuComputeTimestamps(): Promise<number | null> {
+    await this.resolveGpuTimestamps('compute');
+    return this.gpuComputeMs;
+  }
+
+  /**
+   * Best-effort async resolve of one timestamp pool. three exposes exactly two
+   * public pools, `render` and `compute`, so this is the safe per-pass
+   * granularity available without reaching into backend internals: the
+   * destination+nested-volume+post+present chain shares the render pool, while
+   * particle/compute dispatch is separately attributable.
+   */
+  private resolveGpuTimestamps(type: 'render' | 'compute' = 'render'): Promise<void> {
     const renderer = this.rendererValue as {
       resolveTimestampsAsync?: (type: string) => Promise<unknown>;
     } | null;
     if (renderer === null) return Promise.resolve();
-    if (this.gpuResolvePromise !== null) return this.gpuResolvePromise;
+    const inFlight = type === 'render' ? this.gpuResolvePromise : this.gpuComputeResolvePromise;
+    if (inFlight !== null) return inFlight;
     if (this.disposed || this.deviceLost) {
       // Reset the counter so a recovered session starts a fresh window.
       this.gpuFramesSinceResolve = 0;
       return Promise.resolve();
     }
-    this.gpuResolvePromise = (async () => {
+    const promise = (async () => {
       try {
-        const result = await renderer.resolveTimestampsAsync?.('render');
+        const result = await renderer.resolveTimestampsAsync?.(type);
         const lastFrameMs = typeof result === 'number' ? result : Number(result);
         // three.js TimestampQueryPool returns the LAST frame's summed pass
-        // duration — a per-frame quantity. Record it verbatim (no averaging).
+        // duration for the pool — a per-frame quantity. Record it verbatim
+        // (no averaging).
         if (!Number.isFinite(lastFrameMs) || lastFrameMs < 0) return;
-        this.lastGpuFrameMs = lastFrameMs;
+        if (type === 'render') this.lastGpuFrameMs = lastFrameMs;
+        else this.lastGpuComputeMs = lastFrameMs;
       } catch {
         // Timestamp resolution is optional telemetry; never surface as an app error.
       } finally {
-        this.gpuFramesSinceResolve = 0;
+        if (type === 'render') this.gpuFramesSinceResolve = 0;
       }
     })().finally(() => {
-      this.gpuResolvePromise = null;
+      if (type === 'render') this.gpuResolvePromise = null;
+      else this.gpuComputeResolvePromise = null;
     });
-    return this.gpuResolvePromise;
+    if (type === 'render') this.gpuResolvePromise = promise;
+    else this.gpuComputeResolvePromise = promise;
+    return promise;
   }
 
   // -- device loss ----------------------------------------------------------
@@ -512,9 +548,70 @@ export class SharedRendererKernel implements IRendererKernel {
     if (!Number.isFinite(pixelRatio) || pixelRatio <= 0) pixelRatio = 1;
     renderer.setPixelRatio(pixelRatio);
 
-    const widthPx = Math.max(1, Math.round(cssWidth * pixelRatio));
-    const heightPx = Math.max(1, Math.round(cssHeight * pixelRatio));
-    this.options.post.ensureSize(widthPx, heightPx, scale);
+    // The shared post target keeps the certified rounding; the drawing buffer
+    // three actually allocates is `floor(css * ratio)` (WebGLRenderer
+    // getDrawingBufferSize semantics), so the telemetry fallback mirrors that
+    // rather than reusing the post size. No rendering behavior changes here.
+    const postWidthPx = Math.max(1, Math.round(cssWidth * pixelRatio));
+    const postHeightPx = Math.max(1, Math.round(cssHeight * pixelRatio));
+    this.drawingBufferSizeValue = {
+      widthPx: Math.max(1, Math.floor(cssWidth * pixelRatio)),
+      heightPx: Math.max(1, Math.floor(cssHeight * pixelRatio))
+    };
+    this.options.post.ensureSize(postWidthPx, postHeightPx, scale);
+  }
+
+  /**
+   * Internal drawing-buffer size (WS0/tasks.md §1). Read back from the live
+   * renderer when it exposes `getDrawingBufferSize`, falling back to the size
+   * computed by the last {@link handleResize}. Null before any successful
+   * resize — never a fabricated viewport-derived number.
+   */
+  effectiveSize(): { widthPx: number; heightPx: number } | null {
+    const renderer = this.rendererValue;
+    if (renderer === null) return null;
+    const read = (
+      renderer as unknown as {
+        getDrawingBufferSize?: (target: {
+          x: number;
+          y: number;
+          set?: (x: number, y: number) => { x: number; y: number; floor(): unknown };
+          floor?: () => unknown;
+        }) => unknown;
+      }
+    ).getDrawingBufferSize;
+    if (typeof read === 'function') {
+      try {
+        // three's implementation calls `target.set(...).floor()`, so the duck
+        // target must expose both methods.
+        const target = {
+          x: 0,
+          y: 0,
+          set(x: number, y: number) {
+            this.x = x;
+            this.y = y;
+            return this;
+          },
+          floor() {
+            this.x = Math.floor(this.x);
+            this.y = Math.floor(this.y);
+            return this;
+          }
+        };
+        read.call(renderer, target);
+        if (
+          Number.isFinite(target.x) &&
+          target.x > 0 &&
+          Number.isFinite(target.y) &&
+          target.y > 0
+        ) {
+          return { widthPx: Math.round(target.x), heightPx: Math.round(target.y) };
+        }
+      } catch {
+        // Fall through to the size computed by handleResize.
+      }
+    }
+    return this.drawingBufferSizeValue;
   }
 
   // -- frame orchestration ----------------------------------------------------
@@ -606,7 +703,8 @@ export class SharedRendererKernel implements IRendererKernel {
         this.gpuFramesSinceResolve >= SharedRendererKernel.GPU_RESOLVE_INTERVAL_FRAMES &&
         this.gpuResolvePromise === null
       ) {
-        void this.resolveGpuTimestamps();
+        void this.resolveGpuTimestamps('render');
+        void this.resolveGpuTimestamps('compute');
       }
     } finally {
       governor.endFrame();

@@ -22,6 +22,7 @@ import type {
   QualityTier,
   RendererInfoTelemetry,
   ResourceScopeCounters,
+  RuntimeTelemetry,
   VisualWorkBudget
 } from './types';
 import type { ScopeInventory } from './ResourceManager';
@@ -65,12 +66,16 @@ export interface DebugInventoryHostPieces {
   backend: BackendInfo | null;
   /** BH-121 GPU frame ms of the last resolved frame (null = unavailable). */
   gpuFrameMs: number | null;
+  /** Compute-pool GPU ms of the last resolved frame (null = no compute/unavailable). */
+  gpuComputeMs?: number | null;
   /** WS0/tasks.md §1 frame-invalidation telemetry (null before the host wires it). */
   frame: FrameInvalidationTelemetry | null;
   /** WS0/tasks.md §1 renderer.info mirror (null when no renderer is live). */
   rendererInfo: RendererInfoTelemetry | null;
   /** Resolved global visual-work budget (null before the governor is live). */
   visualWorkBudget?: VisualWorkBudget | null;
+  /** WS0/tasks.md §1 aggregated runtime telemetry (null before the host wires it). */
+  runtime?: RuntimeTelemetry | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -89,6 +94,8 @@ export interface DebugInventoryView {
   backend: BackendInfo | null;
   /** BH-121 GPU frame ms of the last resolved frame (null = unavailable). */
   gpuFrameMs: number | null;
+  /** Compute-pass GPU ms of the last resolved frame (null = no compute/unavailable). */
+  gpuComputeMs: number | null;
   /**
    * WS0/tasks.md §1 frame-invalidation telemetry: which reasons woke recent
    * frames, how many frames were skipped, and which stages the last
@@ -101,6 +108,8 @@ export interface DebugInventoryView {
   rendererInfo: RendererInfoTelemetry | null;
   /** Resolved global visual-work budget for destination services. */
   visualWorkBudget: VisualWorkBudget | null;
+  /** WS0/tasks.md §1 aggregated runtime telemetry (null before wired). */
+  runtime: RuntimeTelemetry | null;
   /** Per-scope entries exactly as reported by the ResourceManager. */
   resourceScopes: readonly ResourceScopeInventoryEntry[];
   /** True when `debugInventory()` was reachable and returned without throwing. */
@@ -205,9 +214,11 @@ export function collectInventory(pieces: DebugInventoryHostPieces): DebugInvento
           },
     backend: pieces.backend,
     gpuFrameMs: pieces.gpuFrameMs,
+    gpuComputeMs: pieces.gpuComputeMs ?? null,
     frame: pieces.frame,
     rendererInfo: pieces.rendererInfo,
     visualWorkBudget: pieces.visualWorkBudget ?? null,
+    runtime: pieces.runtime ?? null,
     resourceScopes: scopes,
     resourceInventoryAvailable,
     resourceInventoryError,
@@ -277,6 +288,13 @@ export function formatInventoryText(view: DebugInventoryView): string {
           : `${formatFixed(view.gpuFrameMs, 2)} ms (window mean)`
       }`
     );
+    lines.push(
+      `${label('gpu compute time')}${
+        view.gpuComputeMs === null
+          ? 'unavailable (no compute pass / no timestamps)'
+          : `${formatFixed(view.gpuComputeMs, 2)} ms (last resolved frame)`
+      }`
+    );
   } else {
     lines.push(`${label('backend')}none (not initialized)`);
   }
@@ -295,6 +313,50 @@ export function formatInventoryText(view: DebugInventoryView): string {
     lines.push(
       `${label('temporal history')}${budget.temporalEnabled ? budget.temporalHistoryFrames : 'off'}`
     );
+  }
+
+  if (view.runtime !== null) {
+    const runtime = view.runtime;
+    lines.push(
+      `${label('internal size')}${
+        runtime.size === null
+          ? 'pending resize'
+          : `${runtime.size.widthPx}x${runtime.size.heightPx} (${runtime.size.effectivePixels} px, ` +
+            `dpr ${formatFixed(runtime.size.devicePixelRatio, 2)}, scale ` +
+            `${formatFixed(runtime.size.renderScale, 3)})`
+      }`
+    );
+    lines.push(
+      `${label('transition')}${runtime.transition.phase ?? 'idle'}` +
+        ` active=${boolLabel(runtime.transition.active)}` +
+        ` occluded=${boolLabel(runtime.transition.destinationOccluded)}` +
+        ` progress=${formatFixed(runtime.transition.progress, 3)}`
+    );
+    const volume = runtime.volume;
+    lines.push(
+      `${label('volumes')}live=${volume.liveVolumes} visible=${volume.visibleVolumes}` +
+        ` steps=${volume.activeSteps}/${volume.baseMaxSteps}` +
+        ` internal=${volume.internalWidth}x${volume.internalHeight}` +
+        ` octaves=${volume.detailOctaves} taps=${volume.lightingTaps}`
+    );
+    const particles = runtime.particles;
+    lines.push(
+      `${label('particles')}drawn=${particles.drawn}/${particles.capacity}` +
+        ` systems=${particles.liveSystems} path=${particles.updatePath}` +
+        ` updates=${particles.simulationUpdates} skipped=${particles.skippedUpdates}`
+    );
+    const lensing = runtime.lensing;
+    const passSummary =
+      lensing.passes.length === 0
+        ? 'none'
+        : lensing.passes
+            .map(
+              (pass) =>
+                `${pass.kind}@${pass.qualityTier}` +
+                (pass.maxSteps === null ? '' : `:${pass.maxSteps}`)
+            )
+            .join(',');
+    lines.push(`${label('lensing passes')}${passSummary}`);
   }
 
   if (view.governor !== null) {

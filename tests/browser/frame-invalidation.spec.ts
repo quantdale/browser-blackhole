@@ -445,4 +445,110 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
   });
+
+  test('runtime telemetry reports internal size, transition and the live lensing pass', async ({
+    page
+  }) => {
+    // WS0/tasks.md §1: the aggregated runtime block is what later workstreams
+    // read to attribute work; it must describe the REAL drawing buffer and the
+    // actually-created strong-field pass, not a fabricated summary.
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+
+    const view = await page.evaluate(() => {
+      const runtime = window.__ATLAS_APP__!.host.debugInventory().runtime;
+      const canvas = document.getElementById('scene') as HTMLCanvasElement | null;
+      return {
+        runtime,
+        canvas: canvas === null ? null : { width: canvas.width, height: canvas.height }
+      };
+    });
+
+    expect(view.runtime).not.toBeNull();
+    expect(view.canvas).not.toBeNull();
+    expect(view.runtime!.size).not.toBeNull();
+    expect(view.runtime!.size!.widthPx).toBe(view.canvas!.width);
+    expect(view.runtime!.size!.heightPx).toBe(view.canvas!.height);
+    expect(view.runtime!.size!.effectivePixels).toBe(view.canvas!.width * view.canvas!.height);
+
+    // Arrived and settled: no transition, no destination occlusion.
+    expect(view.runtime!.transition.active).toBe(false);
+    expect(view.runtime!.transition.destinationOccluded).toBe(false);
+
+    // The strong-field pass exists and reports a real per-frame step budget
+    // read from the material's own uniform (never guessed from a tier table).
+    expect(view.runtime!.lensing.livePasses).toBeGreaterThan(0);
+    const pass = view.runtime!.lensing.passes[0]!;
+    expect(['numerical', 'lut', 'kerr']).toContain(pass.kind);
+    expect(pass.maxSteps).toBeGreaterThan(0);
+  });
+
+  test('runtime telemetry reports live volume and particle work for a cinematic destination', async ({
+    page
+  }) => {
+    await page.goto('/atlas/compact-merger');
+    await waitForArrival(page);
+
+    const runtime = await page.evaluate(async () => {
+      const app = window.__ATLAS_APP__!;
+      // The ejecta volume is phase-gated (`tau > 0`, off before contact), so a
+      // settled arrival frame can honestly report no executed march. Scrub
+      // past contact and force one render so the aggregate describes a volume
+      // that actually marched, not a retired phase.
+      app.host.time.pause();
+      app.host.time.scrubTo(0.6);
+      await app.captureFrame();
+      // A paused capture passes dt = 0, which the particle service correctly
+      // skips (zero-dt); advance a few playing frames so the dynamic
+      // population actually dispatches its compute update.
+      app.host.time.play();
+      await new Promise<void>((resolve) => {
+        let remaining = 6;
+        const step = (): void => {
+          remaining -= 1;
+          if (remaining <= 0) resolve();
+          else requestAnimationFrame(step);
+        };
+        requestAnimationFrame(step);
+      });
+      return app.host.debugInventory().runtime;
+    });
+
+    expect(runtime).not.toBeNull();
+    expect(runtime!.volume.liveVolumes).toBeGreaterThan(0);
+    expect(runtime!.volume.visibleVolumes).toBeGreaterThan(0);
+    expect(runtime!.volume.activeSteps).toBeGreaterThan(0);
+    // A march has executed with the volume visible, so the internal target
+    // has a real size.
+    expect(runtime!.volume.internalWidth).toBeGreaterThan(0);
+    expect(runtime!.volume.internalHeight).toBeGreaterThan(0);
+    expect(runtime!.particles.liveSystems).toBeGreaterThan(0);
+    expect(runtime!.particles.capacity).toBeGreaterThan(0);
+    expect(runtime!.particles.drawn).toBeGreaterThan(0);
+
+    // §1 GPU attribution: when the backend exposes timestamp queries AND the
+    // population runs on the compute path, the compute pool resolves to a real
+    // duration. Any other combination honestly reports null rather than a
+    // CPU-derived estimate.
+    const timing = await page.evaluate(async () => {
+      const host = window.__ATLAS_APP__!.host;
+      const inventory = host.debugInventory();
+      const computeMs = await host.flushGpuComputeTimestamps();
+      return {
+        timestampQuery: inventory.backend?.timestampQuery === true,
+        updatePath: inventory.runtime?.particles.updatePath ?? 'none',
+        computeMs
+      };
+    });
+    if (timing.timestampQuery && timing.updatePath === 'compute') {
+      // The compute pool only exists because a compute dispatch created it, so
+      // a null here would be a wiring bug. The duration itself may quantize to
+      // 0 for a sub-resolution dispatch, which is why this asserts finiteness
+      // rather than a positive value.
+      expect(timing.computeMs).not.toBeNull();
+      expect(timing.computeMs!).toBeGreaterThanOrEqual(0);
+    } else {
+      expect(timing.computeMs).toBeNull();
+    }
+  });
 });
