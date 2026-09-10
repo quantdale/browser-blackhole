@@ -333,6 +333,15 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   private skippedUpdates = 0;
   private lastSkipReason: 'none' | 'zero-population' | 'static' | 'zero-dt' = 'none';
   private disposed = false;
+  /**
+   * First index whose slot was newly ACTIVATED by a population increase and
+   * must be respawned before it is simulated (-1 = nothing pending). This is
+   * the documented deterministic population-resume rule for the CPU path:
+   * growth spawns the new tail at the frame it becomes visible, using the
+   * same deterministic PRNG stream as ordinary respawns, so state is well
+   * defined instead of resuming a frozen pre-growth snapshot.
+   */
+  private pendingRespawnFrom = -1;
 
   constructor(config: ParticleSystemConfig, rendererRef: RendererLike | null) {
     if (!Number.isFinite(config.capacity) || config.capacity < 1) {
@@ -617,6 +626,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     if (this.disposed) return;
     const rand = mulberry32(seed);
     this.respawnRand = mulberry32((seed ^ 0x9e3779b9) >>> 0);
+    this.pendingRespawnFrom = -1;
     for (let i = 0; i < this.capacity; i++) {
       this.spawn(i, rand, true);
     }
@@ -760,15 +770,25 @@ class ParticleSystemImpl implements ParticleSystemHandle {
       return;
     }
 
-    // CPU fallback path. Cost note: O(capacity) JS loop (~30 flops/particle) plus a
-    // full position+life upload of 32 B/particle per dirty frame; velocity uploads
-    // only on frames where at least one particle respawned. Comfortable up to roughly
-    // 50k particles at 60 Hz on mid hardware; beyond that prefer the compute path.
-    const cap = this.capacity;
+    // CPU fallback path. Cost note: O(active population) JS loop (~30 flops per
+    // particle) plus a PARTIAL position+life upload of 32 B/particle for the
+    // active prefix only (WebGPU/WebGL update ranges), velocity uploads only on
+    // frames where at least one active particle respawned. Comfortable up to
+    // roughly 50k particles at 60 Hz on mid hardware; beyond that prefer the
+    // compute path. Slots outside the active prefix are deliberately NOT
+    // advanced (WS6 §11.1); growth respawns the newly drawn tail first.
+    const cap = Math.min(this.drawnCount, this.capacity);
     const pos = this.positions;
     const vel = this.velocities;
     const life = this.lifeParams;
     let anyRespawn = false;
+    if (this.pendingRespawnFrom >= 0) {
+      for (let i = Math.min(this.pendingRespawnFrom, cap); i < cap; i++) {
+        this.spawn(i, this.respawnRand, false);
+      }
+      this.pendingRespawnFrom = -1;
+      anyRespawn = true;
+    }
     for (let i = 0; i < cap; i++) {
       const lo = i * LIFE_STRIDE;
       const age1 = (life[lo] ?? 0) + dt;
@@ -783,9 +803,26 @@ class ParticleSystemImpl implements ParticleSystemHandle {
       pos[po + 1] = (pos[po + 1] ?? 0) + (vel[po + 1] ?? 0) * dt;
       pos[po + 2] = (pos[po + 2] ?? 0) + (vel[po + 2] ?? 0) * dt;
     }
+    this.uploadActiveRanges(cap, anyRespawn);
+  }
+
+  /**
+   * Mark only the active prefix of every SoA channel dirty. Upload ranges are
+   * precise element counts for the packed strides, so a throttled population
+   * never uploads the whole capacity buffer.
+   */
+  private uploadActiveRanges(activeCount: number, anyRespawn: boolean): void {
+    this.posAttr.clearUpdateRanges();
+    this.posAttr.addUpdateRange(0, activeCount * POS_STRIDE);
     this.posAttr.needsUpdate = true;
+    this.lifeAttr.clearUpdateRanges();
+    this.lifeAttr.addUpdateRange(0, activeCount * LIFE_STRIDE);
     this.lifeAttr.needsUpdate = true;
-    if (anyRespawn) this.velAttr.needsUpdate = true;
+    if (anyRespawn) {
+      this.velAttr.clearUpdateRanges();
+      this.velAttr.addUpdateRange(0, activeCount * VEL_STRIDE);
+      this.velAttr.needsUpdate = true;
+    }
   }
 
   /**
@@ -801,9 +838,16 @@ class ParticleSystemImpl implements ParticleSystemHandle {
     const s = Math.min(this.requestedPopulationScale, this.globalPopulationScale);
     const nextCount = Math.round(this.capacity * s);
     if (nextCount === this.drawnCount) return;
+    const previousCount = this.drawnCount;
     this.drawnCount = nextCount;
     // Instanced equivalent of drawRange: the renderer skips the draw entirely at 0.
     this.geometry.instanceCount = this.drawnCount;
+    if (this.drawnCount > previousCount) {
+      // Newly activated tail: respawn before its first simulated frame.
+      this.pendingRespawnFrom = previousCount;
+    } else {
+      this.pendingRespawnFrom = -1;
+    }
   }
 
   setGlobalPopulationScale(scale: number): void {

@@ -256,3 +256,32 @@ describe('PerformanceGovernor: resetTiming on visibility resume', () => {
     expect(() => governor.resetTiming()).not.toThrow();
   });
 });
+
+/**
+ * WS7 §12.3 — tier-churn torture. Rapid forced pins (the transition/UI path)
+ * must apply immediately without corrupting the auto walk, and releasing them
+ * must resume the documented grace + sustain behavior.
+ */
+describe('PerformanceGovernor tier churn', () => {
+  it('survives rapid forced-tier churn and resumes auto cleanly', () => {
+    const governor = newAutoGovernor();
+    stepFrames(governor, 60, VSYNC_60_MS);
+
+    for (const tier of ['low', 'ultra', 'medium', 'high'] as const) {
+      governor.setForcedTier(tier);
+      expect(governor.currentTier).toBe(tier);
+      stepFrames(governor, 5, VSYNC_60_MS);
+    }
+
+    governor.setForcedTier(null);
+    // Release keeps the last pin and re-arms grace, so the following overload
+    // burst cannot cascade while the pipeline may still be compiling.
+    expect(governor.currentTier).toBe('high');
+    stepFrames(governor, 60, OVERLOAD_25_MS);
+    expect(governor.currentTier).toBe('high');
+
+    // Past grace plus the 1 s sustain, sustained overload degrades normally.
+    stepFrames(governor, 220, OVERLOAD_25_MS);
+    expect(governor.currentTier).not.toBe('high');
+  });
+});

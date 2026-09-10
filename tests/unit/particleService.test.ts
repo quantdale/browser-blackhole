@@ -1,5 +1,5 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
-import type { InstancedBufferGeometry } from 'three';
+import type { BufferAttribute, InstancedBufferGeometry } from 'three';
 import { ParticleService, mulberry32 } from '../../src/renderer/shared/ParticleService.js';
 import type { ParticleSystemConfig, ParticleSystemHandle } from '../../src/atlas/types.js';
 
@@ -471,6 +471,65 @@ describe('ParticleService WS0 aggregate telemetry', () => {
       drawn: 0,
       skippedUpdates: 1,
       lastSkipReason: 'zero-population'
+    });
+    service.dispose();
+  });
+});
+
+describe('ParticleService active-prefix simulation (WS6 §11.1)', () => {
+  function particleGeometry(handle: ParticleSystemHandle): InstancedBufferGeometry {
+    return (handle.object3d() as unknown as { geometry: InstancedBufferGeometry }).geometry;
+  }
+
+  it('simulates and uploads only the active prefix on the CPU path', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const system = service.createSystem(makeConfig({ capacity: 100 }));
+    system.setPopulationScale(0.5);
+    const before = snapshot(system).pos.slice();
+    system.update(0.5);
+    const after = snapshot(system).pos;
+
+    let activeMoved = false;
+    for (let i = 0; i < 50 * 4; i += 4) {
+      if (after[i] !== before[i]) activeMoved = true;
+    }
+    expect(activeMoved).toBe(true);
+    // Inactive slots are deliberately not advanced.
+    expect(Array.from(after.slice(50 * 4))).toEqual(Array.from(before.slice(50 * 4)));
+
+    // Upload ranges cover only the active prefix (packed POS_STRIDE = 4).
+    const posAttr = particleGeometry(system).getAttribute('aParticlePos') as BufferAttribute;
+    expect(posAttr.updateRanges).toEqual([{ start: 0, count: 200 }]);
+    service.dispose();
+  });
+
+  it('respawns the newly active tail on growth, deterministically', () => {
+    const run = (): number[] => {
+      const service = new ParticleService({ computeAvailable: false });
+      const system = service.createSystem(makeConfig({ capacity: 100 }));
+      system.setPopulationScale(0.5);
+      system.update(0.25);
+      system.update(0.25);
+      system.setPopulationScale(1);
+      system.update(0.25);
+      const out = Array.from(snapshot(system).pos);
+      service.dispose();
+      return out;
+    };
+    expect(run()).toEqual(run());
+  });
+
+  it('does not upload after a static population update', () => {
+    const service = new ParticleService({ computeAvailable: false });
+    const system = service.createSystem(makeConfig({ activity: 'static' }));
+    const posAttr = particleGeometry(system).getAttribute('aParticlePos') as BufferAttribute;
+    const version = posAttr.version;
+    system.update(0.5);
+    expect(posAttr.version).toBe(version);
+    expect(system.getDebugSnapshot()).toMatchObject({
+      simulationUpdates: 0,
+      skippedUpdates: 1,
+      lastSkipReason: 'static'
     });
     service.dispose();
   });

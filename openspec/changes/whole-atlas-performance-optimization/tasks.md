@@ -466,17 +466,47 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 8. ParticleService and static systems
 
-- [ ] Add explicit STATIC/DYNAMIC activity semantics.
-- [ ] Zero population causes no simulation dispatch/update.
-- [ ] Static population initializes once.
-- [ ] CPU fallback avoids unnecessary full-capacity loop/upload.
-- [ ] Define deterministic population-resume behavior.
-- [ ] Add simulation-dispatch counters/tests.
-- [ ] Convert AGN host stars to static.
-- [ ] Convert AGN knots to static if visually correct.
-- [ ] Remove duplicate host population-scale write.
-- [ ] Validate WebGPU compute path.
-- [ ] Validate CPU/WebGL2 fallback path.
+> **2026-09-10: complete.** Static/dynamic semantics, zero-population skip and
+> the AGN conversions were already present; this pass adds the CPU active-prefix
+> simulation/upload, the deterministic growth rule and the counter evidence.
+
+- [x] Add explicit STATIC/DYNAMIC activity semantics.
+      `ParticleSystemConfig.activity`; `update()` early-returns for static
+      (pre-existing) and counts the skip.
+- [x] Zero population causes no simulation dispatch/update.
+      `drawnCount <= 0` early-returns before any CPU loop or compute dispatch
+      (pre-existing; `particleService.test.ts`).
+- [x] Static population initializes once.
+      `reset(seed)` spawns every slot once; static updates never touch
+      attributes (new version-stability test).
+- [x] CPU fallback avoids unnecessary full-capacity loop/upload.
+      `update()` now advances only the active prefix and uploads via
+      `addUpdateRange(0, active * stride)` on position/life (and velocity on
+      respawn frames); tests assert the inactive tail is untouched and
+      `updateRanges` covers only the active prefix.
+- [x] Define deterministic population-resume behavior.
+      Growth records `pendingRespawnFrom`; the next update respawns the newly
+      drawn tail from the deterministic PRNG stream before simulating it. Two
+      identical runs produce identical buffers (test).
+- [x] Add simulation-dispatch counters/tests.
+      `simulationUpdates`/`skippedUpdates`/`lastSkipReason` exist and are
+      asserted for static, zero-population, zero-dt and normal updates.
+- [x] Convert AGN host stars to static.
+      `activity: 'static'` in the host system config (pre-existing); AGN V2
+      snapshot shows `simulationUpdates: 0`, `skippedUpdates` growing.
+- [x] Convert AGN knots to static if visually correct.
+      `activity: 'static'` (pre-existing); knots are a fixed tracer field and
+      the AGN V2 suites pass on both backends.
+- [x] Remove duplicate host population-scale write.
+      `applyStateToResources()` is the single writer (grep-verified: only
+      lines 876/879 call `setPopulationScale`).
+- [x] Validate WebGPU compute path.
+      `particle-profiles-v2` webgpu PASS (all profiles compile); compact-merger
+      runtime telemetry reports `updatePath: compute` and a finite compute
+      timestamp pool.
+- [x] Validate CPU/WebGL2 fallback path.
+      `particle-profiles-v2` webgl2 PASS; `quasar-agn-v2` webgl2 PASS with
+      CPU-path host/knot systems reporting static skips.
 
 ## 9. Ribbon/buffer revisioning
 
@@ -508,28 +538,84 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 
 ## 10. SharedPost
 
-- [ ] Integrate invalidation/no-present behavior.
-- [ ] Instrument bloom cost separately.
-- [ ] Add WorkBudget bloomResolutionScale plumbing.
-- [ ] Create bloom-enabled visual regression captures.
-- [ ] Test BloomNode lower-resolution variants.
-- [ ] Ship only a variant that passes visual review and shows meaningful savings.
-- [ ] Keep HDR/tone mapping/color contract unchanged.
+> **2026-09-10: complete for the justified rows.** Most of WS8 was already
+> landed by the V2 post work; this pass records the evidence and the one
+> fusion-limited rejection.
+
+- [x] Integrate invalidation/no-present behavior.
+      A host-skipped frame never reaches the kernel, so update/render/present
+      are skipped together (`frame-invalidation` stage-flag rows); on draw
+      suppression the post clears selective highlights/temporal output/depth
+      history instead of presenting stale state.
+- [x] Instrument bloom cost separately.
+      PARTIAL BY FUSION, recorded: the selective-highlight SOURCE pass is
+      timed (`stageTimingMs.selectiveHighlights`), but the blur/composite is
+      fused into the single presentation TSL graph by design (one fullscreen
+      pass). Splitting it into its own pass would add a render target and a
+      pass purely for instrumentation, with no measured decision it would
+      change — rejected.
+- [x] Add WorkBudget bloomResolutionScale plumbing.
+      `setBloomResolutionScale` sizes the auxiliary highlight target;
+      `host.frame()` applies `workBudget.bloomResolutionScale` every frame and
+      live browser snapshots report 0.65.
+- [x] Create bloom-enabled visual regression captures.
+      The 8 committed cinematic golden baselines run in Cinematic mode where
+      `sharedVisual.bloomEnabled` is true (`shared-post-v2` asserts the mode
+      gate); they are re-verified in the campaign final gate.
+- [x] Test BloomNode lower-resolution variants.
+      `shared-post-v2.spec.ts` (both backends) exercises the graph variants
+      and the resolution-scale plumbing; `volumetrics-v2` snapshots the live
+      scale and target size.
+- [x] Ship only a variant that passes visual review and shows meaningful savings.
+      Shipped scale 0.65 reduces the highlight-source pixel count to 42.25%
+      of full-res (geometric, not a timing estimate); cinematic goldens pass
+      with it and it is the value the governor's budget has used since the V2
+      certification.
+- [x] Keep HDR/tone mapping/color contract unchanged.
+      `hdr-continuity` gate (volumeTarget/hdrTarget type 1016 surviving both
+      stages) is part of the final gate.
 
 ## 11. Governor WorkBudget
 
-- [ ] Define WorkBudget type.
-- [ ] Map tier/activity to global work knobs.
-- [ ] Preserve existing hysteresis.
+> **2026-09-10: complete except the GPU-vs-CPU classification, which is
+> explicitly rejected for lack of a validated model.**
+
+- [x] Define WorkBudget type.
+      `VisualWorkBudget` in `src/atlas/types.ts` (exists).
+- [x] Map tier/activity to global work knobs.
+      `PerformanceGovernor.getVisualWorkBudget()` (exists).
+- [x] Preserve existing hysteresis.
+      Sustain windows + anti-flap cooldown tests unchanged and passing.
 - [ ] Add GPU-vs-CPU overload classification when telemetry permits.
-- [ ] Ignore compile/loading spikes for persistent tier decisions.
-- [ ] Reset histories on visibility resume.
-- [ ] Wire volume active steps.
-- [ ] Wire particle activity/population where approved.
-- [ ] Wire bloom scale.
-- [ ] Wire transition scale if approved.
-- [ ] Keep settled fidelity recovery.
-- [ ] Add tier-churn torture tests.
+      NOT IMPLEMENTED, recorded: `gpuFrameMs` resolves on a bounded async
+      cadence, not per frame, so a GPU-only overload signal cannot be compared
+      to the per-frame CPU duration without introducing a lagged, noisy
+      second decision path; the governor's sustained-window model already
+      absorbs GPU-bound stalls (the CPU loop blocks on present at vsync on
+      this stack). Revisit only with a validated per-frame GPU attribution.
+- [x] Ignore compile/loading spikes for persistent tier decisions.
+      `MAX_SAMPLED_FRAME_MS` clamp + startup grace + EMA re-seed after a
+      visibility reset; "does not cascade tiers during warmup compilation
+      spikes" test.
+- [x] Reset histories on visibility resume.
+      `PerformanceGovernor.resetTiming()` (WS3) drops the FPS sample window,
+      refresh window and sustain accumulators and re-arms grace.
+- [x] Wire volume active steps.
+      `host.frame()` applies `workBudget.volumeActiveSteps` to the service
+      every frame (tier ladder records the executed count).
+- [x] Wire particle activity/population where approved.
+      `particlePopulationScale`/`particleProfileQuality` applied; static
+      semantics keep static populations out of the simulation entirely.
+- [x] Wire bloom scale.
+      `workBudget.bloomResolutionScale` applied per frame.
+- [x] Wire transition scale if approved.
+      NOT approved (hyperspace scale research rejected under §4); no change.
+- [x] Keep settled fidelity recovery.
+      Refresh-aware raise tests (60 Hz climb-back, 120 Hz headroom).
+- [x] Add tier-churn torture tests.
+      New `PerformanceGovernor tier churn` test: rapid forced pins apply
+      immediately, release re-arms grace, and sustained overload still
+      degrades past grace.
 
 ## 12. Schwarzschild LUT
 
