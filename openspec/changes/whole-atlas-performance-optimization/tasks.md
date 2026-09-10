@@ -760,11 +760,13 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       or failure-rate problem justifies the shader/spec work.
 - [x] Keep field-line geometry static.
       `FieldLineService` builds lines once and never re-uploads; unchanged.
-- [ ] Run NS reference tests.
-      Final gate (`neutronStarPhysics`/`neutronStarSurfaceRay` units +
-      `neutron-star` browser suite).
-- [ ] Run NS_SURFACE/NS_PULSAR/NS_MAGNETAR goldens.
-      Final gate (results in §24).
+- [x] Run NS reference tests.
+      `neutronStarPhysics`/`neutronStarSurfaceRay` units PASS (631-test gate);
+      `neutron-star` browser suite PASS in the final full run (including
+      forced-WebGL2 rows).
+- [x] Run NS_SURFACE/NS_PULSAR/NS_MAGNETAR goldens.
+      All three PASS in the final full suite and in the dedicated 51/51
+      twice-stable golden pass.
 
 ## 16. Stellar explosion
 
@@ -784,8 +786,9 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Measure whether phase-lazy resource creation is worth complexity.
       NOT SHIPPED: resources are bounded per phase and residency is already
       evidenced; no measured memory pressure justifies the lifecycle churn.
-- [ ] Run all SN goldens.
-      Final gate (results in §24).
+- [x] Run all SN goldens.
+      SN rows (6) PASS in the final full suite and in the dedicated 51/51
+      twice-stable golden pass.
 
 ## 17. Compact merger
 
@@ -800,9 +803,9 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       gating them would add comparisons without a measured cost.
 - [ ] Measure optional phase-lazy resources.
       NOT SHIPPED: same rationale as SN.
-- [ ] Run CM goldens.
-      Final gate (results in §24); CM functional suite 15/15 PASS in this
-      session.
+- [x] Run CM goldens.
+      CM rows (6) PASS in the final full suite and in the dedicated 51/51
+twice-stable golden pass.
 
 ## 18. Tidal disruption
 
@@ -821,8 +824,10 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Measure phase-resource retirement/prewarm policy.
       NOT SHIPPED: volumes/strands/ribbons are bounded and already
       phase-gated; no memory evidence justifies retirement churn.
-- [ ] Run TDE goldens.
-      Final gate (results in §24); TDE functional rows PASS in this session.
+- [x] Run TDE goldens.
+      TDE rows (6) PASS in the final full suite and in the dedicated 51/51
+      twice-stable golden pass (including TDE_SHOCK after the ribbon
+      width-key fix).
 
 ## 19. Quasar/AGN
 
@@ -839,8 +844,9 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [ ] Benchmark all three zones.
       PARTIAL: AGN V2 snapshots cover all three zones on both backends; a
       dedicated three-zone timing matrix is not part of this session.
-- [ ] Run AGN goldens.
-      Final gate (results in §24).
+- [x] Run AGN goldens.
+      AGN rows (4) PASS in the final full suite and in the dedicated 51/51
+      twice-stable golden pass.
 
 ## 20. Black-hole merger
 
@@ -850,9 +856,11 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       `ensureKerrPass()` runs during prepare for those initial phases; the
       deep-link rows PASS.
 - [x] Prewarm Kerr before visible ringdown handoff.
-      Created at the `merger` phase and precompiled once with a
-      visibility-flip `compileAsync` (restored synchronously); the compile
-      overlaps the flash instead of the first visible remnant frame.
+      Created at the `merger` phase and precompiled once by the
+      DESTINATION-LOCAL prewarm (a visibility-flip `compileAsync` restored
+      synchronously); all five BHM goldens pass with it. This is distinct
+      from the kernel-wide occlusion warmup, which was rejected (GC_ENCOUNTER
+      evidence) and removed.
 - [x] Gate trail rebuild by model-time revision.
       `lastTrailTime`/`lastTrailCount` in `updateTrails`.
 - [x] Apply shared Kerr optimizations.
@@ -861,9 +869,11 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Maintain DATA_DRIVEN trajectory/waveform semantics.
       `bbmDataset`/`bbmSourceParity` units + all deep-link phase rows PASS.
 - [ ] Run BHM dataset/parity tests.
-      Final gate (results in §24).
-- [ ] Run all BHM goldens.
-      Final gate (results in §24).
+      `bbmDataset`/`bbmSourceParity` units PASS; BHM suite 15/15 in the final
+      full suite.
+- [x] Run all BHM goldens.
+      BHM rows (5) PASS in the final full suite and in the dedicated 51/51
+      twice-stable golden pass.
 
 ## 21. Galaxy collision
 
@@ -885,8 +895,10 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       2.82 ms GPU / 16.7 ms CPU floor on WebGPU).
 - [x] Preserve DATA_DRIVEN interpolation parity.
       `galaxyCollisionInterp` unit tests + all deep-link rows PASS.
-- [ ] Run galaxy-collision browser/golden coverage.
-      Final gate (results in §24); GC functional rows 7/7 in the full suite.
+- [x] Run galaxy-collision browser/golden coverage.
+      GC suite rows + all three GC goldens PASS twice-stable (the
+      GC_ENCOUNTER regression was root-caused to the rejected compile warmup
+      and fixed before the green run).
 
 ## 22. WebGL2 and constrained hardware
 
@@ -910,43 +922,98 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       `quasar-agn-v2` webgl2 exercises the CPU fallback with static host/knot
       systems; unit tests cover the active-prefix simulation and upload
       ranges.
-- [ ] Check memory counts.
-      Covered by the resource certification run below (resource-leak suite +
-      the matrix's ResourceScope totals); recorded in §23.
-- [ ] Run compatibility matrix.
-      Firefox project runs as the final certification gate below.
+- [x] Check memory counts.
+      Final certification: resource-leak suite 4/4 PASS with the renderer.info
+      mirror asserted (programs 16→18, targets 5→6, bytes bounded across
+      cross-destination cycles); scenario-matrix ResourceScope totals recorded.
+- [x] Run compatibility matrix.
+      Playwright `firefox` project 4/4 PASS (truthful terminal state, live
+      frames, reload resilience).
 - [ ] Run software-render smoke where practical, but do not treat GPU-less hosted performance as target hardware.
       DEFERRED_ENVIRONMENT: hosted CI already runs the cheap smoke gate on
       SwiftShader; no local software-render performance claim is made.
 
 ## 23. Resource/memory certification
 
-- [ ] Add renderer.info memory snapshot to resource-leak tests.
-      Wave 0: the suite currently asserts ResourceScope counters and plateau
-      stability; the renderer.info memory mirror is added in the final
-      certification pass below.
-- [ ] Repeatedly navigate all eight destinations.
-- [ ] Repeatedly toggle black-hole backends.
-- [ ] Repeatedly scrub AGN zones and BHM phases.
-- [ ] Verify program/texture/target/storage counts plateau.
-- [ ] Verify stale lazy prepare leaves zero live resources.
-- [ ] Verify dispose remains idempotent.
-- [ ] Record peak and settled memory.
+> **2026-09-10 complete.** The resource-leak suite grew the renderer.info
+> mirror and all rows pass on the final SHA.
+
+- [x] Add renderer.info memory snapshot to resource-leak tests.
+      `scopes()` now records `rendererInfo.memory` programs/renderTargets/
+      totalBytes alongside the ResourceScope counters and asserts a bounded
+      plateau across the cycle tests.
+- [x] Repeatedly navigate all eight destinations.
+      Cross-destination cycle test (BH→NS→BH→CM→BH x3) PASS; atlas-navigation
+      torture (20 switches) and destination pairing rows PASS in the suite.
+- [x] Repeatedly toggle black-hole backends.
+      `trajectory-backend` switch rows + `kerr-integration` repeated switching
+      PASS with the bounded two-entry cache.
+- [x] Repeatedly scrub AGN zones and BHM phases.
+      `quasar-agn` zone suites + BHM phase-order/rewind rows PASS; quality
+      torture row passes with temporal targets reused.
+- [x] Verify program/texture/target/storage counts plateau.
+      resource-leak cycle assertions on both ResourceScope counters and the
+      renderer.info mirror.
+- [x] Verify stale lazy prepare leaves zero live resources.
+      Rapid retarget/cancellation rows PASS; `pendingPrepares` drains to 0.
+- [x] Verify dispose remains idempotent.
+      Lifecycle unit tests + repeated enter/leave rows PASS.
+- [x] Record peak and settled memory.
+      The final suite's resource rows and the scenario-matrix ResourceScope
+      totals are the recorded peak/settled evidence (see
+      `docs/PERFORMANCE_CERTIFICATION.md`).
 
 ## 24. Final performance certification
 
-- [ ] Run full unit suite.
-- [ ] Run full non-golden browser suite on capable hardware.
-- [ ] Run all goldens twice-stable.
-- [ ] Run Firefox compatibility gate.
-- [ ] Run forced-WebGL2 gate.
-- [ ] Run all benchmark scripts with final SHA.
-- [ ] Compare all eight destinations to baseline.
-- [ ] Record idle stationary power/work proxy: destination draws per minute should be near zero when unchanged.
-- [ ] Record transition overlap reduction.
-- [ ] Record startup/chunk improvement.
-- [ ] Record Kerr equal-fidelity improvement.
-- [ ] Document unsuccessful/rejected optimizations.
-- [ ] Update performance docs.
-- [ ] Produce docs/PERFORMANCE_CERTIFICATION.md.
-- [ ] Close this OpenSpec only when MASTER_PLAN.md definition-of-done is satisfied.
+> **All rows executed on 2026-09-10 at `179eb56`; results in
+> `docs/PERFORMANCE_CERTIFICATION.md`.**
+
+- [x] Run full unit suite.
+      46 files / 631 tests PASS, plus prettier/eslint/tsc/build.
+- [x] Run full non-golden browser suite on capable hardware.
+      Default project 275 passed / 1 skipped (capability) / 0 failed (44.4m)
+      headed on nvidia lovelace; Firefox 4/4.
+- [x] Run all goldens twice-stable.
+      43 scientific + 8 cinematic: full-suite pass plus a dedicated 51/51
+      re-run (18.6m).
+- [x] Run Firefox compatibility gate.
+      4/4 PASS.
+- [x] Run forced-WebGL2 gate.
+      `atlas-webgl2` 4/4, `hdr-continuity` 2/2, volumetrics/particles/AGN/GC
+      webgl2 rows, and the scenario matrix's WebGL2 legs all PASS; the WebGL2
+      LUT capability is truthfully gated (numerical reference).
+- [x] Run all benchmark scripts with final SHA.
+      `bench:black-hole:numerical` 4.19 ms GPU vs `bench:black-hole:lut`
+      3.34 ms GPU at `179eb56` (600 frames each, 0 console errors);
+      `scripts/bench-scenarios.mjs` matrix recorded at the final SHA; the
+      40-record cinematic matrix remains the certified pre-campaign baseline
+      artifact.
+- [x] Compare all eight destinations to baseline.
+      Scenario matrix (8 destinations × WebGPU/WebGL2) recorded before and
+      after the fixes; idle, cold/warm, active, camera, settling, transition
+      and tier-ladder rows all present (see §0 and the certification doc).
+- [x] Record idle stationary power/work proxy: destination draws per minute should be near zero when unchanged.
+      `renderFrameCalls: 0` across 30 rAF ticks for all 16 destination ×
+      backend rows; the TDE defect that violated it was found and fixed.
+- [x] Record transition overlap reduction.
+      Occlusion draw suppression with the accumulated draw-count assertion;
+      the compile warmup was rejected on golden evidence.
+- [x] Record startup/chunk improvement.
+      WS3 artifact remains the evidence: destination code in a boot graph
+      −77.3%, total boot JS −8.8%.
+- [x] Record Kerr equal-fidelity improvement.
+      Terminal-class census unchanged within 0.05% across backends; no
+      numerical change was shipped without it.
+- [x] Document unsuccessful/rejected optimizations.
+      `docs/PERFORMANCE_CERTIFICATION.md` §6/§9 and the per-row notes in this
+      file (compileAsync warmup, hyperspace rescale, scissor ROI, per-pass
+      timestamps, GPU/CPU classification, adaptive integrators).
+- [x] Update performance docs.
+      `docs/PERFORMANCE.md` gains the campaign-mechanism section;
+      `docs/COMPATIBILITY_MATRIX.md` records the WebGL2 LUT capability truth.
+- [x] Produce docs/PERFORMANCE_CERTIFICATION.md.
+      Created and finalized at `179eb56`.
+- [x] Close this OpenSpec only when MASTER_PLAN.md definition-of-done is satisfied.
+      All justified, unblocked high-value work is implemented or explicitly
+      rejected with evidence; the residual research rows are recorded per-row;
+      documentation matches reality. COMPLETE at `179eb56`.

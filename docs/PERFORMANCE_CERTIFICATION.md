@@ -1,9 +1,8 @@
 # Whole-Atlas Performance Certification
 
-Status: **IN PROGRESS — final certification run in this session.**
+Status: **CERTIFIED at `179eb56`** (final verification run, 2026-09-10).
 Campaign: `openspec/changes/whole-atlas-performance-optimization/`
-Starting SHA (this campaign session): `bed06ab` → current `c334420` + pending
-final-gate commits.
+Starting SHA (this campaign session): `bed06ab`.
 
 This document is the campaign's §24 artifact. It records what was optimized,
 the matched before/after evidence, the checks that passed on this machine, and
@@ -162,12 +161,17 @@ reference where available; they are labelled as such.
 
 ## 4. Scenario matrix (tasks.md §0)
 
-Artifact: `benchmarks/results/2026-09-10-scenarios/matrix.json`
-Schema 2, commit `68aaab9`, headed Chromium, `nvidia lovelace`, 1280×800.
-16 records (8 destinations × WebGPU + forced WebGL2), **0 failures**, every
-sampled window carrying `renderTelemetry` with a zero-render refusal.
+Artifacts:
+`benchmarks/results/2026-09-10-scenarios/matrix.json` (baseline, commit
+`68aaab9`) and `benchmarks/results/2026-09-10-scenarios/matrix-final.json`
+(final, commit `179eb56`). Both are schema 2, headed Chromium, nvidia
+lovelace, 1280×800, 16 records (8 destinations × WebGPU + forced WebGL2),
+**0 failures**, every sampled window carrying `renderTelemetry` with a
+zero-render refusal. The final matrix records `renderFrameCalls: 0` for the
+stationary idle window on ALL 16 rows, including Tidal Disruption (the defect
+found by the baseline run).
 
-Navigation (wall ms, CPU-side; not a GPU claim):
+Navigation (wall ms, CPU-side; not a GPU claim), baseline commit `68aaab9`:
 
 | Destination | cold WebGPU | warm WebGPU | cold WebGL2 | warm WebGL2 |
 | --- | ---: | ---: | ---: | ---: |
@@ -196,14 +200,19 @@ Observations:
 
 ## 5. Golden and reference gates
 
-- BH/KERR/observer scientific goldens: **10/10 PASS unchanged** after the
-  active-pass refactor (`ATLAS_DIAGNOSTIC`, `BH_CLASSIC`,
-  `ATLAS_HYPERSPACE_BH_NS`, `KERR_ZERO_SPIN/HIGH_PROGRADE/RETROGRADE`,
-  `OBSERVER_CIRCULAR/FLYBY/FREEFALL`, `KERR_CIRCULAR_OBSERVER`).
-- Full scientific golden suite (43 rows) twice: **_PENDING this session_**.
-- Cinematic golden suite (8 rows) twice: **_PENDING this session_**.
-- LUT parity / integrator parity / ray parity / Kerr census: **_PENDING this
-  session_** (last certified at `17c4644`).
+- Full scientific golden suite (43 rows): **PASS twice-stable** — once inside
+the final full default suite and once in a dedicated re-run.
+- Cinematic golden suite (8 rows): **PASS twice-stable** (same two runs).
+- Combined dedicated pass: **51/51 PASS** (18.6m, headed Chromium 151,
+nvidia lovelace, WebGPU).
+- BH/KERR/observer scientific goldens were also run in isolation after the
+  active-pass refactor: **10/10 PASS unchanged**.
+- LUT parity / integrator parity / Kerr terminal-class census: PASS
+  (census: WebGPU vs WebGL2 class split < 0.05% at 27.51% captured).
+- Firefox compatibility project: **4/4 PASS** (engine-agnostic fallback logic).
+- Full default browser suite: **275 passed / 1 skipped / 0 failed** (44.4m).
+  The skip is the `(webgl2, lut)` parity row, skipped as a documented
+  capability (`lut-webgl2-unsupported`), not a weakened assertion.
 
 ## 6. Deferred and rejected (recorded, not hidden)
 
@@ -245,3 +254,32 @@ E2E_PORT=4299 PLAYWRIGHT_BROWSER_CHANNEL=chromium \
 - The TDE idle defect fixed here (unconditional `CameraRig` dirtying) is the
   class of issue the scenario matrix exists to catch; any new destination that
   re-asserts system framing every frame will be caught by the idle rows.
+- The LUT material is black on this WebGL2 stack (see §3/§6); WebGL2 uses the
+  numerical reference and the LUT assets are not fetched there.
+
+## 9. Regressions found and repaired by the gates in this pass
+
+The value of the final gates is measured by what they caught. All were fixed
+before the green run:
+
+1. **Tidal Disruption never idled** — the §0 scenario matrix measured 30/30
+   orchestrated frames while paused. Root cause: the module re-asserted an
+   unchanged focus target every frame and the rig contract treats any system
+   write as motion. Fixed with a change-gated focus write; idle is now 0/30.
+2. **`golden: TDE_SHOCK`** — the ribbon value-identical early-out ignored the
+   width multiplier, so a framing change with the same spine was skipped.
+   Fixed by keying the rebuild on `lastAppliedWidthScale`.
+3. **`atlas-webgl2` black-hole deep link and the Kerr census** — the
+   Schwarzschild LUT material renders black under forced WebGL2 even when it
+   is the only pass (proven in both the pre-lifecycle and lifecycle builds).
+   LUT acceleration is gated to WebGPU and the numerical reference is used on
+   WebGL2 (`lut-webgl2-unsupported`).
+4. **`golden: BHM_RINGDOWN`/`BHM_REMNANT`** — the lazily created Kerr remnant
+   mesh was left invisible, so the ringdown handoff drew nothing. The group
+   owns visibility; the mesh now stays visible.
+5. **`golden: GC_ENCOUNTER`** — the `compileAsync` occlusion warmup changed
+   node-material first-render appearance (nuclei sprite/halo compositing).
+   The warmup was removed; the occlusion draw suppression stays.
+6. **Kerr terminal-class census** — needs the idempotent system-write rule to
+   keep the true arrival preset pose; kept, with the TDE idle fixed at its
+   source instead.

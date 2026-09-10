@@ -1,3 +1,31 @@
+## 2026-09-10 session — CAMPAIGN CERTIFIED at 179eb56
+
+Status: **COMPLETE — whole-atlas-performance-optimization certified.**
+
+Final gates (all on `179eb56`, headed Chromium 151 / nvidia lovelace unless
+noted):
+
+- `npm run check`: 46 files / 631 tests, format/lint/typecheck/build PASS.
+- Full default browser suite: **275 passed / 1 skipped / 0 failed** (44.4m).
+  The skip is the `(webgl2, lut)` parity row, skipped as a documented
+  capability (`lut-webgl2-unsupported`).
+- Goldens twice-stable: 43 scientific + 8 cinematic, full-suite pass plus a
+dedicated **51/51** re-run (18.6m).
+- Firefox compatibility project: **4/4 PASS**.
+- `bench:black-hole:numerical` **4.19 ms GPU** vs `:lut` **3.34 ms GPU**
+  (600 frames each, 0 console errors).
+- Scenario matrix re-run at the final SHA (8 destinations × WebGPU/WebGL2).
+- `docs/PERFORMANCE_CERTIFICATION.md` finalized; `docs/PERFORMANCE.md` and
+  `docs/COMPATIBILITY_MATRIX.md` updated; `tasks.md` §0-§24 carry per-row
+  evidence.
+
+Gate-caught regressions fixed before the green run: TDE idle churn, TDE_SHOCK
+ribbon width key, LUT/WebGL2 black containment, BHM Kerr remnant visibility,
+GC_ENCOUNTER compile-warmup appearance change, Kerr census rig-pose
+sensitivity. No known Critical/High regression remains.
+
+Next action: none for this campaign; the repository is auditable as-is.
+
 ## 2026-09-10 session — GC GOLDEN ROOT-CAUSED: COMPILEASYNC WARMUP REMOVED
 
 Status: **second full-suite run had ONE failure — `golden: GC_ENCOUNTER` —
