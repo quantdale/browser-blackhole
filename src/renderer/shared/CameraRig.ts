@@ -389,11 +389,25 @@ export class CameraRig implements ICameraRig {
   ): void {
     this.cancelAnimation();
     this.configured = true;
-    this.azimuthDeg = requireFinite(azimuthDeg, 'azimuthDeg');
-    this.polarDeg = clamp(requireFinite(polarDeg, 'polarDeg'), POLAR_MIN_DEG, POLAR_MAX_DEG);
-    this.distance = clamp(requireFinite(distance, 'distance'), this.minDistance, this.maxDistance);
+    const nextAzimuth = requireFinite(azimuthDeg, 'azimuthDeg');
+    const nextPolar = clamp(requireFinite(polarDeg, 'polarDeg'), POLAR_MIN_DEG, POLAR_MAX_DEG);
+    const nextDistance = clamp(
+      requireFinite(distance, 'distance'),
+      this.minDistance,
+      this.maxDistance
+    );
+    // System writers (AutoFramer and destination presentation code) re-assert
+    // the same orbit every frame; dirtying on an unchanged value would keep a
+    // paused, settled scene rendering forever. Viewer writes always count.
+    const changed =
+      nextAzimuth !== this.azimuthDeg ||
+      nextPolar !== this.polarDeg ||
+      nextDistance !== this.distance;
+    this.azimuthDeg = nextAzimuth;
+    this.polarDeg = nextPolar;
+    this.distance = nextDistance;
     if (source === 'user') this.userInteractionRevision += 1;
-    this.dirty = true;
+    if (changed || source === 'user') this.dirty = true;
   }
 
   /**
@@ -417,13 +431,16 @@ export class CameraRig implements ICameraRig {
     if (source === 'system' && this.animation !== null) return;
     this.cancelAnimation();
     this.configured = true;
-    this.target.set(
-      requireFinite(target.x, 'target.x'),
-      requireFinite(target.y, 'target.y'),
-      requireFinite(target.z, 'target.z')
-    );
+    const x = requireFinite(target.x, 'target.x');
+    const y = requireFinite(target.y, 'target.y');
+    const z = requireFinite(target.z, 'target.z');
+    // Same idempotence rule as setOrbit: destinations re-assert the same
+    // presentation focus every frame while the framer is enabled, and that
+    // must not read as camera motion once the scene has settled.
+    const changed = x !== this.target.x || y !== this.target.y || z !== this.target.z;
+    this.target.set(x, y, z);
     if (source === 'user') this.userInteractionRevision += 1;
-    this.dirty = true;
+    if (changed || source === 'user') this.dirty = true;
   }
 
   setFov(fovDeg: number): void {

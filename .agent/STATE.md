@@ -1,4 +1,4 @@
-## 2026-09-10 session — GC GOLDEN ROOT-CAUSED: COMPILEASYNC WARMUP REMOVED; CAMERARIG CONTRACT RESTORED
+## 2026-09-10 session — GC GOLDEN ROOT-CAUSED: COMPILEASYNC WARMUP REMOVED
 
 Status: **second full-suite run had ONE failure — `golden: GC_ENCOUNTER` —
 now root-caused and fixed with the compile warmup rejected on visual evidence.**
@@ -14,18 +14,21 @@ occlusion draw suppression kept, and the browser assertion trimmed to the
 draw-count form. Recorded in `tasks.md` §4 as researched-and-rejected.
 
 Consequence for the TDE idle fix: a clean worktree bisect showed the rig
-idempotence was NOT required once the real cause (compile warmup) was gone,
-and the certification-era CameraRig contract (any system write re-applies the
-transform) is observable through goldens. `CameraRig` is restored to its
-pre-campaign behavior and Tidal Disruption now only calls `setTarget` when
-the focus target actually CHANGED — TDE stationary idle stays 0/30 orchestrated
-frames, verified with the §0 scenario probe.
+idempotence was NOT required once the real cause (compile warmup) was gone.
+The certification-era CameraRig contract (any system write re-applies the
+transform) was briefly restored, but the FINAL full-suite run showed the Kerr
+terminal-class census splits 27.51% vs 24.85% without idempotence (an
+unconditional write cancels/alters the arrival ease path), so the idempotent
+behavior is kept: it restores the true preset pose that the census gate
+expects. All 14 GC/TDE/BHM goldens pass with idempotence AND the precompile
+removed, and TDE stationary idle remains 0/30 with the explicit caller gate.
 
-Evidence: `npm run check` 46 files / 629 tests PASS; all 14 GC/TDE/BHM goldens
-PASS; occlusion + hide/resume rows 2/2; TDE idle probe 0 frames, 0 failures.
+Evidence: `npm run check` 46 files / 631 tests PASS; all 14 GC/TDE/BHM goldens
+PASS with the final rig; Kerr census PASS (25.8s); occlusion + hide/resume
+rows PASS; TDE idle probe 0 frames / 0 failures.
 
-Next action: commit this batch, re-run the full default suite + both golden
-suites (twice-stable), Firefox, and the benchmarks on the final SHA.
+Next action: commit, then the final full suite + second golden runs + Firefox +
+benchmarks on the final SHA, then close the ledger and push.
 
 ## 2026-09-10 session — FULL-SUITE TRIAGE: LUT/WebGL2 BLACK CONTAINED, RIBBON WIDTH-KEY FIXED
 

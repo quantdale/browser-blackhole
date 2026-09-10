@@ -166,7 +166,7 @@ describe('CameraRig: clip range follows orbit distance without ratcheting', () =
  * and that must not count as camera motion once settled — otherwise a paused
  * scene renders forever. Viewer writes are deliberately exempt.
  */
-describe('CameraRig: system framing writes keep the established dirty contract', () => {
+describe('CameraRig: idempotent system writes do not dirty the camera', () => {
   function rigWithCamera(): { rig: CameraRig; camera: PerspectiveCamera } {
     const rig = new CameraRig({});
     const camera = new PerspectiveCamera(60, 1, 0.05, 5000);
@@ -174,22 +174,42 @@ describe('CameraRig: system framing writes keep the established dirty contract',
     return { rig, camera };
   }
 
-  it('a repeated system setOrbit write still re-applies the camera transform', () => {
-    // The whole-atlas campaign tried making these idempotent to kill a TDE
-    // idle-render loop; the GC_ENCOUNTER golden proved some code paths depend
-    // on a system write re-applying the transform. The idle loop is fixed at
-    // its source (Tidal Disruption only writes a CHANGED focus target), and
-    // this contract stays as certified.
+  it('repeated identical system setOrbit writes stay quiet after the first', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016); // settle from attach()
+    rig.setOrbit(33, 88, 42, 'system');
+    expect(rig.update(0.016)).toBe(true);
+    for (let i = 0; i < 5; i += 1) {
+      rig.setOrbit(33, 88, 42, 'system');
+      expect(rig.update(0.016)).toBe(false);
+    }
+  });
+
+  it('repeated identical system setTarget writes stay quiet after the first', () => {
+    const { rig } = rigWithCamera();
+    rig.update(0.016);
+    rig.setTarget(new Vector3(1, 2, 3), 'system');
+    expect(rig.update(0.016)).toBe(true);
+    for (let i = 0; i < 5; i += 1) {
+      rig.setTarget(new Vector3(1, 2, 3), 'system');
+      expect(rig.update(0.016)).toBe(false);
+    }
+  });
+
+  it('a changed system value still dirties exactly once', () => {
     const { rig } = rigWithCamera();
     rig.update(0.016);
     rig.setOrbit(33, 88, 42, 'system');
+    rig.update(0.016);
+    rig.setOrbit(33, 88, 43, 'system');
     expect(rig.update(0.016)).toBe(true);
-    rig.setOrbit(33, 88, 42, 'system');
-    expect(rig.update(0.016)).toBe(true);
+    expect(rig.update(0.016)).toBe(false);
   });
 
-  it('user writes always dirty and bump the takeover revision', () => {
+  it('user writes always dirty and bump the takeover revision, even unchanged', () => {
     const { rig } = rigWithCamera();
+    rig.update(0.016);
+    rig.setOrbit(33, 88, 42, 'system');
     rig.update(0.016);
     const revision = rig.getUserInteractionRevision();
     rig.setOrbit(33, 88, 42, 'user');
