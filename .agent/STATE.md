@@ -1,7 +1,8 @@
 ## 2026-09-11 session — UI/UX PRODUCT-SURFACE CAMPAIGN ("Instrument Console")
 
-Status: **frontend redesign complete and verified; one host-speed golden
-timeout recorded as environment-deferred (see Evidence).**
+Status: **frontend redesign complete and verified; committed at `932370b`.
+One host-speed golden timeout recorded as environment-deferred (see
+Evidence).**
 
 Scope: explicitly user-directed UI/UX workstream. This was **not**
 planner-generated — `whole-atlas-performance-optimization` was already
@@ -71,9 +72,10 @@ Evidence:
   destination, including the same scenes the cinematic set grades), the
   cinematic failures are host-speed artifacts.
 
-Next action: none for this workstream. The cinematic golden suite should be
-re-run on a quiet host before any future release certification — **do not**
-weaken, skip or re-baseline a golden to clear a timeout.
+Next action: none for this workstream — committed as `932370b`. The cinematic
+golden suite should be re-run on a quiet host before any future release
+certification — **do not** weaken, skip or re-baseline a golden to clear a
+timeout.
 
 
 
