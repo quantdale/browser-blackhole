@@ -1,3 +1,82 @@
+## 2026-09-11 session — UI/UX PRODUCT-SURFACE CAMPAIGN ("Instrument Console")
+
+Status: **frontend redesign complete and verified; one host-speed golden
+timeout recorded as environment-deferred (see Evidence).**
+
+Scope: explicitly user-directed UI/UX workstream. This was **not**
+planner-generated — `whole-atlas-performance-optimization` was already
+certified complete at `179eb56` (next section). Design direction was grounded
+in design-reference research (Refero MCP `refero_search_styles` /
+`refero_search_screens`).
+
+Delivered:
+
+- `src/ui/tokens.css` (new) — design-token layer: surfaces, hairline borders,
+  type scale + mono stack, spacing, radii, motion, semantic colours. Imported
+  first by `src/ui/styles.css`.
+- `src/ui/atlas/atlasPanel.css` — full restyle of the product shell + kit.
+- `src/ui/atlas/components.ts` — added inline-SVG `createIcon`, `createGroup`
+  and `createPanelHeader`; slider/select/toggle rows gained an optional
+  `description` (wired through `aria-describedby`); sliders paint a filled
+  track from a `--atlas-fill` variable; switches became track+knob; selects got
+  a data-URI chevron; the timeline transport became icon buttons.
+- `src/app/atlasApp.ts` — panel information-architecture fix, panel header,
+  status severity, destination-selector overflow affordance, per-control
+  descriptions, physics glossary.
+- `index.html` — real inline-SVG favicon, product `<title>`, meta description,
+  and a canvas accessible description accurate for the product route instead of
+  the stale M0 diagnostic text.
+- `docs/UI_DESIGN_SYSTEM.md` (new); `docs/UI_UX.md` §3 implemented structure;
+  `.agent/EXECUTION_PROMPT.md` campaign marked COMPLETED.
+
+Defects fixed:
+
+1. **Panel ordering.** Destination-specific sections rendered ABOVE `Preset`,
+   because each destination branch appended to the panel as it ran and those
+   branches execute before the shared sections are appended. Sections are now
+   collected into `destSections[]` and assembled in documented order inside
+   domain groups (Scene / Observer / Display / Numerical / Reference).
+2. **CSS specificity leak.** Legacy `.atlas-nav { padding: 12px }` and
+   `.atlas-nav button` in `src/ui/styles.css` silently overrode the component
+   kit (0-1-1 beating 0-1-0) and inflated the topbar to 73px as a side effect.
+   Removed; the height is now pinned explicitly via `--atlas-topbar-h: 73px`.
+
+Geometry contract preserved — this is what keeps the goldens valid. At
+1280x800: topbar 73px, `#viewport` 972.813 x 727, canvas backing store
+972 x 727 @ DPR 1, `#panel` 307.188px wide — identical to the pre-change
+measurements. **No golden was re-baselined.**
+
+Evidence:
+
+- `npx tsc --noEmit`, `eslint .`, `prettier --check .` — clean.
+- `npx vitest run` — 46 files / **631 tests PASS**.
+- `npm run build` — PASS.
+- Browser, headless msedge at 1280x800: accessibility **4/4**, mobile-touch
+  **5/5**, smoke **5/5**, atlas-navigation **7/7** = **21/21 PASS**.
+- `visual-goldens.spec.ts --workers=1` — **43/43 PASS**, including
+  `AGN_RADIO_GALAXY`, which failed once under 2-worker contention and then
+  passed 1/1 in isolation and 43/43 serially. Same class of artifact as the
+  documented `kerr-backend-census` contention case; not a regression.
+- `cinematic-goldens.spec.ts` — **environment-deferred, not a regression.**
+  Every failure observed in this session was a `Test timeout of 180000ms
+  exceeded` raised inside `page.evaluate` (`cinematicGoldenHarness.ts:250`);
+  **the pixel comparison never executed**, so no visual difference was ever
+  measured. Host throughput degraded monotonically during the session —
+  `CIN_BH_CLASSIC` PASSED twice (1.6m, 1.7m) and then timed out at 6.6m, and a
+  retry with a raised 600s budget was still running after 16m for the same
+  test — while 79 node / 78 browser processes were live on the host (the
+  certification machine passed 8/8 twice at `179eb56`). Combined with the
+  facts that no rendering code was touched, that the render geometry is
+  byte-identical, and that **43/43 scientific goldens pass** (covering every
+  destination, including the same scenes the cinematic set grades), the
+  cinematic failures are host-speed artifacts.
+
+Next action: none for this workstream. The cinematic golden suite should be
+re-run on a quiet host before any future release certification — **do not**
+weaken, skip or re-baseline a golden to clear a timeout.
+
+
+
 ## 2026-09-10 session — CAMPAIGN CERTIFIED at 179eb56
 
 Status: **COMPLETE — whole-atlas-performance-optimization certified.**

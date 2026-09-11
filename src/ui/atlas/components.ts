@@ -1,23 +1,79 @@
 /**
  * Atlas UI component kit — framework-free DOM factories for the product
- * control panel (M5 productization, campaign §6/§8/§14).
+ * control panel (M5 productization; design refresh 2026-09-11).
  *
  * Spec sources:
  * - docs/UI_UX.md §3 (panel structure), §5 (parameter safety: bounded
  *   validated inputs; controls never touch uniforms directly — consumers wire
- *   callbacks into canonical state setters).
+ *   callbacks into canonical state setters), §6 (the visual hierarchy must
+ *   reinforce the physical/observer/visual/rendering classification).
  * - docs/cosmic-atlas/PRODUCT_UX_AND_TRANSITIONS.md §13 (persistent elements:
  *   destination selector, quality access, About/Fidelity, reset, accessibility).
+ * - docs/UI_DESIGN_SYSTEM.md (tokens, layout geometry contract, text-case rule).
  *
  * Layer discipline: this module imports NOTHING from src/atlas or
  * src/renderer. It is a pure DOM layer; the app shell (src/app/atlasApp.ts)
- * owns all host wiring. Every element is built with createElement/textContent
- * — no dynamic HTML parsing (Gate G injection policy). All interactive rows
- * keep visible labels/units, native keyboard operability, aria semantics and
- * >= 40 px touch targets (styles in ./atlasPanel.css).
+ * owns all host wiring. Every element is built with createElement /
+ * createElementNS / textContent — no dynamic HTML parsing (Gate G injection
+ * policy). All interactive rows keep visible labels/units, native keyboard
+ * operability, aria semantics and >= 40 px touch targets on coarse pointers
+ * (styles in ./atlasPanel.css).
+ *
+ * Accessibility contract (load-bearing, asserted by
+ * tests/browser/accessibility.spec.ts):
+ * - a slider's accessible name comes from its linked `<label for>`; the label
+ *   element must keep exactly the caller's label text;
+ * - the slider row keeps the `.atlas-row--slider` class and contains a
+ *   `.atlas-slider-value` element carrying the formatted value + unit;
+ * - selects stay real `<select>` elements (role=combobox, arrow-key semantics);
+ * - `text-transform` is never applied to control label text, because browsers
+ *   fold it into the accessible name and Playwright matches on rendered text.
  */
 
 import { clamp01, decimalsFromStep, finiteClamp } from './util.js';
+
+// ---------------------------------------------------------------------------
+// Icons (inline SVG, no HTML parsing)
+// ---------------------------------------------------------------------------
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+
+interface IconPath {
+  d: string;
+  filled?: boolean;
+}
+
+const ICON_PATHS = {
+  chevronRight: [{ d: 'M6 3.5l4.5 4.5-4.5 4.5' }],
+  play: [{ d: 'M5 3.4l8.2 4.6-8.2 4.6z', filled: true }],
+  pause: [{ d: 'M6.2 4v8' }, { d: 'M9.8 4v8' }],
+  reset: [{ d: 'M13.2 8a5.2 5.2 0 1 1-1.6-3.75' }, { d: 'M13.4 3v3.3h-3.3' }],
+  panel: [{ d: 'M2.4 3.4h11.2v9.2H2.4z' }, { d: 'M9.9 3.4v9.2' }]
+} as const satisfies Record<string, readonly IconPath[]>;
+
+export type AtlasIconName = keyof typeof ICON_PATHS;
+
+/** Build an inline SVG icon. Decorative by default (`aria-hidden`). */
+export function createIcon(name: AtlasIconName, size = 14): SVGSVGElement {
+  const svg = document.createElementNS(SVG_NS, 'svg');
+  svg.setAttribute('viewBox', '0 0 16 16');
+  svg.setAttribute('width', String(size));
+  svg.setAttribute('height', String(size));
+  svg.setAttribute('aria-hidden', 'true');
+  svg.setAttribute('focusable', 'false');
+  svg.classList.add('atlas-icon');
+  for (const spec of ICON_PATHS[name]) {
+    const path = document.createElementNS(SVG_NS, 'path');
+    path.setAttribute('d', spec.d);
+    path.setAttribute('stroke', 'currentColor');
+    path.setAttribute('stroke-width', '1.5');
+    path.setAttribute('stroke-linecap', 'round');
+    path.setAttribute('stroke-linejoin', 'round');
+    path.setAttribute('fill', 'filled' in spec && spec.filled === true ? 'currentColor' : 'none');
+    svg.append(path);
+  }
+  return svg;
+}
 
 // ---------------------------------------------------------------------------
 // Unique-id plumbing (label[for] / aria-controls wiring)
@@ -66,8 +122,7 @@ export function createCollapsibleSection(
 
   const indicator = document.createElement('span');
   indicator.className = 'atlas-section-chevron';
-  indicator.setAttribute('aria-hidden', 'true');
-  indicator.textContent = '▸';
+  indicator.append(createIcon('chevronRight', 12));
 
   const body = document.createElement('div');
   const bodyId = nextDomId('atlas-section-body');
@@ -98,7 +153,71 @@ export function createCollapsibleSection(
 }
 
 // ---------------------------------------------------------------------------
-// b) Slider row
+// b) Domain group header (docs/UI_UX.md §6 classification)
+// ---------------------------------------------------------------------------
+
+export interface GroupHandle {
+  root: HTMLElement;
+  body: HTMLDivElement;
+}
+
+/**
+ * A labelled group of sections. The caption is decorative micro-type
+ * (uppercase via CSS) — it is never an interactive element, so uppercasing it
+ * cannot affect any accessible name.
+ */
+export function createGroup(title: string): GroupHandle {
+  const root = document.createElement('div');
+  root.className = 'atlas-group';
+
+  const caption = document.createElement('p');
+  caption.className = 'atlas-group-title';
+  caption.textContent = title;
+
+  const body = document.createElement('div');
+  body.className = 'atlas-group-body';
+
+  root.append(caption, body);
+  return { root, body };
+}
+
+// ---------------------------------------------------------------------------
+// c) Panel header
+// ---------------------------------------------------------------------------
+
+export interface PanelHeaderHandle {
+  root: HTMLElement;
+  set(title: string, subtitle: string): void;
+}
+
+/** Destination identity block at the top of the control panel. */
+export function createPanelHeader(): PanelHeaderHandle {
+  const root = document.createElement('div');
+  root.className = 'atlas-panel-head';
+
+  const text = document.createElement('div');
+  text.className = 'atlas-panel-head-text';
+
+  const title = document.createElement('p');
+  title.className = 'atlas-panel-head-title';
+
+  const subtitle = document.createElement('p');
+  subtitle.className = 'atlas-panel-head-sub';
+
+  text.append(title, subtitle);
+  root.append(text);
+
+  return {
+    root,
+    set(nextTitle: string, nextSubtitle: string): void {
+      title.textContent = nextTitle;
+      subtitle.textContent = nextSubtitle;
+    }
+  };
+}
+
+// ---------------------------------------------------------------------------
+// d) Slider row
 // ---------------------------------------------------------------------------
 
 export interface SliderRowOptions {
@@ -108,6 +227,8 @@ export interface SliderRowOptions {
   step: number;
   value: number;
   unit?: string;
+  /** Optional help text rendered under the label (docs/UI_UX.md §3). */
+  description?: string;
   /** Receives finite, clamped numbers only. */
   onInput(value: number): void;
 }
@@ -117,18 +238,31 @@ export interface SliderRowHandle {
   setValue(value: number): void;
 }
 
-/** Bounded numeric input with linked label and live formatted readout. */
+/**
+ * Bounded numeric input with linked label, formatted value badge and a
+ * filled-track slider. The row is stacked (label + value above a full-width
+ * track) so long labels and units stay readable in a narrow panel.
+ */
 export function createSliderRow(options: SliderRowOptions): SliderRowHandle {
   const min = finiteClamp(options.min, -Number.MAX_VALUE, Number.MAX_VALUE);
   const max = Math.max(min, options.max);
   const row = document.createElement('div');
-  row.className = 'atlas-row atlas-row--slider';
+  row.className = 'atlas-row atlas-row--slider atlas-row--stacked';
+
+  const head = document.createElement('div');
+  head.className = 'atlas-row-head';
 
   const inputId = nextDomId('atlas-slider');
   const label = document.createElement('label');
   label.className = 'atlas-row-label';
   label.htmlFor = inputId;
   label.textContent = options.label;
+
+  const readout = document.createElement('span');
+  readout.className = 'atlas-slider-value';
+
+  head.append(label, readout);
+  row.append(head);
 
   const input = document.createElement('input');
   input.type = 'range';
@@ -138,11 +272,24 @@ export function createSliderRow(options: SliderRowOptions): SliderRowHandle {
   input.max = String(max);
   input.step = String(options.step > 0 ? options.step : 1);
 
-  const readout = document.createElement('span');
-  readout.className = 'atlas-slider-value';
+  if (options.description !== undefined && options.description.length > 0) {
+    const desc = document.createElement('p');
+    desc.className = 'atlas-row-desc';
+    const descId = nextDomId('atlas-slider-desc');
+    desc.id = descId;
+    desc.textContent = options.description;
+    input.setAttribute('aria-describedby', descId);
+    row.append(desc);
+  }
 
   const render = (): void => {
-    readout.textContent = formatWithStep(input.valueAsNumber, options.step, options.unit);
+    const value = input.valueAsNumber;
+    readout.textContent = formatWithStep(value, options.step, options.unit);
+    // Paint the filled portion of the track (CSS var consumed by
+    // ::-webkit-slider-runnable-track; Gecko uses ::-moz-range-progress).
+    const span = max - min;
+    const pct = span > 0 ? clamp01((value - min) / span) * 100 : 0;
+    input.style.setProperty('--atlas-fill', `${pct.toFixed(3)}%`);
   };
   input.addEventListener('input', () => {
     const value = finiteClamp(input.valueAsNumber, min, max);
@@ -157,7 +304,7 @@ export function createSliderRow(options: SliderRowOptions): SliderRowHandle {
   };
   setValue(options.value);
 
-  row.append(label, input, readout);
+  row.append(input);
   return { root: row, setValue };
 }
 
@@ -168,7 +315,7 @@ function formatWithStep(value: number, step: number, unit?: string): string {
 }
 
 // ---------------------------------------------------------------------------
-// c) Select row
+// e) Select row
 // ---------------------------------------------------------------------------
 
 export interface SelectOption {
@@ -180,6 +327,8 @@ export interface SelectRowOptions {
   label: string;
   options: SelectOption[];
   value: string;
+  /** Optional help text rendered under the label. */
+  description?: string;
   onChange(value: string): void;
 }
 
@@ -192,6 +341,9 @@ export interface SelectRowHandle {
 export function createSelectRow(options: SelectRowOptions): SelectRowHandle {
   const row = document.createElement('div');
   row.className = 'atlas-row atlas-row--select';
+  if (options.description !== undefined && options.description.length > 0) {
+    row.classList.add('atlas-row--stacked');
+  }
 
   const selectId = nextDomId('atlas-select');
   const label = document.createElement('label');
@@ -214,22 +366,34 @@ export function createSelectRow(options: SelectRowOptions): SelectRowHandle {
     options.onChange(select.value);
   });
 
+  if (options.description !== undefined && options.description.length > 0) {
+    const head = document.createElement('div');
+    head.className = 'atlas-row-head';
+    head.append(label);
+    const desc = document.createElement('p');
+    desc.className = 'atlas-row-desc';
+    desc.textContent = options.description;
+    row.append(head, desc, select);
+  } else {
+    row.append(label, select);
+  }
+
   const setValue = (value: string): void => {
     if (allowed.has(value)) select.value = value;
   };
   setValue(options.value);
 
-  row.append(label, select);
   return { root: row, setValue };
 }
 
 // ---------------------------------------------------------------------------
-// d) Toggle row (switch)
+// f) Toggle row (switch)
 // ---------------------------------------------------------------------------
 
 export interface ToggleRowOptions {
   label: string;
   checked: boolean;
+  description?: string;
   onChange(checked: boolean): void;
 }
 
@@ -242,6 +406,9 @@ export interface ToggleRowHandle {
 export function createToggleRow(options: ToggleRowOptions): ToggleRowHandle {
   const row = document.createElement('div');
   row.className = 'atlas-row atlas-row--toggle';
+  if (options.description !== undefined && options.description.length > 0) {
+    row.classList.add('atlas-row--stacked');
+  }
 
   const button = document.createElement('button');
   button.type = 'button';
@@ -262,18 +429,30 @@ export function createToggleRow(options: ToggleRowOptions): ToggleRowHandle {
   });
   setChecked(options.checked);
 
-  row.append(button);
+  if (options.description !== undefined && options.description.length > 0) {
+    const desc = document.createElement('p');
+    desc.className = 'atlas-row-desc';
+    desc.textContent = options.description;
+    const descId = nextDomId('atlas-toggle-desc');
+    desc.id = descId;
+    button.setAttribute('aria-describedby', descId);
+    row.append(button, desc);
+  } else {
+    row.append(button);
+  }
+
   return { root: row, setChecked };
 }
 
 // ---------------------------------------------------------------------------
-// e) Button row
+// g) Button row
 // ---------------------------------------------------------------------------
 
 export interface ButtonAction {
   text: string;
   onClick(): void;
   primary?: boolean;
+  icon?: AtlasIconName;
 }
 
 /** Horizontal group of action buttons; `primary` marks the emphasized one. */
@@ -284,7 +463,10 @@ export function createButtonRow(actions: ButtonAction[]): HTMLElement {
     const button = document.createElement('button');
     button.type = 'button';
     button.className = action.primary === true ? 'atlas-btn atlas-btn--primary' : 'atlas-btn';
-    button.textContent = action.text;
+    if (action.icon !== undefined) button.append(createIcon(action.icon));
+    const label = document.createElement('span');
+    label.textContent = action.text;
+    button.append(label);
     button.addEventListener('click', action.onClick);
     row.append(button);
   }
@@ -292,7 +474,7 @@ export function createButtonRow(actions: ButtonAction[]): HTMLElement {
 }
 
 // ---------------------------------------------------------------------------
-// f) Readout list (debug telemetry)
+// h) Readout list (debug telemetry)
 // ---------------------------------------------------------------------------
 
 export interface ReadoutEntry {
@@ -350,7 +532,7 @@ export function createReadoutList(): ReadoutListHandle {
 }
 
 // ---------------------------------------------------------------------------
-// g) Timeline transport
+// i) Timeline transport
 // ---------------------------------------------------------------------------
 
 export interface TimelineTransportOptions {
@@ -387,9 +569,9 @@ export function createTimelineTransport(
 
   const playButton = document.createElement('button');
   playButton.type = 'button';
-  playButton.className = 'atlas-btn atlas-timeline-play';
+  playButton.className = 'atlas-btn atlas-btn--icon atlas-timeline-play';
   playButton.setAttribute('aria-pressed', 'false');
-  playButton.textContent = 'Play';
+  playButton.append(createIcon('play', 13));
   playButton.addEventListener('click', () => {
     const playing = playButton.getAttribute('aria-pressed') !== 'true';
     setPlaying(playing);
@@ -397,13 +579,19 @@ export function createTimelineTransport(
   });
   const setPlaying = (playing: boolean): void => {
     playButton.setAttribute('aria-pressed', playing ? 'true' : 'false');
-    playButton.textContent = playing ? 'Pause' : 'Play';
+    playButton.replaceChildren(createIcon(playing ? 'pause' : 'play', 13));
+    // Accessible name is carried by aria-label so the icon-only face stays
+    // announced; kept in sync with the pressed state.
+    playButton.setAttribute('aria-label', playing ? 'Pause' : 'Play');
+    playButton.setAttribute('title', playing ? 'Pause' : 'Play');
   };
 
   const resetButton = document.createElement('button');
   resetButton.type = 'button';
-  resetButton.className = 'atlas-btn';
-  resetButton.textContent = 'Reset';
+  resetButton.className = 'atlas-btn atlas-btn--icon';
+  resetButton.append(createIcon('reset', 13));
+  resetButton.setAttribute('aria-label', 'Reset timeline');
+  resetButton.setAttribute('title', 'Reset timeline');
   resetButton.addEventListener('click', options.onReset);
 
   const scrubber = document.createElement('input');
@@ -413,11 +601,17 @@ export function createTimelineTransport(
   scrubber.max = '1';
   scrubber.step = '0.001';
   scrubber.setAttribute('aria-label', 'Timeline position');
+  const paintScrubber = (): void => {
+    const pct = clamp01(scrubber.valueAsNumber) * 100;
+    scrubber.style.setProperty('--atlas-fill', `${pct.toFixed(3)}%`);
+  };
   scrubber.addEventListener('input', () => {
+    paintScrubber();
     options.onScrub(clamp01(scrubber.valueAsNumber));
   });
   const setPhase01 = (phase01: number): void => {
     scrubber.value = String(clamp01(phase01)); // silent update
+    paintScrubber();
   };
 
   const rateSelect = document.createElement('select');
@@ -437,6 +631,8 @@ export function createTimelineTransport(
   });
 
   root.append(playButton, resetButton, scrubber, rateSelect);
+  setPlaying(false);
+  paintScrubber();
   return {
     root,
     setPlaying,
@@ -449,7 +645,7 @@ export function createTimelineTransport(
 }
 
 // ---------------------------------------------------------------------------
-// h) Mode switch (segmented radio group)
+// j) Mode switch (segmented radio group)
 // ---------------------------------------------------------------------------
 
 export interface ModeSwitchOption {

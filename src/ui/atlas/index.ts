@@ -6,7 +6,10 @@
 export {
   createButtonRow,
   createCollapsibleSection,
+  createGroup,
+  createIcon,
   createModeSwitch,
+  createPanelHeader,
   createReadoutList,
   createSelectRow,
   createSliderRow,
@@ -15,12 +18,15 @@ export {
   nextDomId
 } from './components.js';
 export type {
+  AtlasIconName,
   ButtonAction,
   CollapsibleSectionHandle,
   CollapsibleSectionOptions,
+  GroupHandle,
   ModeSwitchHandle,
   ModeSwitchOption,
   ModeSwitchOptions,
+  PanelHeaderHandle,
   ReadoutEntry,
   ReadoutListHandle,
   SelectOption,

@@ -1,8 +1,22 @@
 # EXECUTION PROMPT — Browser Blackhole active campaign
 
+Status: **COMPLETED** (certified 2026-09-10 at `179eb56`; ledger closed in commit `5cb9ea6`)
 Updated: 2026-08-28
 Active change: `whole-atlas-performance-optimization`
 Audit: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
+
+> Reconciliation note (2026-09-11): this campaign reached its completion gate —
+> `npm run check` 46 files / 631 tests, full default browser suite 275 passed /
+> 1 documented skip, 43 scientific + 8 cinematic goldens twice-stable, Firefox
+> 4/4, benchmarks captured, `docs/PERFORMANCE_CERTIFICATION.md` finalized. See
+> `.agent/STATE.md` §"CAMPAIGN CERTIFIED at 179eb56" for the full evidence
+> table. No workstream below remains open, so a `/goal continue` must **not**
+> resume this campaign.
+>
+> The work that followed (2026-09-11) was a separate, explicitly user-directed
+> **UI/UX product-surface campaign** — see `.agent/STATE.md` §"UI/UX design
+> system" and `docs/UI_DESIGN_SYSTEM.md`. It is recorded there rather than
+> here because it was not planner-generated.
 
 ## Mission
 

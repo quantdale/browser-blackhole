@@ -1,0 +1,152 @@
+/**
+ * Cosmic Atlas design tokens — the single source of truth for the product
+ * visual language ("Instrument Console").
+ *
+ * Direction (grounded in design-reference research, see docs/UI_DESIGN_SYSTEM.md):
+ * a deep-space instrument console rather than a generic admin panel. Void-black
+ * surfaces, hairline borders instead of heavy strokes, uppercase letter-spaced
+ * micro-labels, tabular numerals for every physical readout, near-zero corner
+ * radii so controls read as instrumentation, and one restrained spectral accent
+ * plus small semantic indicators.
+ *
+ * Layering contract:
+ * - This file declares VALUES ONLY (custom properties) plus the base element
+ *   reset. It must not style any component class.
+ * - `src/ui/styles.css` imports it first so every later stylesheet
+ *   (`src/ui/atlas/atlasPanel.css`) can consume the tokens.
+ * - Legacy token names (`--panel-bg`, `--panel-border`, `--text`, `--text-dim`,
+ *   `--accent`, `--error`, `--warn`, `--ok`) are kept as aliases because the
+ *   legacy M0 diagnostic app (`?legacy=1`) and the atlas shell both read them.
+ *
+ * Geometry contract (load-bearing, see docs/UI_DESIGN_SYSTEM.md §5):
+ * `--atlas-topbar-h` and `--atlas-panel-w` pin the product shell chrome. The
+ * canvas `#viewport` must measure exactly 972.813 x 727 CSS px at a 1280 x 800
+ * viewport, because the visual-regression goldens screenshot that element and
+ * compare pixels. Any change to these two values invalidates 51 goldens.
+ */
+
+:root {
+  color-scheme: dark;
+
+  /* --- layout geometry (load-bearing; do not change without re-baselining) - */
+  --atlas-topbar-h: 73px;
+  --atlas-panel-w: clamp(260px, 24vw, 320px);
+
+  /* --- surfaces ---------------------------------------------------------- */
+  --surface-void: #04060a;
+  --surface-0: #0a0d14;
+  --surface-1: #10141d;
+  --surface-2: #161c27;
+  --surface-3: #1e2532;
+  --surface-float: rgba(10, 13, 20, 0.86);
+
+  /* --- hairlines --------------------------------------------------------- */
+  --line: rgba(150, 175, 215, 0.13);
+  --line-strong: rgba(150, 175, 215, 0.26);
+  --line-focus: #7fb4ff;
+
+  /* --- text -------------------------------------------------------------- */
+  --text: #e9edf5;
+  --text-2: #a7b2c6;
+  --text-3: #6f7c92;
+  --text-inverse: #06090f;
+
+  /* --- accent + semantics ------------------------------------------------ */
+  --accent: #7fb4ff;
+  --accent-ink: #cfe2ff;
+  --accent-soft: rgba(127, 180, 255, 0.13);
+  --accent-line: rgba(127, 180, 255, 0.5);
+  --ok: #6fe0a6;
+  --warn: #ffd479;
+  --error: #ff8f85;
+  --ok-soft: rgba(111, 224, 166, 0.13);
+  --warn-soft: rgba(255, 212, 121, 0.13);
+  --error-soft: rgba(255, 143, 133, 0.13);
+
+  /* --- typography -------------------------------------------------------- */
+  --font-ui: system-ui, -apple-system, 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+  --font-mono:
+    ui-monospace, 'SF Mono', SFMono-Regular, 'JetBrains Mono', 'Cascadia Mono', Consolas,
+    'Liberation Mono', monospace;
+  --fs-micro: 10px;
+  --fs-xs: 11px;
+  --fs-sm: 12px;
+  --fs-md: 13px;
+  --fs-lg: 15px;
+  --lh-tight: 1.25;
+  --lh-body: 1.5;
+  --tracking-micro: 0.09em;
+  --tracking-tight: 0.01em;
+
+  /* --- spacing ----------------------------------------------------------- */
+  --sp-1: 2px;
+  --sp-2: 4px;
+  --sp-3: 6px;
+  --sp-4: 8px;
+  --sp-5: 12px;
+  --sp-6: 16px;
+  --sp-7: 20px;
+  --sp-8: 24px;
+
+  /* --- radii (small on purpose: instrumentation, not consumer chrome) ----- */
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 6px;
+  --r-pill: 999px;
+
+  /* --- elevation --------------------------------------------------------- */
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, 0.5);
+  --shadow-2: 0 8px 24px rgba(0, 0, 0, 0.55);
+  --inset-top: inset 0 1px 0 rgba(255, 255, 255, 0.045);
+
+  /* --- motion ------------------------------------------------------------ */
+  --dur-1: 120ms;
+  --dur-2: 180ms;
+  --ease: cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* --- control metrics --------------------------------------------------- */
+  --ctl-h: 30px;
+  --ctl-h-touch: 40px;
+
+  /* --- legacy aliases (M0 diagnostic app + existing shell) ---------------- */
+  --panel-bg: var(--surface-0);
+  --panel-border: var(--line-strong);
+  --text-dim: var(--text-2);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+  background: var(--surface-void);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: var(--fs-md);
+  line-height: var(--lh-body);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
+}
+
+/* Numeric instrument readouts always align column-wise. */
+.tabular,
+.atlas-readouts-value,
+.atlas-slider-value,
+.bbm-waveform-readout {
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: 'tnum' 1;
+}
+
+/* Uppercase micro-label used for group headers and instrument captions. */
+.micro-label {
+  font-size: var(--fs-micro);
+  font-weight: 600;
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--text-3);
+}

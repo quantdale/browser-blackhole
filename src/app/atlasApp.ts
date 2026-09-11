@@ -51,7 +51,10 @@ import { getCachedDataset } from '../phenomena/black-hole-merger/dataset.js';
 import {
   createButtonRow,
   createCollapsibleSection,
+  createGroup,
+  createIcon,
   createModeSwitch,
+  createPanelHeader,
   createReadoutList,
   createSelectRow,
   createSliderRow,
@@ -101,6 +104,51 @@ const TARGET_FPS_OPTIONS = [
 /** UI reflection cadence: scrubber/readouts refresh at 4 Hz, not per frame. */
 const UI_SYNC_INTERVAL_SECONDS = 0.25;
 
+/**
+ * Minimum educational definitions required by docs/UI_CONTROL_CATALOG.md §14.
+ * Wording is kept to statements that hold for the metrics this build renders
+ * (Schwarzschild radii from docs/PHYSICS.md; the shadow definition follows the
+ * "photon capture, not a mesh radius" rule in AGENTS.md).
+ */
+const GLOSSARY: ReadonlyArray<readonly [term: string, definition: string]> = [
+  ['Gravitational radius r_g', 'GM/c². The metric length scale; the horizon sits at 2 r_g.'],
+  ['Event horizon', 'The one-way surface at r = 2 r_g for a non-spinning black hole.'],
+  ['Photon sphere', 'r = 3 r_g. The radius where null geodesics can orbit the hole.'],
+  [
+    'Black-hole shadow',
+    'The apparent dark region. Set by photon capture and lensing — not by a mesh radius.'
+  ],
+  ['ISCO', 'Innermost stable circular orbit; 6 r_g for Schwarzschild.'],
+  ['Gravitational redshift', 'Light climbing out of a gravity well arrives at a lower frequency.'],
+  ['Doppler beaming', 'Material approaching the observer appears brighter and bluer.'],
+  [
+    'Normalized scale invariance',
+    'With every length expressed in r_g, the image is independent of mass.'
+  ],
+  [
+    'Numerical vs LUT',
+    'Direct per-pixel geodesic integration, or a precomputed lookup-table acceleration.'
+  ],
+  [
+    'Scientific vs Cinematic',
+    'Scientific prioritizes physically defined output and conservative post-processing; Cinematic may enhance presentation without changing geodesic geometry.'
+  ]
+];
+
+/** Inline glossary of the documented minimum physics vocabulary. */
+function createPhysicsGlossary(): HTMLElement {
+  const list = document.createElement('dl');
+  list.className = 'atlas-glossary';
+  for (const [term, definition] of GLOSSARY) {
+    const dt = document.createElement('dt');
+    dt.textContent = term;
+    const dd = document.createElement('dd');
+    dd.textContent = definition;
+    list.append(dt, dd);
+  }
+  return list;
+}
+
 export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle> {
   const canvas = root.querySelector<HTMLCanvasElement>('#scene');
   const viewport = root.querySelector<HTMLElement>('#viewport');
@@ -128,13 +176,36 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   nav.className = 'atlas-nav';
   nav.setAttribute('aria-label', 'Cosmic Atlas destinations');
 
+  /**
+   * Overflow affordance (PRODUCT_UX_AND_TRANSITIONS §2: the destination strip
+   * scrolls, so the user must be able to tell that it does). The scrollbar is
+   * deliberately hidden to keep the topbar height identical across
+   * destinations with few/many chips (canvas-sized goldens depend on it), so
+   * an edge-fade mask carries the "there is more" signal instead.
+   */
+  const updateNavOverflow = (): void => {
+    const overflowing = nav.scrollWidth - nav.clientWidth > 1;
+    nav.classList.toggle('atlas-nav--overflow', overflowing);
+    nav.classList.toggle('atlas-nav--start', overflowing && nav.scrollLeft > 1);
+    nav.classList.toggle(
+      'atlas-nav--end',
+      overflowing && nav.scrollLeft + nav.clientWidth < nav.scrollWidth - 1
+    );
+  };
+  nav.addEventListener('scroll', updateNavOverflow, { passive: true });
+  window.addEventListener('resize', updateNavOverflow);
+
   const modeHost = document.createElement('div');
   modeHost.className = 'atlas-mode-host';
 
   const panelToggle = document.createElement('button');
   panelToggle.type = 'button';
   panelToggle.className = 'atlas-panel-toggle';
-  panelToggle.textContent = 'Controls';
+  // Icon + visible text; the accessible name stays exactly "Controls"
+  // (tests/browser/accessibility.spec.ts queries it by that name).
+  const panelToggleLabel = document.createElement('span');
+  panelToggleLabel.textContent = 'Controls';
+  panelToggle.append(createIcon('panel', 13), panelToggleLabel);
   panelToggle.setAttribute('aria-controls', panelHost.id);
   let panelOpen = true;
   const applyPanelVisibility = (): void => {
@@ -158,9 +229,18 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
 
   // Truthful single-line status fed by the InitStatusTracker (kept first in
   // the panel so screen readers announce boot progress before sections).
+  // The severity drives only a decorative ::before indicator dot, so the
+  // element's text content stays exactly the reported message (the browser
+  // suites assert `toHaveText('Atlas ready')`).
   const status = document.createElement('p');
   status.className = 'atlas-status';
   status.setAttribute('role', 'status');
+  type StatusSeverity = 'ok' | 'busy' | 'error';
+  const setStatus = (message: string, severity: StatusSeverity): void => {
+    status.textContent = message;
+    status.setAttribute('data-severity', severity);
+  };
+  setStatus('Atlas: starting', 'busy');
 
   // Dev/test-only ?backend= override (docs/CI_CD.md §6): forward webgpu|webgl2
   // to the kernel so the atlas fallback path is exercisable on capable machines.
@@ -205,6 +285,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       });
       nav.append(chip);
     }
+    updateNavOverflow();
   };
 
   // --- experience-mode switch (top bar) ---------------------------------------
@@ -284,16 +365,40 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     const { destId, presetId } = activeSelection();
     const entry = host.registry.get(destId);
     if (entry === undefined) return; // pre-registration boot window; retried by sync
+    const activePreset = entry.presetById.get(presetId);
+
+    /** Preset label with the redundant "<Destination> — " prefix stripped. */
+    const presetLabel = (displayName: string): string =>
+      displayName.replace(new RegExp(`^${entry.descriptor.title} — `), '');
+
+    // -- Panel header: destination identity (PRODUCT_UX_AND_TRANSITIONS §13) --
+    const header = createPanelHeader();
+    header.set(
+      entry.descriptor.title,
+      `${activePreset ? presetLabel(activePreset.displayName) : 'Default'} · ${
+        entry.descriptor.fidelity
+      } fidelity`
+    );
+    panelElement.append(header.root);
+
+    // Sections owned by the ACTIVE destination. Collected here (rather than
+    // appended inside the branch that builds them) so they land AFTER Preset
+    // and in a documented order — previously the destination branch ran before
+    // the shared sections were appended, which pushed destination controls
+    // above Preset in the panel.
+    const destSections: HTMLElement[] = [];
 
     // -- Preset -------------------------------------------------------------
     const presetSection = createCollapsibleSection({ title: 'Preset', open: true });
     const presetOptions = entry.presets.map((preset) => ({
       value: preset.id,
-      label: preset.displayName.replace(new RegExp(`^${entry.descriptor.title} — `), '')
+      label: presetLabel(preset.displayName)
     }));
     presetSection.body.append(
       createSelectRow({
         label: 'Scenario',
+        description:
+          'Documented scenario for this destination. Physical setup and visual quality are kept separate, so changing quality never mutates the physics.',
         options: presetOptions,
         value: presetId,
         onChange: (value) => {
@@ -307,6 +412,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     observerSection.body.append(
       createSliderRow({
         label: 'Field of view',
+        description: 'Vertical field of view of the observer camera.',
         min: 20,
         max: 120,
         step: 1,
@@ -319,6 +425,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       createButtonRow([
         {
           text: 'Reset camera',
+          icon: 'reset',
           onClick: () => {
             const preset = entry.presetById.get(activeSelection().presetId);
             if (preset !== undefined) {
@@ -333,6 +440,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     const visualSection = createCollapsibleSection({ title: 'Visual', open: false });
     const bloomToggle = createToggleRow({
       label: 'Bloom',
+      description:
+        'Additive glow over bright pixels. A display effect only — the simulated image is unchanged.',
       checked: host.state.sharedVisual.bloomEnabled,
       onChange: (checked) => {
         host.setVisual({ bloomEnabled: checked });
@@ -341,6 +450,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     visualSection.body.append(
       createSliderRow({
         label: 'Exposure',
+        description: 'Display exposure. Pure post-process.',
         min: EXPOSURE_RANGE.min,
         max: EXPOSURE_RANGE.max,
         step: 0.05,
@@ -351,6 +461,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }).root,
       createSelectRow({
         label: 'Tone mapping',
+        description: 'Display transfer curve applied after rendering.',
         options: TONE_MAPPING_OPTIONS,
         value: host.state.sharedVisual.toneMapping,
         onChange: (value) => {
@@ -377,6 +488,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     renderingSection.body.append(
       createSelectRow({
         label: 'Quality',
+        description:
+          'Quality tier. Sets the internal render scale and integration budget together.',
         options: QUALITY_OPTIONS,
         value: host.state.rendering.qualityMode,
         onChange: (value) => {
@@ -393,6 +506,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }).root,
       createSelectRow({
         label: 'Target',
+        description: 'Frame-rate target the quality governor steers toward.',
         options: TARGET_FPS_OPTIONS,
         value: String(host.state.rendering.targetFps),
         onChange: (value) => {
@@ -402,6 +516,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }).root,
       createToggleRow({
         label: 'Dynamic resolution',
+        description: 'Lets the governor choose the render scale automatically.',
         checked: host.state.rendering.dynamicResolution,
         onChange: (checked) => {
           host.setRenderScaleOverride(checked ? null : host.governor.renderScale);
@@ -409,6 +524,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }).root,
       createSliderRow({
         label: 'Render scale',
+        description: 'Internal render-resolution multiplier.',
         min: RENDER_SCALE_OVERRIDE_RANGE.min,
         max: RENDER_SCALE_OVERRIDE_RANGE.max,
         step: 0.05,
@@ -419,6 +535,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }).root,
       createSelectRow({
         label: 'Trajectory backend',
+        description:
+          'Ray-trajectory integrator: the numerical reference, or LUT acceleration where supported.',
         options: TRAJECTORY_BACKEND_OPTIONS,
         value: host.state.rendering.trajectoryBackend,
         onChange: (value) => {
@@ -443,6 +561,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       mergerSection.body.append(
         createSliderRow({
           label: 'Viewing angle',
+          description: 'Inclination of the viewing direction to the orbital plane.',
           min: 0,
           max: 90,
           step: 1,
@@ -454,6 +573,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root,
         createSelectRow({
           label: 'Remnant',
+          description: 'Post-merger outcome the ejecta and jet models are built for.',
           options: [
             { value: 'massive-ns', label: 'Massive NS' },
             { value: 'prompt-bh', label: 'Prompt BH' },
@@ -468,6 +588,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root,
         createSelectRow({
           label: 'Jet',
+          description: 'Opening angle of the relativistic jet, if any.',
           options: [
             { value: 'none', label: 'None' },
             { value: 'thin', label: 'Thin (8°)' },
@@ -480,7 +601,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
           }
         }).root
       );
-      panelElement.append(mergerSection.root);
+      destSections.push(mergerSection.root);
     }
 
     // -- Black-hole M10 observer controls (canonical applyControlState) ------
@@ -515,6 +636,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
           : 'camera';
       const modeSelect = createSelectRow({
         label: 'Observer mode',
+        description:
+          'Observer worldline model. The physics modes drive the camera from the metric; Camera keeps free orbit control.',
         options: [
           { value: 'camera', label: 'Camera (legacy)' },
           { value: 'static', label: 'Static' },
@@ -533,6 +656,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       if (modeValue === 'circular') {
         const radius = createSliderRow({
           label: 'Orbit radius',
+          description: 'Coordinate radius of the circular orbit.',
           min: 3.2,
           max: 40,
           step: 0.1,
@@ -542,6 +666,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         });
         const sense = createSelectRow({
           label: 'Orbit sense',
+          description: 'Prograde or retrograde relative to the disk.',
           options: [
             { value: '1', label: 'Prograde (+phi)' },
             { value: '-1', label: 'Retrograde' }
@@ -564,6 +689,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       if (modeValue === 'flyby') {
         const beta = createSliderRow({
           label: 'Asymptotic speed',
+          description: 'Speed at infinity, in units of c.',
           min: 0.05,
           max: 0.95,
           step: 0.01,
@@ -573,6 +699,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         });
         const impact = createSliderRow({
           label: 'Impact parameter',
+          description: 'Perpendicular offset of the asymptotic trajectory.',
           min: -40,
           max: 40,
           step: 0.5,
@@ -595,6 +722,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       if (modeValue === 'freefall') {
         const release = createSliderRow({
           label: 'Release radius',
+          description: 'Radius at which the observer is released from rest.',
           min: 1.2,
           max: 60,
           step: 0.1,
@@ -611,6 +739,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       if (modeValue !== 'camera' && modeValue !== 'static') {
         const rate = createSliderRow({
           label: 'Proper-time rate',
+          description: "Scales the observer's proper-time advance.",
           min: -5,
           max: 5,
           step: 0.1,
@@ -639,7 +768,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         );
         for (const row of liveRows) row.apply(row.read());
       };
-      panelElement.append(bhSection.root);
+      destSections.push(bhSection.root);
     }
 
     // -- Tidal Disruption controls (canonical applyControlState channel) ------
@@ -656,6 +785,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       tdeSection.body.append(
         createSliderRow({
           label: 'BH mass (log10 solar)',
+          description: 'Black-hole mass on a logarithmic solar-mass scale.',
           min: 5,
           max: 7.7,
           step: 0.01,
@@ -668,6 +798,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root,
         createSelectRow({
           label: 'Star',
+          description: 'Stellar structure preset for the disrupted star.',
           options: [
             { value: 'solar-type', label: 'Solar type' },
             { value: 'low-mass-k', label: 'Low-mass K dwarf' },
@@ -680,6 +811,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root,
         createSelectRow({
           label: 'Penetration',
+          description: 'Pericentre distance relative to the tidal radius (β).',
           options: [
             { value: 'grazing', label: 'Grazing (β 0.85)' },
             { value: 'canonical', label: 'Canonical (β 1.0)' },
@@ -695,6 +827,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root,
         createSliderRow({
           label: 'Observer orientation',
+          description: 'Inclination of the viewing direction to the orbital plane.',
           min: 0,
           max: 90,
           step: 1,
@@ -708,7 +841,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
           }
         }).root
       );
-      panelElement.append(tdeSection.root);
+      destSections.push(tdeSection.root);
     }
 
     // -- Black-Hole Merger controls + synchronized waveform (CA8-13/16) ------
@@ -721,6 +854,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       mergerSection.body.append(
         createToggleRow({
           label: 'Orbit trails',
+          description: 'Draw the inspiral orbital paths from the dataset.',
           checked: share['showOrbitTrails'] !== false,
           onChange: (checked) => {
             host.setDestinationControl('black-hole-merger', { showOrbitTrails: checked });
@@ -728,6 +862,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         }).root,
         createToggleRow({
           label: 'Illustrative lens accents',
+          description:
+            'Non-physical lensing accents. Turning this off leaves the dataset-driven view.',
           checked: share['illustrativeLensing'] !== false,
           onChange: (checked) => {
             host.setDestinationControl('black-hole-merger', { illustrativeLensing: checked });
@@ -740,31 +876,34 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         'Reference-event view: orbital paths and timing come from the pinned ' +
         'numerical-relativity dataset; the lens accents are illustrative.';
       mergerSection.body.append(note);
-      panelElement.append(mergerSection.root);
+      destSections.push(mergerSection.root);
 
       const waveSection = createCollapsibleSection({ title: 'Waveform (h22)', open: true });
       waveformPanel = createWaveformPanel();
       waveSection.body.append(waveformPanel.root);
-      panelElement.append(waveSection.root);
+      destSections.push(waveSection.root);
       bindWaveformPanel();
     }
 
     // -- Diagnostics (Debug domain; opt-in) ------------------------------------
-    if (host.diagnosticsEnabled) {
-      const diagSection = createCollapsibleSection({ title: 'Diagnostics', open: true });
+    const diagSection = host.diagnosticsEnabled
+      ? createCollapsibleSection({ title: 'Diagnostics', open: true })
+      : null;
+    if (diagSection !== null) {
       readouts = createReadoutList();
       diagSection.body.append(readouts.root);
-      panelElement.append(diagSection.root);
     }
 
-    // -- About / Fidelity ---------------------------------------------------------
+    // -- About / Fidelity + glossary ---------------------------------------------
+    // docs/UI_CONTROL_CATALOG.md §14 lists the minimum educational definitions
+    // the product must expose. They live inline here (not behind a modal) so
+    // they stay reachable by keyboard and without devtools.
     const aboutSection = createCollapsibleSection({ title: 'About / Fidelity', open: false });
-    const activePreset = entry.presetById.get(presetId);
     const note = document.createElement('p');
     note.className = 'atlas-note';
     note.textContent =
       (activePreset?.fidelityNote ?? '') + ` Fidelity class: ${entry.descriptor.fidelity}.`;
-    aboutSection.body.append(note);
+    aboutSection.body.append(note, createPhysicsGlossary());
 
     // -- Timeline (shared transport) ----------------------------------------------
     const timelineSection = createCollapsibleSection({ title: 'Timeline', open: true });
@@ -785,13 +924,32 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     });
     timelineSection.body.append(transport.root);
 
+    // -- Assemble, grouped by control domain (docs/UI_UX.md §6) -------------------
+    // Order follows docs/UI_UX.md §3: preset -> destination -> observer -> visual
+    // -> rendering -> diagnostics, with the shared timeline kept beside Preset
+    // because it is part of the scene rather than a display setting.
+    const sceneGroup = createGroup('Scene');
+    sceneGroup.body.append(presetSection.root, ...destSections, timelineSection.root);
+
+    const observerGroup = createGroup('Observer');
+    observerGroup.body.append(observerSection.root);
+
+    const displayGroup = createGroup('Display');
+    displayGroup.body.append(visualSection.root);
+
+    const numericalGroup = createGroup('Numerical');
+    numericalGroup.body.append(renderingSection.root);
+
+    const referenceGroup = createGroup('Reference');
+    if (diagSection !== null) referenceGroup.body.append(diagSection.root);
+    referenceGroup.body.append(aboutSection.root);
+
     panelElement.append(
-      presetSection.root,
-      timelineSection.root,
-      observerSection.root,
-      visualSection.root,
-      renderingSection.root,
-      aboutSection.root
+      sceneGroup.root,
+      observerGroup.root,
+      displayGroup.root,
+      numericalGroup.root,
+      referenceGroup.root
     );
   }
 
@@ -846,10 +1004,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   try {
     await host.init();
   } catch (err) {
-    status.textContent = `Atlas failed to initialize: ${String(err)}`;
+    setStatus(`Atlas failed to initialize: ${String(err)}`, 'error');
     throw err;
   }
-  status.textContent = 'Atlas ready';
+  setStatus('Atlas ready', 'ok');
 
   // Share-link subset application (STATE_AND_ROUTES §9): the compact query
   // keys ride the SAME normalizer as runtime state. Applied once after init
@@ -1068,9 +1226,9 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
 
   const unsubscribeStatus = host.status.subscribe((snapshot) => {
     if (snapshot.failed) {
-      status.textContent = `Atlas error [${snapshot.errorCode ?? 'UNKNOWN'}]: ${snapshot.message}`;
+      setStatus(`Atlas error [${snapshot.errorCode ?? 'UNKNOWN'}]: ${snapshot.message}`, 'error');
     } else if (!snapshot.ready) {
-      status.textContent = `Atlas: ${snapshot.message}`;
+      setStatus(`Atlas: ${snapshot.message}`, 'busy');
     }
   });
 
@@ -1079,8 +1237,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // submission stops — the kernel refuses work on a lost device and the
   // tick skips host.frame so the governor stops sampling a dead pipeline.
   const unsubscribeFatal = host.onFatal(() => {
-    status.textContent =
-      'Atlas error [GPU_DEVICE_LOST]: Graphics device was lost — reload the page to restart with a fresh device.';
+    setStatus(
+      'Atlas error [GPU_DEVICE_LOST]: Graphics device was lost — reload the page to restart with a fresh device.',
+      'error'
+    );
   });
 
   // Test/inspection hook (mirrors __BLACKHOLE_TEST__ convention from main.ts).
@@ -1131,6 +1291,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       }
       cancelAnimationFrame(rafId);
       resizeObserver.disconnect();
+      nav.removeEventListener('scroll', updateNavOverflow);
+      window.removeEventListener('resize', updateNavOverflow);
       document.removeEventListener('visibilitychange', onVisibilityChange);
       window.removeEventListener('beforeunload', onTeardown);
       window.removeEventListener('pagehide', onPageHide);

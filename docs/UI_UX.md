@@ -44,6 +44,25 @@ Order:
 
 Each scientific control shows units and a tooltip/help description. Rendering controls use terms like render scale and integration quality rather than pretending they are astrophysical.
 
+### Implemented structure
+
+The shell groups the sections above into control domains so the visual
+hierarchy reinforces the classification in §6 (physical/model, observer,
+numerical/render-quality, display/post-process):
+
+| Group | Sections |
+| --- | --- |
+| Scene | Preset → destination-specific controls → Timeline |
+| Observer | Observer |
+| Display | Visual |
+| Numerical | Rendering |
+| Reference | Diagnostics (Debug mode only) → About / Fidelity (+ physics glossary) |
+
+Only controls with defined semantics in the current implementation are
+exposed; the remaining catalogue entries arrive with their destinations.
+Component-level details, the design-token layer, the layout geometry contract
+and the accessibility/text-case rules live in `docs/UI_DESIGN_SYSTEM.md`.
+
 ## 4. Initial presets
 
 Create deterministic presets as milestones make them possible:

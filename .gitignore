@@ -38,3 +38,6 @@ Thumbs.db
 tools/cosmic-data/scratch/
 __pycache__/
 *.pyc
+
+# Agent tooling workspace (WorkBuddy AI local state)
+.workbuddy-ai/
