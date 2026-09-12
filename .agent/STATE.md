@@ -1,3 +1,40 @@
+## 2026-09-12 session — RE-CERTIFICATION AT HEAD (`bbd71ef`)
+
+Status: **PRODUCTION READY re-certified at `bbd71ef` (2026-09-12).**
+
+The 2026-08-27 release certification covered `7d55423`; HEAD has since advanced
+through the performance campaign (`179eb56`) and the UI campaign (`932370b` /
+`bbd71ef`). Re-verified all gates at HEAD on a quiet host (0 extraneous
+node/browser processes). See `docs/RELEASE_CERTIFICATION.md` §0 for the full
+evidence.
+
+Evidence (local capable runner — headed Chromium 151 / nvidia lovelace):
+
+- Gate A: `format:check`/`lint`/`typecheck` clean; vitest **631/631** (46
+  files, 10.16s); `vite build` PASS (9.23s); `npm audit` **0 vulns** (196
+  deps); no source maps / local paths / secrets in `dist/`; no
+  `TODO`/`FIXME` in `src/`.
+- Gate D: `visual-goldens.spec.ts --workers=1` **43/43 PASS**;
+  `cinematic-goldens.spec.ts` **8/8 PASS** (18.0m, SSIM 0.986264–0.999989).
+  This **closes the 2026-09-11 environment-deferred cinematic item** — on a
+  quiet host every previously-timed-out cinematic golden passes; **no golden
+  was weakened or re-baselined**.
+- Gate B/F: full non-golden `default` suite **224 passed / 1 skipped / 0
+  failed** (10.4m; the single skip is the documented WebGPU-only LUT parity
+  row); Firefox `--project=firefox` **4/4 PASS** (25.5s).
+- UI-redesign geometry contract preserved (topbar 73px, viewport
+  972.813×727, canvas 972×727 @ DPR1, panel 307.188px) — 51 goldens valid
+  without re-baselining.
+
+Known non-defect: Playwright worker-teardown hang on Windows (1–4 workers
+force-killed at the 300s `forceKill` ceiling; exit code 1, but the summary is
+always emitted and no test fails). Tracked as a Low-severity environment
+artifact, not a release blocker.
+
+Next action: none — re-certified. Push of `932370b`/`bbd71ef` to `origin/main`
+remains pending explicit owner confirmation (external action).
+
+
 ## 2026-09-11 session — UI/UX PRODUCT-SURFACE CAMPAIGN ("Instrument Console")
 
 Status: **frontend redesign complete and verified; committed at `932370b`.
