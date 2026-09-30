@@ -138,7 +138,6 @@ change. Note that `src/shaders/cameraRayMath.ts` — the CPU reference the brows
 on — currently has zero unit coverage; the report should surface exactly that.
 
 ### D9 — Capability failure modes as data
-
 **Decision.** Table-drive the capability decision tests over the documented failure-mode list,
 widening the input type where the current two-boolean signature cannot express a case.
 
@@ -146,8 +145,29 @@ widening the input type where the current two-boolean signature cannot express a
 not expressible as `{webgpuAvailable: true}`. Where a documented case is genuinely unreachable, assert
 that explicitly with a reason rather than omitting it silently.
 
-## Risks / Trade-offs
+### D10 — Declare timeouts proportionate to the work a test does
 
+**Decision.** Any test that loads a large module graph (the destination modules, the renderer
+library) declares its own timeout, and the gate is run repeatedly to prove determinism.
+
+**Rationale.** This one was found by *running* the gate during the audit rather than trusting the
+recorded certification, which is the point. `launchCatalog.test.ts` awaits the dynamic import of
+roughly twenty modules that transitively pull in the 1 MB `three/webgpu`, sequentially, inside a
+single test bounded by Vitest's default 5000 ms. Standalone it measured 2.38 s / 5.03 s / 2.41 s, and
+it failed **2 of 3 full-suite runs** on a host that was not otherwise doing GPU work.
+
+**Why this is P1 and not a nuisance.** The repository's entire trust model rests on gate integrity —
+`AGENTS.md` forbids weakening tolerances to obtain a pass, and the whole V-lane exists because gates
+were reporting success without measuring. A headline result that reproduces two times in three is
+exactly the failure that model is meant to prevent, and it also undermines the recorded "631/631"
+release evidence, which would then need re-certification rather than re-assertion.
+
+**Note on the same test.** `launchCatalog.test.ts` is simultaneously too weak and too brittle: its
+imports are wrapped in a `catch` that swallows failures (finding V-11), so a partial import can
+collect fewer descriptors and still satisfy the `>= 8` floor, while the whole test can also time out.
+D10 and V-11 must both be fixed; neither alone makes the test sound.
+
+## Risks / Trade-offs
 - **[Red tests on first run]** D2 will likely surface currently-passing tests as failing. → Mitigation:
   this is the designed outcome. Triage each as either a real finding or an explicitly documented
   reduced corpus. Record the list in this change's `tasks.md`.

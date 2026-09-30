@@ -217,6 +217,36 @@ tree, and the report SHALL be recorded as evidence.
 - **THEN** it appears in the coverage report with zero coverage
 - **AND** the reviewing agent can see it
 
+### Requirement: The automated gate SHALL be reproducible on a quiet host
+
+The automated unit gate SHALL pass or fail deterministically for a given source revision on a host
+that is not otherwise loaded. A test SHALL NOT be able to fail because of host timing, and a test
+that necessarily loads a large module graph SHALL declare a timeout proportionate to that work.
+
+#### Scenario: A quiet host
+
+- **WHEN** the unit gate is run repeatedly on an otherwise idle host at the same source revision
+- **THEN** the result is the same every time
+- **AND** no test fails because of timing
+
+#### Scenario: A loaded host
+
+- **WHEN** the unit gate is run while other work is consuming the host
+- **THEN** a test's result still reflects its subject, not the host's load
+- **AND** a test that is known to be load-sensitive declares a timeout proportionate to its work
+
+#### Scenario: A test that loads a large module graph
+
+- **WHEN** a test loads the destination module graph or the renderer library
+- **THEN** it declares a timeout proportionate to that work rather than relying on the default
+- **AND** it does not rely on being the only work in the process
+
+#### Scenario: The gate is claimed as a release gate
+
+- **WHEN** a release cites a passing unit gate as evidence
+- **THEN** that result is reproducible at the cited revision
+- **AND** a flaky gate is treated as a defect, not as a passing result
+
 ### Requirement: Capability failure modes SHALL be covered as data
 
 Capability-driven decision logic SHALL be exercised over a table of capability snapshots covering

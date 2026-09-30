@@ -238,7 +238,7 @@ Confirmed defects, all reproduced by direct source inspection during this audit:
 | Neutron Star | Preset fidelity note claims no ray-bent limb; the renderer produces one |
 | Renderer | `renderScale` is applied twice; the HDR target is sized at `scale²` |
 | Test harness | Zero-assertion `tests/unit/__probe.test.ts` in the CI gate |
-| Benchmarks | 9 of 10 harnesses' zero-render refusal cannot fail the process |
+| Benchmarks | All 9 per-destination harnesses' zero-render refusal cannot fail the process |
 
 ### 3.6 Uncertain (requires runtime / external validation)
 
@@ -359,12 +359,13 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 | V-14 | `findShippedFamilyDir()` is `readdirSync`-order dependent | P3 | confirmed | `lutRuntime.test.ts:24-33`, `lutEquivalence.test.ts:34-45` |
 | V-15 | `lutEquivalence.test.ts` shares mutable state across `it()` blocks via a setup test | P3 | confirmed | `lutEquivalence.test.ts:93-99` |
 | V-16 | The two data loaders accept a manifest asset filename that could escape the asset directory; the LUT loader already rejects it | P2 | confirmed | `black-hole-merger/loader.ts:47,85` and `galaxy-collision/loader.ts:43,89` (validate as `typeof string`, interpolate into a fetch URL) vs `lut/validate.ts:170` which rejects `..`, `\` and a leading `/` |
+| V-17 | The unit gate is not reliably reproducible: `launchCatalog.test.ts` times out under load (2 of 3 full-suite runs failed during this audit) | **P1** | confirmed | `launchCatalog.test.ts:56-92` sequentially `await import()`s every phenomenon presets/module and destination file, transitively loading the 1 MB `three/webgpu`, in one test against Vitest's default 5000 ms timeout; measured 2.38 s / 5.03 s / 2.41 s standalone and 2 of 3 full-suite failures |
 
 ### B — Benchmark harness integrity (change: `benchmark-harness-integrity`)
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| B-01 | 9 of 10 harnesses' zero-render refusal cannot fail the process: `process.exit(0)` overwrites `process.exitCode = 1` | P1 | confirmed | `bench-{black-hole,kerr,neutron-star,compact-merger,tidal-disruption,quasar-agn,stellar-explosion,galaxy-collision,black-hole-merger}.mjs` |
+| B-01 | All 9 per-destination harnesses' zero-render refusal cannot fail the process: `process.exit(0)` overwrites `process.exitCode = 1` (9 of 11 `bench-*.mjs` scripts; the 2 orchestrators are correct) | P1 | confirmed | `bench-{black-hole,kerr,neutron-star,compact-merger,tidal-disruption,quasar-agn,stellar-explosion,galaxy-collision,black-hole-merger}.mjs` |
 | B-02 | Two harnesses ignore the matrix's pinned viewport and channel while the matrix records the requested values | P1 | confirmed | `bench-stellar-explosion.mjs:41-42`, `bench-galaxy-collision.mjs:41-42` vs `bench-cinematic-matrix.mjs:112-118,168-176` |
 | B-03 | 4 of 18 committed baseline rows record `commit: "uncommitted"` | P1 | confirmed | `benchmarks/results/2026-08-28-ws0-baseline/{stellar-explosion,galaxy-collision}-{webgpu,webgl2}.json` |
 | B-04 | `bench-black-hole-merger` defaults `--outdir` to a committed historical campaign directory and can overwrite it | P2 | confirmed | `bench-black-hole-merger.mjs:352-355` |
@@ -656,51 +657,53 @@ No clause is satisfied by assertion.
 13. Committed offline-tool artifacts have a freshness gate, or are explicitly annotated as
     commit-unattributable.
 14. No zero-assertion test file remains in the gate.
+15. The unit gate is deterministic: five consecutive runs on a quiet host at the same revision
+    produce an identical result, and no test's outcome depends on host timing.
 
 ### Build, lint, types
-15. `npm ci && npm run check` is green from a fresh checkout at a pinned Node version.
-16. `dist/` contains no source maps, no machine-local paths and no secrets.
+16. `npm ci && npm run check` is green from a fresh checkout at a pinned Node version.
+17. `dist/` contains no source maps, no machine-local paths and no secrets.
 
 ### Security and supply chain
-17. `npm audit --audit-level=high` is clean, or every remaining advisory is recorded with its scope,
+18. `npm audit --audit-level=high` is clean, or every remaining advisory is recorded with its scope,
     its justification, an owner and a review date.
-18. The CI workflow declares `permissions`, `concurrency` and `timeout-minutes`; actions are pinned
+19. The CI workflow declares `permissions`, `concurrency` and `timeout-minutes`; actions are pinned
     to immutable references with a mechanism that keeps them current.
-19. Test/debug hooks are not reachable in a production build without an explicit opt-in.
-20. No secrets, no required API keys, no unknown-provenance runtime asset.
+20. Test/debug hooks are not reachable in a production build without an explicit opt-in.
+21. No secrets, no required API keys, no unknown-provenance runtime asset.
 
 ### Performance and resources
-21. A tier change demonstrably changes the drawing buffer, and telemetry reports the applied size.
-22. The governor's unit harness and its production wiring measure the same quantity.
-23. Every long-lived service guards post-dispose creation and unlinks disposed handles.
-24. No per-frame buffer upload or TSL graph rebuild occurs on a settled, unchanged frame.
-25. A resource-leak suite shows bounded residency across repeated destination switching.
+22. A tier change demonstrably changes the drawing buffer, and telemetry reports the applied size.
+23. The governor's unit harness and its production wiring measure the same quantity.
+24. Every long-lived service guards post-dispose creation and unlinks disposed handles.
+25. No per-frame buffer upload or TSL graph rebuild occurs on a settled, unchanged frame.
+26. A resource-leak suite shows bounded residency across repeated destination switching.
 
 ### Reliability and lifecycle
-26. Device loss is terminal, visible, and no renderer work is attempted after it.
-27. Prepare/abort/dispose races are covered: no double dispose, no post-disposal mutation.
-28. A stalled preparation terminates visibly; the case is covered by an automated test.
-29. The documented deployment contract is exercised by a test against a real static server.
+27. Device loss is terminal, visible, and no renderer work is attempted after it.
+28. Prepare/abort/dispose races are covered: no double dispose, no post-disposal mutation.
+29. A stalled preparation terminates visibly; the case is covered by an automated test.
+30. The documented deployment contract is exercised by a test against a real static server.
 
 ### Documentation
-30. `openspec/config.yaml` exists; `openspec doctor` reports healthy.
-31. `openspec validate --changes --strict` passes for every change.
-32. Every document in the root `AGENTS.md` required-reading list is true of the current code.
-33. Every command named in any document exists in the project's command surface.
-34. The release certification has exactly one authoritative gate table with a commit and a date,
+31. `openspec/config.yaml` exists; `openspec doctor` reports healthy.
+32. `openspec validate --changes --strict` passes for every change.
+33. Every document in the root `AGENTS.md` required-reading list is true of the current code.
+34. Every command named in any document exists in the project's command surface.
+35. The release certification has exactly one authoritative gate table with a commit and a date,
     and its `npm audit` claim is current.
 
 ### CI/CD and release
-35. Cheap compensating checks run in hosted CI for the GPU work it cannot host: golden inventory,
+36. Cheap compensating checks run in hosted CI for the GPU work it cannot host: golden inventory,
     artifact freshness, dependency audit, capability injection table.
-36. A documented self-hosted/capable-runner procedure exists for the full suite, and its most recent
+37. A documented self-hosted/capable-runner procedure exists for the full suite, and its most recent
     result is recorded.
-37. A release can be produced and served from a fresh checkout with the committed host
+38. A release can be produced and served from a fresh checkout with the committed host
     configuration.
 
 ### Repository state
-38. Working tree clean; no generated caches, browser profiles, benchmark dumps or secrets tracked.
-39. `.agent/STATE.md` records the release commit, the evidence, and the exact deferred items with
+39. Working tree clean; no generated caches, browser profiles, benchmark dumps or secrets tracked.
+40. `.agent/STATE.md` records the release commit, the evidence, and the exact deferred items with
     their reasons.
 
 ---
@@ -759,7 +762,7 @@ No clause is satisfied by assertion.
 | `npm run format:check` | PASS — all files Prettier-clean |
 | `npm run lint` (eslint) | PASS, 29.7 s |
 | `npm run typecheck` (`tsc --noEmit`) | PASS |
-| `npx vitest run` | PASS — 46 files, 631 tests, 8.2 s |
+| `npx vitest run` | PASS — 46 files, 631 tests, 8.2 s — **but not reliably reproducible; see V-17** |
 | `npm audit` | **1 high-severity advisory** (see D-08/O-02) |
 | `openspec validate --changes --strict` | **3 passed, 4 failed** (see D-01) |
 | `openspec doctor` | **unhealthy** — missing `openspec/config.yaml` (see D-04) |

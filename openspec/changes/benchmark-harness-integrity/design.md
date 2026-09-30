@@ -8,8 +8,8 @@ matched machine and configuration metadata, and never claim a win without before
 
 The harnesses implement the *measurement* discipline well. What they do not implement is the
 *refusal* discipline. A harness that cannot render correctly still emits a record; the record is
-well-formed, plausible, and accepted. The only defence is an exit code that nine of ten harnesses
-overwrite on the way out.
+well-formed, plausible, and accepted. The only defence is an exit code that nine of the eleven
+harness scripts overwrite on the way out.
 
 That is a single-line defect with campaign-wide consequences, and it is the reason the four P0/P1
 physics defects in `kerr-gpu-initializer-correctness` were certified: the evidence produced by this

@@ -37,6 +37,12 @@ The evidence is specific and repeated:
 - **The production asset-resolution path is untested.** The app resolves the LUT through
   `public/luts/index.json`; the unit tests scan directories instead. A corrupted index silently
   degrades the whole application to the numerical backend with a green suite.
+- **The gate itself is not reproducible.** `tests/unit/launchCatalog.test.ts` sequentially
+  `await import()`s every phenomenon presets/module and destination file, transitively loading the
+  1 MB `three/webgpu`, in a single test against Vitest's default 5000 ms timeout. During this audit
+  it measured 2.38 s / 5.03 s / 2.41 s standalone and failed **2 of 3 full-suite runs**. A
+  "631/631" headline is therefore not a reproducible result on a loaded host, which matters because
+  the repository's entire trust model rests on gate integrity.
 
 - **The hosted CI gate can skip.** Two of five smoke tests `test.skip` on a backend-less runner and
   the job still exits 0.
@@ -48,6 +54,8 @@ leverage change in the plan: it is what prevents the next campaign from repeatin
 
 - **Assert every declared tolerance.** Where a tolerance in a test header is not yet enforced,
   either enforce it or mark the test explicitly as measurement-only.
+- **Make every gate deterministic** so a passing result means what it says: no test may pass or fail
+  because of host timing.
 - **Count compared subjects.** Any test that can skip subjects asserts a minimum compared count.
 - **Give the scientific golden suite an absolute content floor** and a golden-inventory assertion,
   generalising the pattern the cinematic suite already uses.

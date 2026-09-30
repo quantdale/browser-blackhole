@@ -16,7 +16,7 @@ against defective code encodes the defect as expected behaviour.
 - [ ] 1.2 Delete one committed golden PNG. Confirm no automated check currently fails. Record that.
 - [ ] 1.3 Widen a LUT domain exclusion so all corpus rays are skipped. Confirm the affected tests currently PASS. Record that.
 - [ ] 1.4 Delete a subject from a sparse-content scene (or simulate it). Confirm the golden row currently PASSES. Record that.
-- [ ] 1.5 Run a benchmark harness with the renderer neutered. Confirm the process currently exits 0. Record that.
+- [ ] 1.6 Demonstrate the flake: run the full unit gate 3 times and record that `launchCatalog.test.ts` fails on a subset of runs. This is the before-evidence that the gate is not reproducible.
 
 ## 2. Declared tolerances
 
@@ -77,6 +77,9 @@ against defective code encodes the defect as expected behaviour.
 - [ ] 7.4 Table-drive the capability decision tests over the documented failure-mode list, widening the input type where the current signature cannot express a case.
 - [ ] 7.5 Mark unreachable documented cases explicitly with a reason.
 - [ ] 7.6 Make the destination-enumeration completeness check derive from the authoritative registry and fail on incomplete discovery, rather than accepting a floor.
+- [ ] 7.7 FIX THE FLAKY GATE: `tests/unit/launchCatalog.test.ts` times out under load (measured 2 of 3 full-suite failures during this audit). Give the module-graph-loading test a timeout proportionate to its work, and confirm the failure cannot recur.
+- [ ] 7.8 Sweep every other unit test for the same pattern: one test that loads a large module graph against the default timeout. Give each a proportionate timeout or split the work.
+- [ ] 7.9 Run the full unit gate 5 consecutive times on a quiet host and record the result. All 5 MUST be identical; any variance is a remaining defect.
 
 ## 8. Documentation
 

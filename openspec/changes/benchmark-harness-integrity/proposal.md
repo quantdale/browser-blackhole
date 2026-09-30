@@ -1,7 +1,7 @@
 ## Why
 
 The performance campaign was the repository's largest effort and its evidence rests entirely on
-fourteen `scripts/bench-*.mjs` harnesses. The harnesses are unusually honest about what they measure
+`scripts/bench-*.mjs` harnesses. The harnesses are unusually honest about what they measure
 — each reports `frameCpuMs` and `frameGpuMs` separately with a `gpuTimingNote` explaining exactly
 where the GPU number came from, and refuses to report when zero frames were rendered. That
 discipline is the point of the campaign's credibility.
@@ -9,13 +9,14 @@ discipline is the point of the campaign's credibility.
 It is undermined by a set of confirmed defects in the harness plumbing, all of which cause a
 *refusal or a recorded value to be wrong*:
 
-1. **The zero-render refusal cannot fail the process.** Nine of the ten per-destination harnesses
-   set `process.exitCode = 1` and then terminate with an explicit `process.exit(0)`, which
-   overwrites the assigned exit code. `bench-scenarios.mjs` and `bench-cinematic-matrix.mjs` do not
-   call `process.exit` and are correct — which is why running the orchestrators hides the bug.
+1. **The zero-render refusal cannot fail the process.** Nine of the eleven `scripts/bench-*.mjs`
+   files set `process.exitCode = 1` and then terminate with an explicit `process.exit(0)`, which
+   overwrites the assigned exit code. The nine are exactly the per-destination harnesses;
+   `bench-scenarios.mjs` and `bench-cinematic-matrix.mjs` do not call `process.exit` and are correct —
+   which is why running the orchestrators hides the bug.
    The campaign's own `benchmarks/results/2026-08-28-ws0-baseline/SUMMARY.md` states "A harness that
    renders nothing now exits non-zero with an explicit refusal instead of emitting a plausible
-   number." For nine of ten harnesses that statement is false.
+   number." For all nine per-destination harnesses that statement is false.
 
 2. **The matrix orchestrator does not compensate.** `bench-cinematic-matrix.mjs` validates the
    effective backend, the effective tier and console errors, but never checks
@@ -46,7 +47,7 @@ It is undermined by a set of confirmed defects in the harness plumbing, all of w
 
 6. **The comparison contract does not exist.** `docs/BENCHMARK_MATRIX.md` §11 prescribes a
    `benchmarks/` tree with `schema.json` and §12 requires a comparison script that refuses to
-   compare mismatched metadata. Neither exists. The 13 committed result directories use at least
+   compare mismatched metadata. Neither exists. The 12 committed result directories use at least
    three different record shapes, and nothing detects the difference — so any future "X% faster"
    claim has no enforced precondition.
 
