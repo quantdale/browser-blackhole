@@ -112,6 +112,31 @@ selects which asset is loaded — SHALL be covered by a test that runs in the au
 - **WHEN** asset resolution fails at runtime
 - **THEN** the failure is surfaced rather than silently degrading to a different backend
 
+### Requirement: A manifest SHALL NOT be able to direct a fetch outside its asset directory
+
+A runtime asset manifest SHALL validate every asset reference it declares as a safe relative path
+before it is used to construct a request. A reference that could escape the asset directory SHALL be
+rejected with an explicit reason, consistently across every loader in the project.
+
+#### Scenario: A traversing asset reference
+
+- **WHEN** a manifest declares an asset file name containing a parent-directory segment, a backslash,
+  or a leading slash
+- **THEN** the manifest is rejected with an unsafe-path reason
+- **AND** no request is issued to the referenced location
+
+#### Scenario: A sibling asset reference
+
+- **WHEN** a manifest declares an ordinary file name within the asset directory
+- **THEN** the manifest is accepted
+- **AND** the request is issued within the asset directory
+
+#### Scenario: Every loader applies the same rule
+
+- **WHEN** the manifest schemas for every runtime asset are compared
+- **THEN** each one validates asset references as safe relative paths
+- **AND** no loader accepts a reference that another loader in the project would reject
+
 ### Requirement: A degraded gate SHALL fail rather than pass quietly
 
 When a gate's intended coverage is reduced for environmental reasons — an unavailable backend, a

@@ -35,24 +35,35 @@
 - [ ] 4.1 Wire `buildUnsupportedMessage` from `src/atlas/hostStatus.ts` into the product boot-failure path.
 - [ ] 4.2 Confirm it gives the same remediation standard as the legacy route.
 
-## 5. Documentation
+## 5. Stall termination
 
-- [ ] 5.1 Record the product-route implementation of `docs/FAILURE_RECOVERY.md` section 3.
-- [ ] 5.2 Add the error presentation contract to `docs/cosmic-atlas/PRODUCT_UX_AND_TRANSITIONS.md`.
-- [ ] 5.3 Update `docs/cosmic-atlas/ARCHITECTURE.md` section 11's transition boundary to note the public error field.
+- [ ] 5.1 Add a stall threshold to the transition director, distinct from and much longer than `slowLoadThresholdMs`, and record why the two differ.
+- [ ] 5.2 On reaching the stall threshold with the preparation still pending, abort the preparation through the existing abort path so the generation/stale guards run unchanged.
+- [ ] 5.3 Verify the abort produces the normal recoverable failure with a retry action, not a silent reset.
+- [ ] 5.4 Confirm a slow but progressing preparation is NOT aborted, and that the slow-load status keeps reporting.
+- [ ] 5.5 Add a browser test that simulates a request that never settles and asserts the application leaves `preparing` and surfaces a failure.
+- [ ] 5.6 Add a browser test that a slow-but-progressing preparation still completes.
+- [ ] 5.7 Confirm retry after a stall behaves as an ordinary preparation.
 
-## 6. Validation and evidence
+## 6. Documentation
 
-- [ ] 6.1 `npm run check` green.
-- [ ] 6.2 The new navigation and accessibility rows pass.
-- [ ] 6.3 Re-measure the UI geometry contract and confirm it is byte-identical to the baseline from 0.3 when no error is present.
-- [ ] 6.4 `npx playwright test atlas-navigation atlas-webgl2 smoke --project=default` green.
-- [ ] 6.5 `npx playwright test visual-goldens --workers=1` green with no re-baselining.
-- [ ] 6.6 Run the full non-golden browser suite and record pass/skip/fail counts.
-- [ ] 6.7 `openspec validate transition-error-user-visibility --type change --strict` still passes.
+- [ ] 6.1 Record the product-route implementation of `docs/FAILURE_RECOVERY.md` section 3.
+- [ ] 6.2 Add the error presentation contract to `docs/cosmic-atlas/PRODUCT_UX_AND_TRANSITIONS.md`.
+- [ ] 6.3 Update `docs/cosmic-atlas/ARCHITECTURE.md` section 11's transition boundary to note the public error field.
+- [ ] 6.4 Record the stall-threshold contract and its rationale alongside the device-loss contract.
 
-## 7. Close-out
+## 7. Validation and evidence
 
-- [ ] 7.1 Strike findings E-01, E-02, E-03 from `docs/MASTER_PLAN.md` with their resolution commit.
-- [ ] 7.2 Append evidence to `.agent/STATE.md`.
-- [ ] 7.3 Commit this change as one coherent checkpoint.
+- [ ] 7.1 `npm run check` green.
+- [ ] 7.2 The new navigation, accessibility and stall rows pass.
+- [ ] 7.3 Re-measure the UI geometry contract and confirm it is byte-identical to the baseline from 0.3 when no error is present.
+- [ ] 7.4 `npx playwright test atlas-navigation atlas-webgl2 smoke --project=default` green.
+- [ ] 7.5 `npx playwright test visual-goldens --workers=1` green with no re-baselining.
+- [ ] 7.6 Run the full non-golden browser suite and record pass/skip/fail counts.
+- [ ] 7.7 `openspec validate transition-error-user-visibility --type change --strict` still passes.
+
+## 8. Close-out
+
+- [ ] 8.1 Strike findings E-01, E-02, E-03, E-04 and E-05 from `docs/MASTER_PLAN.md` with their resolution commit.
+- [ ] 8.2 Append evidence to `.agent/STATE.md`.
+- [ ] 8.3 Commit this change as one coherent checkpoint.

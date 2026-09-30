@@ -42,8 +42,17 @@ product one was left as a code plus a raw string.
   real remediation copy instead of a code.
 - **Ensure the status surface is never hidden** behind the collapsible panel, and is announced
   assertively rather than only politely.
+- **Terminate a stalled preparation.** A destination preparation currently has no stall timeout: the
+  slow-load threshold only emits a status event, and the only things that abort a prepare are a
+  retargeting navigation, an explicit cancel and teardown. A data request that never completes
+  therefore leaves the application in `preparing` indefinitely — a permanent "Preparing…" with no
+  failure, no error and no recovery. This is the one failure mode the error surface would still not
+  catch, because nothing ever rejects.
 - **Keep the existing console diagnostics** — they stay as the technical-detail channel, not the
   only channel.
+- **Keep the existing slow-load status behaviour** unchanged: a slow load that is still progressing
+  is reported as in progress, not as a failure. The new stall threshold is a separate, much longer
+  bound.
 
 Non-goals, explicitly out of scope:
 

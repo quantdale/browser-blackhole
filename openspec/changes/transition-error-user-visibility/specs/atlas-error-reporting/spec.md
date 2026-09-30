@@ -110,3 +110,36 @@ existing remediation guidance rather than a bare error code.
 - **WHEN** the product and legacy routes reach their unsupported state
 - **THEN** both present remediation guidance to the user
 - **AND** neither presents a bare code as the whole message
+
+### Requirement: A stalled destination preparation SHALL terminate
+
+A destination preparation that makes no progress for longer than a defined stall threshold SHALL
+terminate in a user-visible failure with a recovery action, rather than remaining pending
+indefinitely. The stall threshold SHALL be distinct from, and much longer than, the threshold at
+which a slow load is reported as still in progress.
+
+#### Scenario: A data request never completes
+
+- **WHEN** a destination's data request remains outstanding past the stall threshold
+- **THEN** the preparation is aborted
+- **AND** the user sees a failure identifying the destination
+- **AND** a recovery action is offered
+
+#### Scenario: A slow but progressing load is not aborted
+
+- **WHEN** a preparation takes longer than the slow-load reporting threshold but continues to make
+  progress
+- **THEN** it is not aborted
+- **AND** the slow-load status continues to be reported
+
+#### Scenario: A progressing load after a stall warning
+
+- **WHEN** a preparation continues to make progress beyond the stall threshold
+- **THEN** it completes normally
+- **AND** the stall warning did not terminate it
+
+#### Scenario: Recovery after a stall
+
+- **WHEN** the user retries a destination whose preparation stalled
+- **THEN** the retry is permitted
+- **AND** it behaves as an ordinary preparation, including the same stall threshold

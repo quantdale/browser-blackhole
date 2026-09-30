@@ -56,6 +56,8 @@ against defective code encodes the defect as expected behaviour.
 - [ ] 5.5 Add a test for the same behaviour on the BBH and GC loaders.
 - [ ] 5.6 Confirm the check from 1.1 now fails.
 - [ ] 5.7 Remove the order-dependent `findShippedFamilyDir()` helpers; share one resolver.
+- [ ] 5.8 Apply the LUT's existing unsafe-path rule (`..`, backslash, leading slash) to the black-hole-merger and galaxy-collision manifest validators, so all three loaders agree.
+- [ ] 5.9 Add a test per loader asserting a traversing asset reference is rejected with an explicit reason and that no request is issued.
 
 ## 6. Skips, artifacts, dead tests
 

@@ -55,6 +55,10 @@ leverage change in the plan: it is what prevents the next campaign from repeatin
   scan.
 - **Make a skip observable.** Skips that are correct stay, but a gate that degrades below its
   intended coverage fails instead of passing quietly.
+- **Make every runtime asset loader reject unsafe asset references.** The LUT loader already
+  rejects a parent-directory segment, a backslash or a leading slash in a declared asset file name;
+  the black-hole-merger and galaxy-collision loaders validate the field only as a string and
+  interpolate it directly into a request URL. Bring the two loaders onto the existing rule.
 - **Make stored artifacts provably fresh**, or explicitly annotated as historical.
 - **Delete the zero-assertion test file** and resolve the orphaned golden fixtures.
 - **Add cheap compensating CI checks** for the GPU work hosted CI cannot run.

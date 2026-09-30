@@ -232,6 +232,7 @@ Confirmed defects, all reproduced by direct source inspection during this audit:
 | Adaptive quality | Tier change never re-applies the drawing-buffer size |
 | Adaptive quality | Every transition overwrites the user's manual quality mode with `auto` |
 | Product UX | Failed destination preparation is console-only; no public error channel exists |
+| Product UX | A stalled preparation has no timeout, so a hung data request is an unrecoverable dead end |
 | AGN | Torus never renders after a zone change |
 | Neutron Star | `observerInclinationDeg` control has no effect on rendering |
 | Neutron Star | Preset fidelity note claims no ray-bent limb; the renderer produces one |
@@ -283,6 +284,7 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 | E-02 | The atlas shell's own remediation builder has no callers; the product terminal state is a code + raw message | P1 | confirmed | `hostStatus.ts:497` vs `atlasApp.ts:1227-1235` |
 | E-03 | A failed lazy-chunk load (bad deploy / offline) silently reverts with no user explanation | P1 | confirmed | `TransitionDirector.ts:578-581` + `host.ts:499-509` |
 | E-04 | Overlay can be left frozen opaque if device loss occurs during `outgoing` | P2 | suspected | `TransitionDirector.renderOverlay` early-returns on null renderer |
+| E-05 | A stalled destination preparation never terminates: no prepare timeout exists, so a hung data request leaves the app in `preparing` forever | P1 | confirmed | `TransitionDirector.ts:277` sets only `slowLoadThresholdMs` (900 ms), which merely emits a status event (`:602-610`); the only `abort()` calls are retarget (`:416`), cancel (`:471`) and dispose (`:986`); the loaders pass the signal to `fetch` (`galaxy-collision/loader.ts:74,90`, `black-hole-merger/loader.ts:70,86`) but nothing times it out |
 
 ### A — Adaptive quality / rendering authority (change: `quality-ladder-resolution-integrity`)
 
@@ -356,6 +358,7 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 | V-13 | `void x;` statements mark computed-and-discarded values in two tests | P3 | confirmed | `lutRuntime.test.ts:255,272` |
 | V-14 | `findShippedFamilyDir()` is `readdirSync`-order dependent | P3 | confirmed | `lutRuntime.test.ts:24-33`, `lutEquivalence.test.ts:34-45` |
 | V-15 | `lutEquivalence.test.ts` shares mutable state across `it()` blocks via a setup test | P3 | confirmed | `lutEquivalence.test.ts:93-99` |
+| V-16 | The two data loaders accept a manifest asset filename that could escape the asset directory; the LUT loader already rejects it | P2 | confirmed | `black-hole-merger/loader.ts:47,85` and `galaxy-collision/loader.ts:43,89` (validate as `typeof string`, interpolate into a fetch URL) vs `lut/validate.ts:170` which rejects `..`, `\` and a leading `/` |
 
 ### B — Benchmark harness integrity (change: `benchmark-harness-integrity`)
 
@@ -637,63 +640,67 @@ No clause is satisfied by assertion.
    the implementation.
 5. Destination preparation failure, asset-load failure, device loss and unsupported backend each
    produce a visible, accessible, actionable state with remediation copy.
+6. A destination preparation that stalls terminates in a user-visible failure with a recovery action;
+   a slow but progressing preparation is reported as in progress and is not aborted.
 
 ### Tests and verification
-6. `npm run test` is green and every test either asserts or is explicitly marked as
+7. `npm run test` is green and every test either asserts or is explicitly marked as
    measurement-only.
-7. No test can report passed having skipped every subject; subject counts are asserted.
-8. Every tolerance declared in a test header is asserted.
-9. The scientific golden suite has an absolute content floor and a golden-inventory assertion.
-10. The production LUT index resolution path is covered by a test that runs in CI.
-11. Coverage tooling is configured and its summary is recorded, with no global threshold that
+8. No test can report passed having skipped every subject; subject counts are asserted.
+9. Every tolerance declared in a test header is asserted.
+10. The scientific golden suite has an absolute content floor and a golden-inventory assertion.
+11. The production LUT index resolution path is covered by a test that runs in CI, and every
+    runtime asset loader rejects an asset reference that could escape its asset directory.
+12. Coverage tooling is configured and its summary is recorded, with no global threshold that
     contradicts the deliberate browser-only coverage of `src/shaders/*` and the DOM shells.
-12. Committed offline-tool artifacts have a freshness gate, or are explicitly annotated as
+13. Committed offline-tool artifacts have a freshness gate, or are explicitly annotated as
     commit-unattributable.
-13. No zero-assertion test file remains in the gate.
+14. No zero-assertion test file remains in the gate.
 
 ### Build, lint, types
-14. `npm ci && npm run check` is green from a fresh checkout at a pinned Node version.
-15. `dist/` contains no source maps, no machine-local paths and no secrets.
+15. `npm ci && npm run check` is green from a fresh checkout at a pinned Node version.
+16. `dist/` contains no source maps, no machine-local paths and no secrets.
 
 ### Security and supply chain
-16. `npm audit --audit-level=high` is clean, or every remaining advisory is recorded with a
-    justification and an owner.
-17. The CI workflow declares `permissions`, `concurrency` and `timeout-minutes`; actions are pinned
-    to commit SHAs.
-18. Test/debug hooks are not reachable in a production build without an explicit opt-in.
-19. No secrets, no required API keys, no unknown-provenance runtime asset.
+17. `npm audit --audit-level=high` is clean, or every remaining advisory is recorded with its scope,
+    its justification, an owner and a review date.
+18. The CI workflow declares `permissions`, `concurrency` and `timeout-minutes`; actions are pinned
+    to immutable references with a mechanism that keeps them current.
+19. Test/debug hooks are not reachable in a production build without an explicit opt-in.
+20. No secrets, no required API keys, no unknown-provenance runtime asset.
 
 ### Performance and resources
-20. A tier change demonstrably changes the drawing buffer, and telemetry reports the applied size.
-21. The governor's unit harness and its production wiring measure the same quantity.
-22. Every long-lived service guards post-dispose creation and unlinks disposed handles.
-23. No per-frame buffer upload or TSL graph rebuild occurs on a settled, unchanged frame.
-24. A resource-leak suite shows bounded residency across repeated destination switching.
+21. A tier change demonstrably changes the drawing buffer, and telemetry reports the applied size.
+22. The governor's unit harness and its production wiring measure the same quantity.
+23. Every long-lived service guards post-dispose creation and unlinks disposed handles.
+24. No per-frame buffer upload or TSL graph rebuild occurs on a settled, unchanged frame.
+25. A resource-leak suite shows bounded residency across repeated destination switching.
 
 ### Reliability and lifecycle
-25. Device loss is terminal, visible, and no renderer work is attempted after it.
-26. Prepare/abort/dispose races are covered: no double dispose, no post-disposal mutation.
-27. The documented deployment contract is exercised by a test against a real static server.
+26. Device loss is terminal, visible, and no renderer work is attempted after it.
+27. Prepare/abort/dispose races are covered: no double dispose, no post-disposal mutation.
+28. A stalled preparation terminates visibly; the case is covered by an automated test.
+29. The documented deployment contract is exercised by a test against a real static server.
 
 ### Documentation
-28. `openspec/config.yaml` exists; `openspec doctor` reports healthy.
-29. `openspec validate --changes --strict` passes for every change.
-30. Every document in the root `AGENTS.md` required-reading list is true of the current code.
-31. Every command named in any document exists in `package.json`.
-32. The release certification has exactly one authoritative gate table with a commit and a date,
+30. `openspec/config.yaml` exists; `openspec doctor` reports healthy.
+31. `openspec validate --changes --strict` passes for every change.
+32. Every document in the root `AGENTS.md` required-reading list is true of the current code.
+33. Every command named in any document exists in the project's command surface.
+34. The release certification has exactly one authoritative gate table with a commit and a date,
     and its `npm audit` claim is current.
 
 ### CI/CD and release
-33. Cheap compensating checks run in hosted CI for the GPU work it cannot host: golden inventory,
+35. Cheap compensating checks run in hosted CI for the GPU work it cannot host: golden inventory,
     artifact freshness, dependency audit, capability injection table.
-34. A documented self-hosted/capable-runner procedure exists for the full suite, and its most recent
+36. A documented self-hosted/capable-runner procedure exists for the full suite, and its most recent
     result is recorded.
-35. A release can be produced and served from a fresh checkout with the committed host
+37. A release can be produced and served from a fresh checkout with the committed host
     configuration.
 
 ### Repository state
-36. Working tree clean; no generated caches, browser profiles, benchmark dumps or secrets tracked.
-37. `.agent/STATE.md` records the release commit, the evidence, and the exact deferred items with
+38. Working tree clean; no generated caches, browser profiles, benchmark dumps or secrets tracked.
+39. `.agent/STATE.md` records the release commit, the evidence, and the exact deferred items with
     their reasons.
 
 ---
@@ -771,6 +778,29 @@ boundaries (host ↔ director ↔ kernel ↔ services ↔ destinations; loaders 
 **Not covered.** `dist/`, `node_modules/`, the 59 golden PNGs' pixel content, and the internals of
 the offline Python trajectory models behind the shipped binaries. Those require runtime or
 provenance validation and are recorded in §3.6 rather than asserted as clean.
+
+**Inspected and judged not material** (recorded so the exclusion is explicit rather than silent):
+
+- **Agent-harness integration layer** — `opencode.json` (two version-pinned MCP servers, both with
+  telemetry flags disabled), `.agents/skills/goal/SKILL.md`, `.claude/commands/goal.md`,
+  `.opencode/commands/goal.md`, `.kimi-code/AGENTS.md`, and
+  `docs/agent-integrations/REPOSITORY_LOCAL_ADDONS_{MASTER_PLAN,HANDOFF}.md`. Four near-duplicate
+  `/goal` definitions exist because four agent harnesses are supported; they state the same
+  governance and the duplication is a deliberate portability cost. The layer is bounded,
+  documented by a handoff, guarded by `scripts/mcp-preflight.mjs`, and explicitly constrains
+  itself ("No MCP result may be treated as physics validation"). Not a defect. The one real issue
+  inside it — `mcp-preflight.mjs`'s `shell: true` and over-broad path rule — is finding O-08.
+- **No structured logger.** 25 `console.*` calls in `src/`, no logger abstraction. For a static
+  client-side application with no backend, the console plus the existing `runtimeTelemetry` /
+  `debugInventory` / `frameTelemetry` surfaces are the conventional and adequate observability
+  model. Adding a logging framework would be unjustified churn.
+- **No web attack surface requiring auth work.** No backend, no authentication, no authorization,
+  no cookies, no `localStorage`/`sessionStorage`, no `postMessage`, no Workers, no `eval`, no
+  `Function` constructor, and every dynamic `import()` is a static literal. The only `innerHTML`
+  uses assign the empty string. URL parameters (`preset`, `backend`, `view`, `mode`, `rm`, `dc`)
+  are allow-listed or schema-validated, and the `dc=` JSON parse is wrapped so a malformed payload is
+  ignored rather than thrown. Security work is therefore confined to supply chain (O-02, O-03),
+  the production debug surface (U-04), and asset-reference validation (V-16).
 
 **Independence.** Every P0/P1 finding in this document was verified directly against the source by
 the supervising agent, not accepted on a subagent's word. Where a claim could not be settled by
