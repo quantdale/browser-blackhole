@@ -1,0 +1,5 @@
+schema: spec-driven
+# This change corrects documentation only. It changes no product behaviour,
+# so it declares no specification deltas rather than inventing requirements
+# that the tooling would have to accept without any verified behaviour behind them.
+skip_specs: true
