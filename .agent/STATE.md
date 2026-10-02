@@ -29,6 +29,14 @@ Next action: finish validation, commit the application checkpoint, archive
 `specification-baseline-review-corrections` with normal spec merging, recount, revalidate,
 commit the archive checkpoint, and stop. No push.
 
+POST-ARCHIVE STAGE (2026-10-03, `specification-baseline-review-corrections` archived as
+`2026-10-03-specification-baseline-review-corrections`, specs merged: neutron-star
+MODIFIED replaced the vacuous scenario with positive + 3 negative cases; repository-integrity
+preserved original scenarios + 3 new). Post-archive populations: 7 archived, 11 active
+(1 complete-awaiting-archive + 10 unfinished), 6 specs. Validation: `doctor` ok;
+`--changes --strict` 11/0; `--specs --strict` 6/0; `--all --strict` 17/0. No product code,
+no browser/GPU gates (not run), no Phase 1, no push.
+
 ## 2026-10-03 session — Phase 0 review-correction proposal and separate-session handoff
 
 Status: **PROPOSED — NOT APPLIED.** The operator requested an OpenSpec proposal

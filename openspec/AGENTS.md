@@ -2,12 +2,12 @@
 
 ## Current status
 
-The repository holds 18 change folders: 6 complete (all archived under `openspec/changes/archive/2026-10-03-*`) and 12 active. Of the 12 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, `specification-baseline-review-corrections` is the active bounded documentation correction, and the remaining ten are the unfinished hardening wave. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
+The repository holds 18 change folders: 7 complete archived under `openspec/changes/archive/2026-10-03-*` and 11 active. Of the 11 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, and the remaining ten are the unfinished hardening wave. Post-archive at this checkpoint: `--changes --strict` 11 passed / 0 failed, `--specs --strict` 6 passed / 0 failed, `--all --strict` 17 passed / 0 failed. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
 
 Baseline correction record: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` supersedes the two erroneous archived cinematic headers (`2fc1b5d` → final restored-scope certified checkpoint `17c4644`) and the Phase 0 state entry's revision/count claims. Active validation/inventory claims must be quoted with command, population and lifecycle stage.
 
 - Phase 0 (complete, checklist-landed 2026-10-03): `specification-baseline-hygiene` (46/46, awaiting archive).
-- Bounded follow-up (documentation-only, apply in its own session): `specification-baseline-review-corrections`.
+- Phase 0 review corrections (landed and archived 2026-10-03): `specification-baseline-review-corrections`; erratum at `docs/SPECIFICATION_BASELINE_CORRECTIONS.md`.
 - Phase 1, one writer at a time: `kerr-gpu-initializer-correctness` (owns `src/phenomena/black-hole/{kerr,lut,observer}/**`), then `quality-ladder-resolution-integrity`, then `transition-error-user-visibility`, then `destination-control-truthfulness`.
 - Phase 2: `shared-renderer-service-lifecycle` (only after quality-ladder and transition-error land).
 - Phase 3: `verification-gate-integrity`.

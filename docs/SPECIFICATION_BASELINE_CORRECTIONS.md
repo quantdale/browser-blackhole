@@ -150,6 +150,11 @@ archived); it is recorded history, not the current population. It must not be re
 changes. Post-archive, the change population is the 12 (11 at that time) active folders, not 17.
 A truthful current inventory names the command, the revision and the lifecycle stage.
 
+Post-application/post-archive stage (2026-10-03, after archiving this change): 7 archived
+changes, 11 active changes (1 complete-awaiting-archive + 10 unfinished), 6 baseline specs.
+Validation: doctor ok; `--changes --strict` 11 passed / 0 failed; `--specs --strict` 6 passed /
+0 failed; `--all --strict` 17 passed / 0 failed.
+
 ## Boundaries
 
 - No edits to `src/`, `tests/`, `scripts/`, `tools/`, `public/`, dependency manifests/lockfiles,

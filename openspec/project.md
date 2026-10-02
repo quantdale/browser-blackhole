@@ -41,7 +41,8 @@ whole-atlas performance optimization campaign is complete-with-deferrals (certif
 Current baseline correction: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` is authoritative for
 the Phase 0 review findings — the cinematic final certified checkpoint is `17c4644` (not
 `2fc1b5d`), archived paths are under `openspec/changes/archive/2026-10-03-*`, and validation
-counts must be quoted with command, population and lifecycle stage.
+counts must be quoted with command, population and lifecycle stage. At this checkpoint: 7
+archived changes, 11 active (1 complete-awaiting-archive + 10 unfinished), 6 baseline specs.
 
 ## Technical stack
 
