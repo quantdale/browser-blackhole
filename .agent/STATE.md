@@ -1,3 +1,40 @@
+## 2026-10-03 session — Phase 0 review-correction proposal and separate-session handoff
+
+Status: **PROPOSED — NOT APPLIED.** The operator requested an OpenSpec proposal
+for the four review findings and a prompt for a later apply session. No existing
+baseline specs, archive files, certifications or executor instructions were
+corrected in this session; no product code changed.
+
+Proposal: `openspec/changes/specification-baseline-review-corrections/`.
+Handoff: `openspec/changes/specification-baseline-review-corrections/APPLY_PROMPT.md`.
+Reviewed base: `5bbd2cc97e57f9a0ef4a4cfba0a92a3fe59068fa` (clean `main` before proposing).
+Toolchain: Node v24.3.0 / npm 11.4.2 / OpenSpec 1.9.0, `spec-driven`.
+
+The proposal covers exactly the wrong cinematic final revision, the vacuous
+neutron-star fidelity scenario, current evidence paths broken by archiving,
+and stale inventory/validation counts. Archive policy is preserved: erroneous
+archived headers are superseded through a linked erratum, not rewritten.
+
+Planning diagnostics (after adding this proposal, before any application):
+
+- `openspec doctor`: root **ok**.
+- `openspec validate specification-baseline-review-corrections --type change --strict`: **valid**.
+- `openspec validate --changes --strict`: **12 passed / 0 failed**.
+- `openspec validate --specs --strict`: **6 passed / 0 failed**.
+- `openspec validate --all --strict`: **18 passed / 0 failed** (12 active changes + 6 baseline specs).
+- Native apply context: **ready**, **0/25 complete**, 25 remaining. Planning-artifact completion is not implementation completion.
+- Parsed plan: **3 MODIFIED requirements / 15 scenarios** across two existing capabilities. No new capability or `skip_specs` bypass.
+- Narrow planning checks passed: neutron-star normative body unchanged, original scenario identifier retained, original repository-integrity scenarios preserved, all implementation checkboxes unchecked.
+- Initial validation caught an omitted existing scenario name; the positive case now corrects that original scenario in place, and strict revalidation passes.
+- Runtime, browser/GPU and product quality gates: **not run** for this planning-only scope; no new certification claimed.
+
+Next action: in a separately authorized apply session, read `APPLY_PROMPT.md`
+and apply only `specification-baseline-review-corrections`. Follow its bounded
+validation/archive protocol, recount at each lifecycle stage, and stop. Do not
+begin Phase 1, restart a closed campaign, activate Goal mode or push from that
+assignment. The earlier Phase 0 completion entry below remains historical;
+this proposal does not yet claim its four review defects are resolved.
+
 ## 2026-10-03 session — specification-baseline-hygiene landed (Phase 0 complete)
 
 Status: **COMPLETE.** Planning-artifact only; no product code changed
