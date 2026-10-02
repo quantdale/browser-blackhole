@@ -1,7 +1,7 @@
 # Whole-Atlas Performance Certification
 
 Status: **CERTIFIED at `179eb56`** (final verification run, 2026-09-10).
-Campaign: `openspec/changes/whole-atlas-performance-optimization/`
+Campaign: `openspec/changes/archive/2026-10-03-whole-atlas-performance-optimization/`
 Starting SHA (this campaign session): `bed06ab`.
 
 This document is the campaign's §24 artifact. It records what was optimized,

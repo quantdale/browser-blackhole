@@ -1,6 +1,6 @@
 # Release certification — Browser Blackhole
 
-Change: `openspec/changes/final-production-readiness`.
+Change: `openspec/changes/archive/2026-10-03-final-production-readiness`.
 Certified: 2026-08-27 (commit `7d55423`); **re-certified 2026-09-12 at `bbd71ef`** (see §0 below).
 
 This report records the evidence for the final production-readiness campaign. It
@@ -110,7 +110,7 @@ the current HEAD rather than re-asserted from the August baseline.
 
 **`PRODUCTION READY`** at `bbd71ef`.
 
-- P0 = 0, P1 = 0 (ledger `openspec/changes/final-production-readiness/ledger.md`
+- P0 = 0, P1 = 0 (ledger `openspec/changes/archive/2026-10-03-final-production-readiness/ledger.md`
   unchanged since `7d55423`; no new P0/P1 introduced by the performance or UI
   campaigns).
 - Gates A–H pass on the local capable runner; the GPU-heavy golden/cinematic
@@ -131,7 +131,7 @@ the current HEAD rather than re-asserted from the August baseline.
 - Runtime: Node 22 (CI) / v24.3.0 (local dev); npm 11.4.2
 - Dependencies: exact-pinned in `package.json` + `package-lock.json`; `npm ci` reproduces the lockfile; `npm audit` 0 vulnerabilities (dev + prod)
 
-## Defects (ledger: `openspec/changes/final-production-readiness/ledger.md`)
+## Defects (ledger: `openspec/changes/archive/2026-10-03-final-production-readiness/ledger.md`)
 
 - P0: **0**
 - P1: **0** (F-01a/F-01b resolved by the local-gate CI architecture — no P1 remains in shipped code paths)
@@ -223,7 +223,7 @@ The full behavioral suite (navigation, presets, timeline, observer modes, resize
 **`PRODUCTION READY`**
 
 - Hosted CI: `quality` + `browser-smoke` green on 3 consecutive runs of commit `79b2da9` (run `33079109595`, run and 2 re-runs).
-- Defects: P0 = 0, P1 = 0 (ledger: `openspec/changes/final-production-readiness/ledger.md`).
+- Defects: P0 = 0, P1 = 0 (ledger: `openspec/changes/archive/2026-10-03-final-production-readiness/ledger.md`).
 - Local capable-runner evidence: 515/515 unit, 131/131 non-golden browser, 43/43 goldens twice-stable, 4/4 Firefox, `npm audit` 0 vulnerabilities.
 - Every environment-limited gate (full GPU suite, goldens, Firefox, WebKit, real mobile devices) is recorded as local-capable-runner evidence or DEFERRED_ENVIRONMENT — never claimed as hosted-CI PASS.
 - Repository/OpenSpec/README/`.agent` state agree with this report as of commit `7d55423` and the docs follow-up on `main`.

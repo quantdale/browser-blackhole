@@ -1,3 +1,34 @@
+## 2026-10-03 session — specification-baseline-review-corrections apply (in progress)
+
+Status: **APPLY IN PROGRESS.** Bounded documentation/specification correction only; no
+product code, no browser/GPU gates (reported not run, never PASS), no Phase 1 work.
+
+Supersedes (without rewriting history) the Phase 0 entry's claims:
+
+- "cinematic (`2fc1b5d`, certified 2026-08-30) now state their revisions" — WRONG. The
+  restored-scope final certified checkpoint is `17c4644` (2026-08-30); `2fc1b5d` (2026-08-29)
+  is an earlier checkpoint. Correction of record: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md`.
+- "`openspec validate --changes --strict`: 13 passed / 4 failed → 17 passed / 0 failed" —
+  the 17 was the pre-archive change population; post-archive the change population is 11
+  active (now 12 with this proposal) and 6 archived; `--all` then counted 17 items
+  (11 changes + 6 specs), now 18 (12 changes + 6 specs). Qualify every count by command
+  and lifecycle stage.
+
+Repaired during this apply: current evidence citations in release/performance/visual-fidelity
+certifications, observability diagnostics, the Galaxy Collision source lock, and the
+spatial-atlas master plan now resolve to `openspec/changes/archive/2026-10-03-*` paths.
+See `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` for the full old-to-archive mapping and the
+deliberate historical exceptions.
+
+Evidence (pre-correction, at `APPLY_BASE` `2a57d9fe71afcf694106f942fbf645b647a1fbca`):
+`openspec doctor` ok; `--changes --strict` 12 passed / 0 failed; `--specs --strict` 6 passed /
+0 failed; `--all --strict` 18 passed / 0 failed. The four before-diagnostics are recorded in
+the correction record.
+
+Next action: finish validation, commit the application checkpoint, archive
+`specification-baseline-review-corrections` with normal spec merging, recount, revalidate,
+commit the archive checkpoint, and stop. No push.
+
 ## 2026-10-03 session — Phase 0 review-correction proposal and separate-session handoff
 
 Status: **PROPOSED — NOT APPLIED.** The operator requested an OpenSpec proposal

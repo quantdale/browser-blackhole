@@ -66,7 +66,7 @@ numbers live in the figure captions / planes of the scanned article, which
 has **no machine-readable text layer** in the copy obtained here. They
 therefore could NOT be transcribed verbatim in this environment.
 
-Per `openspec/changes/ca9-galaxy-collision/design.md` §2, any value derived
+Per `openspec/changes/archive/2026-10-03-ca9-galaxy-collision/design.md` §2, any value derived
 from a figure (rather than tabulated text) must be explicitly labeled as
 derived, with method and uncertainty. The production scenario shipped in
 this repository is therefore classified as follows:

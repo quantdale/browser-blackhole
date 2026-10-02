@@ -48,7 +48,7 @@ interface RuntimeDiagnostics {
 `CosmicAtlasHost.debugInventory()` — the live runtime snapshot, reachable in
 specs and benchmarks through `window.__ATLAS_APP__.host` — carries two further
 sections added by the whole-atlas performance campaign
-(`openspec/changes/whole-atlas-performance-optimization`, tasks.md §1):
+(`openspec/changes/archive/2026-10-03-whole-atlas-performance-optimization`, tasks.md §1):
 
 - **`frame`** (`FrameInvalidationTelemetry`, also available directly as
   `host.frameTelemetry()`): the reason mask that woke the most recent frame

@@ -38,6 +38,11 @@ whole-atlas performance optimization campaign is complete-with-deferrals (certif
 0/123, and not started. Do not restart M0–M12, CA9, final-production-readiness, or
 `whole-atlas-performance-optimization`.
 
+Current baseline correction: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` is authoritative for
+the Phase 0 review findings — the cinematic final certified checkpoint is `17c4644` (not
+`2fc1b5d`), archived paths are under `openspec/changes/archive/2026-10-03-*`, and validation
+counts must be quoted with command, population and lifecycle stage.
+
 ## Technical stack
 
 - TypeScript

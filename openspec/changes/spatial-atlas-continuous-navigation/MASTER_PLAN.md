@@ -97,7 +97,7 @@ spatial explorer
 
 At the time this plan was authored, `.agent/START_HERE.md` points to:
 
-`openspec/changes/whole-atlas-performance-optimization/`
+`openspec/changes/archive/2026-10-03-whole-atlas-performance-optimization/`
 
 That campaign changes the host scheduler, transition occlusion behavior, lazy construction policy, shared-service work budgets, and other runtime contracts that the Spatial Atlas will depend on.
 

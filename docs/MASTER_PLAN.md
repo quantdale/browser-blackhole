@@ -495,6 +495,12 @@ Establish the trustworthy planning substrate before anything else, because every
 **Gate:** `openspec validate --changes --strict` passes for all changes; `openspec doctor` healthy;
 each change's declared status matches its task state.
 
+**Bounded follow-up (documentation-only):** `specification-baseline-review-corrections` applies the
+Phase 0 review corrections from `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` (wrong cinematic
+final revision, vacuous neutron-star fidelity scenario, archived evidence paths, stage-qualified
+counts). Finish and archive it before starting Phase 1; it does not re-open Phase 0 and does not
+restart any closed campaign.
+
 ### Phase 1 — Critical correctness defects
 
 **Changes: `kerr-gpu-initializer-correctness`, then `quality-ladder-resolution-integrity`, then
