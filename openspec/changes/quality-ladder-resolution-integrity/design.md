@@ -79,8 +79,9 @@ harnesses; changing the signature widens the blast radius beyond the defect. (b)
 stop folding scale into the pixel ratio and let the post chain apply it — rejected: the drawing
 buffer would then be unscaled, which is not what the DPR policy means.
 
-The invariant to pin is: **HDR target dimensions equal drawing-buffer dimensions**. That single
-assertion would have caught the double application and is the regression test this change adds.
+The invariant to pin is both equality and the documented formula. HDR dimensions must equal the
+drawing buffer, and both must equal `floor(cssSize * effectiveDpr * renderScale)`. Equality alone
+can pass if both targets are scaled twice, so it is not a sufficient regression test.
 
 ### D5 — Measure frame cadence for the governor's FPS signal
 

@@ -53,21 +53,26 @@ exact reason codes.
 geometry, render targets, materials). The contract must be expressed in terms all of them share —
 lifetime, unlinking, counter return — not in terms of any one resource type.
 
-### D2 — Fix the temporal interaction cap at the weight derivation, not with a reset
+### D2 — Bound the numerator by the active cap and divide by the settled cap
 
-**Decision.** Compute the effective weight from `min(historyAge, previousMaxAge) / maxAge`, so
-lowering the cap immediately reduces the weight given to already-accumulated history. Record the
-transition in the reset-reason ring.
+**Decision.** Compute
 
-**Alternatives considered.** (a) Reset history when interaction begins — rejected: it discards all
-accumulation, producing a visible flash, when the documented intent is a *lower cap*, not a reset.
-(b) Include `interaction` in the `variantChanged` computation — necessary but insufficient, because
-`variantChanged` only decides whether to reset; it does not change the weight of existing history.
+`weight = min(0.94, min(historyAge, activeCap) / settledCap * 0.94) * confidence`
 
-**Why the bug exists.** The weight is a function of absolute history age, so lowering `maxAge`
-retroactively has no effect on weight already accumulated under the old cap. The fix makes the
-weight a function of history age *relative to the cap that was in effect while that history was
-accumulated*.
+where `activeCap` is `interactionHistoryFrames` during interaction and `settledCap` is
+`historyFrames`. Record the active cap and applied weight in the diagnostic snapshot. Do not require
+a history invalidation solely to prove the change.
+
+**Forbidden formula.** `historyAge / loweredMaxAge`, and `min(historyAge, previousMaxAge) /
+loweredMaxAge`, both remain at the 0.94 ceiling when history is saturated. They do not implement
+this requirement.
+
+**Rejected alternative — reset history when interaction begins.** That lowers the weight, but it
+discards accumulation and produces a flash. The documented intent is a shorter cap, not a reset.
+
+**Why the bug exists.** The current code already selects the shorter cap as `maxAge`. Because the
+numerator is not bounded before that division, a saturated age divided by the lowered cap is still
+at least 1 and the weight stays at the ceiling.
 
 ### D3 — Idempotent presentation setters; separate visibility state
 

@@ -30,9 +30,11 @@ The evidence is specific and repeated:
 - **A stored verdict asserted as a measurement.** `tests/unit/ca9Integrator.test.ts` asserts
   `report.allPass === true` from a committed JSON produced by a Python tool that CI never runs.
 
-- **A refusal gate that cannot refuse.** Nine of ten benchmark harnesses set `process.exitCode = 1`
-  and then call `process.exit(0)`, which overwrites it. The campaign's own summary claims "a harness
-  that renders nothing now exits non-zero".
+- **A refusal gate that cannot refuse.** Nine of the eleven `scripts/bench-*.mjs` files set
+  `process.exitCode = 1` and then call `process.exit(0)`, which overwrites it. Those nine are the
+  per-destination harnesses. `bench-scenarios.mjs` and `bench-cinematic-matrix.mjs` do not call
+  `process.exit` and are already correct. The campaign's own summary claims "a harness that renders
+  nothing now exits non-zero".
 
 - **The production asset-resolution path is untested.** The app resolves the LUT through
   `public/luts/index.json`; the unit tests scan directories instead. A corrupted index silently

@@ -80,9 +80,11 @@ Schwarzschild selection, and select `1/|E|` only when the flag is active.
 which silently changes the legacy static-camera output. Mirroring the existing, tested pattern is
 lower risk than inventing a Kerr-specific mechanism.
 
-**Compatibility.** The legacy static path becomes bit-identical to its previous behaviour *only if*
-`√f_s` were 1 — it is not, so the static appearance changes slightly. That change is a **correction**,
-and any affected golden must be re-captured with this justification recorded in `tasks.md`.
+**Compatibility.** These are two separate corrections. The frequency gate removes the unconditional
+`/|E|` from the legacy path, so static Kerr output changes relative to the current shader. The
+`L_z` normalisation also changes photon constants. Neither effect is accepted by prescribing a
+brightness ratio such as `sqrt(f_s)`. Acceptance is CPU/GPU parity at the existing tolerances. Any
+golden that changes must be justified by that improved agreement, not by a fixed ratio.
 
 ### D4 — Classification authority moves to the analytic comparison
 
@@ -118,11 +120,10 @@ reject, and to make the rejection explicit rather than implicit.
 
 ## Risks / Trade-offs
 
-- **[Golden churn] The static Kerr goldens will change.** The `g`-factor fix alters the static
-  Kerr disk brightness by a factor `√f_s`. → Mitigation: re-capture only the KERR_* rows, justify
-  each in `tasks.md`, and prove the change is a correction by showing the CPU reference agrees with
-  the new GPU output where it did not agree before. Never re-baseline a golden to make a red test
-  green without that demonstration.
+- **[Golden churn] Static Kerr goldens may change.** Both the frequency gate and the `L_z`
+  correction can change the image. → Mitigation: re-capture only rows whose CPU/GPU disagreement
+  improves after the fix, and justify each in `tasks.md`. Never re-baseline a golden to make a red
+  test green, and never treat a `sqrt(f_s)` brightness ratio as the expected result.
 - **[Parity tolerance interaction] The new close-in rows may not meet existing tolerances.** The
   defects are model errors, not precision errors, so a correct model should *improve* agreement.
   → Mitigation: if a new row fails after the fix, investigate as a precision finding before

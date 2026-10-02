@@ -54,18 +54,19 @@ one value and will recur the next time a second consumer of `activeZone` appears
 raw state made diagnostics contradict the frame, which is what allowed this defect to survive
 review.
 
-### D2 — The camera rig is the single source of truth for observer orientation
+### D2 — Neutron-star inclination is one live value shared by the control and the rig
 
-**Decision.** Derive the reported `observerInclinationDeg` from `cameraRig.getOrbit().polarDeg`,
-and keep the field only as a preset-seeded input that seeds the rig rather than shadowing it.
+**Decision.** `observerInclinationDeg` remains an exposed control. A user change sets
+`CameraRig` polar angle. An orbit gesture writes the resulting polar angle back to canonical state
+and the displayed control. A preset may seed the rig when the destination enters; after that seed
+is applied, the field is not a second live source and is not a passive readout.
 
-**Rationale.** The presets already encode inclination as a camera polar angle
-(`presets.ts:19-21` documents exactly this). The field is a *seed*, not a live value. The sibling
-Tidal-Disruption module made the equivalent call explicitly and documented it; Neutron Star carries
-no such disclosure, which is why the divergence went unnoticed.
+**Rationale.** `AGENTS.md` forbids an exposed control with no visual effect. Reporting the rig
+while leaving the slider inert would satisfy a readout and still violate that rule. Bidirectional
+binding preserves orbiting: the latest user action, whether slider or orbit, writes the same value.
 
-**Rejected alternative — drive the camera polar angle from the control.** This would make the
-control authoritative and break camera orbiting, which the product supports. Not acceptable.
+**Rejected alternatives.** A readout-only field leaves the shipped control inert. Removing the
+control is a larger product change than the defect requires and is not this change's choice.
 
 ### D3 — Correct the fidelity note against the implementation
 
@@ -181,7 +182,5 @@ both presentations and makes the existing CSS comment true.
 
 ## Open Questions
 
-None that change the approach. One judgement call for the implementer: whether to remove
-`observerInclinationDeg` from the public state entirely (cleanest) or keep it as a documented
-preset seed (less disruptive). Recommendation — keep it as a seed with an explicit comment, because
-presets reference it and removing it would churn the preset files.
+None. The neutron-star inclination binding in D2 is normative; do not reopen it as a seed-only
+readout during implementation.

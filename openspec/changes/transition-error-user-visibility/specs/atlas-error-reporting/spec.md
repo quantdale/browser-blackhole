@@ -113,33 +113,43 @@ existing remediation guidance rather than a bare error code.
 
 ### Requirement: A stalled destination preparation SHALL terminate
 
-A destination preparation that makes no progress for longer than a defined stall threshold SHALL
-terminate in a user-visible failure with a recovery action, rather than remaining pending
-indefinitely. The stall threshold SHALL be distinct from, and much longer than, the threshold at
-which a slow load is reported as still in progress.
+A destination preparation SHALL terminate in a user-visible failure when it has an outstanding
+abortable operation and no progress event occurs for the stall threshold. Elapsed time alone SHALL
+NOT abort a preparation that continues to emit progress events. The stall threshold SHALL be at
+least ten times the slow-load reporting threshold, and the two thresholds SHALL remain distinct.
+
+A progress event is one of: settlement of the prepare operation; a `reportProgress` report whose
+finite fraction is the first report or is strictly greater than the last accepted fraction; receipt
+of response headers for that operation; or an increase in received response bytes. A changed label
+without one of those events is not progress. A preparation that can neither report progress nor
+expose fetch activity SHALL emit a start report and subsequent finite progress before the stall
+gate applies to it.
 
 #### Scenario: A data request never completes
 
-- **WHEN** a destination's data request remains outstanding past the stall threshold
-- **THEN** the preparation is aborted
+- **WHEN** a destination's abortable data request remains pending and emits no progress event for
+  the stall threshold
+- **THEN** the preparation is aborted through the existing abort path
 - **AND** the user sees a failure identifying the destination
 - **AND** a recovery action is offered
 
-#### Scenario: A slow but progressing load is not aborted
+#### Scenario: Continued progress is not treated as a stall
 
-- **WHEN** a preparation takes longer than the slow-load reporting threshold but continues to make
-  progress
+- **WHEN** a preparation remains pending beyond both the slow-load threshold and the stall duration
+- **AND** it continues to emit progress events within each stall window
 - **THEN** it is not aborted
 - **AND** the slow-load status continues to be reported
 
-#### Scenario: A progressing load after a stall warning
+#### Scenario: Elapsed time alone is not progress
 
-- **WHEN** a preparation continues to make progress beyond the stall threshold
-- **THEN** it completes normally
-- **AND** the stall warning did not terminate it
+- **WHEN** a pending request emits no progress event, regardless of how long the slow-load status
+  has been displayed
+- **THEN** expiry of the stall threshold aborts it
+- **AND** merely remaining in `preparing` is not treated as progress
 
 #### Scenario: Recovery after a stall
 
 - **WHEN** the user retries a destination whose preparation stalled
 - **THEN** the retry is permitted
-- **AND** it behaves as an ordinary preparation, including the same stall threshold
+- **AND** it behaves as an ordinary preparation, including the same progress definition and stall
+  threshold

@@ -101,8 +101,10 @@ Non-goals, explicitly out of scope:
 
 **Dependencies**
 
-- None in phase 1. It touches `src/atlas/host.ts`, which is a single-owner lane; it must not be
-  edited concurrently with another host change.
+- It shares `src/atlas/host.ts`, `TransitionDirector.ts`, `SharedRendererKernel.ts`, and
+  `SharedPost.ts` with later changes. This change lands before
+  `transition-error-user-visibility` and `shared-renderer-service-lifecycle`. Kerr may run beside
+  it. Do not edit the shared files concurrently with either later change.
 
 **Compatibility risk**
 

@@ -37,10 +37,11 @@
 
 ## 5. Stall termination
 
-- [ ] 5.1 Add a stall threshold to the transition director, distinct from and much longer than `slowLoadThresholdMs`, and record why the two differ.
-- [ ] 5.2 On reaching the stall threshold with the preparation still pending, abort the preparation through the existing abort path so the generation/stale guards run unchanged.
+- [ ] 5.1 Add a stall threshold of at least ten times `slowLoadThresholdMs`. Define a progress event exactly as the spec does: settlement, first or strictly increased finite `reportProgress` fraction, response headers, or additional response bytes. A label change alone is not progress.
+- [ ] 5.2 When an abortable operation stays pending with no progress event for that threshold, abort it through the existing abort path so the generation and stale guards run unchanged.
 - [ ] 5.3 Verify the abort produces the normal recoverable failure with a retry action, not a silent reset.
-- [ ] 5.4 Confirm a slow but progressing preparation is NOT aborted, and that the slow-load status keeps reporting.
+- [ ] 5.4 Confirm a preparation that keeps emitting progress events is not aborted, even after the stall duration has elapsed, and that slow-load status keeps reporting.
+- [ ] 5.4a Give every production prepare path a start report and subsequent finite progress, or an observable fetch, before enabling the stall gate for that path.
 - [ ] 5.5 Add a browser test that simulates a request that never settles and asserts the application leaves `preparing` and surfaces a failure.
 - [ ] 5.6 Add a browser test that a slow-but-progressing preparation still completes.
 - [ ] 5.7 Confirm retry after a stall behaves as an ordinary preparation.

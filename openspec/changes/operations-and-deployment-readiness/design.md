@@ -48,7 +48,8 @@ branch ignores its own parameters.
 
 **Decision.** Commit SPA-fallback configuration for the common static host families plus a `404.html`
 fallback, and add a test that serves `dist/` from a plain static server with and without the
-configuration.
+configuration. Publish-directory files may live in `public/`. Repository-root files such as
+`vercel.json` and `netlify.toml` must not, because Vite copies `public/` into `dist/`.
 
 **Rationale.** "Provider-neutral" is a legitimate goal, but it degraded into "unverified" because no
 provider was ever chosen. Committing a configuration per family keeps the neutrality (the operator

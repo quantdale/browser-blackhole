@@ -10,7 +10,7 @@
 
 ## 1. Failing tests first
 
-- [ ] 1.1 Add a unit test asserting the HDR render target dimensions equal the drawing-buffer dimensions at render scale 0.6 and 0.8. Confirm it FAILS before the fix.
+- [ ] 1.1 Add a unit test asserting that, at render scale 0.6 and 0.8, the HDR target equals the drawing buffer AND both equal `floor(cssSize * effectiveDpr * renderScale)`. Equality alone is not sufficient. Confirm it FAILS before the fix.
 - [ ] 1.2 Add a unit test asserting the telemetry-reported render scale equals the scale applied to the buffer. Confirm it FAILS before the fix.
 - [ ] 1.3 Add a browser row in `tests/browser/frame-invalidation.spec.ts` that drives a tier change and asserts the drawing-buffer dimensions change. Confirm it FAILS before the fix.
 - [ ] 1.4 Add a browser row asserting a user-selected manual quality mode survives a full transition. Confirm it FAILS before the fix.

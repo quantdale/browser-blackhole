@@ -100,6 +100,21 @@ Because preparation already leaves the previous destination active, "stay" is al
 requires no rollback work. There is no spinner state to get wrong, because the director is already
 back at `idle` before the error is published.
 
+### D7 — Stall means no progress event, not elapsed time
+
+**Decision.** Reuse the director's existing `reportProgress(fraction01)` channel and observable
+fetch activity. A progress event is settlement, a first or strictly increased finite fraction, response
+headers, or additional response bytes. The stall threshold is at least ten times
+`slowLoadThresholdMs`. Expiry aborts through the existing `AbortController` path.
+
+**Rationale.** Elapsed time cannot distinguish a hung fetch from a slow fetch that is still
+delivering bytes. A label-only status update is also not progress. Destinations that today neither
+report progress nor expose fetch activity must emit start and subsequent finite progress before the
+gate applies; otherwise a healthy silent compile would be aborted.
+
+**Rejected alternative — abort every preparation after a wall-clock limit.** That satisfies the hung
+request scenario and fails the continued-progress scenario. Both are required.
+
 ## Risks / Trade-offs
 
 - **[Over-notification risk] A retry loop could spam the error region.** → Mitigation: retry is

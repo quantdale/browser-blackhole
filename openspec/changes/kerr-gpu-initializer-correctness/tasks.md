@@ -5,7 +5,7 @@ evidence its Verification line names.
 
 ## 0. Baseline
 
-- [ ] 0.1 Record the audit base: `git rev-parse HEAD`, `node --version`, `npm --version`, and a clean `git status --short`.
+- [ ] 0.1 Record `git rev-parse HEAD`, `node --version`, `npm --version`, and a clean `git status --short`. Re-derive every cited symbol against that HEAD. Audit citations were taken at `dc0b3ba` and are not authoritative line numbers.
 - [ ] 0.2 Run and record the required baseline: `npm run check` (expect 46 files / 631 unit tests green plus a passing build).
 - [ ] 0.3 Record the current `kerr-backend-census` terminal-class percentages and the current KERR_*/OBSERVER_* golden results as the before-evidence for this change.
 - [ ] 0.4 Record `openspec validate kerr-gpu-initializer-correctness --type change --strict` passes before any implementation edit.
@@ -24,7 +24,7 @@ evidence its Verification line names.
 - [ ] 2.2 Replace the camera-side quartic at the current `:464` with a call to the shared factory.
 - [ ] 2.3 Replace the integration-loop quartic with a call to the same factory so both sites are literally the same definition.
 - [ ] 2.4 Correct the static `L_z` frame term to `g_tphi0 / sqrt(max(fS0, denomFloor))`.
-- [ ] 2.5 Add the `observerFrequencyComoving` uniform to the Kerr uniform block; select `1/|E|` only when it is active, mirroring `schwarzschildIntegrator.ts:432-437`.
+- [ ] 2.5 Add the `observerFrequencyComoving` uniform to the Kerr uniform block. Mirror the Schwarzschild `energyMultiplier`: inactive multiplies by exactly 1; active multiplies by `1/max(|E|, denomFloor)`. Do not use a different sign convention, and do not treat a `sqrt(f_s)` brightness ratio as the expected result.
 - [ ] 2.6 Make the mass convention explicit: reject a non-unit normalised mass with a clear reason, or thread `a = a* · M` through every metric term if the agent judges threading safe.
 - [ ] 2.7 Confirm the unit tests from §1.1–1.2 now pass and the typecheck is clean.
 

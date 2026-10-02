@@ -36,6 +36,13 @@ an artifact committed in this repository, without the operator having to reconst
 - **THEN** the committed configuration expresses that policy
 - **AND** it is documented which host families it applies to
 
+#### Scenario: Repository-root configuration is not published as an asset
+
+- **WHEN** a host reads its configuration from the repository root rather than the publish directory
+- **THEN** that configuration is not placed under `public/`
+- **AND** the production build does not contain it as an application asset
+- **AND** a missing runtime asset still returns a not-found response
+
 ### Requirement: The deployment contract SHALL be exercised by an automated check
 
 The deployment contract SHALL be verified by serving the built application from a server that does

@@ -1,14 +1,18 @@
 # OpenSpec execution rules for autonomous agents
 
-This repository currently has three planned changes. They are intentionally ordered and MUST NOT be collapsed into one uncontrolled refactor.
+## Current status
 
-## Required order
+Do not execute the historical M12/CA9 order below. `m12-neutron-star-surface-lensing`, `m12-repository-integrity`, and `ca9-galaxy-collision` are complete. Restarting them is a defect.
+
+The live work is `docs/MASTER_PLAN.md` and its hardening changes. At the 2026-09-30 review the tree had 17 changes: 5 complete and 12 in progress. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
+
+`specification-baseline-hygiene` must replace this interim section with a complete inventory generated from the tree at implementation time. Until that lands, this section overrides every older sentence in this file about a three-change repository.
+
+## Historical order — completed, do not re-execute
 
 1. `m12-neutron-star-surface-lensing`
 2. `m12-repository-integrity`
 3. `ca9-galaxy-collision`
-
-The first change is a production scientific-fidelity blocker. CA9 feature implementation may not begin until the M12 neutron-star change passes its hard gates.
 
 ## Before editing
 

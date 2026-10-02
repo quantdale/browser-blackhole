@@ -25,7 +25,7 @@
 
 ## 3. Neutron Star
 
-- [ ] 3.1 Derive the reported observer inclination from `cameraRig.getOrbit().polarDeg`; keep the state field as a documented preset seed.
+- [ ] 3.1 Bind `observerInclinationDeg` to the camera rig: a control change sets polar angle, and an orbit change updates the control and canonical state. A preset may seed the rig on enter only. Do not leave the control as a passive readout.
 - [ ] 3.2 Correct the `surface` preset's `fidelityNote` to describe the shipped direct surface-ray path.
 - [ ] 3.3 Correct the `physics.ts` module header to name `surfaceLensingGpu` rather than the shared lensing pass.
 - [ ] 3.4 Preserve the still-true omitted effects in the corrected note (Doppler, aberration, frame dragging, atmosphere).
@@ -89,6 +89,6 @@
 
 ## 10. Close-out
 
-- [ ] 10.1 Strike findings U-01 through U-19 and L-02 from `docs/MASTER_PLAN.md` with their resolution commits.
+- [ ] 10.1 Strike findings U-01 through U-19 from `docs/MASTER_PLAN.md` with their resolution commits. Do not strike L-02; this change does not retarget `src/shaders/diagnostic.ts`.
 - [ ] 10.2 Append evidence to `.agent/STATE.md`.
 - [ ] 10.3 Commit this change as one coherent checkpoint.

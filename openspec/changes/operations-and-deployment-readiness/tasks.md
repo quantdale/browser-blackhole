@@ -14,7 +14,7 @@ state this change's dependency-audit and Python-toolchain outcome.
 
 ## 1. Deployment contract
 
-- [ ] 1.1 Add SPA-fallback configuration for the common static host families under `public/`.
+- [ ] 1.1 Add SPA-fallback configuration. Put publish-directory files (`404.html`, Netlify `_redirects`) in `public/` only when the host reads them from the published site. Put repo-root files (`vercel.json`, `netlify.toml`) at the repository root, never under `public/`, because Vite copies `public/` into `dist/`.
 - [ ] 1.2 Add a `404.html` fallback, scoped to navigation requests so a missing asset still returns a not-found status.
 - [ ] 1.3 Add a sub-path build: make the base configurable at build time and produce a sub-path smoke build.
 - [ ] 1.4 Add a deployment-contract test that serves `dist/` from a plain static server, with and without the committed configuration.

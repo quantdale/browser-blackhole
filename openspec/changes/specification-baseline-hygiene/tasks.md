@@ -7,7 +7,7 @@
 
 - [ ] 0.1 Record `git rev-parse HEAD`, `node --version`, `npm --version`, clean `git status --short`.
 - [ ] 0.2 Record `openspec doctor` output (expected: unhealthy, missing `openspec/config.yaml`).
-- [ ] 0.3 Record `openspec validate --changes --strict` output (expected: 3 passed, 4 failed).
+- [ ] 0.3 Record `openspec validate --changes --strict` output. The audit-time result was 3 passed and 4 failed, before the ten hardening changes existed. The 2026-09-30 re-review was 13 passed and 4 failed. Record the actual output; do not treat a mismatch with 3/4 as a failed baseline.
 - [ ] 0.4 Record `openspec list` output.
 - [ ] 0.5 Record `openspec list --specs` output (expected: no specs found).
 - [ ] 0.6 Save all four baseline outputs. They are the before-evidence for this change.
@@ -25,11 +25,11 @@
 - [ ] 2.1 For each "requirement body must contain SHALL/MUST" error: move the normative sentence to the line immediately after the requirement header. No semantic change. Record the count per change.
 - [ ] 2.2 For each "must include at least one scenario" error: decide per requirement whether it is an incomplete requirement (add a real scenario describing an observable outcome) or a non-normative statement (remove it from the delta, or mark the change `skip_specs` with a comment).
 - [ ] 2.3 FORBIDDEN: do not delete a requirement solely to pass validation, and do not write a scenario that merely restates the requirement. A scenario that cannot fail is worse than none.
-- [ ] 2.4 Repeat for `cinematic-visual-fidelity-overhaul` (24 errors).
-- [ ] 2.5 Repeat for `whole-atlas-performance-optimization` (18 errors).
-- [ ] 2.6 Repeat for `m12-neutron-star-surface-lensing` (1 error).
+- [ ] 2.4 Repair `cinematic-visual-fidelity-overhaul`: 24 errors at re-review, split evenly between missing normative body text and missing scenarios. Re-count before editing.
+- [ ] 2.5 Repair `whole-atlas-performance-optimization`: 17 errors at re-review, not 18. Eight lack normative body text, eight lack a scenario, and one requirement lacks body text. Re-count before editing.
+- [ ] 2.6 Repair `m12-neutron-star-surface-lensing` (1 missing scenario at re-review).
 - [ ] 2.7 Resolve `spatial-atlas-continuous-navigation`, which has no `specs/` directory at all. Per `design.md` D3: author real ADDED deltas transcribed from its locked design, OR set `skip_specs: true` with a comment stating the deltas are authored at implementation time. Record which was chosen and why.
-- [ ] 2.8 Run `openspec validate --changes --strict` and confirm all seven pass.
+- [ ] 2.8 Run `openspec validate --changes --strict` and confirm every change in the tree passes. There were 17 at the 2026-09-30 review; count the tree rather than assuming seven.
 - [ ] 2.9 Run `openspec validate --specs --strict` if the assembled baseline reports errors.
 
 ## 3. Correct status headers
@@ -42,8 +42,8 @@
 
 ## 4. Rewrite the execution instructions
 
-- [ ] 4.1 Rewrite `openspec/AGENTS.md` so it enumerates all seven changes: five closed, two open.
-- [ ] 4.2 State the real ordering constraint: the performance campaign is complete-with-deferrals; `spatial-atlas-continuous-navigation` is not started and must not begin without its prerequisite.
+- [ ] 4.1 Replace the interim `openspec/AGENTS.md` correction with a complete inventory of every change present at implementation time. At the 2026-09-30 review: 5 complete and 12 in progress, including the ten hardening changes. Do not restore a seven-change description.
+- [ ] 4.2 State the real ordering constraint from `docs/MASTER_PLAN.md` §7. The performance campaign is complete-with-deferrals and is not the live queue. `spatial-atlas-continuous-navigation` is not started. The hardening changes are serialized by shared file, not parallel by phase.
 - [ ] 4.3 Document the archive policy: when a change completes, its requirements are archived into a baseline capability specification and the change is archived.
 - [ ] 4.4 Remove any instruction that would cause an agent to redo completed work. Verify by re-reading as a fresh agent.
 - [ ] 4.5 Resolve the two-sources-of-truth conflict in `openspec/project.md` (lines 34 and 79). Name `docs/MASTER_PLAN.md` plus one campaign audit as current; mark the others historical.

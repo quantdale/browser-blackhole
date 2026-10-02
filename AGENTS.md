@@ -2,6 +2,12 @@
 
 This repository is designed so a capable coding agent can resume work without chat history. This file is the operating contract.
 
+## Current work — read this before the historical list
+
+The live campaign is the hardening plan in `docs/MASTER_PLAN.md`, executed through the OpenSpec changes under `openspec/changes/`. Follow that plan's file-serialization rules. Do not resume `whole-atlas-performance-optimization`, M0–M12, CA9, or `final-production-readiness`; those campaigns are complete or complete-with-deferrals.
+
+The numbered list below still contains historical planning documents. Read `docs/PHYSICS.md`, `docs/RENDERING_PIPELINE.md`, `docs/PERFORMANCE.md`, and `docs/TESTING.md` for conventions that remain in force. Do not treat `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, or `docs/BACKLOG.md` as the live work queue. `documentation-truthfulness-realignment` owns the permanent restructuring of this list.
+
 ## Required reading before editing
 
 Read, in this order:

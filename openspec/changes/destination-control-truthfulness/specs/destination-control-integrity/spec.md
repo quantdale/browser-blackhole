@@ -25,11 +25,13 @@ value. A control that changes neither SHALL NOT be exposed, or SHALL be removed.
 - **THEN** the object controlled by that toggle remains visible
 - **AND** it does not require the user to toggle twice to restore
 
-#### Scenario: An observer control is reflected in the render
+#### Scenario: Neutron-star observer inclination changes the rendered observer
 
-- **WHEN** the user changes a control that declares observer-orientation semantics
-- **THEN** the rendered observer orientation changes accordingly
-- **AND** the reported value for that orientation equals the rendered value
+- **WHEN** the user changes the exposed neutron-star observer-inclination control
+- **THEN** the camera rig polar angle changes to that value
+- **AND** the rendered observer direction follows that polar angle
+- **AND** an orbit gesture that changes polar angle updates the same control and canonical state
+- **AND** the control is not left as a preset seed or passive readout
 
 #### Scenario: Reported values equal effective values
 

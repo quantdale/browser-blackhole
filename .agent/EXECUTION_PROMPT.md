@@ -1,9 +1,11 @@
 # EXECUTION PROMPT — Browser Blackhole active campaign
 
-Status: **COMPLETED** (certified 2026-09-10 at `179eb56`; ledger closed in commit `5cb9ea6`)
-Updated: 2026-08-28
-Active change: `whole-atlas-performance-optimization`
-Audit: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
+Status: **COMPLETED AND SUPERSEDED** (certified 2026-09-10 at `179eb56`; ledger closed in commit `5cb9ea6`)
+Updated: 2026-09-30
+Successor: `docs/MASTER_PLAN.md` and `.agent/START_HERE.md`
+Historical change: `whole-atlas-performance-optimization`
+
+Do not execute the mission below. It is retained as the record of a completed campaign. The live campaign is the hardening plan, and its file order is `docs/MASTER_PLAN.md` §7.
 
 > Reconciliation note (2026-09-11): this campaign reached its completion gate —
 > `npm run check` 46 files / 631 tests, full default browser suite 275 passed /

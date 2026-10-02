@@ -10,13 +10,12 @@ The confirmed defects are all instances of the same omission: **the ownership an
 that two services implement are not implemented by their siblings, and no shared contract test
 enforces them.**
 
-1. **`interactionHistoryFrames` does not reduce accumulated history weight.** `TemporalService.ts`
-   documents "Interaction path uses this shorter history cap" (`:41-45`). In `resolve`
-   (`:243-249`) the weight is derived from absolute `historyAge` against `maxAge`, and the clamp at
-   `:265` only limits *future* growth. So when interaction begins, weight is already saturated at
-   0.94 and the cap has no effect. `setPolicy` (`:150-175`) computes `variantChanged` from the four
-   policy numbers only and ignores `interaction` entirely, so toggling interaction neither resets
-   history nor changes the weight. The documented property is not implemented.
+1. **Lowering the interaction cap does not reduce saturated blend weight.** `TemporalService.resolve`
+   does select `interactionHistoryFrames` as `maxAge`. The weight is then
+   `min(0.94, historyAge / maxAge * 0.94)`. Once history is saturated, lowering `maxAge` leaves that
+   ratio at or above 1, so the weight stays at the 0.94 ceiling on the first interaction frame and
+   after `historyAge` is clamped. The defect is this saturated ratio, not a missing cap selection.
+   Dividing accumulated age by the lowered cap preserves the bug and is forbidden.
 
 2. **`StrandService.setQuality` re-uploads the colour buffer every frame and cancels
    `setVisible(false)`.** `host.ts:741` calls it on every rendered frame. `setQuality` (`:331-337`)
@@ -66,8 +65,10 @@ loader that its sibling has.
 
 ## What Changes
 
-- **Make the temporal interaction cap actually reduce history weight**, and make the change
-  observable in the reset-reason ring.
+- **Make the temporal interaction cap reduce saturated history weight on the first interaction
+  frame.** Use the settled cap as the denominator and the active cap as the numerator bound. Do not
+  implement `historyAge / loweredMaxAge`, and do not require a full history reset to satisfy the
+  weight change.
 - **Make `StrandService.setQuality` idempotent** and stop it from overriding an explicit visibility
   request.
 - **Make the particle compute dispatch honour the population throttle**, or report the two paths
@@ -85,7 +86,8 @@ Non-goals, explicitly out of scope:
 - No change to what any service renders. Every fix is about lifetime, idempotence, honesty, or
   avoiding work that produces nothing.
 - No change to any work-budget value, tier, or quality constant.
-- No new service and no removal of a service.
+- No new service and no removal of a service. In particular, this change does not remove the legacy
+  shell (L-01) and does not retarget `src/shaders/diagnostic.ts` (L-02).
 - No performance claim. This change removes work that is currently specified but not performed;
   measuring the improvement is a separate, evidence-gated activity.
 
@@ -125,10 +127,12 @@ Non-goals, explicitly out of scope:
 
 **Dependencies**
 
-- Touches `src/atlas/host.ts` (the per-frame fan-out), so it is in the same single-owner lane as
-  `quality-ladder-resolution-integrity`. Sequence them; do not edit `host.ts` concurrently.
-- Sequentially follows `verification-gate-integrity`, whose new contract tests would otherwise need
-  to be written twice.
+- Touches `src/atlas/host.ts`, `SharedRendererKernel.ts`, and `SharedPost.ts`. It starts only
+  after `quality-ladder-resolution-integrity` and `transition-error-user-visibility` have landed.
+  Do not edit those files concurrently with either change.
+- Its new service-contract tests should follow the conventions from `verification-gate-integrity`
+  when that change has landed. It does not wait for verification before fixing a confirmed
+  lifecycle defect, and it does not edit `.github/workflows/ci.yml`.
 
 **Compatibility risk**
 

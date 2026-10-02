@@ -72,11 +72,12 @@ already-scaled value.
   device pixel ratio and the render scale, once each
 - **AND** a test asserts the relationship for at least two non-unity render scales
 
-#### Scenario: Drawing buffer and HDR target agree
+#### Scenario: Drawing buffer and HDR target agree with the documented formula
 
 - **WHEN** the render scale is not one
 - **THEN** the HDR render target's dimensions equal the drawing buffer's dimensions
-- **AND** the destination is not rendered at a resolution lower than the documented scale
+- **AND** both equal `floor(cssSize * effectiveDpr * renderScale)` for that viewport
+- **AND** equality of the two sizes is not sufficient when both differ from that formula
 
 #### Scenario: Overlay and post targets agree
 

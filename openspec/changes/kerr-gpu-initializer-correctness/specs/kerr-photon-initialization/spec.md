@@ -59,27 +59,33 @@ power of `f_s` other than `√f_s`.
 
 ### Requirement: Frequency ratio SHALL be gated by the observer-frequency convention
 
-The Kerr pass SHALL apply the comoving frequency normalisation factor only when the observer
-frequency convention is active. On the legacy static-camera path the factor SHALL be exactly 1, so
-that a Kerr static camera and a Schwarzschild static camera at the same radius apply the identical
-convention.
+The Kerr pass SHALL select the comoving frequency multiplier with the same rule as the Schwarzschild
+`energyMultiplier`. When the observer-frequency convention is inactive, the multiplier SHALL be
+exactly 1 and the legacy factor `g = 1 / (u^t * (1 - Omega * b_z))` SHALL NOT be divided by photon
+energy. When the convention is active, the multiplier SHALL be `1 / max(|E|, denomFloor)`. A
+non-positive energy SHALL remain an invalid stationary image and SHALL NOT be repaired by flipping
+its sign. At zero spin, a static Kerr camera and a Schwarzschild static camera SHALL agree within
+the existing parity tolerance. A fixed brightness ratio involving `sqrt(f_s)` SHALL NOT be an
+acceptance criterion.
 
-#### Scenario: Static camera applies no normalisation
+#### Scenario: Static camera applies no energy normalisation
 
 - **WHEN** the observer frequency convention is inactive
-- **THEN** the frequency ratio is computed without division by the photon energy
-- **AND** the Kerr and Schwarzschild passes agree on the convention for the same static observer
+- **THEN** the legacy frequency factor is multiplied by exactly 1
+- **AND** it is not divided by photon energy
 
-#### Scenario: Moving observer applies the normalisation
+#### Scenario: Moving observer uses the Schwarzschild multiplier
 
 - **WHEN** the observer frequency convention is active
-- **THEN** the frequency ratio is divided by the photon energy as the observer-frame ADR specifies
+- **THEN** the legacy frequency factor is multiplied by `1 / max(|E|, denomFloor)`
+- **AND** the pass does not invent a different sign convention for that multiplier
+- **AND** a non-positive energy remains an invalid stationary image
 
-#### Scenario: Kerr and Schwarzschild static conventions are equivalent
+#### Scenario: Zero-spin static cameras agree within parity tolerance
 
-- **WHEN** the same static observer radius and inclination are rendered by the Kerr and the
-  Schwarzschild backend
-- **THEN** the ratio of the two passes' disk brightness equals `√f_s` for that radius
+- **WHEN** the same static observer is rendered by Kerr at zero spin and by the Schwarzschild pass
+- **THEN** the disk brightness agrees within the existing parity tolerance
+- **AND** the comparison does not expect a `sqrt(f_s)` brightness ratio
 
 ### Requirement: Kerr parity SHALL cover close camera radii and moving observers
 

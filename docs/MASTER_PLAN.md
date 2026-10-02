@@ -1,9 +1,16 @@
 # Master Implementation / Completion / Hardening Plan — `browser-blackhole`
 
-Status: **audit-derived execution specification.** Prepared from a read-only, evidence-backed
-repository-wide audit of `main@dc0b3ba`. No product code was modified to produce this document.
+Status: **audit-derived execution specification, revised after proposal review.** Prepared from a
+read-only audit of product code at `main@dc0b3ba`, then corrected against current source at
+`c0ee5f5`. No product code was modified to produce or revise this document.
 
-Audit base: `main@dc0b3ba` (working tree clean).
+Audit base: `main@dc0b3ba`. Planning revisions through `c0ee5f5` did not change product code, but
+**every cited line must be re-derived at the current HEAD before implementation.** Do not treat an
+audit line number as authoritative after the tree moves.
+
+**Instruction precedence for implementation agents:** this document's file-serialization rules in
+§7 override any earlier sentence that says lanes inside a phase may run in parallel. The OpenSpec
+change artifacts remain the behavioural contracts, including the corrections in this revision.
 Audit scope: 567 tracked files — 50,944 LOC `src/`, 22,116 LOC `tests/`, 7,092 LOC `docs/`,
 8,289 LOC `scripts/` + `tools/`, 13,396 LOC `openspec/`.
 OpenSpec toolchain: `openspec` 1.9.0, `spec-driven` schema.
@@ -153,7 +160,7 @@ destinations, never into their physics (CA-ADR-013). The `Phases`/lifecycle cont
 | Build | `tsc --noEmit && vite build` | CI |
 | Browser smoke | `playwright test tests/browser/smoke.spec.ts` (legacy M0 shell, WebGL2) | CI |
 | Behavioural / parity / goldens | 44 further browser specs, 59 golden PNGs, Firefox project | **local capable-runner gate only** |
-| Performance | 14 `scripts/bench-*.mjs` harnesses, committed results under `benchmarks/results/` | local |
+| Performance | 11 `scripts/bench-*.mjs` harnesses, committed results under `benchmarks/results/` | local |
 
 This split is deliberate and documented: hosted runners have no GPU, so GPU-heavy suites cannot be
 stable hosted gates. The cost of that decision is analysed in §4 (V-05, V-06) — it is correct in
@@ -187,9 +194,9 @@ Little or no work required:
 - **Shared renderer services** (`ParticleService`, `VolumeService`, `StrandService`, `LensingService`)
   work but retain dead handles, lack post-dispose creation guards, or re-upload buffers per frame.
 - **Adaptive quality governor** works and is well tested in isolation, but its tier ladder and its
-  FPS signal are wired in ways that do not match their own documentation (§4 Q-01, Q-02).
-- **Temporal accumulation** is sound in structure; the documented interaction history cap is not
-  honoured (§4 R-03).
+  FPS signal are wired in ways that do not match their own documentation (§4 A-01, A-05).
+- **Temporal accumulation** selects the interaction cap, but a saturated `historyAge / maxAge`
+  ratio does not reduce blend weight when that cap is lowered (§4 R-01).
 - **Browser test suite** — 45 specs with genuinely good non-vacuity discipline in the parity specs,
   but several rows can pass without measuring (§4 V-01…V-07).
 - **Benchmark harnesses** — honest measurement, but the refusal gate and argument contract are
@@ -200,7 +207,7 @@ Little or no work required:
 ### 3.3 Partial
 
 - **Kerr backend.** The integration loop and the CPU reference are correct and mutually consistent;
-  the *camera-side* initialisation in the GPU shader is not (§4 Q-04, Q-05, Q-06). The Kerr +
+  the *camera-side* initialisation in the GPU shader is not (§4 Q-01, Q-02, Q-03). The Kerr +
   moving-observer combination has no GPU parity test at all, which is why the defect survived two
   certified campaigns.
 - **Spatial Atlas Continuous Navigation** — a complete, well-researched OpenSpec change at **0/123
@@ -326,7 +333,7 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| R-01 | `interactionHistoryFrames` does not reduce accumulated history weight | P1 | confirmed | `TemporalService.ts:243-249,265`; `setPolicy` `:150-175` ignores `interaction` |
+| R-01 | Lowering the interaction history cap does not reduce saturated blend weight: `historyAge / loweredMaxAge` remains at the 0.94 ceiling | P1 | confirmed | `TemporalService.ts:232-240,265`; the cap is selected, but the ratio is saturated. Do not “fix” it by dividing accumulated age by the lowered cap |
 | R-02 | `StrandService.setQuality` re-uploads the colour buffer every frame and overrides `setVisible(false)` | P1 | confirmed | `StrandService.ts:331-337,343`; called every frame from `host.ts:741` |
 | R-03 | `ParticleService` compute dispatch ignores the population throttle (full capacity every frame) | P2 | confirmed | `ParticleService.ts:621` (fixed at build) vs `:838-850` |
 | R-04 | `renderer.info` is read as per-frame telemetry but never reset in the Atlas lane | P2 | confirmed | `SharedRendererKernel` `readRendererInfo`; three resets only inside `setAnimationLoop`, which the Atlas never uses |
@@ -377,9 +384,9 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| D-01 | 4 of 7 OpenSpec changes fail `openspec validate --changes --strict` | P1 | confirmed | `openspec validate --changes --strict` output |
+| D-01 | Four pre-existing OpenSpec changes fail `openspec validate --changes --strict` | P1 | confirmed | At `dc0b3ba`: 3 passed, 4 failed. At `c0ee5f5`: 13 passed, 4 failed. The same four fail: cinematic, whole-atlas performance, neutron-star surface, spatial atlas |
 | D-02 | Change status headers say "PLAN ONLY — NO IMPLEMENTATION" while the same folder's `tasks.md` says COMPLETE | P1 | confirmed | `whole-atlas-performance-optimization/proposal.md:4` + `MASTER_PLAN.md:4` vs `tasks.md:1019`; same in `cinematic-visual-fidelity-overhaul` |
-| D-03 | `openspec/AGENTS.md` orders three already-complete changes and describes a three-change repository | P1 | confirmed | `openspec/AGENTS.md:3-11` vs `ls openspec/changes` |
+| D-03 | OpenSpec execution instructions still need a complete current inventory and archive policy | P1 | confirmed | The completed M12/CA9 order was an active misdirection; an interim correction now forbids re-executing it. Hygiene must still enumerate all 17 changes and write the archive policy |
 | D-04 | No `openspec/config.yaml`; `openspec doctor` reports the root unhealthy | P1 | confirmed | `openspec doctor` |
 | D-05 | No `openspec/specs/` — five completed changes were never archived, so no capability baseline exists | P1 | confirmed | `openspec list --specs` → "No specs found" |
 | D-06 | Root `AGENTS.md` required-reading list points at superseded single-destination docs | P1 | confirmed | `AGENTS.md:5-15` → `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, `docs/BACKLOG.md` |
@@ -407,12 +414,16 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 | O-08 | `mcp-preflight.mjs` uses `execFileSync(..., {shell: true})` and an over-broad `'~'` path rule | P3 | confirmed | `mcp-preflight.mjs:34-43,136-149` |
 | O-09 | Reducer hardcodes `retrievedAt: "2026-08-25"` into a regenerated manifest | P3 | confirmed | `reduce_bbh_merger.py:495` |
 
-### L — Legacy surface (change: `shared-renderer-service-lifecycle`, P3 scope)
+### L — Legacy surface (deferred; no current change owns this lane)
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
 | L-01 | ~1,900 LOC of M0 legacy shell (two app shells, two state schemas, two renderer lifecycles) retained behind `?legacy=1` | P3 | confirmed | `App.ts`, `state.ts`, `BlackHoleRenderer.ts`, `RenderCoordinator.ts`, `renderSize.ts`, `ResizeController.ts`, `controlPanel.ts`, `statusPanel.ts` |
 | L-02 | The shared `src/shaders/diagnostic.ts` imports `DebugViewMode` from the legacy app state — a shared module depends on a legacy module | P3 | confirmed | `shaders/diagnostic.ts:30` |
+
+L-01 and L-02 are **not completion criteria** of `shared-renderer-service-lifecycle` or
+`destination-control-truthfulness`. Neither change may remove the legacy shell or retarget
+`diagnostic.ts` as a side effect. They remain deferred until a change explicitly owns them.
 
 ---
 
@@ -486,8 +497,11 @@ each change's declared status matches its task state.
 
 ### Phase 1 — Critical correctness defects
 
-**Changes: `kerr-gpu-initializer-correctness`, `destination-control-truthfulness` (U-01..U-04),
-`quality-ladder-resolution-integrity` (A-01, A-02).**
+**Changes: `kerr-gpu-initializer-correctness`, then `quality-ladder-resolution-integrity`, then
+`transition-error-user-visibility`, then `destination-control-truthfulness`.** Kerr may proceed
+in parallel with that host/shell sequence because it does not edit `src/atlas/host.ts`,
+`TransitionDirector.ts`, or `src/app/atlasApp.ts`. The other three are one writer at a time, in
+that order. See §7.
 
 These are reachable from the shipped product, produce wrong output, and are invisible to the
 current test suite. Each lands with the regression test that would have caught it.
@@ -505,13 +519,17 @@ current test suite. Each lands with the regression test that would have caught i
 except where a fix provably corrects a defect (and each such golden change is justified in the
 change's `design.md`); the KERR/OBSERVER/AGN/NS goldens pass twice-stable.
 
-### Phase 2 — Failure visibility and reliability
+### Phase 2 — Failure visibility and renderer lifecycle
 
-**Change: `transition-error-user-visibility`; part of `shared-renderer-service-lifecycle`.**
+**Changes, in order: `transition-error-user-visibility` if it did not land in Phase 1, then
+`shared-renderer-service-lifecycle`.** The lifecycle change starts only after both
+`quality-ladder-resolution-integrity` and `transition-error-user-visibility` have landed. It does
+not own L-01 or L-02.
 
-- Add the transition error to `TransitionPublicState`; render it in the shell with remediation copy;
-  wire `buildUnsupportedMessage` into the product route.
+- Publish transition failure, including a defined progress signal for stall detection, and render
+  remediation in the shell.
 - Add the post-dispose creation guards and handle unlinking to the shared services.
+- Correct the temporal interaction weight without using `historyAge / loweredMaxAge`.
 - Gate `handleResize` on device loss; surface the `maxTextureSize` clamp.
 
 **Gate:** a forced preparation rejection produces a visible, accessible error with a recovery
@@ -573,56 +591,45 @@ changes into `openspec/specs/`; update `.agent/STATE.md` with the release commit
 
 ---
 
-## 7. Parallel Workstreams
+## 7. Workstreams and file serialization
 
-Genuinely independent lanes, safe to delegate concurrently. **Phases 0 and 1 are sequential
-relative to each other; everything inside a phase can be parallel by lane.**
+Independent file ownership may proceed concurrently. **Shared files are strictly serialized.** An
+earlier sentence that says everything inside a phase can run in parallel is withdrawn.
 
-| Lane | Owns | Changes | Parallel with |
-| --- | --- | --- | --- |
-| **A — Physics** | `src/phenomena/black-hole/{kerr,lut,observer}`, `src/physics`, the parity specs | `kerr-gpu-initializer-correctness` | B, C, D, E |
-| **B — Atlas host / quality** | `src/atlas/{host,governor,TransitionDirector,types,navigation,hostStatus}.ts`, `src/renderer/SharedRendererKernel.ts`, `src/renderer/shared/SharedPost.ts` | `quality-ladder-resolution-integrity`, `transition-error-user-visibility` | A, D, E |
-| **C — Product/UI** | `src/app/atlasApp.ts`, `src/ui/**`, `src/phenomena/*/[a-z]*Module.ts`, `index.html` | `destination-control-truthfulness` | A, D, E |
-| **D — Tests/CI** | `tests/**`, `playwright.config.ts`, `.github/workflows/ci.yml`, `vite.config.ts` | `verification-gate-integrity` | A, B, C, E |
-| **E — Tooling/docs/ops** | `scripts/**`, `tools/**`, `docs/**`, `openspec/**`, `public/**` | `benchmark-harness-integrity`, `operations-and-deployment-readiness`, `documentation-truthfulness-realignment`, `specification-baseline-hygiene` | A, B, C, D |
+| Order | Change | Exclusive files while it is active |
+| --- | --- | --- |
+| 0 | `specification-baseline-hygiene` | `openspec/**`, `openspec/AGENTS.md`, `openspec/project.md` |
+| 1a, parallel with 1b–1d | `kerr-gpu-initializer-correctness` | `src/phenomena/black-hole/{kerr,lut,observer}/**`, Kerr/LUT parity specs |
+| 1b | `quality-ladder-resolution-integrity` | `src/atlas/host.ts`, `src/atlas/TransitionDirector.ts`, `src/renderer/SharedRendererKernel.ts`, `src/renderer/shared/SharedPost.ts` |
+| 1c, after 1b | `transition-error-user-visibility` | those same host/director files, plus `src/atlas/types.ts` and `src/app/atlasApp.ts` |
+| 1d, after 1c | `destination-control-truthfulness` | `src/app/atlasApp.ts`, `src/ui/**`, destination modules |
+| 2, after 1b and 1c | `shared-renderer-service-lifecycle` | `src/atlas/host.ts`, `src/renderer/SharedRendererKernel.ts`, `src/renderer/shared/**` |
+| 3, after 1–2 | `verification-gate-integrity` | `tests/**`, `playwright.config.ts`, `.github/workflows/ci.yml` |
+| 4, after 3 | `benchmark-harness-integrity` | `scripts/bench-*.mjs`, `benchmarks/**`; CI only after verification releases it |
+| 5a, after 4 | `operations-and-deployment-readiness` | `.github/**`, deployment config, `tools/cosmic-data/**`, `vite.config.ts` |
+| 5b, after 5a | `documentation-truthfulness-realignment` | `docs/**`, root `AGENTS.md`, certification docs |
 
-### Ownership boundaries that must not be crossed concurrently
+### Rules
 
-1. **`src/atlas/host.ts` and `src/atlas/TransitionDirector.ts` are single-owner.** B owns them. No
-   other lane edits them without coordinating with B.
-2. **Shader physics (`kerrIntegrator.ts`, `lensingGpu.ts`, `schwarzschildIntegrator.ts`) are
-   single-owner.** A owns them. This is the AGENTS.md rule: physics formulas and coordinate
-   conventions are integration-sensitive.
-3. **`src/app/atlasApp.ts` is single-owner.** C owns it. B must send any required shell change as a
-   contract request, not an edit. **The one approved exception is recorded here explicitly:** B's
-   `transition-error-user-visibility` must render its error surface in this file, so that change and
-   C's `destination-control-truthfulness` are **sequenced rather than parallel** —
-   `transition-error-user-visibility` first, `destination-control-truthfulness` second. Two agents
-   must not rewrite the product shell concurrently.
-4. **Goldens are evidence, not a negotiation.** A golden may change only after the physical change
+1. **One writer for `src/atlas/host.ts`, `TransitionDirector.ts`, `SharedRendererKernel.ts`, and
+   `SharedPost.ts`.** Quality, transition, and lifecycle all edit those files. They run in the
+   order above, never concurrently and never as an informal “coordinate with B”.
+2. **One writer for `src/app/atlasApp.ts`.** Transition lands its error surface first.
+   Destination-control work starts only after that change has landed.
+3. **One writer for `.github/workflows/ci.yml`.** Verification, then benchmark, then operations,
+   then documentation. Do not edit it from two changes at once.
+4. **Shader physics remain single-owner.** Kerr may run beside the host sequence only while it
+   stays inside its exclusive files.
+5. **Goldens are evidence, not a negotiation.** A golden may change only after the physical change
    it reflects is independently validated, and every golden change must be justified in the owning
    change's `design.md`.
-5. **`.agent/STATE.md` and `docs/RELEASE_CERTIFICATION.md` are written once, at the end, by the
-   integrating agent.** Lanes report evidence; they do not edit certification documents.
+6. **`.agent/STATE.md` and `docs/RELEASE_CERTIFICATION.md` are written by the integrating agent**
+   when a change closes. Lanes report evidence; they do not rewrite certification history.
+7. **L-01 and L-02 are deferred.** No current change removes the legacy shell or retargets
+   `src/shaders/diagnostic.ts`.
 
-### Cross-lane dependency order
-
-```text
-Phase 0 (E)  ──► everything: establishes the planning substrate
-Phase 1: A ──┐
-         B ──┼──► Phase 2 (B + A handoff) ──► Phase 3 (D) ──► Phase 4 (E) ──► Phase 5 (E) ──► Phase 6
-         C ──┘
-         │
-         └── B and C are SEQUENCED, not parallel: transition-error-user-visibility (B)
-             must land before destination-control-truthfulness (C), because both edit
-             src/app/atlasApp.ts.
-```
-
-Within Phase 1, A may run fully in parallel with B and C. B's `quality-ladder-resolution-integrity`
-and the later `shared-renderer-service-lifecycle` share `src/atlas/host.ts` and are also sequenced.
 Phase 3 must not start before Phases 1–2: a verification change written against defective code
-would encode the defect as expected behaviour. Phase 4 must not start before Phase 3: the benchmark
-harnesses are the evidence instrument for the verification changes.
+would encode the defect as expected behaviour. Phase 4 must not start before Phase 3.
 
 ---
 
@@ -715,9 +722,10 @@ No clause is satisfied by assertion.
    ordering record.
 2. **Verify repository state first.** Record `git status --short`, `git rev-parse HEAD`,
    `node --version`, `npm --version`. If the tree is not clean, stop and reconcile before starting.
-3. **Do not blindly trust this plan.** It was written against `dc0b3ba`. If the code has moved,
-   re-derive the specific finding from the current source before acting on it. Reconcile the
-   difference; do not silently choose one.
+3. **Do not blindly trust this plan or an audit line number.** Findings were derived at
+   `dc0b3ba`; this revision was checked at `c0ee5f5`. Re-derive the cited symbol against current
+   source before editing. If the code has moved, reconcile the difference; do not silently choose
+   the plan.
 4. **Execute prerequisite work first.** Phase 0 gates every other phase. Within a phase, respect
    the lane ownership table in §7 and never take ownership of another lane's files.
 5. **Preserve working functionality.** The physics contracts, the fidelity labels, the
@@ -764,7 +772,7 @@ No clause is satisfied by assertion.
 | `npm run typecheck` (`tsc --noEmit`) | PASS |
 | `npx vitest run` | PASS — 46 files, 631 tests, 8.2 s — **but not reliably reproducible; see V-17** |
 | `npm audit` | **1 high-severity advisory** (see D-08/O-02) |
-| `openspec validate --changes --strict` | **3 passed, 4 failed** (see D-01) |
+| `openspec validate --changes --strict` | **3 passed, 4 failed at audit time** (see D-01). Re-review at `c0ee5f5`: **13 passed, 4 failed**; the same four historical changes fail |
 | `openspec doctor` | **unhealthy** — missing `openspec/config.yaml` (see D-04) |
 | `openspec list` | 188/246, 0/123, five unarchived "complete" changes |
 

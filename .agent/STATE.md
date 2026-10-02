@@ -1,3 +1,27 @@
+## 2026-09-30 session — proposal review corrections
+
+Status: **planning only.** No product code changed. The live campaign is
+`docs/MASTER_PLAN.md`, not the completed performance campaign.
+
+Corrected contradictory OpenSpec acceptance criteria and stale entry points:
+
+- Kerr frequency scenarios no longer require both "no energy normalisation" and a
+  `sqrt(f_s)` brightness ratio. The multiplier matches the Schwarzschild
+  `energyMultiplier`.
+- Transition stall is absence of a defined progress event, not elapsed time.
+- Temporal interaction weight must use the settled cap as denominator. The
+  saturated `historyAge / loweredMaxAge` formula is forbidden.
+- Quality tests must assert the documented size formula, not buffer equality alone.
+- Neutron-star inclination is a live rig binding, not a passive seed.
+- Shared-file order is serialized in `docs/MASTER_PLAN.md` §7.
+- Counts corrected: 17 OpenSpec changes, performance validation has 17 errors,
+  12 benchmark result directories, 9 of 11 bench scripts overwrite their exit code.
+- `.agent/START_HERE.md`, `.agent/EXECUTION_PROMPT.md`, `AGENTS.md`, and
+  `openspec/AGENTS.md` no longer direct an agent to restart completed campaigns.
+
+Next action: implement `specification-baseline-hygiene` only when implementation
+is explicitly requested. Re-derive every source citation at current HEAD first.
+
 ## 2026-09-12 session — RE-CERTIFICATION AT HEAD (`bbd71ef`)
 
 Status: **PRODUCTION READY re-certified at `bbd71ef` (2026-09-12).**

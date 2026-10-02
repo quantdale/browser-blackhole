@@ -1,7 +1,8 @@
 # Tasks — Shared renderer service lifecycle
 
-**Sequenced after `quality-ladder-resolution-integrity`** (both edit `src/atlas/host.ts`) and after
-`verification-gate-integrity` (whose contract-test conventions this change reuses).
+**Sequenced after `quality-ladder-resolution-integrity` and `transition-error-user-visibility`.**
+All three edit `src/atlas/host.ts`; do not start this change until both have landed. It does not
+wait for `verification-gate-integrity` and does not edit CI.
 
 ## 0. Baseline
 
@@ -29,9 +30,9 @@
 
 ## 3. Temporal
 
-- [ ] 3.1 Compute the effective history weight relative to the cap in effect while the history was accumulated.
-- [ ] 3.2 Record the interaction-cap transition in the reset-reason ring.
-- [ ] 3.3 Confirm the tests from 1.1 pass.
+- [ ] 3.1 Compute interaction weight as `min(0.94, min(historyAge, activeCap) / settledCap * 0.94) * confidence`. Do not implement `historyAge / loweredMaxAge` or `min(historyAge, previousMaxAge) / loweredMaxAge`.
+- [ ] 3.2 Report the active cap and applied weight in the diagnostic snapshot. Do not require a history reset to satisfy the weight change.
+- [ ] 3.3 Confirm the test from 1.1 fails on the saturated-ratio formula and passes on the settled-denominator formula.
 - [ ] 3.4 Re-run `temporal-stability` and `temporal-critical-regions`; record any golden or metric change and justify each.
 
 ## 4. Strand and ribbons
@@ -94,6 +95,6 @@
 
 ## 11. Close-out
 
-- [ ] 11.1 Strike findings R-01 through R-12 and L-01 from `docs/MASTER_PLAN.md` with their resolution commits.
+- [ ] 11.1 Strike findings R-01 through R-12 from `docs/MASTER_PLAN.md` with their resolution commits. Do not strike L-01; this change does not remove the legacy shell.
 - [ ] 11.2 Append evidence, including the measurement from 7.8, to `.agent/STATE.md`.
 - [ ] 11.3 Commit this change as one coherent checkpoint.

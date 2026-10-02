@@ -25,8 +25,8 @@ consistency check.
 
 ## 2. Required-reading list
 
-- [ ] 2.1 Realign `AGENTS.md`'s required-reading list to current documents: `docs/MASTER_PLAN.md`, the atlas architecture, the physics and numerics documents, the current certification.
-- [ ] 2.2 Move `PRODUCT_SPEC.md`, `ROADMAP.md`, `BACKLOG.md` and `MILESTONE_WORK_PACKETS.md` into an explicitly labelled historical section.
+- [ ] 2.1 Complete the realignment of `AGENTS.md`. An interim banner may already warn that the numbered list is not the live queue. Replace that banner and list with current documents: `docs/MASTER_PLAN.md`, the atlas architecture, the physics and numerics documents, and the current certification. Do not restore the old list as required live reading.
+- [ ] 2.2 Move `PRODUCT_SPEC.md`, `ROADMAP.md`, `BACKLOG.md` and `MILESTONE_WORK_PACKETS.md` into an explicitly labelled historical section. Keep their physics and history value; remove their authority as the work queue.
 - [ ] 2.3 Verify by fresh-agent reading: following the list leads to current work, not to a finished campaign.
 
 ## 3. Release certification

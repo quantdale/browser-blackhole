@@ -45,9 +45,9 @@ product one was left as a code plus a raw string.
 - **Terminate a stalled preparation.** A destination preparation currently has no stall timeout: the
   slow-load threshold only emits a status event, and the only things that abort a prepare are a
   retargeting navigation, an explicit cancel and teardown. A data request that never completes
-  therefore leaves the application in `preparing` indefinitely — a permanent "Preparing…" with no
-  failure, no error and no recovery. This is the one failure mode the error surface would still not
-  catch, because nothing ever rejects.
+  therefore leaves the application in `preparing` indefinitely. Stall is absence of a defined
+  progress event, not elapsed time by itself. A long preparation that keeps reporting an increased
+  fraction or receiving additional bytes is not aborted.
 - **Keep the existing console diagnostics** — they stay as the technical-detail channel, not the
   only channel.
 - **Keep the existing slow-load status behaviour** unchanged: a slow load that is still progressing
@@ -111,14 +111,18 @@ Non-goals, explicitly out of scope:
   avoid two agents rewriting the shell concurrently. This change goes **first**: it defines the
   error surface, and `destination-control-truthfulness` then rebuilds the panel around a shell that
   already has one.
-- Independent of `kerr-gpu-initializer-correctness`, `quality-ladder-resolution-integrity` and
-  `shared-renderer-service-lifecycle` in files; it may run in parallel with those, provided the
-  `src/atlas/host.ts` single-owner rule is respected.
+- Independent of `kerr-gpu-initializer-correctness` in files, so that change may run beside it.
+  It is not independent of `quality-ladder-resolution-integrity` or
+  `shared-renderer-service-lifecycle`: all three edit `src/atlas/host.ts`. Quality lands first,
+  this change second, and lifecycle only after this change. "Coordinate" is not permission to
+  edit those files concurrently.
 
 **Blast radius**
 
-- Additive to the public type. No existing consumer reads a field that does not exist today, so the
-  change cannot break a current caller. The only behaviour change is that a previously silent
-  failure becomes visible — which is the intent.
+- The new public error field is additive in product behaviour, but it is not source-compatible
+  without edits. `getPublicState()` and every value satisfying `TransitionPublicState` must include
+  it, and exact-shape assertions or normalizers must be updated. A typecheck failure at those sites
+  is expected work, not evidence that the change is wrong. The user-visible behaviour change is
+  that a previously silent failure becomes visible.
 - Shared shell file: see the Dependencies note. `src/app/atlasApp.ts` must not be edited by two
   agents at once.

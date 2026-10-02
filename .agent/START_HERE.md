@@ -1,25 +1,21 @@
 # START HERE — active campaign
 
-Updated: 2026-08-28
-Audit base: `main@02d129fe29d3f4fa383c3ed5760d70b7381a0191`
+Updated: 2026-09-30
+Planning revision: `c0ee5f5` and later. Product-code findings were derived at `dc0b3ba`; re-derive citations before editing.
 
-The feature-completion and final-production-readiness campaigns are complete. **Do not restart M0–M12, CA9, or final-production-readiness.**
+The feature-completion, final-production-readiness, and whole-atlas performance campaigns are complete or complete-with-deferrals. **Do not restart M0–M12, CA9, final-production-readiness, or `whole-atlas-performance-optimization`.**
 
 ## Active work
 
-The active campaign is:
+The active campaign is the hardening plan:
 
-`openspec/changes/whole-atlas-performance-optimization/`
+1. `docs/MASTER_PLAN.md` — priority, sequencing, and file ownership. §7 overrides any older parallel-lane sentence.
+2. The assigned change under `openspec/changes/`. Its proposal, design, tasks, and spec are the behavioural contract.
+3. `.agent/QUALITY_GATES.md`
 
-Start with:
+Start with `specification-baseline-hygiene` unless a later change has already landed and the master plan's sequence says otherwise. Do not implement `spatial-atlas-continuous-navigation` as part of this campaign.
 
-1. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
-2. `openspec/changes/whole-atlas-performance-optimization/EXECUTION_PROMPT.md`
-3. `openspec/changes/whole-atlas-performance-optimization/MASTER_PLAN.md`
-4. `openspec/changes/whole-atlas-performance-optimization/tasks.md`
-5. `.agent/QUALITY_GATES.md`
-
-Mission: execute the performance-hardening campaign across all eight production destinations and shared runtime. Eliminate unnecessary CPU/GPU work before reducing fidelity. Preserve visual goldens, scientific parity, deterministic behavior, WebGPU/WebGL2 compatibility, and resource-lifecycle guarantees.
+Mission: correct confirmed defects and make gates, controls, deployment, and documentation truthful. Do not add a destination or reopen a completed campaign.
 
 ## Mandatory start gate
 

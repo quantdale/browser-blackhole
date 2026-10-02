@@ -44,20 +44,21 @@ the documented effect of that parameter, and the change SHALL be observable.
 
 #### Scenario: The interaction history cap reduces accumulated weight
 
-- **WHEN** the interaction history cap is lowered and interaction begins
-- **THEN** the weight given to previously accumulated history is lower than the settled weight
-- **AND** it is lower on the first frame after interaction begins, not only after further frames
+- **WHEN** history weight has reached its settled ceiling and interaction begins
+- **THEN** the weight on that first interaction frame is strictly lower than the settled ceiling
+- **AND** the implementation does not leave the weight at the ceiling by dividing accumulated age by
+  the lowered cap
 
 #### Scenario: A settled cap still applies
 
-- **WHEN** the interaction history cap is at its settled value
-- **THEN** accumulation converges as documented
+- **WHEN** interaction is inactive
+- **THEN** accumulation converges to the documented settled weight
 
-#### Scenario: The change is observable
+#### Scenario: The applied cap is observable without a forced reset
 
-- **WHEN** the interaction history cap changes
-- **THEN** the change is recorded in the service's reset-reason history
-- **AND** it is visible in the service's diagnostic snapshot
+- **WHEN** interaction begins
+- **THEN** the diagnostic snapshot reports the active cap and the applied weight
+- **AND** satisfying the weight change does not require invalidating accumulated history
 
 ### Requirement: Presentation setters SHALL be idempotent
 

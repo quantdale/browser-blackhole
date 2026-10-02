@@ -5,7 +5,7 @@
 - [ ] 0.1 Record `git rev-parse HEAD`, `node --version`, `npm --version`, clean `git status --short`.
 - [ ] 0.2 Run `npm run check` and record the result.
 - [ ] 0.3 Record the current exit status of a harness that renders nothing (see task 1.1) as the before-evidence.
-- [ ] 0.4 Inventory the record shape of all 13 committed benchmark result directories.
+- [ ] 0.4 Inventory the record shape of all 12 committed benchmark result directories. The earlier "13" count was wrong.
 - [ ] 0.5 Confirm `openspec validate benchmark-harness-integrity --type change --strict` passes.
 
 ## 1. Negative test first

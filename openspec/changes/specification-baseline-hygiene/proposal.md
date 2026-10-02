@@ -8,13 +8,18 @@ Four confirmed defects, all verified by running the tool:
    project has an installed, configured OpenSpec toolchain (1.9.0, `spec-driven` schema) and no
    configuration file.
 
-2. **Four of seven changes fail `openspec validate --changes --strict`.** The failures are
-   mechanical: requirement bodies that do not carry a normative verb on the line after the
-   requirement header, and requirements with no `#### Scenario:` block.
-   `cinematic-visual-fidelity-overhaul` has 24 such errors, `whole-atlas-performance-optimization` 18,
-   `m12-neutron-star-surface-lensing` 1, and `spatial-atlas-continuous-navigation` has no `specs/`
-   directory at all. The delta specs are therefore not machine-checkable contracts — they are prose
-   that happens to sit in a directory.
+2. **Four changes fail `openspec validate --changes --strict`.** At the original audit there were
+   seven changes and three passed. The current tree has 17 changes: the ten hardening changes pass,
+   and the same four historical changes fail. The failures are mechanical, but the counts must not
+   be collapsed into one class. Re-review at `c0ee5f5` found:
+   - `cinematic-visual-fidelity-overhaul`: 24 errors, 12 missing a normative body sentence and 12
+     missing a scenario.
+   - `whole-atlas-performance-optimization`: 17 errors, 8 missing a normative body sentence, 8
+     missing a scenario, and 1 requirement missing its body text. This is not 18 body-only errors.
+   - `m12-neutron-star-surface-lensing`: 1 missing scenario.
+   - `spatial-atlas-continuous-navigation`: no `specs/` directory.
+   Record the validator output at implementation time rather than expecting the audit-time 3/4
+   split.
 
 3. **Five changes are marked complete and none has been archived.** There is no `openspec/specs/`
    directory, so the repository has **no baseline capability specifications**. The consequence is
@@ -29,12 +34,12 @@ Four confirmed defects, all verified by running the tool:
    contradiction exists in `cinematic-visual-fidelity-overhaul`. An agent reading the folder top-down
    is told twice that nothing was implemented, and discovers the opposite only in `tasks.md`.
 
-5. **`openspec/AGENTS.md` describes a repository that no longer exists.** It states "This repository
-   currently has three planned changes" and orders `m12-neutron-star-surface-lensing`,
-   `m12-repository-integrity` and `ca9-galaxy-collision` as required execution order. All three are
-   complete. The tree holds seven changes and `openspec/project.md` names a fourth campaign as
-   active. `openspec/project.md` itself then names two different "sources of truth" audit documents
-   (lines 34 and 79).
+5. **`openspec/AGENTS.md` described a repository that no longer exists.** It ordered three
+   completed M12/CA9 changes as required work. An interim correction now forbids re-executing that
+   order, but this change must still replace that correction with a complete inventory of every
+   change present at implementation time. At the 2026-09-30 review that inventory was 17 changes:
+   5 complete and 12 in progress, including the ten hardening changes. `openspec/project.md` still
+   names two different "sources of truth" audit documents (lines 34 and 79).
 
 This violates the repository's own rule, stated in `openspec/project.md`: "When historical text
 conflicts with an active OpenSpec change, do not silently choose one. Determine whether the

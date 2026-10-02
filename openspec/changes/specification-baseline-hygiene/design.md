@@ -8,10 +8,10 @@
 > Determine whether the historical statement is stale, update it as part of the appropriate
 > truthfulness task, and preserve scientific/runtime invariants."
 
-The conflict is between planning artifacts and the code, and the planning artifacts are stale in
-four ways. Two are structural (`config.yaml` absent, four changes failing strict validation) and two
-are factual (status headers contradicting their own task lists, execution instructions describing a
-three-change repository that holds seven).
+The conflict is between planning artifacts and the code. Two defects are structural (`config.yaml`
+absent, four historical changes failing strict validation) and two are factual (status headers
+contradicting their own task lists, and execution instructions that formerly described three
+completed changes). The current tree has 17 changes, not seven.
 
 The fourth finding — no `openspec/specs/` — is the one that matters most going forward, and it is
 easy to underestimate. Without a baseline, a new change cannot write `## MODIFIED Requirements`
@@ -109,8 +109,11 @@ goal.
 
 ### D6 — Rewrite `openspec/AGENTS.md` against the real tree
 
-**Decision.** Rewrite it to describe all seven changes, mark the five closed, name the two open, and
-state the real prerequisite (performance campaign first; spatial atlas explicitly not started).
+**Decision.** Replace the interim correction with an inventory of every change present when this
+task runs. At the 2026-09-30 review that was 17 changes: five complete, and twelve in progress.
+The twelve include the ten hardening changes plus `whole-atlas-performance-optimization` and
+`spatial-atlas-continuous-navigation`. Do not reduce the inventory to seven, and do not describe
+the performance campaign as the only open work.
 
 **Rationale.** The file is the contract every autonomous agent is told to obey. It currently orders
 three completed changes, which would cause an agent to redo shipped work. This is the highest

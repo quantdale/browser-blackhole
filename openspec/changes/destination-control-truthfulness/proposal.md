@@ -56,8 +56,9 @@ or a displayed value that does not agree with canonical state:
 
 - **Make the AGN torus visibility a pure function of `state.torusVisible`.** Group-level zone gating
   already provides exclusivity.
-- **Make the reported observer inclination agree with the rendered observer** — derive the reported
-  value from the camera orbit, or drive the orbit from the control. One source of truth.
+- **Bind the Neutron Star observer-inclination control to the camera rig.** A user change sets the
+  rig polar angle; an orbit change updates the same control and canonical state. The field may seed
+  the rig from a preset, but it SHALL NOT remain a passive readout or a second live source.
 - **Correct the Neutron Star fidelity note and module header** to describe the shipped DIRECT
   surface-ray path, keeping the still-true omissions (Doppler, aberration, frame dragging,
   atmosphere).

@@ -48,8 +48,12 @@ Separately, the operational surface has drifted from its own claims:
 
 ## What Changes
 
-- **Ship a reference static-host configuration** satisfying the mandatory SPA-fallback contract, for
-  at least the common host families, plus a `404.html` fallback.
+- **Ship a reference static-host configuration** satisfying the mandatory SPA-fallback contract.
+  Files a host reads from the publish directory, such as `404.html` and a Netlify `_redirects`,
+  may live in `public/` and are intentionally copied into `dist/`. Files a host reads from the
+  repository root, such as `vercel.json` and `netlify.toml`, must not be placed in `public/`; Vite
+  would publish them as runtime assets. The test must prove a missing asset still 404s and that
+  repo-root config is absent from `dist/`.
 - **Test the deployment contract** by serving `dist/` from a plain static server with no SPA fallback
   and asserting the failure mode, so the requirement is genuinely exercised rather than assumed.
 - **Make the sub-path hosting assumption explicit** and support it, or document it as a supported
