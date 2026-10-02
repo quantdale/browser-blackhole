@@ -1,0 +1,4 @@
+# OpenSpec project configuration.
+# Minimal by design: the repository already uses the spec-driven workflow schema.
+# See openspec/changes/specification-baseline-hygiene/design.md D1.
+schema: spec-driven

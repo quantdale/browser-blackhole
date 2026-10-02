@@ -29,13 +29,16 @@ matrix are a documented **local capable-runner gate** (`docs/CI_CD.md` §2/§16)
 — run with `npm run e2e` / `--project=firefox` on a WebGPU-capable machine and
 record results as evidence, never claim them as hosted-CI PASS.
 
-## Active campaign — 2026-08-28
+## Active work — 2026-10-02
 
-The selected next phase is **whole-atlas performance hardening**:
+The 2026-08-28 performance campaign (`whole-atlas-performance-optimization`) is
+certified complete with documented deferrals at `179eb56`. The active work is the
+hardening roadmap in `docs/MASTER_PLAN.md` §6, executed as the ordered OpenSpec
+changes under `openspec/changes/` (Phase 0 `specification-baseline-hygiene` first —
+see `openspec/AGENTS.md` for the real change set and ordering).
 
-`openspec/changes/whole-atlas-performance-optimization/`
-
-The pre-optimization product remains production-certified, but the optimization task checklist is active and must be executed with matched benchmark evidence. Read `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md` and the active change's `EXECUTION_PROMPT.md` before modifying runtime code.
+Historical context: `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md` and the active change's
+`EXECUTION_PROMPT.md` describe the performance campaign as originally planned.
 
 ## Technical stack
 
@@ -77,15 +80,21 @@ Use narrower unit/browser/parity/golden commands during development, but close a
 
 ## Planning/execution sources of truth
 
-Read in this order for active work:
+Current sources of truth (reconciled 2026-10-02):
 
-1. `.agent/START_HERE.md`
-2. `.agent/EXECUTION_PROMPT.md`
-3. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`
+1. `docs/MASTER_PLAN.md` — the canonical audit and implementation plan (2026-09-30).
+2. `.agent/START_HERE.md`
+3. `.agent/EXECUTION_PROMPT.md`
 4. the active `openspec/changes/<change>/` folder
 5. `.agent/QUALITY_GATES.md`
 6. implementation-specific docs referenced by that change
 7. `.agent/STATE.md` for durable historical evidence
+
+Historical, superseded by `docs/MASTER_PLAN.md` (kept for context, do not follow as
+current):
+
+- `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`
+- `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
 
 When historical text conflicts with an active OpenSpec change, do not silently choose one. Determine whether the historical statement is stale, update it as part of the appropriate truthfulness task, and preserve scientific/runtime invariants.
 

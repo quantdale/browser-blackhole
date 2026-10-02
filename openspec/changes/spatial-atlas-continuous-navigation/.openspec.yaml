@@ -1,0 +1,8 @@
+# Per-change metadata.
+# D3 decision (specification-baseline-hygiene/design.md): this change carries no
+# spec deltas at planning time. It is a 0/123 deliberate design gated behind the
+# whole-atlas performance campaign; its ADDED capability deltas are authored at
+# implementation time from the locked design in design.md / MASTER_PLAN.md, not
+# invented ahead of the implementation they describe.
+schema: spec-driven
+skip_specs: true

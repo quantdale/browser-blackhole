@@ -1,6 +1,9 @@
-# Neutron-star surface-lensing delta specification
+# neutron-star-surface-lensing Specification
 
-## ADDED Requirements
+## Purpose
+TBD - created by archiving change m12-neutron-star-surface-lensing. Update Purpose after archive.
+
+## Requirements
 
 ### Requirement: Direct Schwarzschild material-surface ray tracing
 
@@ -143,8 +146,13 @@ The repository SHALL provide a discoverable neutron-star benchmark path and SHAL
 - **THEN** the record SHALL include enough context to reproduce/compare it
 - **AND** it SHALL NOT describe CPU/rAF timing as GPU time.
 
-## MODIFIED Requirements
-
 ### Requirement: Neutron Star production fidelity claim
 
 The Neutron Star destination MAY be documented as direct compact-surface Schwarzschild ray tracing only when the material-surface ray path, reference validation and production parity requirements above are satisfied. Otherwise all public and scientific documentation SHALL explicitly describe the actual reduced/straight-line rendering model and its limitation.
+
+#### Scenario: Documentation claim is checked against the landed model
+
+- **GIVEN** the neutron-star surface-ray implementation, its reference validation results and the production parity evidence recorded in this change
+- **WHEN** the production fidelity claim in documentation and the UI is reviewed
+- **THEN** a claim of direct compact-surface Schwarzschild ray tracing SHALL be present only if the surface-ray path, reference validation and production parity requirements are all satisfied by code and tests
+- **AND** otherwise the claim SHALL name the actual reduced/straight-line model and its limitation explicitly.

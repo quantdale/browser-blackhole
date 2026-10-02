@@ -1,3 +1,79 @@
+## 2026-10-02 session — OpenSpec apply: Phase 0 `specification-baseline-hygiene` COMPLETE
+
+Status: **Phase 0 done (46/46 tasks with evidence). The planning substrate is
+now trustworthy; Phase 1 is unblocked.** No product code changed
+(`git diff main -- src tests scripts tools` empty).
+
+Executed via the goal skill as an `openspec apply` run on the change the
+repository contract mandates first (Phase 0 gates every other change, per
+`docs/MASTER_PLAN.md` §6 and `openspec/AGENTS.md`).
+
+### Baseline (before, at `c0ee5f5`)
+
+- `openspec doctor`: unhealthy (missing `openspec/config.yaml`).
+- `openspec validate --changes --strict`: 13 passed, 4 failed (cinematic 24
+  errors, whole-atlas 17, m12-neutron-star 1, spatial-atlas no deltas).
+- `openspec list --specs`: no specs found — no capability baseline existed.
+- Two changes declared `Status: PLAN ONLY` while their own tasks said COMPLETE.
+
+### After
+
+- `openspec/config.yaml` added (`schema: spec-driven`); `openspec doctor`
+  healthy.
+- All strict-validation failures repaired without weakening content: normative
+  sentences moved into requirement bodies (cinematic 13, whole-atlas 8), missing
+  scenarios written and grounded in delivered/evidenced behavior (cinematic 11,
+  whole-atlas 9 incl. one empty-body requirement), m12 fidelity-claim scenario
+  added. `spatial-atlas-continuous-navigation` resolved per D3 with
+  `skip_specs: true` + recorded rationale (0/123, gated behind prerequisites;
+  deltas authored at implementation time).
+- Status headers corrected: whole-atlas `IMPLEMENTED ... complete-with-deferrals
+  at 179eb56 (2026-09-10)`, cinematic `IMPLEMENTED ... certified 2026-08-30 at
+  17c4644`.
+- All 58 deferred boxes in whole-atlas annotated inline `DEFERRED`/`REJECTED`
+  with per-box reasons (evidence preserved; none checked or deleted).
+- `openspec/AGENTS.md` rewritten as a full 17-change inventory with the §6/§7
+  ordering, shared-file serialization rules, and a 5-step archive policy.
+  `openspec/project.md` sources of truth resolved (`docs/MASTER_PLAN.md` current;
+  both NEXT_CAMPAIGN_AUDIT docs marked historical).
+- Six closed changes archived to `openspec/changes/archive/2026-10-02-*`
+  (final-production-readiness pilot first and verified, then m12-neutron-star,
+  m12-repository-integrity, ca9-galaxy-collision, cinematic, whole-atlas last
+  with its 58 annotations intact). Baseline assembled: 6 capabilities /
+  79 requirements (ci-release-readiness 4, cinematic-visual-fidelity 28,
+  galaxy-collision 11, neutron-star-surface-lensing 11, repository-integrity 7,
+  whole-atlas-performance 18); `openspec validate --specs --strict` 6/6.
+- Root-cause repair during archive: m12's MODIFIED delta (impossible against a
+  new spec) was made ADDED, but that split the delta into two `## ADDED`
+  sections and the first archive silently kept 1/11 requirements. Sections
+  merged, partial baseline removed, re-archived — 11/11 verified.
+
+### Integration note
+
+Local `main` was one commit ahead of `origin/main` at `4aa442a` (owner's
+planning-corrections commit, touching the same files). All work was re-based
+onto that commit on branch `phase0/specification-baseline-hygiene`; the two
+conflicts (`openspec/AGENTS.md`, this change's `tasks.md`) were resolved by
+keeping the owner's corrected wording and re-applying the completed inventory
+and evidence on top. Nothing of the owner's was discarded.
+
+### Gates
+
+`npm run check` not run (planning-only change; task 6.6's empty product diff is
+the applicable gate). OpenSpec gates: doctor healthy; `--changes --strict`
+11/11 active; `--specs --strict` 6/6; `openspec list` statuses agree with
+tasks.md; fresh-agent read-through of `openspec/AGENTS.md` reaches the correct
+next work without redo-completed-work instructions (one misleading line found
+during the test was fixed).
+
+### Next action
+
+Phase 1, in order: `kerr-gpu-initializer-correctness` (Lane A),
+`quality-ladder-resolution-integrity` (Lane B) and
+`destination-control-truthfulness` (Lane C, sequenced after
+`transition-error-user-visibility` for `src/app/atlasApp.ts`). Per
+`openspec/AGENTS.md`, Phase 0's own archival happens at Phase 6.
+
 ## 2026-09-30 session — proposal review corrections
 
 Status: **planning only.** No product code changed. The live campaign is
