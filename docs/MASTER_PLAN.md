@@ -384,11 +384,11 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| D-01 | Four pre-existing OpenSpec changes fail `openspec validate --changes --strict` | P1 | confirmed | At `dc0b3ba`: 3 passed, 4 failed. At `c0ee5f5`: 13 passed, 4 failed. The same four fail: cinematic, whole-atlas performance, neutron-star surface, spatial atlas |
-| D-02 | Change status headers say "PLAN ONLY — NO IMPLEMENTATION" while the same folder's `tasks.md` says COMPLETE | P1 | confirmed | `whole-atlas-performance-optimization/proposal.md:4` + `MASTER_PLAN.md:4` vs `tasks.md:1019`; same in `cinematic-visual-fidelity-overhaul` |
-| D-03 | OpenSpec execution instructions still need a complete current inventory and archive policy | P1 | confirmed | The completed M12/CA9 order was an active misdirection; an interim correction now forbids re-executing it. Hygiene must still enumerate all 17 changes and write the archive policy |
-| D-04 | No `openspec/config.yaml`; `openspec doctor` reports the root unhealthy | P1 | confirmed | `openspec doctor` |
-| D-05 | No `openspec/specs/` — five completed changes were never archived, so no capability baseline exists | P1 | confirmed | `openspec list --specs` → "No specs found" |
+| D-01 | Four pre-existing OpenSpec changes fail `openspec validate --changes --strict` | P1 | confirmed | At `dc0b3ba`: 3 passed, 4 failed. At `c0ee5f5`: 13 passed, 4 failed. The same four fail: cinematic, whole-atlas performance, neutron-star surface, spatial atlas — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-02 | Change status headers say "PLAN ONLY — NO IMPLEMENTATION" while the same folder's `tasks.md` says COMPLETE | P1 | confirmed | `whole-atlas-performance-optimization/proposal.md:4` + `MASTER_PLAN.md:4` vs `tasks.md:1019`; same in `cinematic-visual-fidelity-overhaul` — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-03 | OpenSpec execution instructions still need a complete current inventory and archive policy | P1 | confirmed | The completed M12/CA9 order was an active misdirection; an interim correction now forbids re-executing it. Hygiene must still enumerate all 17 changes and write the archive policy — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-04 | No `openspec/config.yaml`; `openspec doctor` reports the root unhealthy | P1 | confirmed | `openspec doctor` — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-05 | No `openspec/specs/` — five completed changes were never archived, so no capability baseline exists | P1 | confirmed | `openspec list --specs` → "No specs found" — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
 | D-06 | Root `AGENTS.md` required-reading list points at superseded single-destination docs | P1 | confirmed | `AGENTS.md:5-15` → `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, `docs/BACKLOG.md` |
 | D-07 | `docs/RELEASE_CERTIFICATION.md` self-contradicts: 631/46 vs 515/35 for the same gate | P1 | confirmed | lines 39 vs 151 |
 | D-08 | `docs/RELEASE_CERTIFICATION.md` claims `npm audit` = 0 vulnerabilities; it now reports 1 high | P1 | confirmed | lines 43/132/156/227 vs `npm audit` |
@@ -396,7 +396,7 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 | D-10 | `docs/cosmic-atlas/ARCHITECTURE.md` §2 lists a repository layout matching no shipped path | P2 | confirmed | `ARCHITECTURE.md:33-101` |
 | D-11 | `docs/PHENOMENA_IMPLEMENTATION.md` §9–§11 describe three expansion destinations that do not exist | P2 | confirmed | `README.md:124` presents the file as current |
 | D-12 | `docs/KERR_RESEARCH_PLAN.md` still frames Kerr as deferred | P2 | confirmed | line 3; M9 is complete |
-| D-13 | `openspec/project.md` names two different "sources of truth" audit documents | P3 | confirmed | lines 34 vs 79 |
+| D-13 | `openspec/project.md` names two different "sources of truth" audit documents | P3 | confirmed | lines 34 vs 79 — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
 | D-14 | Two galaxy-collision data-source documents carry different identifiers for the same source | P2 | confirmed | `DATA_SOURCES_GALAXY_COLLISION.md:13-16` vs `..._SOURCE_LOCK.md:15-18` |
 | D-15 | Two competing control inventories, neither cross-referencing the other | P3 | confirmed | `UI_CONTROL_CATALOG.md:3` vs `cosmic-atlas/DESTINATION_CONTROL_CATALOG.md` |
 

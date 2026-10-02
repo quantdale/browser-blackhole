@@ -2,23 +2,28 @@
 
 ## Current status
 
-Do not execute the historical M12/CA9 order below. `m12-neutron-star-surface-lensing`, `m12-repository-integrity`, and `ca9-galaxy-collision` are complete. Restarting them is a defect.
+The repository holds 17 changes: 5 complete (archived as documented below) and 12 in progress. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
 
-The live work is `docs/MASTER_PLAN.md` and its hardening changes. At the 2026-09-30 review the tree had 17 changes: 5 complete and 12 in progress. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
+- Phase 0 (complete when this change lands): `specification-baseline-hygiene`.
+- Phase 1, one writer at a time: `kerr-gpu-initializer-correctness` (owns `src/phenomena/black-hole/{kerr,lut,observer}/**`), then `quality-ladder-resolution-integrity`, then `transition-error-user-visibility`, then `destination-control-truthfulness`.
+- Phase 2: `shared-renderer-service-lifecycle` (only after quality-ladder and transition-error land).
+- Phase 3: `verification-gate-integrity`.
+- Phase 4: `benchmark-harness-integrity`.
+- Phase 5: `operations-and-deployment-readiness`, then `documentation-truthfulness-realignment`.
+- Archived, complete: `m12-neutron-star-surface-lensing`, `m12-repository-integrity`, `ca9-galaxy-collision`, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, `whole-atlas-performance-optimization` (complete-with-deferrals).
+- Not started: `spatial-atlas-continuous-navigation` (0/123; do not implement in this campaign).
 
-`specification-baseline-hygiene` must replace this interim section with a complete inventory generated from the tree at implementation time. Until that lands, this section overrides every older sentence in this file about a three-change repository.
+Restarting M0–M12, CA9, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, or `whole-atlas-performance-optimization` is a defect.
 
-## Historical order — completed, do not re-execute
+## Archive policy
 
-1. `m12-neutron-star-surface-lensing`
-2. `m12-repository-integrity`
-3. `ca9-galaxy-collision`
+When a change completes, archive it: its delta requirements move into a baseline capability specification under `openspec/specs/<capability>/spec.md`, and the change folder moves to the archive location. Never archive a change with unchecked tasks unless those boxes are annotated DEFERRED/REJECTED with reasons, and never archive `specification-baseline-hygiene` until it is itself complete. Archived changes are no longer edited; corrections land in a new change.
 
 ## Before editing
 
-- Read `.agent/EXECUTION_PROMPT.md` completely.
-- Read `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`.
-- Read the entire active change folder.
+- Read `docs/MASTER_PLAN.md` (priority, sequencing, §7 serialization).
+- Read `.agent/START_HERE.md` and `.agent/STATE.md`'s newest section.
+- Read the entire active change folder (proposal, design, tasks, specs).
 - Inspect the current implementation and tests named by the change; do not rely only on the planning text.
 - Run and record the required baseline. A pre-existing failure must be classified before implementation.
 
@@ -40,7 +45,7 @@ When a task is blocked by scientific provenance, licensing, unavailable hardware
 1. record the exact blocker and evidence;
 2. stop dependent tasks;
 3. continue only independent work that cannot invalidate the blocked decision;
-4. leave the blocked checkbox unchecked.
+4. leave the blocked checkbox unchanged (or annotate it DEFERRED with the blocker).
 
 Do not substitute a plausible number/model for a missing source fact.
 

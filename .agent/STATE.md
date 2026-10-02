@@ -1,3 +1,42 @@
+## 2026-10-03 session — specification-baseline-hygiene landed (Phase 0 complete)
+
+Status: **COMPLETE.** Planning-artifact only; no product code changed
+(`git diff --stat main -- src tests scripts tools` empty at checkpoint).
+
+Before → after (all recorded at `4aa442a` baseline):
+
+- `openspec doctor`: unhealthy (missing `openspec/config.yaml`) → **ok**.
+- `openspec validate --changes --strict`: 13 passed / 4 failed → **17 passed / 0 failed**.
+- `openspec list --specs`: "No specs found" → **6 baseline capabilities**
+  (`ci-release-readiness`, `cinematic-visual-fidelity`, `galaxy-collision`,
+  `neutron-star-surface-lensing`, `repository-integrity`,
+  `whole-atlas-performance`), all passing `--specs --strict`.
+- Repairs: cinematic (24 errors), whole-atlas (17), m12 neutron-star (1)
+  fixed structurally — normative SHALL/MUST sentences moved into requirement
+  bodies, missing scenarios authored as observable outcomes, and the
+  `neutron-star-surface-lensing` delta reclassified MODIFIED→ADDED because no
+  baseline capability existed to modify.
+- `spatial-atlas-continuous-navigation`: real ADDED deltas authored and
+  transcribed from its locked design (`specs/spatial-atlas/spec.md`, 9
+  requirements).
+- Status headers corrected: whole-atlas (`179eb56`, 2026-09-10) and
+  cinematic (`2fc1b5d`, certified 2026-08-30) now state their revisions;
+  58 unchecked whole-atlas boxes annotated DEFERRED with their inline
+  reasons preserved.
+- `openspec/AGENTS.md` rewritten to the real 17-change inventory, §7
+  serialization, and the archive policy; `openspec/project.md` names
+  `docs/MASTER_PLAN.md` + this ledger as the sources of truth.
+- Archived (one-at-a-time, verify-then-proceed): `ca9-galaxy-collision`,
+  `m12-repository-integrity`, `m12-neutron-star-surface-lensing`,
+  `final-production-readiness`, `cinematic-visual-fidelity-overhaul`,
+  `whole-atlas-performance-optimization` (last, deferrals intact).
+- D-01…D-05 and D-13 struck in `docs/MASTER_PLAN.md`.
+
+Next action: begin Phase 1 — `kerr-gpu-initializer-correctness` (parallel with
+the host/shell sequence serialized by `docs/MASTER_PLAN.md` §7:
+`quality-ladder-resolution-integrity` → `transition-error-user-visibility` →
+`destination-control-truthfulness`). Re-derive all source citations at HEAD.
+
 ## 2026-09-30 session — proposal review corrections
 
 Status: **planning only.** No product code changed. The live campaign is

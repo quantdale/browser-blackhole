@@ -143,8 +143,13 @@ The repository SHALL provide a discoverable neutron-star benchmark path and SHAL
 - **THEN** the record SHALL include enough context to reproduce/compare it
 - **AND** it SHALL NOT describe CPU/rAF timing as GPU time.
 
-## MODIFIED Requirements
-
 ### Requirement: Neutron Star production fidelity claim
 
 The Neutron Star destination MAY be documented as direct compact-surface Schwarzschild ray tracing only when the material-surface ray path, reference validation and production parity requirements above are satisfied. Otherwise all public and scientific documentation SHALL explicitly describe the actual reduced/straight-line rendering model and its limitation.
+
+#### Scenario: fidelity documentation matches the shipped path
+
+- GIVEN the material-surface ray path, reference validation and production parity requirements are all satisfied
+- WHEN the destination's public fidelity note is published
+- THEN it MAY describe direct compact-surface Schwarzschild ray tracing
+- AND if any of those requirements is unsatisfied, the note SHALL describe the actual reduced model and its limitation instead.

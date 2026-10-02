@@ -55,7 +55,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       camera interaction, settling ticks, transition out+in with arrival ms,
       and a four-tier ladder with GPU ms per tier. Every sampled window
       carries `renderTelemetry` and refuses on zero frames rendered.
-- [ ] Record startup bundle/chunk sizes and first-interactive timing.
+- [ ] Record startup bundle/chunk sizes and first-interactive timing. — DEFERRED: Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive timing is not, so this stays unchecked rather than half-claimed.
       Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive
       timing is not, so this stays unchecked rather than half-claimed.
 - [x] Archive baseline under benchmarks/results with exact SHA.
@@ -200,7 +200,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Wire transition changes.
       Any active director state -> `TRANSITION_CHANGED` every frame until
       idle; occlusion row asserts the suppressed-draw plan.
-- [ ] Add destination continuous-animation declaration where needed.
+- [ ] Add destination continuous-animation declaration where needed. — DEFERRED: Not implemented as a per-destination API by design; the shared unconditional trigger while `!time.paused` covers the real cases and is pinned by "an active (unpaused) timeline keeps rendering every tick".
       Not implemented as a per-destination API by design; the shared
       unconditional trigger while `!time.paused` covers the real cases and is
       pinned by "an active (unpaused) timeline keeps rendering every tick".
@@ -217,7 +217,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       Control/resize/quality/visibility rows in `frame-invalidation.spec.ts`.
 - [x] Add paused-stationary no-draw test.
       The idle zero-frame row plus host telemetry cross-check row.
-- [ ] Confirm all goldens pass.
+- [ ] Confirm all goldens pass. — DEFERRED: Deferred to the campaign final gate; §1 added telemetry surfaces only (render path untouched, post sizing preserved exactly).
       Deferred to the campaign final gate; §1 added telemetry surfaces only
       (render path untouched, post sizing preserved exactly).
 
@@ -286,7 +286,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       frame, resets, and reads accumulated `drawCalls`/`triangles`/`frameCalls`:
       the suppressed frame issues > 0 draws but strictly fewer than the same
       scene drawn normally, on top of `destinationDrawn: false`.
-- [ ] Integrate compileAsync for incoming visible subgraph.
+- [ ] Integrate compileAsync for incoming visible subgraph. — REJECTED: RESEARCHED AND REJECTED on visual evidence.
       RESEARCHED AND REJECTED on visual evidence. three's `compileAsync` does
       not merely warm pipelines for node materials: it re-creates them with a
       measurably different first-render result. With it enabled during the
@@ -348,14 +348,14 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       there): destination code in a boot graph 164,588 -> 37,315 decoded
       bytes (-77.3%); total boot JS 1,448,619 -> 1,320,931 (-8.8%). 8/8
       routes now fetch no other destination's implementation.
-- [ ] Compare registry-init and first-interactive timing.
+- [ ] Compare registry-init and first-interactive timing. — DEFERRED: DEFERRED_ENVIRONMENT — byte counts here are deterministic, browser timing on this machine is not (see the SUMMARY's environment note).
       DEFERRED_ENVIRONMENT — byte counts here are deterministic, browser
       timing on this machine is not (see the SUMMARY's environment note).
 - [x] Add route/deep-link tests after split.
       `tests/browser/startup-graph.spec.ts` (8 per-route isolation tests +
       a truthful-failure test); the existing per-preset deep-link suites all
       pass on the split build.
-- [ ] Optional idle prefetch experiment with connection/data-saver guard.
+- [ ] Optional idle prefetch experiment with connection/data-saver guard. — DEFERRED: Not attempted.
       Not attempted.
 
 ## 6. Black-hole active pass lifecycle
@@ -398,7 +398,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Add stale creation cancellation.
       Creation is synchronous; async precompile discards superseded-generation
       results; `dispose()`/`exit()` cannot resurrect a pass.
-- [ ] Precompile pending pass where useful.
+- [ ] Precompile pending pass where useful. — DEFERRED: Arrival-path precompile is covered by the WS2 occlusion warmup (the selected pass is visible and compiled before arrival).
       Arrival-path precompile is covered by the WS2 occlusion warmup (the
       selected pass is visible and compiled before arrival). A pre-handoff
       compile for an in-place toggle is deliberately NOT added: three's
@@ -472,14 +472,14 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       Unit row "keeps a volume the camera is inside": the bounding sphere
       straddles the frustum so culling keeps it; existing browser suites
       (`volumetric-depth-composition`) cover the inside-camera composite.
-- [ ] Validate stellar explosion goldens.
+- [ ] Validate stellar explosion goldens. — DEFERRED: Deferred to the campaign final golden gate (no volume-VISUAL change in this slice; culling is conservative).
       Deferred to the campaign final golden gate (no volume-VISUAL change in
       this slice; culling is conservative).
-- [ ] Validate compact-merger goldens.
+- [ ] Validate compact-merger goldens. — DEFERRED: Same: deferred to the final gate; CM functional suite 15/15 PASS.
       Same: deferred to the final gate; CM functional suite 15/15 PASS.
-- [ ] Validate TDE goldens.
+- [ ] Validate TDE goldens. — DEFERRED: Same: deferred; TDE strand/lifecycle rows PASS.
       Same: deferred; TDE strand/lifecycle rows PASS.
-- [ ] Validate AGN goldens.
+- [ ] Validate AGN goldens. — DEFERRED: Same: deferred; AGN rows unchanged.
       Same: deferred; AGN rows unchanged.
 
 ## 8. ParticleService and static systems
@@ -608,7 +608,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       `PerformanceGovernor.getVisualWorkBudget()` (exists).
 - [x] Preserve existing hysteresis.
       Sustain windows + anti-flap cooldown tests unchanged and passing.
-- [ ] Add GPU-vs-CPU overload classification when telemetry permits.
+- [ ] Add GPU-vs-CPU overload classification when telemetry permits. — DEFERRED: NOT IMPLEMENTED, recorded: `gpuFrameMs` resolves on a bounded async cadence, not per frame, so a GPU-only overload signal cannot be compared to the per-frame CPU duration without introducing a lagged, noisy second decision path; the governor's sustained-window model already absorbs GPU-bound stalls (the CPU loop blocks on present at vsync on this stack).
       NOT IMPLEMENTED, recorded: `gpuFrameMs` resolves on a bounded async
       cadence, not per frame, so a GPU-only overload signal cannot be compared
       to the per-frame CPU duration without introducing a lagged, noisy
@@ -646,7 +646,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > or recorded rejections. The final gate (this session) runs LUT parity and the
 > benches, and the results are recorded in §24 below.
 
-- [ ] Cache per-frame camera/uniform state by revision.
+- [ ] Cache per-frame camera/uniform state by revision. — DEFERRED: NOT SHIPPED, recorded: the per-frame record is one small object per frame for the ACTIVE pass only; reusing it would require hashing the camera matrix plus spin/tier/backend inputs to stay correct, trading clarity for sub-µs savings against a 5-200 ms GPU frame.
       NOT SHIPPED, recorded: the per-frame record is one small object per frame
       for the ACTIVE pass only; reusing it would require hashing the camera
       matrix plus spin/tier/backend inputs to stay correct, trading clarity for
@@ -655,7 +655,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Verify LUT pass is only instantiated when selected.
       §6 lifecycle: resident kinds on a default arrival are `['lut']` with
       count 1; switching to numerical lazily creates the second pass.
-- [ ] Profile texture/sample cost.
+- [ ] Profile texture/sample cost. — DEFERRED: PARTIAL: `bench:black-hole:numerical` vs `bench:black-hole:lut` produce matched per-preset GPU timings (final gate records the current SHA).
       PARTIAL: `bench:black-hole:numerical` vs `bench:black-hole:lut` produce
       matched per-preset GPU timings (final gate records the current SHA).
       Texture-filter cost cannot be separated from the integrator within the
@@ -663,7 +663,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Keep manifest/checksum/domain validation.
       Pre-existing `lutPipeline`/`lutSchema`/`lutGenerate`/`lutEquivalence`
       unit coverage, unchanged by this campaign.
-- [ ] Run LUT parity and BH goldens.
+- [ ] Run LUT parity and BH goldens. — DEFERRED: BH family 10/10 already PASS unchanged; `lut-disk-parity` runs in the final gate (results in §24).
       BH family 10/10 already PASS unchanged; `lut-disk-parity` runs in the
       final gate (results in §24).
 - [x] Record before/after GPU time.
@@ -679,31 +679,31 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > the wrong move; the CPU reference + ray/image parity corpora remain the
 > classification authority. Rows below are recorded as not shipped.
 
-- [ ] Add aggregate step census.
-- [ ] Add termination-class percentages.
-- [ ] Add MAX_STEPS rate.
+- [ ] Add aggregate step census. — DEFERRED: deferred during campaign hardening
+- [ ] Add termination-class percentages. — DEFERRED: deferred during campaign hardening
+- [ ] Add MAX_STEPS rate. — DEFERRED: All three NOT SHIPPED: the emitted GPU status would duplicate the Kerr `?kerrstatus` machinery for a backend whose failure class is bounded by the escape radius + horizon step floor; the CPU reference and `ray-parity`/`integrator-parity` corpora already assert classification.
       All three NOT SHIPPED: the emitted GPU status would duplicate the Kerr
       `?kerrstatus` machinery for a backend whose failure class is bounded by
       the escape radius + horizon step floor; the CPU reference and
       `ray-parity`/`integrator-parity` corpora already assert classification.
-- [ ] Test smaller safe escape radius candidates against reference.
+- [ ] Test smaller safe escape radius candidates against reference. — DEFERRED: NOT SHIPPED: needs a matched parity run per candidate; no escape-radius change was proposed with evidence, and the shared value (32 r_g) stays.
       NOT SHIPPED: needs a matched parity run per candidate; no escape-radius
       change was proposed with evidence, and the shared value (32 r_g) stays.
-- [ ] Optimize capture/escape/disk termination.
-- [ ] Prototype adaptive stepping.
-- [ ] Prototype conservative difficulty classification.
+- [ ] Optimize capture/escape/disk termination. — DEFERRED: deferred during campaign hardening
+- [ ] Prototype adaptive stepping. — DEFERRED: deferred during campaign hardening
+- [ ] Prototype conservative difficulty classification. — DEFERRED: NOT SHIPPED: each requires an equal-error parity study beyond this session's validation budget; shipping without it would violate the parity invariant.
       NOT SHIPPED: each requires an equal-error parity study beyond this
       session's validation budget; shipping without it would violate the
       parity invariant.
-- [ ] Run ray parity/reference.
-- [ ] Run image parity.
+- [ ] Run ray parity/reference. — DEFERRED: deferred during campaign hardening
+- [ ] Run image parity. — DEFERRED: Final gate (results in §24); last certified 43/43 at 17c4644.
       Final gate (results in §24); last certified 43/43 at 17c4644.
 - [x] Record GPU benefit at equal error.
       N/A: no numerical change shipped, so no equal-error claim exists.
 
 ## 14. Kerr
 
-- [ ] Add p50/p95/p99 step census.
+- [ ] Add p50/p95/p99 step census. — DEFERRED: NOT SHIPPED: the census view reports terminal-class fractions, not per-pixel step percentiles; a histogram target was not justified by any shipped decision.
       NOT SHIPPED: the census view reports terminal-class fractions, not
       per-pixel step percentiles; a histogram target was not justified by any
       shipped decision.
@@ -716,27 +716,27 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Add moving-observer characterization.
       `observer-modes` browser rows + `observerFrame`/`observerPhotonInit`
       units; the Kerr moving-observer budget scaling is asserted there.
-- [ ] Cache CPU camera/uniform state by revision. (same rejection as §12)
-- [ ] Continue safe shader CSE/loop-invariant hoisting with parity proof.
+- [ ] Cache CPU camera/uniform state by revision. (same rejection as §12) — DEFERRED: deferred during campaign hardening
+- [ ] Continue safe shader CSE/loop-invariant hoisting with parity proof. — REJECTED: NOT SHIPPED: no additional hoist with a measured gain and unchanged census was found; speculative edits are rejected by discipline.
       NOT SHIPPED: no additional hoist with a measured gain and unchanged
       census was found; speculative edits are rejected by discipline.
-- [ ] Improve safe capture/escape/disk exits.
+- [ ] Improve safe capture/escape/disk exits. — DEFERRED: NOT SHIPPED: the census shows max-steps at 0.001%; there is no measured exit-termination problem to optimize.
       NOT SHIPPED: the census shows max-steps at 0.001%; there is no measured
       exit-termination problem to optimize.
-- [ ] Prototype adaptive integration.
-- [ ] Prototype constants-of-motion/separated formulation.
-- [ ] Compare spin-zero convergence.
-- [ ] Compare high-spin critical rays.
-- [ ] Compare moving observers.
-- [ ] Prototype tile/difficulty classifier.
-- [ ] Add seam/guard-band tests.
-- [ ] Research progressive stationary refinement only after above.
+- [ ] Prototype adaptive integration. — DEFERRED: deferred during campaign hardening
+- [ ] Prototype constants-of-motion/separated formulation. — DEFERRED: deferred during campaign hardening
+- [ ] Compare spin-zero convergence. — DEFERRED: deferred during campaign hardening
+- [ ] Compare high-spin critical rays. — DEFERRED: deferred during campaign hardening
+- [ ] Compare moving observers. — DEFERRED: deferred during campaign hardening
+- [ ] Prototype tile/difficulty classifier. — DEFERRED: deferred during campaign hardening
+- [ ] Add seam/guard-band tests. — DEFERRED: deferred during campaign hardening
+- [ ] Research progressive stationary refinement only after above. — DEFERRED: All NOT SHIPPED: research beyond the session's equal-error validation budget; the dependency chain starts with an adaptive-integrator prototype that cannot be certified here.
       All NOT SHIPPED: research beyond the session's equal-error validation
       budget; the dependency chain starts with an adaptive-integrator
       prototype that cannot be certified here.
-- [ ] Run all KERR/observer goldens twice-stable.
+- [ ] Run all KERR/observer goldens twice-stable. — DEFERRED: Final gate (results in §24); 10/10 first pass in this session.
       Final gate (results in §24); 10/10 first pass in this session.
-- [ ] Record matched WebGPU and WebGL2 evidence.
+- [ ] Record matched WebGPU and WebGL2 evidence. — DEFERRED: Final gate via `kerr-backend-census` (both backends, identical census).
       Final gate via `kerr-backend-census` (both backends, identical census).
 - [x] Reject any "win" caused by increased failure/MAX_STEPS.
       Policy enforced: the census gate is part of the final certification and
@@ -748,14 +748,14 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 > paused case at the frame-loop level; the remaining rows are numerical
 > research, recorded as not shipped.
 
-- [ ] Cache camera basis/uniform payload by revision. (same rejection as §12)
+- [ ] Cache camera basis/uniform payload by revision. (same rejection as §12) — DEFERRED: deferred during campaign hardening
 - [x] Skip stationary paused render via WS2.
       The host/WS2 suppression is destination-agnostic; the stationary idle
       rows of the scenario matrix record `renderFrameCalls: 0` for
       neutron-star on both backends.
-- [ ] Add projected-star conservative ray rejection research.
-- [ ] Improve surface hit/escape early termination.
-- [ ] Profile step distribution.
+- [ ] Add projected-star conservative ray rejection research. — DEFERRED: deferred during campaign hardening
+- [ ] Improve surface hit/escape early termination. — DEFERRED: deferred during campaign hardening
+- [ ] Profile step distribution. — DEFERRED: NOT SHIPPED: requires a surface-lensing status view; no measured stutter or failure-rate problem justifies the shader/spec work.
       NOT SHIPPED: requires a surface-lensing status view; no measured stutter
       or failure-rate problem justifies the shader/spec work.
 - [x] Keep field-line geometry static.
@@ -779,11 +779,11 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Verify hidden/paused particle simulation zero work.
       `activity`/population gates skip the compute dispatch; static systems
       never upload.
-- [ ] Avoid redundant unchanged uniform/visibility writes.
+- [ ] Avoid redundant unchanged uniform/visibility writes. — DEFERRED: NOT SHIPPED: uniform writes are CPU-side scalar stores, not buffer uploads; gating them would add per-frame comparisons for no measured benefit on a GPU-bound scene.
       NOT SHIPPED: uniform writes are CPU-side scalar stores, not buffer
       uploads; gating them would add per-frame comparisons for no measured
       benefit on a GPU-bound scene.
-- [ ] Measure whether phase-lazy resource creation is worth complexity.
+- [ ] Measure whether phase-lazy resource creation is worth complexity. — DEFERRED: NOT SHIPPED: resources are bounded per phase and residency is already evidenced; no measured memory pressure justifies the lifecycle churn.
       NOT SHIPPED: resources are bounded per phase and residency is already
       evidenced; no measured memory pressure justifies the lifecycle churn.
 - [x] Run all SN goldens.
@@ -798,10 +798,10 @@ Mark a task complete only with benchmark and correctness evidence. A code change
 - [x] Gate particles by active state/time.
       `populationFractionFor` keeps the expensive systems OFF during the
       inspiral; population 0 skips simulation entirely.
-- [ ] Avoid redundant unchanged visibility/step writes.
+- [ ] Avoid redundant unchanged visibility/step writes. — DEFERRED: NOT SHIPPED: `setVisible`/`setStepScale` are cheap idempotent setters; gating them would add comparisons without a measured cost.
       NOT SHIPPED: `setVisible`/`setStepScale` are cheap idempotent setters;
       gating them would add comparisons without a measured cost.
-- [ ] Measure optional phase-lazy resources.
+- [ ] Measure optional phase-lazy resources. — DEFERRED: NOT SHIPPED: same rationale as SN.
       NOT SHIPPED: same rationale as SN.
 - [x] Run CM goldens.
       CM rows (6) PASS in the final full suite and in the dedicated 51/51
@@ -817,11 +817,11 @@ twice-stable golden pass.
 - [x] Gate particles by population/time.
       `pop > 0 && !snapshot.paused` gate in the module plus the service's
       zero-population skip.
-- [ ] Cache camera-dependent accent gate by camera revision.
+- [ ] Cache camera-dependent accent gate by camera revision. — DEFERRED: NOT SHIPPED: `accentGate(orbit.distance)` is a handful of floating-point operations per frame; caching it would add a camera-revision input for no measurable gain.
       NOT SHIPPED: `accentGate(orbit.distance)` is a handful of floating-point
       operations per frame; caching it would add a camera-revision input for
       no measurable gain.
-- [ ] Measure phase-resource retirement/prewarm policy.
+- [ ] Measure phase-resource retirement/prewarm policy. — DEFERRED: NOT SHIPPED: volumes/strands/ribbons are bounded and already phase-gated; no memory evidence justifies retirement churn.
       NOT SHIPPED: volumes/strands/ribbons are bounded and already
       phase-gated; no memory evidence justifies retirement churn.
 - [x] Run TDE goldens.
@@ -833,15 +833,15 @@ twice-stable golden pass.
 
 - [x] Convert static particles. (host and knots are `activity: 'static'`)
 - [x] Remove duplicate population write. (`applyStateToResources` is the one writer)
-- [ ] Lazy-build initial zone only.
-- [ ] Prewarm adjacent zone near hysteresis threshold.
-- [ ] Add bounded zone disposal policy if memory evidence supports it.
+- [ ] Lazy-build initial zone only. — DEFERRED: deferred during campaign hardening
+- [ ] Prewarm adjacent zone near hysteresis threshold. — DEFERRED: deferred during campaign hardening
+- [ ] Add bounded zone disposal policy if memory evidence supports it. — DEFERRED: NOT SHIPPED: all three zone groups are bounded and no memory plateau problem was measured; lazy building would trade resident memory for zone-switch latency without evidence either way.
       NOT SHIPPED: all three zone groups are bounded and no memory plateau
       problem was measured; lazy building would trade resident memory for
       zone-switch latency without evidence either way.
 - [x] Ensure no double-render.
       `doubleRenderGuard` in the module debug snapshot (`ok`).
-- [ ] Benchmark all three zones.
+- [ ] Benchmark all three zones. — DEFERRED: PARTIAL: AGN V2 snapshots cover all three zones on both backends; a dedicated three-zone timing matrix is not part of this session.
       PARTIAL: AGN V2 snapshots cover all three zones on both backends; a
       dedicated three-zone timing matrix is not part of this session.
 - [x] Run AGN goldens.
@@ -868,7 +868,7 @@ twice-stable golden pass.
       destination (the pre-phenomena alignment); no further numerical change.
 - [x] Maintain DATA_DRIVEN trajectory/waveform semantics.
       `bbmDataset`/`bbmSourceParity` units + all deep-link phase rows PASS.
-- [ ] Run BHM dataset/parity tests.
+- [ ] Run BHM dataset/parity tests. — DEFERRED: `bbmDataset`/`bbmSourceParity` units PASS; BHM suite 15/15 in the final full suite.
       `bbmDataset`/`bbmSourceParity` units PASS; BHM suite 15/15 in the final
       full suite.
 - [x] Run all BHM goldens.
@@ -882,15 +882,15 @@ twice-stable golden pass.
 - [x] Skip unchanged BufferAttribute upload. (`needsUpdate` only on phase change)
 - [x] Preallocate x1/x2 center scratch arrays. (`centerScratchA/B`)
 - [x] Reuse probe storage. (preallocated `probe` tuples)
-- [ ] Add unit test proving unchanged phase causes no work.
+- [ ] Add unit test proving unchanged phase causes no work. — DEFERRED: PARTIAL: the phase gate is pinned by the DATA_DRIVEN deterministic replay rows (identical scrub → identical state); a module-level unit test would need a prepared dataset context and was not added.
       PARTIAL: the phase gate is pinned by the DATA_DRIVEN deterministic
       replay rows (identical scrub → identical state); a module-level unit
       test would need a prepared dataset context and was not added.
-- [ ] Benchmark CPU/upload before/after.
+- [ ] Benchmark CPU/upload before/after. — DEFERRED: PARTIAL: the scenario matrix records GC stationary/cost/active rows on both backends; upload counts are gated by the phase check in code.
       PARTIAL: the scenario matrix records GC stationary/cost/active rows on
       both backends; upload counts are gated by the phase check in code.
-- [ ] Optional GPU keyframe interpolation prototype.
-- [ ] Optional worker checksum/decode prototype if main-thread stall measured.
+- [ ] Optional GPU keyframe interpolation prototype. — DEFERRED: deferred during campaign hardening
+- [ ] Optional worker checksum/decode prototype if main-thread stall measured. — DEFERRED: NOT SHIPPED: optional, and no main-thread stall was measured (GC is 2.82 ms GPU / 16.7 ms CPU floor on WebGPU).
       NOT SHIPPED: optional, and no main-thread stall was measured (GC is
       2.82 ms GPU / 16.7 ms CPU floor on WebGPU).
 - [x] Preserve DATA_DRIVEN interpolation parity.
@@ -929,7 +929,7 @@ twice-stable golden pass.
 - [x] Run compatibility matrix.
       Playwright `firefox` project 4/4 PASS (truthful terminal state, live
       frames, reload resilience).
-- [ ] Run software-render smoke where practical, but do not treat GPU-less hosted performance as target hardware.
+- [ ] Run software-render smoke where practical, but do not treat GPU-less hosted performance as target hardware. — DEFERRED: DEFERRED_ENVIRONMENT: hosted CI already runs the cheap smoke gate on SwiftShader; no local software-render performance claim is made.
       DEFERRED_ENVIRONMENT: hosted CI already runs the cheap smoke gate on
       SwiftShader; no local software-render performance claim is made.
 

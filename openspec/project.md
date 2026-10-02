@@ -29,13 +29,14 @@ matrix are a documented **local capable-runner gate** (`docs/CI_CD.md` §2/§16)
 — run with `npm run e2e` / `--project=firefox` on a WebGPU-capable machine and
 record results as evidence, never claim them as hosted-CI PASS.
 
-## Active campaign — 2026-08-28
+## Active campaign
 
-The selected next phase is **whole-atlas performance hardening**:
-
-`openspec/changes/whole-atlas-performance-optimization/`
-
-The pre-optimization product remains production-certified, but the optimization task checklist is active and must be executed with matched benchmark evidence. Read `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md` and the active change's `EXECUTION_PROMPT.md` before modifying runtime code.
+The live campaign is the hardening plan in `docs/MASTER_PLAN.md`, executed through the
+OpenSpec changes under `openspec/changes/` with the file-serialization rules in §7. The
+whole-atlas performance optimization campaign is complete-with-deferrals (certified at
+`179eb56`) and is not the live queue. `spatial-atlas-continuous-navigation` is planned,
+0/123, and not started. Do not restart M0–M12, CA9, final-production-readiness, or
+`whole-atlas-performance-optimization`.
 
 ## Technical stack
 
@@ -79,13 +80,17 @@ Use narrower unit/browser/parity/golden commands during development, but close a
 
 Read in this order for active work:
 
-1. `.agent/START_HERE.md`
-2. `.agent/EXECUTION_PROMPT.md`
-3. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md`
+1. `docs/MASTER_PLAN.md` (priority, sequencing, file serialization)
+2. `.agent/START_HERE.md`
+3. `.agent/EXECUTION_PROMPT.md` (when an active planner prompt is recorded there)
 4. the active `openspec/changes/<change>/` folder
 5. `.agent/QUALITY_GATES.md`
 6. implementation-specific docs referenced by that change
 7. `.agent/STATE.md` for durable historical evidence
+
+Current sources of truth: `docs/MASTER_PLAN.md` plus the audit record in `.agent/STATE.md`
+§2026-09-30. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md` and `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
+are historical input documents, not active guidance.
 
 When historical text conflicts with an active OpenSpec change, do not silently choose one. Determine whether the historical statement is stale, update it as part of the appropriate truthfulness task, and preserve scientific/runtime invariants.
 

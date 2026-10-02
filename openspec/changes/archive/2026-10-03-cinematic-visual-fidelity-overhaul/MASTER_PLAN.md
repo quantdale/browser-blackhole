@@ -1,7 +1,7 @@
 # Cosmic Atlas Cinematic Visual Fidelity Overhaul — Implementation Master Plan
 
 Change ID: cinematic-visual-fidelity-overhaul
-Status: PLAN ONLY — NO RUNTIME IMPLEMENTATION IN THIS CHANGE
+Status: COMPLETE — certified 2026-08-30; final implementation checkpoint `2fc1b5d`.
 Priority: HIGH
 Planned-From: main@518bff7b8c14e4a22ada4c9376f166d8565c5263
 Planned-At: 2026-08-29

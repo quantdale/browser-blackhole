@@ -1,6 +1,7 @@
 # Proposal: Whole-Atlas performance optimization
 
 Change ID: whole-atlas-performance-optimization
+Status: COMPLETE at `179eb56` (2026-09-10), with 58 documented task deferrals.
 Priority: HIGH
 Planned-From: main@e2fadde55a39834e2438d56a568f18788b7c7ced
 Planned-At: 2026-08-27

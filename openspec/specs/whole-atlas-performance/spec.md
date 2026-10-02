@@ -1,6 +1,9 @@
-# Whole-Atlas performance specification
+# whole-atlas-performance Specification
 
-## ADDED Requirements
+## Purpose
+TBD - created by archiving change whole-atlas-performance-optimization. Update Purpose after archive.
+
+## Requirements
 
 ### Requirement: Unchanged visual state SHALL NOT require continuous rendering
 
@@ -18,6 +21,8 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 
 ### Requirement: Hidden document state SHALL NOT poison performance adaptation
 
+Hidden document state SHALL NOT poison performance adaptation.
+
 #### Scenario: tab hidden and resumed
 
 - GIVEN the atlas is running
@@ -30,6 +35,8 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 
 ### Requirement: Guaranteed transition occlusion SHALL suppress hidden destination draws
 
+Guaranteed transition occlusion SHALL suppress hidden destination draws.
+
 #### Scenario: incoming destination behind opaque hyperspace
 
 - GIVEN the transition envelope guarantees the destination contributes zero visible pixels
@@ -39,6 +46,8 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 - AND the hyperspace presentation SHALL remain visually unchanged.
 
 ### Requirement: Destination shader compilation MAY be prewarmed without changing presentation
+
+Shader compilation of an incoming destination's visible subgraph MAY be prewarmed during the transition occlusion window. Prewarming SHALL NOT change presented frames or leak resources.
 
 #### Scenario: incoming visible subgraph compiled during occlusion
 
@@ -50,6 +59,8 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 - AND arrival pixels SHALL match the non-precompiled path.
 
 ### Requirement: Black-hole destination SHALL create only the required strong-field pass on first arrival
+
+Black-hole destination SHALL create only the required strong-field pass on first arrival.
 
 #### Scenario: default Schwarzschild LUT route
 
@@ -68,6 +79,8 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 
 ### Requirement: Runtime volume quality SHALL reduce actual marching work
 
+Runtime volume quality SHALL reduce actual marching work.
+
 #### Scenario: governor drops tier
 
 - GIVEN a visible VolumeService instance
@@ -78,11 +91,17 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 
 ### Requirement: Invisible or zero-contribution volume SHALL perform no march
 
+An invisible or zero-contribution volume SHALL perform no nested march.
+
+#### Scenario: zero-contribution volume is skipped
+
 - GIVEN a volume is invisible or its effective contribution is exactly zero
 - WHEN a frame is rendered
 - THEN no nested volume march render SHALL execute for that volume.
 
 ### Requirement: Static particle systems SHALL not simulate per frame
+
+Static particle systems SHALL not simulate per frame.
 
 #### Scenario: AGN host stars
 
@@ -93,11 +112,17 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 
 ### Requirement: Zero active particle population SHALL not dispatch simulation
 
+A zero active particle population SHALL not dispatch simulation work.
+
+#### Scenario: population scaled to zero
+
 - GIVEN population scale resolves to zero
 - WHEN the module updates
 - THEN ParticleService SHALL not perform simulation work that cannot affect future deterministic state, except where an explicitly documented resume policy requires it.
 
 ### Requirement: Dynamic buffer uploads SHALL be revision-driven
+
+Dynamic buffer uploads SHALL be revision-driven.
 
 #### Scenario: galaxy collision paused
 
@@ -108,6 +133,8 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 - AND no new per-frame center/probe scratch allocation SHALL occur.
 
 ### Requirement: Heavy destination implementation modules SHALL be route-lazy
+
+Heavy destination implementation modules SHALL be route-lazy.
 
 #### Scenario: atlas boots to another destination
 
@@ -121,6 +148,14 @@ When the active destination, camera, timeline, controls, quality, transition, vi
 - Destinations SHALL NOT create independent competing performance controllers.
 - WorkBudget changes SHALL be observable in debug telemetry.
 
+#### Scenario: host publishes limits and destinations consume them
+
+- GIVEN the host governor computes a new WorkBudget
+- WHEN quality-sensitive services and destinations are updated
+- THEN each service SHALL receive its work limit from that budget
+- AND no destination SHALL apply a competing local adaptive decision
+- AND the budget change SHALL appear in debug telemetry.
+
 ### Requirement: Kerr speedup SHALL preserve scientific outcomes
 
 For any Kerr optimization claimed as accepted:
@@ -133,13 +168,30 @@ For any Kerr optimization claimed as accepted:
 - image goldens SHALL remain accepted;
 - measured GPU time or work count SHALL improve reproducibly.
 
+#### Scenario: accepted Kerr speedup keeps the reference gates green
+
+- GIVEN a proposed Kerr optimization is evaluated for acceptance
+- WHEN the reference suite runs
+- THEN classification, spin-zero convergence, high-spin and moving-observer cases, and MAX_STEPS rates SHALL remain within their approved contracts
+- AND image goldens SHALL remain accepted
+- AND the measured GPU-time or work-count improvement SHALL reproduce across interleaved runs.
+
 ### Requirement: Performance telemetry SHALL distinguish CPU and GPU time
 
 - CPU rAF timing SHALL never be labeled GPU timing.
 - GPU timestamp timing SHALL be labeled as GPU timing only when the backend reports it.
 - Benchmark artifacts SHALL record pixel size, tier, render scale, backend, browser, adapter and destination.
 
+#### Scenario: benchmark artifact carries its timing labels and environment
+
+- GIVEN a performance run produces a benchmark artifact
+- WHEN the artifact is inspected
+- THEN CPU timings SHALL be labeled as CPU timings and GPU timings only as backend-reported GPU data
+- AND the artifact SHALL record pixel size, tier, render scale, backend, browser, adapter and destination.
+
 ### Requirement: Resource residency SHALL remain bounded under lazy loading
+
+Resource residency SHALL remain bounded under lazy loading.
 
 #### Scenario: repeated backend and destination switching
 
@@ -157,11 +209,26 @@ Every shared optimization SHALL either:
 
 No optimization in this change may silently convert WebGPU from preferred to mandatory.
 
+#### Scenario: optimization keeps the WebGL2 path working
+
+- GIVEN a shared rendering optimization lands
+- WHEN the product runs on WebGL2 fallback
+- THEN the optimized path SHALL either match WebGPU behavior or use its explicit fallback
+- AND WebGPU SHALL remain preferred, not newly mandatory.
+
 ### Requirement: Visual preservation SHALL be a blocking gate
 
 - Existing golden thresholds SHALL not be widened merely to accept an optimization.
 - Golden regeneration SHALL require a separate reviewed reason.
 - Bloom-resolution optimization SHALL use a bloom-enabled visual gate because the core physics goldens intentionally disable bloom.
+
+#### Scenario: optimization cannot weaken the visual gate
+
+- GIVEN a performance change is proposed
+- WHEN the visual gates run
+- THEN existing golden thresholds SHALL NOT be widened to accept it
+- AND bloom-resolution changes SHALL be judged with a bloom-enabled gate
+- AND any golden regeneration SHALL carry a separate reviewed reason.
 
 ### Requirement: Performance claims SHALL be reproducible
 
@@ -174,3 +241,10 @@ For significant renderer changes:
 - median and tail statistics SHALL be recorded;
 - same-machine interleaved A/B SHALL be used where machine-state variance is known;
 - the exact commit SHA SHALL be recorded.
+
+#### Scenario: a single noisy run cannot certify an optimization
+
+- GIVEN a proposed optimization has one favourable measurement
+- WHEN acceptance is judged
+- THEN the claim SHALL NOT be accepted as successful
+- AND warmup, matched pixel counts, median/tail statistics, interleaved A/B and the commit SHA SHALL be recorded for significant renderer changes.

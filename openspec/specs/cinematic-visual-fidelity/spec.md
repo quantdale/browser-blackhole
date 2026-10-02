@@ -1,6 +1,9 @@
-# Cinematic visual fidelity specification
+# cinematic-visual-fidelity Specification
 
-## ADDED Requirements
+## Purpose
+TBD - created by archiving change cinematic-visual-fidelity-overhaul. Update Purpose after archive.
+
+## Requirements
 
 ### Requirement: Scientific state SHALL remain authoritative
 
@@ -56,7 +59,16 @@ The pipeline SHALL explicitly define:
 
 Scientific mode MAY use a simpler subset.
 
+#### Scenario: cinematic mode declares its pipeline stages
+
+- GIVEN a destination renders in Cinematic experience mode
+- WHEN the image-formation configuration is inspected
+- THEN an explicit policy is defined for HDR source, temporal reconstruction, highlight extraction, bloom, composition ordering, exposure, tone mapping and final output conversion
+- AND Cinematic mode SHALL NOT be reducible to a static exposure/bloom preset.
+
 ### Requirement: Selective highlight effects SHALL not contaminate unrelated geometry
+
+Selective highlight effects SHALL not contaminate unrelated geometry.
 
 #### Scenario: bright photosphere near non-emissive UI-like geometry
 
@@ -66,6 +78,8 @@ Scientific mode MAY use a simpler subset.
 - AND Scientific mode SHALL remain valid with bloom disabled.
 
 ### Requirement: Temporal reconstruction SHALL be deterministic and reject stale history
+
+Temporal reconstruction SHALL be deterministic and reject stale history.
 
 #### Scenario: camera cut
 
@@ -89,6 +103,8 @@ Scientific mode MAY use a simpler subset.
 
 ### Requirement: Volumetric jitter SHALL NOT ship as visible animated grain
 
+Volumetric jitter SHALL NOT ship as visible animated grain.
+
 #### Scenario: paused supernova
 
 - GIVEN the supernova timeline and camera are paused
@@ -110,7 +126,16 @@ Quality controls MAY include:
 
 No quality tier may request unbounded shader loops or unbounded resource growth.
 
+#### Scenario: low tier bounds marching work
+
+- GIVEN a volume-rendering destination on a low quality tier
+- WHEN the work budget caps active march steps and detail octaves
+- THEN the volume shader SHALL execute no more steps than the budget allows
+- AND no quality tier SHALL request an unbounded march loop or grow allocated volume resources without bound.
+
 ### Requirement: Volumetric composition SHALL account for scene depth where required
+
+Volumetric composition SHALL account for scene depth where required.
 
 #### Scenario: foreground star crossing a half-resolution volume edge
 
@@ -131,13 +156,29 @@ Examples MAY include:
 - motion-aligned debris;
 - high-dynamic-range emissive core.
 
+#### Scenario: ejecta rendered as velocity-stretched structure
+
+- GIVEN a destination whose model provides particle velocities
+- WHEN high-quality presentation is active
+- THEN the ejecta MAY be rendered with a velocity-stretched profile rather than a generic soft sprite
+- AND the profile SHALL be driven by the same particle state the model produces, not an unrelated decorative seed.
+
 ### Requirement: Unresolved emitter size semantics SHALL remain explicit
 
 - Screen-space size SHALL be used for unresolved emitters where appropriate.
 - World-space size SHALL be used only when the rendered item represents resolved physical extent.
 - No destination SHALL rely on accidental perspective attenuation to create apparent size.
 
+#### Scenario: distant star versus resolved nebula
+
+- GIVEN a scene mixing unresolved point emitters and resolved extended structures
+- WHEN emitter sizes are assigned
+- THEN unresolved emitters SHALL use screen-space size and resolved structures SHALL use world-space size
+- AND no apparent-size effect SHALL depend on accidental perspective attenuation.
+
 ### Requirement: TDE high-quality streams SHALL not be limited to flat ribbons
+
+TDE high-quality streams SHALL not be limited to flat ribbons.
 
 #### Scenario: Ultra TDE debris phase
 
@@ -160,6 +201,8 @@ The shared environment SHALL include deterministic angular structure at multiple
 
 ### Requirement: Galaxy Collision SHALL preserve its data-driven backbone
 
+Galaxy Collision SHALL preserve its data-driven backbone.
+
 #### Scenario: cinematic density reconstruction
 
 - GIVEN the source-locked tracer dataset is loaded
@@ -168,6 +211,8 @@ The shared environment SHALL include deterministic angular structure at multiple
 - AND added layers SHALL not be represented as source-derived particle data unless they actually are.
 
 ### Requirement: Vacuum black-hole scenes SHALL not gain fake luminous matter
+
+Vacuum black-hole scenes SHALL not gain fake luminous matter.
 
 #### Scenario: BBH inspiral without an accretion environment
 
@@ -182,7 +227,16 @@ High/Ultra BBH rendering SHALL not rely on dark spheres plus additive rings and 
 
 The replacement MAY use strong-field lensing, a validated reduced lensing approximation, or another documented representation tied to the data-derived component trajectories.
 
+#### Scenario: Ultra inspiral frame content
+
+- GIVEN the BBH merger data provides component trajectories through inspiral
+- WHEN High/Ultra rendering is active
+- THEN the scene SHALL present a documented strong-field or lensing-informed representation tied to those trajectories
+- AND the primary representation SHALL NOT be only two dark spheres with additive rings.
+
 ### Requirement: Strong-field supersampling SHALL target unstable image regions
+
+Strong-field supersampling SHALL target unstable image regions.
 
 #### Scenario: black-hole critical region
 
@@ -192,6 +246,8 @@ The replacement MAY use strong-field lensing, a validated reduced lensing approx
 - AND the scientific ray classification/result SHALL remain validated against the trusted backend.
 
 ### Requirement: Experience modes SHALL preserve a clear scientific/cinematic boundary
+
+Experience modes SHALL preserve a clear scientific/cinematic boundary.
 
 #### Scenario: switching from Cinematic to Scientific
 
@@ -207,7 +263,16 @@ Destinations SHALL NOT create independent quality governors.
 
 A shared visual work budget SHALL drive expensive visual features.
 
+#### Scenario: no parallel quality authorities
+
+- GIVEN any destination module
+- WHEN it configures expensive visual features or quality scaling
+- THEN it SHALL consume the shared governor/work budget rather than a destination-local governor
+- AND two destinations SHALL NOT apply conflicting adaptive decisions to the same shared pass.
+
 ### Requirement: Interaction SHALL be allowed to trade temporary quality for responsiveness
+
+Interaction SHALL be allowed to trade temporary quality for responsiveness.
 
 #### Scenario: camera orbit on Ultra
 
@@ -218,6 +283,8 @@ A shared visual work budget SHALL drive expensive visual features.
 - AND the transition SHALL avoid visible oscillation/popping.
 
 ### Requirement: Scientific and Cinematic visual gates SHALL be separate
+
+Scientific and Cinematic visual gates SHALL be separate.
 
 #### Scientific gate
 
@@ -236,6 +303,13 @@ A new cinematic visual suite SHALL:
 
 A scientific golden pass SHALL NOT be treated as evidence that Cinematic mode looks correct.
 
+#### Scenario: a scientific pass does not certify cinematic output
+
+- GIVEN Scientific and Cinematic goldens are both gathered for a change
+- WHEN the change is reviewed
+- THEN the Scientific golden pass SHALL NOT be accepted as evidence that Cinematic mode looks correct
+- AND the Cinematic suite SHALL be judged independently against reviewed cinematic baselines.
+
 ### Requirement: Temporal stability SHALL be a blocking visual metric
 
 At least one automated temporal metric SHALL gate high-quality scenes that use temporal reconstruction or animated stochastic detail.
@@ -247,11 +321,25 @@ The metric SHALL detect settled-state flicker in representative:
 - TDE strands;
 - strong-field critical regions.
 
+#### Scenario: settled bright-point flicker fails the gate
+
+- GIVEN a high-quality scene with temporal reconstruction and a settled camera
+- WHEN a bright point emitter is sampled across consecutive frames
+- THEN measured flicker SHALL fall within the temporal stability threshold
+- AND a violation SHALL block acceptance of that scene.
+
 ### Requirement: Human visual review SHALL be mandatory for major milestones
 
 Automated visual metrics SHALL NOT be the sole acceptance criterion.
 
 Each destination migration SHALL include reviewed representative captures.
+
+#### Scenario: unreviewed capture cannot clear a milestone
+
+- GIVEN a milestone requires visual acceptance
+- WHEN representative captures exist only as unattended automated output
+- THEN the milestone SHALL NOT be marked visually accepted
+- AND reviewed capture links SHALL be recorded as durable evidence.
 
 ### Requirement: Visual changes SHALL carry performance evidence
 
@@ -270,7 +358,16 @@ For every shared renderer or destination visual overhaul, evidence SHALL record:
 
 A visual feature that materially increases cost SHALL be assigned to an appropriate tier or redesigned.
 
+#### Scenario: visual overhaul without timing evidence is incomplete
+
+- GIVEN a change modifies shared rendering or destination visuals
+- WHEN its review record lacks backend, browser, adapter, viewport, tier, render-scale and frame-timing evidence
+- THEN the visual change SHALL NOT be accepted as finished
+- AND materially expensive features SHALL name the tier or budget that owns their cost.
+
 ### Requirement: New temporal and auxiliary resources SHALL remain bounded
+
+New temporal and auxiliary resources SHALL remain bounded.
 
 #### Scenario: repeated resize and destination switching
 
@@ -289,11 +386,25 @@ Every new visual capability SHALL be categorized as:
 
 Scientific correctness SHALL NOT become WebGPU-only merely because the cinematic implementation is easier there.
 
+#### Scenario: cinematic enhancement on WebGL2
+
+- GIVEN a cinematic capability that is easy on WebGPU but must remain correct everywhere
+- WHEN the product runs on the WebGL2 fallback
+- THEN the capability SHALL either run in its simplified accepted form or use its defined fallback
+- AND Scientific correctness SHALL NOT depend exclusively on WebGPU.
+
 ### Requirement: Visual regression thresholds SHALL match scene content
 
 Sparse-on-black scenes SHALL use thresholds appropriate to the fraction of meaningful content.
 
 No threshold may be widened or baseline regenerated merely to silence a visually obvious regression.
+
+#### Scenario: sparse scene compared on meaningful content
+
+- GIVEN a sparse-on-black destination render
+- WHEN a golden comparison is configured
+- THEN its threshold SHALL be appropriate for the small fraction of meaningful content
+- AND widening a threshold or regenerating a baseline solely to silence a visible regression SHALL be rejected.
 
 ### Requirement: Showcase quality SHALL have a finite definition of done
 
@@ -309,3 +420,9 @@ Final visual certification SHALL include:
 - no unresolved P0/P1 visual defects;
 - documented deferred P2/P3 polish.
 
+#### Scenario: missing certification artifact blocks the claim
+
+- GIVEN a change claims showcase/cinematic completion
+- WHEN the certification bundle lacks accepted captures, temporal metrics or performance/memory results
+- THEN the completion claim SHALL NOT be accepted
+- AND the term SHALL NOT be used as an open-ended objective.
