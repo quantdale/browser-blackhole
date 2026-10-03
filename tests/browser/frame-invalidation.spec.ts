@@ -523,6 +523,10 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     // in ONE synchronous evaluate: a rAF tick between these steps would render
     // the visible timeline and consume the resume invalidation before the test
     // looks for it, which would measure the harness's timing, not the policy.
+    // The render counter is also re-zeroed IN THIS SAME BLOCK — a separate
+    // evaluate after the dispatch would let a rAF tick consume the resume wake
+    // during the protocol round-trip, leaving the later frame-count assertion
+    // with nothing to see (pre-existing flake).
     const resumeState = await page.evaluate(() => {
       const host = window.__ATLAS_APP__!.host;
       Object.defineProperty(document, 'hidden', { configurable: true, get: () => false });
@@ -532,6 +536,7 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
       host.time.update(1 / 60);
       const delta = host.time.internalCoordinate - before;
       host.time.pause();
+      (window as unknown as { __renderFrameCalls: number }).__renderFrameCalls = 0;
       return {
         hidden: host.time.hidden,
         delta,
@@ -544,7 +549,6 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     // resetTiming dropped the stale sample window; nothing has sampled since.
     expect(resumeState.smoothedFps).toBe(0);
 
-    await resetRenderFrameCalls(page);
     await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
     await resetRenderFrameCalls(page);
