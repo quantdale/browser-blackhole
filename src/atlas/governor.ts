@@ -13,11 +13,15 @@
  *   never trace at unrestricted devicePixelRatio.
  *
  * Semantics implemented here:
- * - FPS is an exponential moving average of per-frame durations sampled by
- *   `beginFrame()`/`endFrame()` pairs via `performance.now()`. The kernel's
- *   `renderFrame()` already brackets every orchestrated frame with these calls
- *   (see `SharedRendererKernel.renderFrame`), so a host driving frames through
- *   the kernel must NOT call them a second time.
+ * - The FPS signal is an exponential moving average of the INTERVAL between
+ *   PRESENTED frames, fed by `advanceFrame(deltaMs, presented)` — the host
+ *   calls it once per frame-loop tick with the wall-clock delta since the
+ *   previous tick and whether a frame was actually presented (quality-ladder-
+ *   resolution-integrity D5/A-05). Skipped/idle ticks advance only the
+ *   activity clock; their deltas accumulate into the next presented sample.
+ *   `beginFrame()`/`endFrame()` (called by the kernel's `renderFrame`) now
+ *   measure only the CPU submission window, retained as the separate
+ *   `lastCpuSubmitMs` metric and never merged into the fps signal.
  * - Auto mode walks one tier at a time on a fixed ladder low→medium→high→ultra:
  *   drop when smoothed fps < target*0.8 sustained ~1 s; raise when
  *   fps > target*1.15 sustained ~3 s; never two changes closer than 2 s
@@ -25,10 +29,11 @@
  * - `setForcedTier(tier)` is a host-side extension used by transitions that
  *   need a deterministic ceiling while keeping 'auto' as the user mode: it
  *   overrides the auto walk but never overrides a manual pin.
- * - Activity model: `notifyInteraction()` restarts a clock advanced by frame
- *   durations; mode is 'interaction' for 0.5 s, then 'settling' for 2 s, then
- *   'stable'. The clock is frame-driven (no wall-clock timers), so `dispose()`
- *   only clears subscriptions.
+ * - Activity model: `notifyInteraction()` restarts a clock advanced by
+ *   `advanceFrame` on EVERY frame-loop tick (rendered or not, quality-ladder-
+ *   resolution-integrity D6/A-06); mode is 'interaction' for 0.5 s, then
+ *   'settling' for 2 s, then 'stable'. The clock is tick-driven (no
+ *   wall-clock timers), so `dispose()` only clears subscriptions.
  * - Work multipliers (`setWorkMultiplier`) express a destination's relative
  *   cost; the effective fps target is `targetFps / multiplier` (clamped to
  *   [0.1, 10]) so a heavier destination tolerates proportionally lower fps
@@ -157,9 +162,15 @@ export class PerformanceGovernor implements IPerformanceGovernor {
   /** Host-forced tier (transitions); overrides auto, not manual pins. */
   private forcedTierValue: QualityTier | null = null;
 
-  // Frame sampling (begin/end pairs).
+  // Frame sampling (begin/end pairs): CPU SUBMISSION window, retained as a
+  // separate metric — NOT the frame-rate signal (quality-ladder-… D5).
   private frameStartMs = -1;
   private sampling = false;
+  private lastCpuSubmitMsValue: number | null = null;
+
+  // Frame-cadence state (advanceFrame): fps EMA + sustain + refresh window
+  // sample PRESENTED frames only; the activity clock advances on every tick.
+  private pendingPresentedDeltaMs = 0;
 
   // Smoothed fps state.
   private fpsEmaValue = 0;
@@ -184,7 +195,7 @@ export class PerformanceGovernor implements IPerformanceGovernor {
   private aboveRaiseThresholdMs = 0;
   private lastAutoChangeAtMs = -Infinity;
 
-  // Activity clock, advanced only by sampled frame durations.
+  /** Activity clock, advanced on every frame-loop tick (D6), rendered or not. */
   private msSinceInteraction = Infinity;
 
   private disposed = false;
@@ -235,12 +246,46 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     this.sampling = true;
   }
 
+  /**
+   * Close the CPU submission window. The measured duration is retained as
+   * `lastCpuSubmitMs` (a separately reported metric) — cadence, activity and
+   * tier decisions are driven by {@link advanceFrame} instead, so a fast
+   * submission onto a slow GPU cannot masquerade as a healthy frame rate
+   * (quality-ladder-resolution-integrity D5/A-05).
+   */
   endFrame(): void {
     if (this.disposed || !this.sampling) return;
     this.sampling = false;
+    this.lastCpuSubmitMsValue = clamp(
+      performance.now() - this.frameStartMs,
+      0,
+      MAX_SAMPLED_FRAME_MS
+    );
+  }
 
-    const durationMs = clamp(performance.now() - this.frameStartMs, 0, MAX_SAMPLED_FRAME_MS);
-    const instantaneousFps = 1000 / Math.max(durationMs, 0.01);
+  /**
+   * Feed one frame-loop tick (D5/D6): `deltaMs` since the previous tick and
+   * whether a frame was presented.
+   *
+   * - The activity clock ALWAYS advances by `deltaMs`, so a correctly
+   *   frame-skipping idle application still reaches the settled state.
+   * - Cadence (fps EMA), the refresh window and the tier sustain
+   *   accumulators sample only PRESENTED frames, using the interval between
+   *   them (pending skipped-frame deltas accumulate into the next presented
+   *   sample). Idle ticks therefore never count as a frame-rate shortfall.
+   */
+  advanceFrame(deltaMs: number, presented: boolean): void {
+    if (this.disposed) return;
+    const dt = Number.isFinite(deltaMs) && deltaMs > 0 ? deltaMs : 0;
+    this.advanceActivityClock(dt);
+    if (!presented) {
+      this.pendingPresentedDeltaMs += dt;
+      return;
+    }
+    const intervalMs = clamp(this.pendingPresentedDeltaMs + dt, 0.01, MAX_SAMPLED_FRAME_MS);
+    this.pendingPresentedDeltaMs = 0;
+
+    const instantaneousFps = 1000 / Math.max(intervalMs, 0.01);
     if (!this.hasFpsSample) {
       this.fpsEmaValue = instantaneousFps;
       this.hasFpsSample = true;
@@ -248,9 +293,13 @@ export class PerformanceGovernor implements IPerformanceGovernor {
       this.fpsEmaValue += FPS_EMA_ALPHA * (instantaneousFps - this.fpsEmaValue);
     }
 
-    this.recordFrameDuration(durationMs);
-    this.advanceActivityClock(durationMs);
-    this.evaluateAutoTier(durationMs);
+    this.recordFrameDuration(intervalMs);
+    this.evaluateAutoTier(intervalMs);
+  }
+
+  /** CPU submission ms of the most recent endFrame window (null before the first). */
+  get lastCpuSubmitMs(): number | null {
+    return this.lastCpuSubmitMsValue;
   }
 
   /**
@@ -270,6 +319,7 @@ export class PerformanceGovernor implements IPerformanceGovernor {
     this.frameStartMs = -1;
     this.hasFpsSample = false;
     this.fpsEmaValue = 0;
+    this.pendingPresentedDeltaMs = 0;
     this.frameWindowCount = 0;
     this.frameWindowCursor = 0;
     this.resetHysteresis();

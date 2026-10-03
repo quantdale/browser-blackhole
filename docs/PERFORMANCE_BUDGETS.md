@@ -61,6 +61,14 @@ Pixel count is
 
 `floor(cssWidth * effectiveDpr * renderScale) * floor(cssHeight * effectiveDpr * renderScale)`.
 
+This product is applied exactly once, in `SharedRendererKernel.handleResize`:
+the drawing buffer is allocated at these dimensions and the post/HDR targets
+receive the same already-scaled dimensions (the shared post's `renderScale`
+parameter multiplies unscaled dimensions only and is always 1 in the
+production path). Reported telemetry (`runtimeTelemetry().size`) reads the
+live buffer plus the scale the kernel actually applied — never the tier's
+nominal scale.
+
 This is why uncontrolled native DPR is forbidden. A 3x DPR has nine times the pixels of 1x at the same CSS size.
 
 ## 5. Effective DPR policy

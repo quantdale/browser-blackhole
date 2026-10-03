@@ -39,6 +39,12 @@ Apply in this order unless profiling disproves it:
 9. optional tile/workload classification/compute passes;
 10. workers/off-main-thread rendering only for measured CPU bottlenecks.
 
+A quality-tier change is a resolution change: it re-applies the drawing
+buffer through the same resize path as a window resize (single render-scale
+application), so the internal pixel count follows the new tier's scale
+immediately instead of staying pinned at the previous resolution
+(quality-ladder-resolution-integrity A-01).
+
 ## 4. Early termination
 
 Terminate rays when confidently:

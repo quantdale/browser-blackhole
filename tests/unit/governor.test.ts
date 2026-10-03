@@ -3,8 +3,11 @@ import { PerformanceGovernor } from '../../src/atlas/governor.js';
 
 /**
  * Deterministic-clock harness for the PerformanceGovernor.
- * performance.now() is mocked; frames are explicit begin/end pairs whose
- * sampled duration equals frameMs. Counts below are chosen so EMA decay
+ * performance.now() is mocked; each step models ONE production frame-loop
+ * tick (quality-ladder-resolution-integrity D5): a begin/end CPU-submission
+ * pair whose measured duration equals frameMs, plus the matching
+ * advanceFrame(frameMs, presented=true) interval that carries the fps EMA,
+ * sustain windows and activity clock. Counts below are chosen so EMA decay
  * (alpha 0.1), sustain windows, the 3 s wall-clock grace, and the 2 s
  * anti-flap cooldown resolve unambiguously at frame granularity.
  */
@@ -29,6 +32,7 @@ function step(governor: PerformanceGovernor, frameMs: number): void {
   governor.beginFrame();
   nowMs += frameMs;
   governor.endFrame();
+  governor.advanceFrame(frameMs, true);
 }
 
 function stepFrames(governor: PerformanceGovernor, count: number, frameMs: number): void {

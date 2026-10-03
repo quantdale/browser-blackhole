@@ -98,10 +98,12 @@ export interface TransitionDirectorOptions {
   /** Repeat interval of slow-load status events while still preparing. */
   slowLoadRepeatMs?: number;
   /**
-   * Quality mode restored in the governor when motion ends (CA1-06). The host
-   * should pass its user-selected mode (`atlasState.rendering.qualityMode`).
+   * Resolves the quality mode restored in the governor when motion ends
+   * (CA1-06, quality-ladder-resolution-integrity D2). Read at motion END —
+   * not captured at construction — so a selection made while the transition
+   * runs wins. Defaults to 'auto'.
    */
-  baseQualityMode?: QualityMode;
+  resolveBaseQualityMode?: () => QualityMode;
   /** Deterministic seed for the hyperspace field. */
   seed?: number;
 }
@@ -221,7 +223,7 @@ export class TransitionDirector {
   private readonly timings: TransitionPhaseTimings;
   private readonly slowLoadThresholdMs: number;
   private readonly slowLoadRepeatMs: number;
-  private readonly baseQualityMode: QualityMode;
+  private readonly resolveBaseQualityMode: () => QualityMode;
   private readonly seed: number;
 
   /** Owned scope tracking the hyperspace pass resources (CA0-04/CA0-09). */
@@ -276,7 +278,7 @@ export class TransitionDirector {
     this.timings = { ...DEFAULT_TRANSITION_TIMINGS, ...options.timings };
     this.slowLoadThresholdMs = options.slowLoadThresholdMs ?? DEFAULT_SLOW_LOAD_THRESHOLD_MS;
     this.slowLoadRepeatMs = options.slowLoadRepeatMs ?? DEFAULT_SLOW_LOAD_REPEAT_MS;
-    this.baseQualityMode = options.baseQualityMode ?? 'auto';
+    this.resolveBaseQualityMode = options.resolveBaseQualityMode ?? (() => 'auto');
     this.seed = options.seed ?? 0x9e3779b9;
     // ASSUMED API: ResourceManager.createScope(name): ResourceScope.
     this.scope = deps.resources.createScope('transition-director');
@@ -855,9 +857,11 @@ export class TransitionDirector {
 
   /**
    * Built-in TRANSITION quality policy: force the governor's quality mode to
-   * 'low' for the duration of motion, restore `baseQualityMode` afterwards.
-   * The governor's own hysteresis then walks the tier back up gradually
-   * instead of jumping straight to high tiers (PRODUCT_UX §6 ARRIVE).
+   * 'low' for the duration of motion, restore the mode resolved at this very
+   * moment afterwards (so a user selection made mid-transition survives,
+   * quality-ladder-resolution-integrity A-02/D2). The governor's own
+   * hysteresis then walks the tier back up gradually instead of jumping
+   * straight to high tiers (PRODUCT_UX §6 ARRIVE).
    */
   private enterMotionQuality(): void {
     if (this.motionQualityActive) return;
@@ -869,7 +873,7 @@ export class TransitionDirector {
   private exitMotionQuality(): void {
     if (!this.motionQualityActive) return;
     this.motionQualityActive = false;
-    this.deps.governor.configure({ qualityMode: this.baseQualityMode });
+    this.deps.governor.configure({ qualityMode: this.resolveBaseQualityMode() });
     this.deps.qualityHooks?.onMotionEnd();
   }
 

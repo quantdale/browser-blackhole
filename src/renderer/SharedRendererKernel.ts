@@ -212,6 +212,13 @@ export class SharedRendererKernel implements IRendererKernel {
   private lastGpuComputeMs: number | null = null;
   /** Internal drawing-buffer size of the last applied resize (WS0/tasks.md §1). */
   private drawingBufferSizeValue: { widthPx: number; heightPx: number } | null = null;
+  /**
+   * Render scale actually embedded in the drawing buffer by the last
+   * successful resize: pixelRatio / min(devicePixelRatio, dprCap), i.e. the
+   * nominal scale after the max-texture clamp and guards. Null before the
+   * first resize (quality-ladder-resolution-integrity D3/A-03).
+   */
+  private appliedRenderScaleValue: number | null = null;
 
   constructor(options: SharedRendererKernelOptions) {
     this.options = options;
@@ -539,7 +546,8 @@ export class SharedRendererKernel implements IRendererKernel {
 
     const configuredCap = this.options.dprCap ?? DEFAULT_DPR_CAP;
     const dprCap = configuredCap > 0 ? configuredCap : DEFAULT_DPR_CAP;
-    let pixelRatio = Math.min(readDevicePixelRatio(), dprCap) * scale;
+    const baseDpr = Math.min(readDevicePixelRatio(), dprCap);
+    let pixelRatio = baseDpr * scale;
 
     const maxTextureSize = this.backendValue?.maxTextureSize ?? 0;
     if (maxTextureSize > 0) {
@@ -548,17 +556,31 @@ export class SharedRendererKernel implements IRendererKernel {
     if (!Number.isFinite(pixelRatio) || pixelRatio <= 0) pixelRatio = 1;
     renderer.setPixelRatio(pixelRatio);
 
-    // The shared post target keeps the certified rounding; the drawing buffer
-    // three actually allocates is `floor(css * ratio)` (WebGLRenderer
-    // getDrawingBufferSize semantics), so the telemetry fallback mirrors that
-    // rather than reusing the post size. No rendering behavior changes here.
-    const postWidthPx = Math.max(1, Math.round(cssWidth * pixelRatio));
-    const postHeightPx = Math.max(1, Math.round(cssHeight * pixelRatio));
+    // Single owner of the pixel-ratio formula (quality-ladder-resolution-
+    // integrity D4): the drawing buffer three allocates is
+    // floor(css * ratio) (WebGLRenderer getDrawingBufferSize semantics), the
+    // post/HDR targets receive those ALREADY-scaled dimensions with scale 1,
+    // and the scale is applied exactly once. The overlay mirror in the host
+    // derives from the same formula. The applied scale is retained for
+    // truthful telemetry even when the texture clamp reduced it.
+    const bufferWidthPx = Math.max(1, Math.floor(cssWidth * pixelRatio));
+    const bufferHeightPx = Math.max(1, Math.floor(cssHeight * pixelRatio));
     this.drawingBufferSizeValue = {
-      widthPx: Math.max(1, Math.floor(cssWidth * pixelRatio)),
-      heightPx: Math.max(1, Math.floor(cssHeight * pixelRatio))
+      widthPx: bufferWidthPx,
+      heightPx: bufferHeightPx
     };
-    this.options.post.ensureSize(postWidthPx, postHeightPx, scale);
+    this.appliedRenderScaleValue = baseDpr > 0 ? pixelRatio / baseDpr : scale;
+    this.options.post.ensureSize(bufferWidthPx, bufferHeightPx, 1);
+  }
+
+  /**
+   * Render scale actually applied to the drawing buffer by the last
+   * successful resize (after DPR cap, texture clamp and guards); null before
+   * the first resize. This is what telemetry must report — never the tier's
+   * nominal scale (WS0/tasks.md §1, quality-ladder-resolution-integrity D3).
+   */
+  appliedRenderScale(): number | null {
+    return this.appliedRenderScaleValue;
   }
 
   /**
@@ -570,6 +592,10 @@ export class SharedRendererKernel implements IRendererKernel {
   effectiveSize(): { widthPx: number; heightPx: number } | null {
     const renderer = this.rendererValue;
     if (renderer === null) return null;
+    // Unknown before the first successful resize — never a fabricated
+    // viewport-derived or canvas-default number (quality-ladder-
+    // resolution-integrity tasks 5.2).
+    if (this.drawingBufferSizeValue === null) return null;
     const read = (
       renderer as unknown as {
         getDrawingBufferSize?: (target: {

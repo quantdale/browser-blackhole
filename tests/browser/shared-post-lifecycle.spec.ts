@@ -81,6 +81,9 @@ test.describe('SharedPost V2 snapshot and HDR transition lifecycle', () => {
           1
         );
         host.post.releaseSnapshot();
+        const canvasEl = document.getElementById('scene');
+        const canvasSize =
+          canvasEl instanceof HTMLCanvasElement ? [canvasEl.width, canvasEl.height] : null;
         const duringTransition = await new Promise<Record<string, unknown>>((resolve) => {
           app.host.navigate('tidal-disruption', 'solar-canonical');
           const poll = () => {
@@ -95,6 +98,14 @@ test.describe('SharedPost V2 snapshot and HDR transition lifecycle', () => {
         return {
           snapshotType: target.texture?.type ?? null,
           snapshotSize: [target.width, target.height],
+          bufferSize: canvasSize,
+          expectedBuffer: rect
+            ? [
+                Math.floor(rect.width * Math.min(window.devicePixelRatio || 1, 2)),
+                Math.floor(rect.height * Math.min(window.devicePixelRatio || 1, 2))
+              ]
+            : null,
+          viewportCss: rect ? [rect.width, rect.height] : null,
           raw: Array.from(raw).slice(0, 4),
           beforeStages: before?.stages ?? [],
           stageTimingMs: before?.stageTimingMs ?? null,
@@ -106,7 +117,18 @@ test.describe('SharedPost V2 snapshot and HDR transition lifecycle', () => {
       console.log(`SHARED_POST_LIFECYCLE ${backend.label}: ${JSON.stringify(result)}`);
       expect(errors).toEqual([]);
       expect(result.snapshotType).toBe(1016);
-      expect(result.snapshotSize).toEqual([973, 727]);
+      // quality-ladder-resolution-integrity (A-04): the HDR snapshot target
+      // must equal the drawing buffer EXACTLY, and both must equal
+      // floor(css * effectiveDpr * renderScale) — here scale 1 (tier 'high')
+      // at effectiveDpr = min(dpr, 2), computed in-page as `expectedBuffer`.
+      // The previous [973, 727] pin captured the pre-fix round-vs-floor
+      // mismatch (post rounded up to the CSS width while the drawing buffer
+      // floored one pixel below); the single-application fix makes the two
+      // agree by construction.
+      expect(result.bufferSize).not.toBeNull();
+      expect(result.expectedBuffer).not.toBeNull();
+      expect(result.snapshotSize).toEqual(result.bufferSize);
+      expect(result.bufferSize).toEqual(result.expectedBuffer);
       expect(result.raw).toHaveLength(4);
       expect(result.beforeStages as string[]).toContain('transition-composite');
       expect(result.transitionStages as string[]).toContain('transition-composite');

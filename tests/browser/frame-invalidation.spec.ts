@@ -178,6 +178,51 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     expect(await renderFrameCalls(page)).toBe(0);
   });
 
+  test('idle ticks settle the activity clock without rendering a frame (A-06)', async ({
+    page
+  }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+    await pauseAndSettle(page);
+
+    // Drive the activity clock into 'interaction', then hold the app in a
+    // frame-skipping idle state past the 500 ms settle + 2000 ms stable
+    // thresholds. rAF keeps firing and host.frame keeps being called, but
+    // zero frames render — the clock must still advance to 'stable'
+    // (quality-ladder-resolution-integrity A-06/D6).
+    const initial = await page.evaluate(() => {
+      const governor = window.__ATLAS_APP__!.host.governor as unknown as {
+        notifyInteraction(): void;
+        readonly activityMode: string;
+      };
+      governor.notifyInteraction();
+      return governor.activityMode;
+    });
+    expect(initial, 'notifyInteraction must put the clock in interaction').toBe('interaction');
+
+    const settled = await page
+      .waitForFunction(
+        () => {
+          const governor = window.__ATLAS_APP__!.host.governor as unknown as {
+            readonly activityMode: string;
+          };
+          return governor.activityMode === 'stable';
+        },
+        undefined,
+        { timeout: 8_000 }
+      )
+      .then(() => true)
+      .catch(() => false);
+
+    expect(settled, 'activity clock never left interaction while frames were being skipped').toBe(
+      true
+    );
+    expect(
+      await renderFrameCalls(page),
+      'the settle must not have required rendering a single frame'
+    ).toBe(0);
+  });
+
   test('a destination control change wakes the frame loop, then goes quiet again', async ({
     page
   }) => {
@@ -222,6 +267,78 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     });
     await waitForAnimationFrames(page, WAKE_FRAMES);
     expect(await renderFrameCalls(page)).toBeGreaterThan(0);
+  });
+
+  test('a quality-tier change re-applies the drawing-buffer size (A-01)', async ({ page }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+
+    const bufferDims = async (): Promise<{
+      w: number;
+      h: number;
+      cssW: number;
+      cssH: number;
+    }> =>
+      page.evaluate(() => {
+        const canvas = document.querySelector('canvas');
+        if (!canvas) throw new Error('no canvas');
+        return {
+          w: canvas.width,
+          h: canvas.height,
+          cssW: canvas.clientWidth,
+          cssH: canvas.clientHeight
+        };
+      });
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.governor.setForcedTier('ultra');
+    });
+    await waitForAnimationFrames(page, WAKE_FRAMES);
+    const ultra = await bufferDims();
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.governor.setForcedTier('low');
+    });
+    await waitForAnimationFrames(page, WAKE_FRAMES);
+    const low = await bufferDims();
+
+    expect(low.w, 'tier drop to low must change the drawing buffer').not.toBe(ultra.w);
+
+    // The new dimensions must equal the documented single-application formula
+    // floor(css * effectiveDpr * renderScale); playwright runs at DPR 1 and
+    // the default dprCap is 2, so effectiveDpr = min(dpr, 2) = 1 here.
+    const dpr = await page.evaluate(() => window.devicePixelRatio);
+    const effectiveDpr = Math.min(dpr > 0 ? dpr : 1, 2);
+    expect(low.w).toBe(Math.floor(low.cssW * effectiveDpr * 0.6));
+    expect(low.h).toBe(Math.floor(low.cssH * effectiveDpr * 0.6));
+  });
+
+  test('a user-selected manual quality mode survives a full transition (A-02)', async ({
+    page
+  }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.setQualityMode('ultra');
+    });
+    expect(
+      await page.evaluate(() => window.__ATLAS_APP__!.host.state.rendering.qualityMode as string)
+    ).toBe('ultra');
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.navigate('galaxy-collision');
+    });
+    await waitForArrival(page);
+
+    expect(
+      await page.evaluate(() => window.__ATLAS_APP__!.host.state.rendering.qualityMode as string),
+      'the manual quality mode must be restored on arrival'
+    ).toBe('ultra');
+
+    // The panel control must display the restored selection after arrival
+    // (the rebuild happens on the first UI sync after the transition ends).
+    await expect(page.getByLabel('Quality', { exact: true })).toHaveValue('ultra');
   });
 
   test('captureFrame() forces a render even while idle-paused', async ({ page }) => {

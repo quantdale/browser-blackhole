@@ -170,6 +170,27 @@ test.describe('M11-04 lifecycle/resource-leak torture', () => {
     const errors = collectErrors(page);
     await page.goto('/atlas/stellar-explosion?preset=core-collapse');
     await waitArrived(page, 'stellar-explosion');
+    // Anchor the baseline at the ladder's TOP tier, not at arrival. Under
+    // truthful cadence measurement (quality-ladder-resolution-integrity A-05)
+    // the auto governor settles low during arrival, and A-04 sizes low-tier
+    // targets at the correct floor(css*dpr*scale) instead of scale squared, so
+    // arrival now represents the SMALLEST tier (16.2 MB) while the scale-1.0
+    // steady state is 39.3 MB — the old arrival-anchored baseline*2 + 4 MB
+    // bound (pre-change arrival was ~36.8 MB at a stale/high-size mix) would
+    // reject the unchanged top tier. Forcing high first restores the original
+    // intent: every later record must stay within 2x of the worst steady state.
+    await page.evaluate(() => {
+      const app = window.__ATLAS_APP__!;
+      const host = app.host as unknown as {
+        governor: { setForcedTier(tier: 'high'): void };
+        handleResize(width: number, height: number): void;
+      };
+      host.governor.setForcedTier('high');
+      const rect = document.getElementById('viewport')?.getBoundingClientRect();
+      if (rect) host.handleResize(rect.width, rect.height);
+      app.captureFrame();
+      app.captureFrame();
+    });
     const baseline = await scopes(page);
     const records: Array<Record<string, unknown>> = [];
     for (const tier of ['low', 'medium', 'high', 'ultra', 'high', 'medium', 'high'] as const) {

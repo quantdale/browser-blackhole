@@ -443,4 +443,12 @@ ResourceScope:
 
 - current owned resources by type.
 
+Render-size telemetry (`runtimeTelemetry().size`) is assembled by
+`src/atlas/renderTelemetry.ts#buildRenderSizeTelemetry` from the kernel's
+`effectiveSize()` (live drawing-buffer dimensions) and `appliedRenderScale()`
+(the scale recorded at the last successful resize, after DPR cap, texture
+clamp and guards). It reports `null` — an explicit unknown — before the first
+successful resize, and never substitutes the tier's nominal scale
+(quality-ladder-resolution-integrity A-03).
+
 Debug instrumentation must not require readback of huge GPU buffers each frame.

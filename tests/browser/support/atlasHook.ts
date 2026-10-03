@@ -39,7 +39,10 @@ interface InventoryView {
   /** Monotonic renderer generation (bumped on device loss / re-init). */
   rendererGeneration: number;
   /** Quality governor view (tier + live dynamic-resolution scale). */
-  governor: { tier: string; renderScale: number };
+  governor: {
+    tier: string;
+    renderScale: number;
+  };
   /** WS0/tasks.md §1 renderer.info mirror; null when no renderer is live. */
   rendererInfo: {
     render: { frameCalls: number; drawCalls: number; triangles: number };
@@ -169,9 +172,15 @@ interface AtlasHook {
       readonly currentTier: 'low' | 'medium' | 'high' | 'ultra';
       /** Smoothed fps of the governor's sample window (0 before a sample). */
       readonly smoothedFps: number;
+      /** Activity clock state: 'interaction' | 'settling' | 'stable'. */
+      readonly activityMode: string;
+      /** Restart the activity clock (interaction input signal). */
+      notifyInteraction(): void;
     };
     /** Re-applies canvas sizing from the given CSS viewport size. */
     handleResize(cssWidth: number, cssHeight: number): void;
+    /** User-facing quality mode (auto or a pinned tier). */
+    setQualityMode(mode: 'auto' | 'low' | 'medium' | 'high' | 'ultra'): void;
     /** M8-09 canonical trajectory-backend preference setter. */
     setTrajectoryBackend(preference: 'auto' | 'numerical' | 'lut'): void;
     /**

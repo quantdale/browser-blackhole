@@ -297,12 +297,12 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| A-01 | Governor tier change never re-runs `handleResize`, so dynamic resolution is inert | P1 | confirmed | `host.ts:517` vs the only `handleResize` callers (`atlasApp.ts:1106`, `host.ts:568`, `host.ts:1025`) |
-| A-02 | Every transition overwrites the user's manual quality mode with `auto` | P1 | confirmed | `host.ts:488` hardcodes `{ baseQualityMode: 'auto' }`; `TransitionDirector.ts:872` |
-| A-03 | `runtimeTelemetry().size.renderScale` reports the tier's nominal scale, not the applied one | P1 | confirmed | `host.ts:1215` vs `kernel.effectiveSize()` |
-| A-04 | `renderScale` applied twice: the HDR/post target is sized at `css·dpr·scale²` | P1 | confirmed | `SharedRendererKernel.ts:542,555,561` + `SharedPost.ts:173-174` |
-| A-05 | Governor FPS EMA measures the CPU submit window, not frame cadence; its own test harness models a different measurement | P1 | indicated | `governor.ts:238-260` called only from `SharedRendererKernel.renderFrame`; `tests/unit/governor.test.ts:6-8,28-32` |
-| A-06 | Governor activity clock advances only on rendered frames, so `activityMode` latches at `interaction` while idle | P2 | confirmed | `host.ts:725-730`, `governor.ts:238-262` |
+| A-01 | Governor tier change never re-runs `handleResize`, so dynamic resolution is inert | P1 | resolved | `host.ts:517` vs the only `handleResize` callers (`atlasApp.ts:1106`, `host.ts:568`, `host.ts:1025`) |
+| A-02 | Every transition overwrites the user's manual quality mode with `auto` | P1 | resolved | `host.ts:488` hardcodes `{ baseQualityMode: 'auto' }`; `TransitionDirector.ts:872` |
+| A-03 | `runtimeTelemetry().size.renderScale` reports the tier's nominal scale, not the applied one | P1 | resolved | `host.ts:1215` vs `kernel.effectiveSize()` |
+| A-04 | `renderScale` applied twice: the HDR/post target is sized at `css·dpr·scale²` | P1 | resolved | `SharedRendererKernel.ts:542,555,561` + `SharedPost.ts:173-174` |
+| A-05 | Governor FPS EMA measures the CPU submit window, not frame cadence; its own test harness models a different measurement | P1 | resolved | `governor.ts:238-260` called only from `SharedRendererKernel.renderFrame`; `tests/unit/governor.test.ts:6-8,28-32` |
+| A-06 | Governor activity clock advances only on rendered frames, so `activityMode` latches at `interaction` while idle | P2 | resolved | `host.ts:725-730`, `governor.ts:238-262` |
 | A-07 | Render-scale table duplicated in `governor.ts` and `visualWorkBudget.ts` | P3 | confirmed | `governor.ts:81-86` vs `visualWorkBudget.ts:11-77` |
 
 ### U — Product correctness / control truthfulness (change: `destination-control-truthfulness`)

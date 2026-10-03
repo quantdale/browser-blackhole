@@ -580,8 +580,30 @@ export interface GovernorConfig {
 
 export interface IPerformanceGovernor {
   configure(config: Partial<GovernorConfig>): void;
+  /**
+   * Bracket the CPU submission window of one orchestrated frame. The measured
+   * duration is retained as a SEPARATE metric (`lastCpuSubmitMs`); it is not
+   * the frame-rate signal (quality-ladder-resolution-integrity D5).
+   */
   beginFrame(): void;
   endFrame(): void;
+  /**
+   * Feed one frame-loop tick: `deltaMs` since the previous tick (wall-clock
+   * semantics, advanced regardless of whether a frame was rendered) and
+   * whether a frame was actually presented.
+   *
+   * Cadence sampling (fps EMA, refresh window, tier sustain) uses presented
+   * frames only, so idle is never misclassified as a frame-rate shortfall;
+   * the activity clock advances on every tick so a frame-skipping idle
+   * application still settles (quality-ladder-resolution-integrity D5/D6).
+   */
+  advanceFrame(deltaMs: number, presented: boolean): void;
+  /**
+   * CPU submission ms of the most recent {@link endFrame} window
+   * (null before the first pair) — separately reported, never merged into
+   * the frame-rate signal.
+   */
+  readonly lastCpuSubmitMs?: number | null;
   notifyInteraction(): void;
   /** Destinations declare relative cost multipliers per tier. */
   setWorkMultiplier(destinationId: DestinationId, multiplier: number): void;
@@ -802,6 +824,14 @@ export interface FrameInvalidationTelemetry {
 }
 
 export interface ISharedPost {
+  /**
+   * Size the HDR and auxiliary targets. `widthPx`/`heightPx` are
+   * ALREADY-scaled pixel dimensions; `renderScale` applies to UNSCALED
+   * dimensions only. The production kernel passes its already-scaled
+   * drawing-buffer size with `renderScale` 1 so the scale is applied exactly
+   * once (quality-ladder-resolution-integrity D4); a caller holding unscaled
+   * CSS dimensions may multiply here instead.
+   */
   ensureSize(widthPx: number, heightPx: number, renderScale: number): void;
   getHdrTarget(): THREE.Texture | null;
   setExposure(exposure: number): void;
@@ -1172,6 +1202,13 @@ export interface IRendererKernel {
   readRendererInfo(): RendererInfoTelemetry | null;
   /** Internal drawing-buffer size, or null before the first resize. */
   effectiveSize?(): { widthPx: number; heightPx: number } | null;
+  /**
+   * Render scale actually applied to the drawing buffer by the last
+   * successful resize (after DPR cap, texture clamp and guards), or null
+   * before the first resize. Telemetry reports THIS, not the tier's nominal
+   * scale (quality-ladder-resolution-integrity D3).
+   */
+  appliedRenderScale?(): number | null;
   capabilities(): CapabilityRequirement[] & { satisfied(id: CapabilityId): boolean };
   /**
    * BH-121: GPU milliseconds per orchestrated frame from the most recent

@@ -46,6 +46,7 @@ import { VolumeService } from '../renderer/shared/VolumeService.js';
 import { NEUTRON_STAR_PRESETS } from '../phenomena/neutron-star/presets.js';
 import { collectInventory } from './debugInventory.js';
 import type { DebugInventoryView } from './debugInventory.js';
+import { buildRenderSizeTelemetry } from './renderTelemetry.js';
 import { PerformanceGovernor } from './governor.js';
 import {
   BLOOM_STRENGTH_RANGE,
@@ -79,6 +80,7 @@ import type {
   PreparedPhenomenon,
   PhenomenonDescriptor,
   PresetDescriptor,
+  QualityMode,
   RenderContext,
   RendererLike,
   ResourceScope,
@@ -160,6 +162,9 @@ class DeferredSharedPost implements ISharedPost {
   }
 
   ensureSize(widthPx: number, heightPx: number, renderScale: number): void {
+    // Pass-through only: no scaling, rounding or clamping is applied here,
+    // so the kernel remains the single owner of the pixel-ratio formula
+    // (quality-ladder-resolution-integrity D4).
     if (this.inner !== null) this.inner.ensureSize(widthPx, heightPx, renderScale);
     else this.pendingSize = { widthPx, heightPx, renderScale };
   }
@@ -388,6 +393,14 @@ export class CosmicAtlasHost {
   private diagnosticsEnabledValue = false;
   /** Manual render-scale override (null = governor-managed dynamic resolution). */
   private renderScaleOverrideValue: number | null = null;
+  /**
+   * The user's quality-mode selection (quality-ladder-resolution-integrity
+   * A-02/D2): the authority behind `setQualityMode`, the resolver the
+   * transition director restores at motion end, and what `state` reports.
+   * Kept distinct from the governor's live config, which the transition
+   * policy forces to 'low' while motion is active.
+   */
+  private userQualityModeValue: QualityMode = 'auto';
   /** M8-09 canonical trajectory-backend preference (rendering domain). */
   private trajectoryBackendValue: TrajectoryBackendPreference = 'auto';
   /** True while the §13 interaction throttle has bloom suspended. */
@@ -485,7 +498,7 @@ export class CosmicAtlasHost {
           disposePrepared: (prepared) => this.disposePrepared(prepared)
         }
       },
-      { baseQualityMode: 'auto' }
+      { resolveBaseQualityMode: () => this.userQualityModeValue }
     );
 
     // Route commit point (STATE_AND_ROUTES §14): canonicalize the URL with a
@@ -517,6 +530,14 @@ export class CosmicAtlasHost {
     this.unsubscribeTierChanged = this.governor.onTierChanged(() => {
       this.post.invalidateTemporal?.('quality-tier-change');
       this.invalidate(INVALIDATION_REASON.QUALITY_CHANGED);
+      // A-01: the new tier's render scale must actually reach the drawing
+      // buffer — a tier change with no re-resize left the canvas pinned at
+      // the old resolution while telemetry claimed the new scale. Re-issue
+      // from the LIVE layout size (same pattern as setRenderScaleOverride);
+      // handleResize carries the buffer, post and overlay together.
+      if (this.canvas.clientWidth > 0 && this.canvas.clientHeight > 0) {
+        this.handleResize(this.canvas.clientWidth, this.canvas.clientHeight);
+      }
     });
 
     this.unsubscribeDeviceLost = this.kernel.onDeviceLost(() => {
@@ -729,7 +750,12 @@ export class CosmicAtlasHost {
     for (const name of INVALIDATION_REASON_NAMES) {
       if ((reasons & INVALIDATION_REASON[name]) !== 0) this.reasonCountsValue[name] += 1;
     }
-    if (!shouldRender) return;
+    if (!shouldRender) {
+      // D6/A-06: the activity clock advances on EVERY tick — a frame-skipping
+      // idle application must still settle — but cadence samples nothing.
+      this.governor.advanceFrame(dt * 1000, false);
+      return;
+    }
 
     this.volumesService.setStepScale(workBudget.volumeActiveSteps);
     this.volumesService.setDetailOctaves(workBudget.volumeDetailOctaves);
@@ -756,7 +782,12 @@ export class CosmicAtlasHost {
     // Count RENDERS, not dispatches: the kernel returns false when it is
     // disposed, the device is lost, or no renderer exists, and a counter that
     // silently included those would overstate the work actually done.
-    if (this.kernel.renderFrame(plan)) this.framesRenderedValue += 1;
+    const rendered = this.kernel.renderFrame(plan);
+    if (rendered) this.framesRenderedValue += 1;
+    // D5/A-05: feed the frame-loop interval (host wall clock) as the fps
+    // signal; kernel begin/endFrame now only records the CPU submission
+    // window as its own metric.
+    this.governor.advanceFrame(dt * 1000, rendered);
   }
 
   /**
@@ -1029,6 +1060,11 @@ export class CosmicAtlasHost {
   }
 
   setQualityMode(mode: CosmicAtlasStateV1['rendering']['qualityMode']): void {
+    this.userQualityModeValue = mode;
+    // While a transition's motion policy holds the governor at 'low', defer
+    // the configure: overriding it now would defeat the forced-low policy,
+    // and the director reads this selection at motion end anyway (A-02/D2).
+    if (this.director.isTransitioning()) return;
     this.governor.configure({ qualityMode: mode });
   }
 
@@ -1150,7 +1186,11 @@ export class CosmicAtlasHost {
         toneMapping: this.toneMappingValue
       },
       rendering: {
-        qualityMode: config.qualityMode,
+        // The USER's selection, not the governor's live config: during a
+        // transition the config is forced to 'low' by policy, and reporting
+        // that here would both misstate the setting and lose it for anything
+        // that reads state as a share/persist snapshot (A-02).
+        qualityMode: this.userQualityModeValue,
         targetFps: config.targetFps,
         dynamicResolution: this.renderScaleOverrideValue === null,
         renderScaleOverride: this.renderScaleOverrideValue,
@@ -1204,16 +1244,10 @@ export class CosmicAtlasHost {
         ? window.devicePixelRatio
         : 1;
     return {
-      size:
-        size === null
-          ? null
-          : {
-              widthPx: size.widthPx,
-              heightPx: size.heightPx,
-              effectivePixels: size.widthPx * size.heightPx,
-              devicePixelRatio: dpr > 0 ? dpr : 1,
-              renderScale: this.effectiveRenderScale()
-            },
+      // D3/A-03: dimensions from the live drawing buffer, renderScale from
+      // the scale the kernel actually applied — never the tier's nominal
+      // scale. Null (explicit unknown) before the first successful resize.
+      size: buildRenderSizeTelemetry(size, this.kernel.appliedRenderScale?.() ?? null, dpr),
       transition: this.director.getPublicState(),
       volume: this.volumesService.getDebugSnapshot(),
       particles: this.particlesService.getDebugSnapshot?.() ?? EMPTY_PARTICLE_TELEMETRY,
