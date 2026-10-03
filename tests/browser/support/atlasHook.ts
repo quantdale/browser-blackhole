@@ -202,6 +202,8 @@ interface AtlasHook {
     flushGpuComputeTimestamps(): Promise<number | null>;
     /** Manual render-scale override (null = governor-managed). */
     renderScaleOverride: number | null;
+    /** Set the manual render-scale override; re-applies the canvas size immediately. */
+    setRenderScaleOverride(scale: number | null): void;
     /** True once the rendering device was lost (terminal for the session). */
     isFatalDeviceLoss: boolean;
     /** M11-03 TEST-ONLY: inject device loss through the production path. */

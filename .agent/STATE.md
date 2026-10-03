@@ -1,3 +1,61 @@
+## 2026-10-03 session — Phase 1 change 1: kerr-gpu-initializer-correctness implemented and validated
+
+Status: **COMPLETE pending checkpoint commit (tasks.md 6.3).** First of the four Phase 1
+changes in `docs/MASTER_PLAN.md` §6/§7. Full product-code change; all gates below.
+
+Implemented (evidence per `openspec/changes/kerr-gpu-initializer-correctness/tasks.md`):
+
+- **D1** shared `bigANode` factory — camera-side `(r+a)²` defect replaced at both GPU sites plus
+  the new `cameraSideInit.ts` mirror (was 56× wrong in A at r=8, a*=0.6).
+- **D2** static `L_z` frame term → `g_tφ/√f_s`; **D3** `observerFrequencyComoving` gate
+  (inactive multiplier exactly 1.0) recorded in `KERR_BACKEND_ADR` §RESOLVED.
+- **D6 mass convention REVERSED from REJECT to THREAD** after evidence: the merger module
+  legitimately passes source-derived `massRg = 0.9516` (docs + user-facing disclosure), the CPU
+  oracle already threads `a = a*·M`, and threading is exact no-op at M=1. `aPhys`/`aPhysSq` now
+  flow through every metric site; spurious `uMassRg` in the wTh θ-derivative removed (reference
+  has no M factor); non-finite/non-positive mass still throws. Pins in
+  `tests/unit/kerrMassConvention.test.ts` (`Δ(r+) ≡ 0` across M grid). The original D6-REJECT
+  build had thrown from `ensureKerrPass` every merger frame (destination stuck "transitioning",
+  `BHM_MERGER_FLASH` 60 s timeout) — fixed by threading.
+- **D7** near-horizon half-step guard (f64 replay proved the stage overshoot → NON_FINITE);
+  guard may shrink below minStep by design.
+- **LUT**: analytic `b` vs `b_c` capture classification (sentinel demoted to secondary guard),
+  manifest `axisX` threaded as uniforms, unsupported mapping → explicit `TypeError` + truthful
+  numerical fallback.
+
+Evidence:
+
+- Fail-first: close-in parity rows received 43/80 rays pre-fix (stash round-trip); observer row
+  is a recorded D8 deviation (shared-defect blind — passes pre-fix by construction).
+- `npm run check`: **green** (prettier/eslint/tsc/vitest/build) after formatting 8 files.
+- `npx playwright test kerr-parity --project=default`: **4/4** both backends, compared-count > 0.
+- `visual-goldens --workers=1`: **43/43 ×2 twice-stable** with exactly two justified re-records
+  (tasks.md §5.4): `KERR_HIGH_PROGRADE` (D7: NON_FINITE spiral → captured, before-image
+  `$env:TEMP/kerr_hp_before.png`), `KERR_CIRCULAR_OBSERVER` (D1: ~97%-black failure-band
+  baseline → real scene, `$env:TEMP/kerr_co_before.png`). `BHM_NEAR_MERGER`'s interim update
+  (captured against the broken D6-REJECT build) was **reverted to HEAD**; all four BHM rows,
+  `KERR_RETROGRADE`, `KERR_ZERO_SPIN` and all `OBSERVER_*` rows pass unchanged. Build hashes
+  stable across rebuilds, so the two golden runs cover the final tree.
+- `kerr-backend-census`: the post-fix standalone runs FAILED the cross-backend assertion
+  (webgpu 40.038% vs webgl2 39.677% captured, deterministic ×3). Root-caused with a canvas
+  geometry dump + playwright-pngjs screenshot diff: **webgl2's backing had latched at
+  `PER_TIER_RENDER_SCALE.low` (583×436 → CSS upscale = blend ring) while webgpu latched 1.0** —
+  a tier change does not re-run `handleResize` (A-01), and post-fix WebGL2 frames are heavier
+  because the rays that used to die in the non-finite spiral now integrate fully. The census now
+  pins `host.setRenderScaleOverride(1)` beside its tier pin. Result: **green ×2, byte-identical
+  runs**, webgpu/webgl2 `capturedBlack 284175/284177 (40.173%)`, cross-backend agreement at
+  2–5 rays; `otherMagenta` 999→0 and `unclassified` 95330→7085 are the correction itself
+  (baseline: 27.510%/27.511%, 8-ray agreement — recorded before/after in tasks.md §0.3/§5.3).
+- `lut-disk-parity` + `observer-modes`: green (8/8 combined run).
+- `openspec validate kerr-gpu-initializer-correctness --type change --strict`: valid on the
+  pre-implementation HEAD artifacts (stash round-trip) and on the final artifacts.
+- Probe files cleaned: `kerr-probe.spec.ts`, `kerr-probe-out.json`, `scripts/tmp-gpu-step-probe*`,
+  `scripts/tmp-census-diff.cjs`; census `[census]` log removed after capture.
+
+Next action: commit the change as one coherent checkpoint (tasks.md 6.3), then start
+`quality-ladder-resolution-integrity` (which owns the A-01 resize-latch behavior this session
+worked around in the census). No push.
+
 ## 2026-10-03 session — specification-baseline-review-corrections apply
 
 Status: **COMPLETE (archived `008966a`).** Bounded documentation/specification correction only; no

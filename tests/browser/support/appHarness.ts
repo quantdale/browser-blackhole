@@ -168,6 +168,15 @@ export interface NdcColorSample extends NdcPoint {
   r: number;
   g: number;
   b: number;
+  /**
+   * Pixel-CENTER NDC of the pixel actually read (pixelToNdc convention —
+   * `(pixel+0.5)/size*2-1`), which is the exact NDC of the GPU ray for that
+   * pixel. CPU-side reference rays must be rebuilt from these coordinates;
+   * the requested point can land up to half a pixel away, which is fatal in
+   * near-critical lensing regimes where direction varies steeply per pixel.
+   */
+  snappedX: number;
+  snappedY: number;
 }
 
 /**
@@ -192,7 +201,11 @@ export async function sampleColorsAtNdc(page: Page, points: NdcPoint[]): Promise
         const px = Math.round(((p.x + 1) / 2) * (bmp.width - 1));
         const py = Math.round(((1 - p.y) / 2) * (bmp.height - 1));
         const d = ctx.getImageData(px, py, 1, 1).data;
-        return { x: p.x, y: p.y, r: d[0] ?? 0, g: d[1] ?? 0, b: d[2] ?? 0 };
+        // pixelToNdc convention (src/shaders/cameraRayMath.ts): the GPU ray
+        // for this pixel was cast at the pixel CENTER, not at the request.
+        const snappedX = ((px + 0.5) / bmp.width) * 2 - 1;
+        const snappedY = 1 - ((py + 0.5) / bmp.height) * 2;
+        return { x: p.x, y: p.y, r: d[0] ?? 0, g: d[1] ?? 0, b: d[2] ?? 0, snappedX, snappedY };
       });
     },
     { src: dataUrl, pts: points }

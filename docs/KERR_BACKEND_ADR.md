@@ -152,6 +152,12 @@ mapping (NM §2/§7). The inverse projection used for terminal escape
 directions follows from the same tetrad with affine scale `kappa = E/
 sqrt(f_s)` and is implemented next to the reference solver.
 
+RESOLVED (kerr-gpu-initializer-correctness): the GPU camera-side legs
+implement this block literally — `L_z` carries `g_tphi/sqrt(f_s)`, not
+`g_tphi/f_s`, and `E = sqrt(f_s)` matches the same gate. The earlier shader
+comment describing a `1/f_s` variant the code did not use has been removed;
+`kerrIntegrator.ts`, `kerr/reference.ts` and this section now state one form.
+
 Camera positions at/below the ergosphere, at non-finite radii, or with
 degenerate direction route to `INVALID_INITIAL_STATE` (truthful failure; the
 UI never offers a "static observer" inside the ergosphere — KERR_RESEARCH_PLAN
@@ -263,6 +269,15 @@ Captured rays terminate immediately; BL time/phi logarithmic divergence at the
 horizon is NEVER integrated through (this is what makes the BL choice safe —
 see §1.10).
 
+Step discipline for those conditions (kerr-gpu-initializer-correctness, D7):
+the GPU loop bounds every step by the remaining horizon gap,
+`h <= (r - r+)/max(|Delta p_r/Sigma|, 1)`, so each RK4 stage — including the
+`(h/2)` sub-stages — stays where `Delta > 0`. Without it a coarse step can
+evaluate a stage below `r+` before condition 1 fires, and the floored-delta
+metric blows the state past the §1.13 NON_FINITE bound (reproduced in f64
+with the GPU step policy alone). The bound may shrink below `minStep`; it
+never exceeds the clamped policy range.
+
 ### 1.13 Numerical-failure taxonomy
 
 Distinct outcome codes (debug-visible; never merged into capture/shadow):
@@ -371,6 +386,14 @@ exact Schwarzschild formulas of accretionDisk.ts.
 `I_obs = g^3 I_emit` applied once inside the shared emission node. No bolometric
 mixing. Static-observer pure gravitational redshift retains its Schwarzschild
 analytic test; Kerr adds the circular-emitter consistency checks of §1.16.
+
+RESOLVED (kerr-gpu-initializer-correctness) — g-factor gating: the backend
+passes RAW `g` and applies the comoving-observer factor only when the explicit
+`observerFrequencyComoving` uniform is active — multiplier
+`1/max(|E|, denomFloor)` (M10 `nu_obs = 1` convention) when active, exactly
+`1` when inactive, mirroring the Schwarzschild `energyMultiplier` gate. The
+previous unconditional `1/|E|` inside the Kerr pass is removed; the legacy
+static/camera path is bit-identical to the pre-gate behaviour.
 
 ### 1.18 f64 CPU-reference strategy
 

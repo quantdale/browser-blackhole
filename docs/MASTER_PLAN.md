@@ -274,13 +274,13 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| Q-01 | Kerr GPU camera-side Kerr quartic `A` computed as `(r+a)²` instead of `(r²+a²)²` | P0 | confirmed | `kerrIntegrator.ts:464` vs `:555`, `reference.ts:215`, `photonInit.ts:282`, `metric.ts:38` |
-| Q-02 | Kerr GPU static `L_z` uses `g_tφ/f_s`; ADR and all CPU paths require `g_tφ/√f_s` | P0 | confirmed | `kerrIntegrator.ts:486` vs `reference.ts:453`, `docs/KERR_BACKEND_ADR.md:145` |
-| Q-03 | Kerr g-factor divides by `\|E\|` unconditionally, diverging from the gated Schwarzschild form | P1 | confirmed | `kerrIntegrator.ts` ~700 vs `schwarzschildIntegrator.ts:432-437` |
-| Q-04 | LUT capture sentinel is read through a linear filter, so classification is interpolated at `b_c` | P1 | indicated | `lensingGpu.ts:399-405`, `textures.ts:66-69`, `generate.ts:455-461` |
-| Q-05 | LUT GPU hard-codes the `x→u` axis mapping; the manifest's `axisX` never reaches the shader | P2 | confirmed | `lensingGpu.ts:200-205` vs `lut/domain.ts:20-22` |
+| Q-01 | Kerr GPU camera-side Kerr quartic `A` computed as `(r+a)²` instead of `(r²+a²)²` | P0 | resolved | `kerrIntegrator.ts:464` vs `:555`, `reference.ts:215`, `photonInit.ts:282`, `metric.ts:38` |
+| Q-02 | Kerr GPU static `L_z` uses `g_tφ/f_s`; ADR and all CPU paths require `g_tφ/√f_s` | P0 | resolved | `kerrIntegrator.ts:486` vs `reference.ts:453`, `docs/KERR_BACKEND_ADR.md:145` |
+| Q-03 | Kerr g-factor divides by `\|E\|` unconditionally, diverging from the gated Schwarzschild form | P1 | resolved | `kerrIntegrator.ts` ~700 vs `schwarzschildIntegrator.ts:432-437` |
+| Q-04 | LUT capture sentinel is read through a linear filter, so classification is interpolated at `b_c` | P1 | resolved | `lensingGpu.ts:399-405`, `textures.ts:66-69`, `generate.ts:455-461` |
+| Q-05 | LUT GPU hard-codes the `x→u` axis mapping; the manifest's `axisX` never reaches the shader | P2 | resolved | `lensingGpu.ts:200-205` vs `lut/domain.ts:20-22` |
 | Q-06 | Escape criterion is radius+momentum only; the documented remaining-deflection proxy is dead code | P2 | confirmed | `docs/NUMERICAL_METHODS.md:151` vs `schwarzschild.ts:460-468` (no production caller) |
-| Q-07 | Kerr `massRg ≠ 1` mixes `a*` and `a = a*·M` (latent; `massRg` is pinned to 1 today) | P3 | confirmed | `kerrIntegrator.ts:458-464` vs `reference.ts:207-213` |
+| Q-07 | Kerr `massRg ≠ 1` mixes `a*` and `a = a*·M` (latent; `massRg` is pinned to 1 today) | P3 | resolved | `kerrIntegrator.ts:458-464` vs `reference.ts:207-213` |
 | Q-08 | Physical constants duplicated 4–5× (spin clamp, capture ε, ISCO, `B_CRITICAL_RG`) | P3 | confirmed | `state.ts:152`, `controlState.ts:95`, `characteristics.ts:40`, `kerrIntegrator.ts:160` |
 
 ### E — Reliability / error surfacing (change: `transition-error-user-visibility`)

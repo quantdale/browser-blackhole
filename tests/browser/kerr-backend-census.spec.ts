@@ -67,6 +67,16 @@ async function classCensus(page: Page, backend: 'webgpu' | 'webgl2'): Promise<Cl
   await page.evaluate(() => {
     const host = window.__ATLAS_APP__!.host;
     host.governor.setForcedTier('medium');
+    // Pin the render SCALE too, not just the tier: a tier change does not
+    // re-run handleResize (A-01), so each backend's backing store latches
+    // whatever scale its auto-walk had reached. Post-fix WebGL2 frames are
+    // heavier (the rays that used to die early now integrate fully), the
+    // auto-walk can drop to low (0.6), and the CSS upscale softens every
+    // class boundary into blend pixels the classifier counts differently
+    // from WebGPU's hard pixels — a resolution mismatch, not a terminal-class
+    // disagreement. An explicit override wins over dynamic resolution and
+    // re-applies the size immediately (host.setRenderScaleOverride).
+    host.setRenderScaleOverride(1);
     host.time.pause();
     // Classify the raw diagnostic colors, not a user display profile. The
     // cinematic overhaul makes Scientific's default bloom-off state explicit;

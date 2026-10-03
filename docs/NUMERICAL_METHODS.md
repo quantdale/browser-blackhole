@@ -128,7 +128,7 @@ The solver needs high resolution near:
 - disk-plane crossings;
 - high winding trajectories near the critical impact parameter.
 
-A conservative heuristic may scale step size with radius and radial/tangential state, but must honor global `minStep`/`maxStep` and a maximum number of steps.
+A conservative heuristic may scale step size with radius and radial/tangential state, but must honor global `minStep`/`maxStep` and a maximum number of steps. `minStep` is a cost floor for the quality heuristic, not permission to step across the horizon: a horizon-proximity safety bound may shrink a step further than `minStep` when needed to keep every integration stage on the covered side of the horizon (never growing past the clamped range), because of the rule immediately below.
 
 Never make a large step across the horizon or disk plane without segment event detection.
 

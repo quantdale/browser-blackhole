@@ -302,15 +302,26 @@ export class BlackHoleModule implements PhenomenonModule {
           ) => LensingHandle & { lutMaterial?: () => unknown };
         };
         if (typeof lutSvc.createBlackHoleLutPass !== 'function') return null;
-        handle = lutSvc.createBlackHoleLutPass(
-          { ...baseParams, diskInnerRg: DISK_INNER_RG, diskOuterRg: DISK_OUTER_RG },
-          {
-            resources: this.lut.resources,
-            storedSpanRad: this.lut.storedSpanRad,
-            bCriticalRg: this.lut.bCriticalRg,
-            hybridBandHalfWidthX: this.lut.hybridBandHalfWidthX
-          }
-        );
+        try {
+          handle = lutSvc.createBlackHoleLutPass(
+            { ...baseParams, diskInnerRg: DISK_INNER_RG, diskOuterRg: DISK_OUTER_RG },
+            {
+              resources: this.lut.resources,
+              storedSpanRad: this.lut.storedSpanRad,
+              bCriticalRg: this.lut.bCriticalRg,
+              hybridBandHalfWidthX: this.lut.hybridBandHalfWidthX
+            }
+          );
+        } catch (err) {
+          // Truthful fallback (D5): an unsupported manifest axis mapping
+          // rejects the family and drops to the numerical backend, disclosed.
+          console.warn('[black-hole] LUT family rejected, numerical backend in use', err);
+          handle = context.lensing.createBlackHoleLensingPass({
+            ...baseParams,
+            diskInnerRg: DISK_INNER_RG,
+            diskOuterRg: DISK_OUTER_RG
+          });
+        }
       } else {
         const kerrSpin = Math.min(0.998, Math.max(-0.998, effectiveSpin(this.controls)));
         const kerrParams: KerrLensingParams = {

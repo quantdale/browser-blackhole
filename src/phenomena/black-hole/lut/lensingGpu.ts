@@ -77,7 +77,7 @@ import {
 } from '../../../physics/schwarzschild.js';
 import { createEnvironmentSamplerNode } from '../../../shaders/starfieldGpu.js';
 import { makeCinematicStarfieldParams } from '../../../shaders/starfield.js';
-import { DEFAULT_AXIS_X } from './domain.js';
+import type { LutAxisMapping } from './types.js';
 import {
   makeDiskEmissionNode,
   validateDiskModelParams,
@@ -143,6 +143,8 @@ export interface CreateLutLensingMaterialParams extends LensingPassParams {
   storedSpanRad: number;
   bCriticalRg: number;
   hybridBandHalfWidthX: number;
+  /** Axis mapping declared by the validated manifest (D5). */
+  axisX: LutAxisMapping;
 }
 
 export interface LutLensingMaterial {
@@ -191,17 +193,41 @@ function readVec2Components(raw: unknown): [number, number] | null {
   return c.every(Number.isFinite) ? (c as [number, number]) : null;
 }
 
-const K1 = DEFAULT_AXIS_X.xKnots[1] as number;
-const K2 = DEFAULT_AXIS_X.xKnots[2] as number;
-const K3 = DEFAULT_AXIS_X.xKnots[3] as number;
-const U1K = DEFAULT_AXIS_X.uBreakpoints[1] as number;
-const U2K = DEFAULT_AXIS_X.uBreakpoints[2] as number;
-
 export function createLutLensingMaterial(
   params: CreateLutLensingMaterialParams
 ): LutLensingMaterial {
   const stepBudget = QUALITY_TIER_STEP_BUDGETS[params.qualityTier] ?? 512;
   const safeMassRg = Number.isFinite(params.massRg) && params.massRg > 0 ? params.massRg : 1;
+
+  // D5: the axis mapping must come from the validated manifest and must be
+  // the supported 3-segment piecewise-linear form anchored at 0 / 1; reject
+  // any other form explicitly so a regenerated family can never silently
+  // produce wrong trajectories.
+  const axisX = params.axisX;
+  const axisFormSupported =
+    Array.isArray(axisX.uBreakpoints) &&
+    axisX.uBreakpoints.length === 4 &&
+    axisX.uBreakpoints[0] === 0 &&
+    axisX.uBreakpoints[1] > 0 &&
+    axisX.uBreakpoints[2] > axisX.uBreakpoints[1] &&
+    axisX.uBreakpoints[3] === 1 &&
+    Array.isArray(axisX.xKnots) &&
+    axisX.xKnots.length === 4 &&
+    axisX.xKnots[0] === 0 &&
+    axisX.xKnots[1] > 0 &&
+    axisX.xKnots[2] > axisX.xKnots[1] &&
+    axisX.xKnots[3] > axisX.xKnots[2];
+  if (!axisFormSupported) {
+    throw new TypeError(
+      'createLutLensingMaterial: unsupported LUT axis mapping (D5); expected uBreakpoints [0,a,b,1] and xKnots [0,x1,x2,x3] strictly increasing'
+    );
+  }
+
+  const uAxisK1 = uniform(axisX.xKnots[1] as number);
+  const uAxisK2 = uniform(axisX.xKnots[2] as number);
+  const uAxisK3 = uniform(axisX.xKnots[3] as number);
+  const uAxisU1 = uniform(axisX.uBreakpoints[1] as number);
+  const uAxisU2 = uniform(axisX.uBreakpoints[2] as number);
 
   const uTanHalfFovY = uniform(1);
   const uAspect = uniform(1);
@@ -301,11 +327,11 @@ export function createLutLensingMaterial(
   }
 
   function xToUNode(x: FloatNode): FloatNode {
-    const k1 = float(K1);
-    const k2 = float(K2);
-    const k3 = float(K3);
-    const uu1 = float(U1K);
-    const uu2 = float(U2K);
+    const k1 = uAxisK1;
+    const k2 = uAxisK2;
+    const k3 = uAxisK3;
+    const uu1 = uAxisU1;
+    const uu2 = uAxisU2;
     const s1 = x.mul(uu1.div(k1));
     const s2 = uu1.add(x.sub(k1).mul(uu2.sub(uu1)).div(k2.sub(k1)));
     const s3 = uu2.add(x.sub(k2).mul(float(1).sub(uu2)).div(k3.sub(k2)));
@@ -458,7 +484,7 @@ export function createLutLensingMaterial(
       // Classification + LUT-eligibility gates (flat 0/1 gate products).
       const xNorm = angularMomentum.div(bcLit);
       const gateDomainLow = select(xNorm.greaterThanEqual(0), float(1), float(0));
-      const gateDomainHigh = select(xNorm.lessThanEqual(float(K3)), float(1), float(0));
+      const gateDomainHigh = select(xNorm.lessThanEqual(uAxisK3), float(1), float(0));
       const bandDist = xNorm.sub(1).abs();
       const gateBandOut = select(bandDist.greaterThan(bandLit), float(1), float(0));
       const gateEnvelope = select(
@@ -491,7 +517,16 @@ export function createLutLensingMaterial(
         const uCol = clamp(xToUNode(xNorm), float(0), float(1)).toVar();
         const aux4 = auxAt(uCol).toVar();
         const arcEnd = aux4.z.toVar();
-        const isCaptured = select(aux4.w.lessThan(0), float(1), float(0)).toVar();
+        // Classification AUTHORITY (D4): the analytic impact-parameter
+        // comparison b >= b_c <=> xNorm >= 1. The stored aux sentinel is
+        // retained only as a secondary guard: disagreement means a corrupted
+        // or mis-mapped family, so the LUT path aborts to the numerical
+        // fallback rather than guessing class.
+        const isCaptured = select(xNorm.greaterThanEqual(float(1)), float(1), float(0)).toVar();
+        const sentinelCaptured = select(aux4.w.lessThan(0), float(1), float(0)).toVar();
+        If(isCaptured.sub(sentinelCaptured).abs().greaterThan(float(0.5)), () => {
+          lutFailed.assign(1);
+        });
         If(isCaptured.greaterThan(0.5), () => {
           lutFailed.assign(1);
         });

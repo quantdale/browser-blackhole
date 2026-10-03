@@ -208,6 +208,12 @@ export interface KerrIntegratorUniforms {
   // --- VisualGpuParams ---
   backgroundIntensity: { value: number };
   /**
+   * M10 comoving-observer frequency flag: 1 activates the 1/E comoving
+   * scaling of the legacy emitter factor; 0 preserves the legacy static/camera
+   * convention exactly (mirrors schwarzschildIntegrator).
+   */
+  observerFrequencyComoving: { value: number };
+  /**
    * Debug view selector (>= 0.5 = parity view): ESCAPED rays output the
    * terminal tetrad-projected direction encoded dir*0.5+0.5 (LINEAR);
    * CAPTURED pure black; failures failure-magenta. Debug tooling only.
@@ -282,7 +288,19 @@ export function createKerrLensingMaterial(
   params: LensingPassParams & { spinDimensionless: number }
 ): KerrLensingMaterial {
   const stepBudget = QUALITY_TIER_STEP_BUDGETS[params.qualityTier] ?? 512;
-  const safeMassRg = Number.isFinite(params.massRg) && params.massRg > 0 ? params.massRg : 1;
+  // D6 mass convention (revised after caller audit; design.md D6): every
+  // metric term uses the physical spin length a = a* * M -- spec: "Kerr metric
+  // terms SHALL use a consistent spin-length convention" -- mirroring
+  // reference.kerrRhs (`const a = aStar * massRg`). Non-unit masses are
+  // supported (the black-hole merger threads its source-derived remnant mass,
+  // 0.9516 M, through pushKerrUniforms); only invalid values are rejected
+  // here rather than silently substituted.
+  if (!Number.isFinite(params.massRg) || params.massRg <= 0) {
+    throw new RangeError(
+      `createKerrLensingMaterial: massRg must be a positive finite value, got ${params.massRg}`
+    );
+  }
+  const safeMassRg = params.massRg;
   const safeSpin = Number.isFinite(params.spinDimensionless)
     ? Math.min(SPIN_CLAMP, Math.max(-SPIN_CLAMP, params.spinDimensionless))
     : 0;
@@ -301,6 +319,13 @@ export function createKerrLensingMaterial(
   const uAspect = uniform(1);
   const uMassRg = uniform(safeMassRg);
   const uSpin = uniform(safeSpin);
+  // Physical spin length a = a* * M and its square, consumed by EVERY metric
+  // term below (design.md D6 threading; mirrors reference.kerrRhs). At unit
+  // mass both reduce to a* via multiplication by exactly 1.0 (IEEE-exact),
+  // so every M=1 graph value is bit-identical to the pre-threading graph and
+  // all existing parity rows/goldens are a no-op proof of this edit.
+  const aPhys = uSpin.mul(uMassRg);
+  const aPhysSq = aPhys.mul(aPhys);
   const uDiskEnabled = uniform(params.diskEnabled ? 1 : 0);
   const uDiskInnerRg = uniform(innerForGraph);
   const uDiskOuterRg = uniform(outerForValidate);
@@ -316,6 +341,7 @@ export function createKerrLensingMaterial(
   const uDebugMode = uniform(0);
   // --- M10 observer-frame block (OBSERVER_FRAME_ADR §5) ---
   const uObserverF = uniform(0);
+  const uObserverFrequencyComoving = uniform(0);
   const observerLegU = { value: new Vector4() };
   const observerLegA1 = { value: new Vector4() };
   const observerLegA2 = { value: new Vector4() };
@@ -341,7 +367,8 @@ export function createKerrLensingMaterial(
     escapeRadiusRg: uEscapeRadiusRg,
     captureEpsilon: uCaptureEpsilon,
     backgroundIntensity: uBackgroundIntensity,
-    debugMode: uDebugMode
+    debugMode: uDebugMode,
+    observerFrequencyComoving: uObserverFrequencyComoving
   };
 
   // Vector uniforms reference the SAME Vector3 instances (pass-by-reference).
@@ -455,13 +482,25 @@ export function createKerrLensingMaterial(
     .sub(ny.mul(sinTheta0));
   const nPh = nz.mul(e0.x).sub(nx.mul(e0.z)).div(s0Safe);
 
-  const sig0 = max(r0.mul(r0).add(uSpin.mul(uSpin).mul(cosTheta0.mul(cosTheta0))), denomFloor);
-  const del0Raw = r0.mul(r0).sub(uMassRg.mul(2).mul(r0)).add(uSpin.mul(uSpin));
+  const sig0 = max(r0.mul(r0).add(aPhysSq.mul(cosTheta0.mul(cosTheta0))), denomFloor);
+  const del0Raw = r0.mul(r0).sub(uMassRg.mul(2).mul(r0)).add(aPhysSq);
   const del0 = max(del0Raw, denomFloor);
   const s20 = max(sinTheta0.mul(sinTheta0), float(SIN2_FLOOR));
   const fS0 = sig0.sub(uMassRg.mul(2).mul(r0)).div(sig0);
-  const gTphi0 = uMassRg.mul(-2).mul(uSpin).mul(r0).mul(s20).div(sig0);
-  const bigA0 = r0.add(uSpin).mul(r0.add(uSpin)).sub(uSpin.mul(uSpin).mul(del0).mul(s20));
+  const gTphi0 = uMassRg.mul(-2).mul(aPhys).mul(r0).mul(s20).div(sig0);
+  // Shared single-source Kerr quartic (ADR; mirrors metricFragments /
+  // cameraSideInit.kerrCameraBigA). One definition for BOTH GPU sites so the
+  // two construction sites cannot diverge again (D1).
+  const bigANode = (
+    rNode: FloatNode,
+    aSqNode: FloatNode,
+    deltaNode: FloatNode,
+    s2Node: FloatNode
+  ): FloatNode => {
+    const r2 = rNode.mul(rNode);
+    return r2.add(aSqNode).pow(2).sub(aSqNode.mul(deltaNode).mul(s2Node)) as FloatNode;
+  };
+  const bigA0 = bigANode(r0, aPhysSq, del0, s20);
 
   // --- M10 observer-frame extraction (OBSERVER_FRAME_ADR §5): when active,
   // pixel-local components map through the tetrad legs directly — valid
@@ -483,7 +522,7 @@ export function createKerrLensingMaterial(
   const lZStatic = nPh
     .mul(sinTheta0)
     .mul(sqrt(del0.div(max(fS0, denomFloor))))
-    .add(gTphi0.div(max(fS0, denomFloor)));
+    .add(gTphi0.div(sqrt(max(fS0, denomFloor))));
   const prStatic = sqrt(sig0.div(del0)).mul(nRadial);
   const pthStatic = sqrt(sig0).mul(nTh);
 
@@ -522,7 +561,7 @@ export function createKerrLensingMaterial(
    * per-stage re-evaluation (SHADER_CONTRACTS §5).
    */
   const energySqInv = energy.mul(energy);
-  const mass4SpinInv = uMassRg.mul(4).mul(uSpin);
+  const mass4SpinInv = uMassRg.mul(4).mul(aPhys);
 
   /**
    * Core RHS (ADR §1.10) for (dr, dtheta, dpr, dptheta) given (r, theta,
@@ -548,9 +587,9 @@ export function createKerrLensingMaterial(
       const s2 = metricV.z;
       const st = metricV.w;
       const ct = cos(th);
-      const aSq = uSpin.mul(uSpin);
+      const aSq = aPhysSq;
       const r2 = r.mul(r);
-      const bigA = r2.add(aSq).pow(2).sub(aSq.mul(delta).mul(s2));
+      const bigA = bigANode(r, aSq, delta, s2);
 
       const w = bigA
         .mul(energySqInv.mul(-1))
@@ -594,7 +633,11 @@ export function createKerrLensingMaterial(
       const sin3 = max(st.mul(s2), float(SIN2_FLOOR));
       const wTh = bigATh
         .mul(energySqInv.mul(-1))
-        .sub(uMassRg.mul(2).mul(delta).mul(lZ).mul(lZ).mul(ct).div(sin3));
+        // d/dtheta of (Delta - a^2 sin^2 th) L_z^2 / sin^2 th is
+        // -2 Delta L_z^2 cos th / sin^3 th -- NO factor of M (reference.kerrRhs
+        // and a direct derivative agree). The previous uMassRg.mul(2) here was
+        // invisible at unit mass and mis-scaled the theta-derivative at M != 1.
+        .sub(float(2).mul(delta).mul(lZ).mul(lZ).mul(ct).div(sin3));
       const dhdtheta = float(0.5)
         .mul(wTh.div(sigmaDelta).sub(w.mul(sigmaTh).mul(delta).div(sigmaDelta.mul(sigmaDelta))))
         .sub(float(0.5).mul(kinetic.mul(sigmaTh).div(sigma.mul(sigma))));
@@ -612,10 +655,10 @@ export function createKerrLensingMaterial(
     const mSigma = metricV.x;
     const mDelta = metricV.y;
     const s2 = metricV.z;
-    const aSq = uSpin.mul(uSpin);
+    const aSq = aPhysSq;
     return uMassRg
       .mul(2)
-      .mul(uSpin)
+      .mul(aPhys)
       .mul(r)
       .mul(energy)
       .add(mDelta.sub(aSq.mul(s2)).mul(lZ).div(s2))
@@ -635,8 +678,8 @@ export function createKerrLensingMaterial(
     const th = float(thIn as FloatNode);
     const st = sin(th);
     const s2 = max(st.mul(st), float(SIN2_FLOOR));
-    const sigma = max(r.mul(r).add(uSpin.mul(uSpin).mul(cos(th).mul(cos(th)))), denomFloor);
-    const delta = max(r.mul(r).sub(uMassRg.mul(2).mul(r)).add(uSpin.mul(uSpin)), denomFloor);
+    const sigma = max(r.mul(r).add(aPhysSq.mul(cos(th).mul(cos(th)))), denomFloor);
+    const delta = max(r.mul(r).sub(uMassRg.mul(2).mul(r)).add(aPhysSq), denomFloor);
     return vec4(sigma, delta, s2, st);
   });
 
@@ -705,6 +748,21 @@ export function createKerrLensingMaterial(
           uMinStep.mul(uMassRg),
           uMaxStep.mul(uMassRg)
         );
+        // --- Near-horizon half-step guard: RK4 takes (h/2) sub-steps and a
+        // full h*d3.x stage; with p_r diverging as delta -> 0 a coarse step
+        // can evaluate a stage BELOW r+ before the capture-band check fires
+        // (floored-delta metric garbage then blows |x| to >= 1e30 ->
+        // NON_FINITE; reproduced in f64 with this exact policy). Bound the
+        // full-step radial displacement to the remaining horizon gap:
+        // h <= (r - r+) / max(|dr|, 1), dr = delta*p_r/sigma (kerrRhs).
+        // May shrink below minStep; inactive whenever the gap is large.
+        const guardDelta = max(rVar.mul(rVar).sub(uMassRg.mul(2).mul(rVar)).add(aPhysSq), float(0));
+        const guardSigma = max(
+          rVar.mul(rVar).add(aPhysSq.mul(cos(thVar).mul(cos(thVar)))),
+          denomFloor
+        );
+        const guardDr = guardDelta.mul(prVar.abs()).div(guardSigma);
+        const hStepGuarded = min(hStep, max(rVar.sub(rPlus), float(0)).div(max(guardDr, float(1))));
 
         prevR.assign(rVar);
         prevTh.assign(thVar);
@@ -716,7 +774,7 @@ export function createKerrLensingMaterial(
         const m1 = stageMetricFn(rVar, thVar);
         const d1 = coreDerivsFn(rVar, thVar, prVar, pthVar, m1);
         const k1phi = phiRateFn(rVar, m1);
-        const halfH = hStep.mul(0.5);
+        const halfH = hStepGuarded.mul(0.5);
         const r1 = rVar.add(halfH.mul(d1.x));
         const th1 = thVar.add(halfH.mul(d1.y));
         const pr1 = prVar.add(halfH.mul(d1.z));
@@ -733,16 +791,16 @@ export function createKerrLensingMaterial(
         const m3 = stageMetricFn(r2s, th2s);
         const d3 = coreDerivsFn(r2s, th2s, pr2s, pth2s, m3);
         const k3phi = phiRateFn(r2s, m3);
-        const r3 = rVar.add(hStep.mul(d3.x));
-        const th3 = thVar.add(hStep.mul(d3.y));
-        const pr3 = prVar.add(hStep.mul(d3.z));
-        const pth3 = pthVar.add(hStep.mul(d3.w));
+        const r3 = rVar.add(hStepGuarded.mul(d3.x));
+        const th3 = thVar.add(hStepGuarded.mul(d3.y));
+        const pr3 = prVar.add(hStepGuarded.mul(d3.z));
+        const pth3 = pthVar.add(hStepGuarded.mul(d3.w));
 
         const m4 = stageMetricFn(r3, th3);
         const d4 = coreDerivsFn(r3, th3, pr3, pth3, m4);
         const k4phi = phiRateFn(r3, m4);
 
-        const sixthH = hStep.mul(1 / 6);
+        const sixthH = hStepGuarded.mul(1 / 6);
         rVar.addAssign(sixthH.mul(d1.x.add(d2.x.mul(2)).add(d3.x.mul(2)).add(d4.x)));
         thVar.addAssign(sixthH.mul(d1.y.add(d2.y.mul(2)).add(d3.y.mul(2)).add(d4.y)));
         phVar.addAssign(sixthH.mul(k1phi.add(k2phi.mul(2)).add(k3phi.mul(2)).add(k4phi)));
@@ -846,12 +904,19 @@ export function createKerrLensingMaterial(
                 const dopplerSafe = max(dopplerDenom.mul(gValid), denomFloor);
                 // M10 comoving-observer convention (ADR §6): the legacy factor
                 // assumed numerator E; the comoving measurement is nu_obs = 1
-                // so scale by 1/E. Exactly 1 for legacy camera/static paths.
+                // so scale by 1/E — gated by observerFrequencyComoving exactly
+                // as the Schwarzschild pass does, so legacy static/camera
+                // paths stay bit-identical (multiplier exactly 1).
+                const gObserverMultiplier = select(
+                  uObserverFrequencyComoving.greaterThan(0.5),
+                  float(1).div(max(energy.abs(), denomFloor)),
+                  float(1)
+                );
                 const gFactor = select(
                   gValid.greaterThan(0.5),
                   float(1).div(max(ut, denomFloor).mul(dopplerSafe)),
                   float(0)
-                ).div(max(energy.abs(), denomFloor));
+                ).mul(gObserverMultiplier);
                 // emit() applies the g^3 Liouville transform INTERNALLY (its
                 // contract) — pass RAW g, never re-multiply (NM §17).
                 const emitted = diskEmission.emit({
@@ -879,17 +944,13 @@ export function createKerrLensingMaterial(
           Break();
         });
         const deltaHere = max(
-          rVar.mul(rVar).sub(uMassRg.mul(2).mul(rVar)).add(uSpin.mul(uSpin)),
+          rVar.mul(rVar).sub(uMassRg.mul(2).mul(rVar)).add(aPhysSq),
           denomFloor
         );
         If(
           select(prVar.lessThan(0), float(1), float(0))
             .mul(
-              select(
-                deltaHere.div(rVar.mul(rVar).add(uSpin.mul(uSpin))).lessThan(1e-3),
-                float(1),
-                float(0)
-              )
+              select(deltaHere.div(rVar.mul(rVar).add(aPhysSq)).lessThan(1e-3), float(1), float(0))
             )
             .greaterThan(0.5),
           () => {
@@ -939,15 +1000,12 @@ export function createKerrLensingMaterial(
       //   n_r  = kappa^-1 p_r sqrt(Delta/Sigma)
       //   n_th = kappa^-1 p_theta/sqrt(Sigma)
       //   n_ph = [(L_z/E)sqrt(f_s) - g_tphi/sqrt(f_s)] sqrt(f_s/Delta)/sin(theta)
-      const sigT = max(
-        rVar.mul(rVar).add(uSpin.mul(uSpin).mul(cos(thVar).mul(cos(thVar)))),
-        denomFloor
-      );
-      const delTRaw = rVar.mul(rVar).sub(uMassRg.mul(2).mul(rVar)).add(uSpin.mul(uSpin));
+      const sigT = max(rVar.mul(rVar).add(aPhysSq.mul(cos(thVar).mul(cos(thVar)))), denomFloor);
+      const delTRaw = rVar.mul(rVar).sub(uMassRg.mul(2).mul(rVar)).add(aPhysSq);
       const delT = max(delTRaw, denomFloor);
       const stT = max(sin(thVar), float(SIN2_FLOOR));
       const fST = sigT.sub(uMassRg.mul(2).mul(rVar)).div(sigT);
-      const gTphiT = uMassRg.mul(-2).mul(uSpin).mul(rVar).mul(stT.mul(stT)).div(sigT);
+      const gTphiT = uMassRg.mul(-2).mul(aPhys).mul(rVar).mul(stT.mul(stT)).div(sigT);
       const kappaInv = sqrt(max(fST, denomFloor)).div(max(energy, denomFloor));
       const nRTerm = prVar.mul(sqrt(delT.div(sigT))).mul(kappaInv);
       const nThTerm = pthVar.div(sqrt(sigT)).mul(kappaInv);
@@ -1128,6 +1186,8 @@ export function createKerrLensingMaterial(
       if (obsA3v) observerLegA3.value.set(obsA3v[0], obsA3v[1], obsA3v[2], obsA3v[3]);
       const obsFlagV = readFiniteNumber(state['observerActive']);
       if (obsFlagV !== null) uObserverF.value = obsFlagV;
+      const comovingV = readFiniteNumber(state['observerFrequencyComoving']);
+      if (comovingV !== null) uObserverFrequencyComoving.value = comovingV;
     },
     setEnvironmentDetail(detail: number): void {
       uEnvironmentDetail.value = Number.isFinite(detail) ? Math.min(1, Math.max(0, detail)) : 0;

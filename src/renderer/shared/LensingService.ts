@@ -220,7 +220,8 @@ export class LensingService implements ILensingService {
       auxTexture: lut.resources.auxTexture,
       storedSpanRad: lut.storedSpanRad,
       bCriticalRg: lut.bCriticalRg,
-      hybridBandHalfWidthX: lut.hybridBandHalfWidthX
+      hybridBandHalfWidthX: lut.hybridBandHalfWidthX,
+      axisX: lut.resources.axisX
     });
     const wrapped = this.wrapLensingHandle(delegate.material, delegate, params, 'lut');
     return {

@@ -27,11 +27,18 @@ import {
   type Texture
 } from 'three';
 import { decodeTexture, floatToHalfBits } from '../../../../tools/generate-luts/encode.js';
-import { lutFormatBytesPerPixel, type LutManifest, type LutTextureEntry } from './types.js';
+import {
+  lutFormatBytesPerPixel,
+  type LutAxisMapping,
+  type LutManifest,
+  type LutTextureEntry
+} from './types.js';
 
 export interface LutGpuResources {
   readonly trajectoryTexture: Texture;
   readonly auxTexture: Texture;
+  /** Axis mapping declared by the validated manifest (passed to the GPU material, D5). */
+  readonly axisX: LutAxisMapping;
   /** Estimated GPU bytes for resource-scope accounting. */
   readonly byteEstimate: number;
   dispose(): void;
@@ -87,6 +94,7 @@ export function buildLutGpuResources(
   return {
     trajectoryTexture,
     auxTexture,
+    axisX: trajEntry.domain.axisX,
     byteEstimate,
     dispose(): void {
       for (const t of textures) t.dispose();
