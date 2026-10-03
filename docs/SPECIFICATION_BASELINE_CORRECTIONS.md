@@ -73,9 +73,13 @@ unconditionally; noncompliant copy (claiming a validated DIRECT path while the s
 reference, or parity is missing/incomplete/failing) is independently rejected in all three
 negative cases. The renderer, model and tolerances are unchanged.
 
-Delta integration status: the delta is staged in this change and is integrated into the baseline
-capability spec only through the normal `openspec archive` spec merge; it is not yet merged into
-`openspec/specs/`.
+Delta integration status: **merged.** The MODIFIED delta was integrated into the baseline
+capability specs by the normal `openspec archive` spec merge on 2026-10-03 (commit `008966a`).
+The neutron-star requirement's body/tolerances and scenario name are unchanged; the vacuous
+scenario now reads as positive + three independent negatives. The archived change folder under
+`openspec/changes/archive/2026-10-03-specification-baseline-review-corrections/` still carries
+its original "PROPOSED — not applied" `proposal.md`/`tasks.md` headers — archives are immutable,
+so this erratum and `.agent/STATE.md` are the corrected record.
 
 ## Finding 3 — Evidence citations broken by archiving
 
@@ -159,8 +163,20 @@ Validation: doctor ok; `--changes --strict` 11 passed / 0 failed; `--specs --str
 
 - No edits to `src/`, `tests/`, `scripts/`, `tools/`, `public/`, dependency manifests/lockfiles,
   CI/build configuration, goldens, benchmark assets, or scientific parameter/source data.
-- No edits to previously existing `openspec/changes/archive/**` files.
+- No edits to previously existing `openspec/changes/archive/**` files. The correction's own
+  archived folder retains its pre-apply "PROPOSED — not applied" `proposal.md`/`tasks.md`
+  status headers; this is accepted as immutable-archive reality and documented above, not a
+  patch to the archive.
 - No duplicate capability specs; delta requirements merge through the normal archive operation.
 - No new destination, renderer fix, re-certification, unrelated campaign archive, or push.
 - Browser/GPU, product, and performance gates for this documentation-only correction are
   **not run**, never PASS.
+- Task evidence is aggregate (this erratum plus the `.agent/STATE.md` entry), consistent with
+  the prior hygiene change's practice; per-task inline evidence was not duplicated into `tasks.md`.
+
+## Archive-protocol fix for future changes
+
+Any completed change whose status headers still read "PROPOSED"/"in progress" must have those
+headers updated to the final state before `openspec archive` runs; otherwise the archived copy
+perpetuates the D-02 status-mismatch defect. This forward-looking rule is also recorded in
+`openspec/AGENTS.md`.

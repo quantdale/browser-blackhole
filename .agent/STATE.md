@@ -1,6 +1,6 @@
-## 2026-10-03 session — specification-baseline-review-corrections apply (in progress)
+## 2026-10-03 session — specification-baseline-review-corrections apply
 
-Status: **APPLY IN PROGRESS.** Bounded documentation/specification correction only; no
+Status: **COMPLETE (archived `008966a`).** Bounded documentation/specification correction only; no
 product code, no browser/GPU gates (reported not run, never PASS), no Phase 1 work.
 
 Supersedes (without rewriting history) the Phase 0 entry's claims:
@@ -25,14 +25,19 @@ Evidence (pre-correction, at `APPLY_BASE` `2a57d9fe71afcf694106f942fbf645b647a1f
 0 failed; `--all --strict` 18 passed / 0 failed. The four before-diagnostics are recorded in
 the correction record.
 
-Next action: finish validation, commit the application checkpoint, archive
-`specification-baseline-review-corrections` with normal spec merging, recount, revalidate,
-commit the archive checkpoint, and stop. No push.
+Next action: none — closed. The application checkpoint (`a9a0713`) and archive checkpoint
+(`008966a`) landed; no Phase 1, no push from this session. The earliest open implementation
+work is Phase 1 per `docs/MASTER_PLAN.md` §7.
 
-POST-ARCHIVE STAGE (2026-10-03, `specification-baseline-review-corrections` archived as
-`2026-10-03-specification-baseline-review-corrections`, specs merged: neutron-star
-MODIFIED replaced the vacuous scenario with positive + 3 negative cases; repository-integrity
-preserved original scenarios + 3 new). Post-archive populations: 7 archived, 11 active
+Known residual (documented in the erratum, not blocking): the archived change's own
+`proposal.md:3`/`tasks.md:3` retain their original "PROPOSED — not applied" headers —
+archives are immutable, so the correct state is recorded in the erratum and this entry, not
+a patch to the archive. Task evidence is aggregate (erratum + this entry), consistent with
+the hygiene change's practice.
+
+POST-ARCHIVE STAGE (recorded 2026-10-03, now folded into the status above): `specification-baseline-review-corrections`
+archived as `2026-10-03-specification-baseline-review-corrections`, specs merged: neutron-star MODIFIED replaced the vacuous scenario with positive + 3
+negative cases; repository-integrity preserved original scenarios + 3 new. Post-archive populations: 7 archived, 11 active
 (1 complete-awaiting-archive + 10 unfinished), 6 specs. Validation: `doctor` ok;
 `--changes --strict` 11/0; `--specs --strict` 6/0; `--all --strict` 17/0. No product code,
 no browser/GPU gates (not run), no Phase 1, no push.

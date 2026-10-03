@@ -2,7 +2,7 @@
 
 ## Current status
 
-The repository holds 18 change folders: 7 complete archived under `openspec/changes/archive/2026-10-03-*` and 11 active. Of the 11 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, and the remaining ten are the unfinished hardening wave. Post-archive at this checkpoint: `--changes --strict` 11 passed / 0 failed, `--specs --strict` 6 passed / 0 failed, `--all --strict` 17 passed / 0 failed. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
+The repository holds 18 change folders: 7 complete archived under `openspec/changes/archive/2026-10-03-*` and 11 active. Of the 11 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, and the remaining ten are nine unfinished hardening changes plus `spatial-atlas-continuous-navigation` (excluded from this campaign). Post-archive at this checkpoint: `--changes --strict` 11 passed / 0 failed, `--specs --strict` 6 passed / 0 failed, `--all --strict` 17 passed / 0 failed. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
 
 Baseline correction record: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` supersedes the two erroneous archived cinematic headers (`2fc1b5d` → final restored-scope certified checkpoint `17c4644`) and the Phase 0 state entry's revision/count claims. Active validation/inventory claims must be quoted with command, population and lifecycle stage.
 
@@ -20,7 +20,7 @@ Restarting M0–M12, CA9, `final-production-readiness`, `cinematic-visual-fideli
 
 ## Archive policy
 
-When a change completes, archive it: its delta requirements move into a baseline capability specification under `openspec/specs/<capability>/spec.md`, and the change folder moves to the archive location. Never archive a change with unchecked tasks unless those boxes are annotated DEFERRED/REJECTED with reasons, and never archive `specification-baseline-hygiene` until it is itself complete. Archived changes are no longer edited; corrections land in a new change.
+When a change completes, archive it: its delta requirements move into a baseline capability specification under `openspec/specs/<capability>/spec.md`, and the change folder moves to the archive location. Never archive a change with unchecked tasks unless those boxes are annotated DEFERRED/REJECTED with reasons, and never archive `specification-baseline-hygiene` until it is itself complete. Archived changes are no longer edited; corrections land in a new change. Before archiving a completed change, update its `proposal.md`/`tasks.md` status headers to the final state (e.g. "COMPLETE — archived"); an archived change must not perpetuate a stale "PROPOSED"/"in progress" header.
 
 ## Before editing
 
