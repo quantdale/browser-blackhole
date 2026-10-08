@@ -1,3 +1,64 @@
+## 2026-10-03 session — Phase 1 change 2: quality-ladder-resolution-integrity implemented, validated and CLOSED
+
+Status: **COMPLETE (committed `274c591`).** Second of the four Phase 1 changes in
+`docs/MASTER_PLAN.md` §6/§7. Implemented A-01, A-02, A-03, A-04, A-05, A-06 (A-07 left open as a
+P3, per the change design's Open Questions recommendation). Per-row evidence is in
+`openspec/changes/quality-ladder-resolution-integrity/tasks.md` §0-§8.
+
+Implemented:
+
+- **A-04** the kernel is the single owner of the pixel-ratio formula (`bufferW/H = floor(css * pixelRatio)`,
+  `post.ensureSize(bufferW, bufferH, 1)`), so HDR target == drawing buffer ==
+  `floor(cssSize * effectiveDpr * renderScale)`. Before: HDR was `scale²` of the intended linear pixel
+  count (350x261 instead of 583x436 at `low`).
+- **A-01** `host.onTierChanged` re-issues `handleResize`, so the tier's render scale now reaches the
+  GPU; the overlay mirror rides the same single path.
+- **A-02** `TransitionDirectorOptions.baseQualityMode` → `resolveBaseQualityMode()` read at motion end
+  from `host.userQualityMode`, so a selection made during a transition wins.
+- **A-03** new `src/atlas/renderTelemetry.ts#buildRenderSizeTelemetry` fed by `kernel.effectiveSize()` +
+  `kernel.appliedRenderScale()`; `size: null` (unknown) before the first successful resize.
+- **A-05** new `PerformanceGovernor.advanceFrame(deltaMs, presented)`; fps EMA, refresh window and tier
+  sustain consume only presented-frame intervals; CPU submission time is retained as `lastCpuSubmitMs`.
+- **A-06** `advanceFrame` calls `advanceActivityClock(deltaMs)` on every tick before the presented gate,
+  so an idle, correctly frame-skipping scene still settles (A-06 row: `renderFrameCalls === 0` with
+  `activityMode === 'stable'`).
+
+Evidence:
+
+- Fail-first: `renderScaleApplication.test.ts` (HDR 350 vs 583 at 0.6), `renderTelemetry.test.ts`
+  (single assembly point), browser rows A-01 (`972 == 972` — buffer never moved) and A-02
+  (`Expected "ultra", Received "auto"`) all failed pre-fix.
+- `npm run check`: exit 0 (format/lint/typecheck/unit/build); build hashes stable
+  (`index-KLf1_Tpn`, `blackHoleDestination-BiaI5V36`).
+- Runtime magnitude for A-05, measured on a heavy preset (cinematic + bloom + timeline playing,
+  240 frames ≈ 4 s): interval signal 54.29 fps vs the pre-fix submit-window reconstruction
+  270.27 fps — the honest signal degrades auto to `low`/0.6 that the old signal would have denied.
+- `frame-invalidation` + `atlas-webgl2` + `shared-post-lifecycle` + `shared-post-v2`: **24/24**.
+  The `shared-post-lifecycle` snapshot pin was updated from magic `[973, 727]` to
+  `snapshot == buffer == floor(viewportCss * effectiveDpr * 1)`; the old pin had ENCODED A-04's
+  round-vs-floor mismatch.
+- `visual-goldens --workers=1`: **43/43**, with **6 justified re-baselines** (`NS_SURFACE`,
+  `NS_PULSAR`, `NS_MAGNETAR`, `GC_ENCOUNTER`, `GC_BRIDGE_TAIL`, `GC_POST_ENCOUNTER`). Justification:
+  every golden pins tier `low` (scale 0.6); pre-fix the buffer was 583x436 but the HDR target was
+  350x261, so every baseline encoded a 350→583 upscale blur. After: HDR == buffer == 583x436, the
+  documented `docs/PERFORMANCE_BUDGETS.md` formula. 37 rows passed against their ORIGINAL
+  committed baselines. `cinematic-goldens`: **8/8**, no re-baseline.
+- Scenario matrix (`scripts/bench-scenarios.mjs --out=$TEMP/ql-scenarios-matrix.json`): 8/8
+  destination records, `failures: 0` (webgpu, msedge, 1280x800, HEAD `2467d35`). GPU cost now
+  rises with tier where it previously could not (black-hole 4.85→10.49 ms, quasar-agn 1.84→6.49 ms),
+  which is only observable now that a tier change actually resizes.
+- `resource-leak` M11-04 was caught by the first full-suite run and fixed on evidence: with truthful
+  cadence the auto governor settles `low` during arrival, so the test's `baseline` had collapsed to
+  the smallest tier and rejected the unchanged top tier. The test now anchors its baseline at the
+  forced `high` tier (same procedure as each record), preserving the original intent. That fix is
+  inside `274c591`. A second, unrelated single failure in `accessibility.spec.ts` M11-05 (keyboard
+  flow) reproduced 3/3 green standalone and is recorded as a load-dependent pre-existing flake owned
+  by `destination-control-truthfulness` (U-09).
+- `openspec validate quality-ladder-resolution-integrity --type change --strict`: valid throughout.
+
+Next action: begin Phase 1 change 3, `transition-error-user-visibility` (host/director/shell lane).
+No push.
+
 ## 2026-10-03 session — Phase 1 change 1: kerr-gpu-initializer-correctness implemented and validated
 
 Status: **COMPLETE pending checkpoint commit (tasks.md 6.3).** First of the four Phase 1

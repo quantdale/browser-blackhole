@@ -297,13 +297,13 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| A-01 | Governor tier change never re-runs `handleResize`, so dynamic resolution is inert | P1 | resolved | `host.ts:517` vs the only `handleResize` callers (`atlasApp.ts:1106`, `host.ts:568`, `host.ts:1025`) |
-| A-02 | Every transition overwrites the user's manual quality mode with `auto` | P1 | resolved | `host.ts:488` hardcodes `{ baseQualityMode: 'auto' }`; `TransitionDirector.ts:872` |
-| A-03 | `runtimeTelemetry().size.renderScale` reports the tier's nominal scale, not the applied one | P1 | resolved | `host.ts:1215` vs `kernel.effectiveSize()` |
-| A-04 | `renderScale` applied twice: the HDR/post target is sized at `css·dpr·scale²` | P1 | resolved | `SharedRendererKernel.ts:542,555,561` + `SharedPost.ts:173-174` |
-| A-05 | Governor FPS EMA measures the CPU submit window, not frame cadence; its own test harness models a different measurement | P1 | resolved | `governor.ts:238-260` called only from `SharedRendererKernel.renderFrame`; `tests/unit/governor.test.ts:6-8,28-32` |
-| A-06 | Governor activity clock advances only on rendered frames, so `activityMode` latches at `interaction` while idle | P2 | resolved | `host.ts:725-730`, `governor.ts:238-262` |
-| A-07 | Render-scale table duplicated in `governor.ts` and `visualWorkBudget.ts` | P3 | confirmed | `governor.ts:81-86` vs `visualWorkBudget.ts:11-77` |
+| A-01 | Governor tier change never re-runs `handleResize`, so dynamic resolution is inert | P1 | **RESOLVED 2026-10-03** `274c591` | `host.ts:517` vs the only `handleResize` callers (`atlasApp.ts:1106`, `host.ts:568`, `host.ts:1025`) — `onTierChanged` now re-issues `handleResize`; steeled by browser row `a quality-tier change re-applies the drawing-buffer size (A-01)` |
+| A-02 | Every transition overwrites the user's manual quality mode with `auto` | P1 | **RESOLVED 2026-10-03** `274c591` | `host.ts:488` hardcodes `{ baseQualityMode: 'auto' }`; `TransitionDirector.ts:872` — replaced by `resolveBaseQualityMode()` read at motion end from `host.userQualityMode` |
+| A-03 | `runtimeTelemetry().size.renderScale` reports the tier's nominal scale, not the applied one | P1 | **RESOLVED 2026-10-03** `274c591` | `host.ts:1215` vs `kernel.effectiveSize()` — new `src/atlas/renderTelemetry.ts#buildRenderSizeTelemetry` reads the live buffer + `appliedRenderScale()`, `null` before first resize |
+| A-04 | `renderScale` applied twice: the HDR/post target is sized at `css·dpr·scale²` | P1 | **RESOLVED 2026-10-03** `274c591` | `SharedRendererKernel.ts:542,555,561` + `SharedPost.ts:173-174` — kernel owns the formula once and passes already-scaled dims with post scale 1; pinned by `tests/unit/renderScaleApplication.test.ts` |
+| A-05 | Governor FPS EMA measures the CPU submit window, not frame cadence; its own test harness models a different measurement | P1 | **RESOLVED 2026-10-03** `274c591` | `governor.ts:238-260` called only from `SharedRendererKernel.renderFrame`; `tests/unit/governor.test.ts:6-8,28-32` — new `advanceFrame(deltaMs, presented)` consumes only presented-frame intervals; `lastCpuSubmitMs` retained separately |
+| A-06 | Governor activity clock advances only on rendered frames, so `activityMode` latches at `interaction` while idle | P2 | **RESOLVED 2026-10-03** `274c591` | `host.ts:725-730`, `governor.ts:238-262` — `advanceFrame` calls `advanceActivityClock(deltaMs)` on every tick, before the presented gate |
+| A-07 | Render-scale table duplicated in `governor.ts` and `visualWorkBudget.ts` | P3 | confirmed — **open** | `governor.ts:81-86` vs `visualWorkBudget.ts:11-77` |
 
 ### U — Product correctness / control truthfulness (change: `destination-control-truthfulness`)
 
