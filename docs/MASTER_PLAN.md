@@ -13,7 +13,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 1a | `kerr-gpu-initializer-correctness` | **complete** (`4a252b9`) — Q-01…Q-05, Q-07 struck |
 | 1b | `quality-ladder-resolution-integrity` | **complete** (`274c591`, close-out `e364437`) — A-01…A-06 struck |
 | 1c | `transition-error-user-visibility` | **complete** (2026-10-09) — E-01, E-02, E-03, E-05 struck; E-04 remains open |
-| 1d | `destination-control-truthfulness` | **in progress** (2026-10-09) — U-01, U-04, U-09, U-10 struck; U-02, U-03 and U-05…U-19 remain |
+| 1d | `destination-control-truthfulness` | **scoped slice complete** (`87deee3`, 2026-10-09) — U-01, U-04, U-09, U-10 struck; U-02, U-03, U-05…U-19 remain scoped in the change |
 | 2 | `shared-renderer-service-lifecycle` | pending (starts only after 1b and 1c) — R-01…R-12 in scope |
 | 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
 | 4 | `benchmark-harness-integrity` | pending — B-01…B-07 in scope |
