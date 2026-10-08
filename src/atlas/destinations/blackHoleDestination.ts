@@ -38,6 +38,7 @@ import {
   type LutGpuResources
 } from '../../phenomena/black-hole/lut/textures.js';
 import { loadLutFamily, formatWebGL2Status } from '../../phenomena/black-hole/lut/runtime.js';
+import { readBodyWithProgress } from '../../phenomena/shared/assetTransfer.js';
 import {
   LUT_AUTO_DEFAULT,
   parseTrajectoryUrlOverride,
@@ -433,7 +434,10 @@ export class BlackHoleModule implements PhenomenonModule {
     ctx.reportProgress(0.2, 'Loading Schwarzschild LUT family');
     if (lutCouldBeSelected) {
       try {
-        const lut = await loadShippedLutFamily();
+        const lut = await loadShippedLutFamily({
+          signal: ctx.signal,
+          report: (fraction01, label) => ctx.reportProgress(fraction01, label)
+        });
         if (lut !== null) {
           this.lut = lut;
           ctx.scope.track(
@@ -461,11 +465,14 @@ export class BlackHoleModule implements PhenomenonModule {
         throw new Error(`initial '${desired}' lensing pass could not be created`);
       }
       this.activatePass(desired, handle);
-      ctx.reportProgress(0.5, 'Strong-field pass ready');
+      // Fraction must EXCEED the LUT loader's ceiling (0.55): a report that goes
+      // backwards is a label change, not a progress event, and would leave this
+      // step unprotected by the stall gate (atlas-error-reporting).
+      ctx.reportProgress(0.6, 'Strong-field pass ready');
     } catch {
       // Honest degraded path: deterministic fullscreen pattern, flagged in
       // the debug snapshot. Never presented as geodesic lensing.
-      ctx.reportProgress(0.4, 'Lensing pass unavailable — deterministic fallback');
+      ctx.reportProgress(0.6, 'Lensing pass unavailable — deterministic fallback');
       throwIfAborted(ctx.signal);
       const pass = createDiagnosticPass();
       ctx.scope.track(
@@ -484,7 +491,7 @@ export class BlackHoleModule implements PhenomenonModule {
       scene.add(pass.mesh);
     }
 
-    ctx.reportProgress(0.85, 'Registering pass resources in scope');
+    ctx.reportProgress(0.75, 'Registering pass resources in scope');
     throwIfAborted(ctx.signal);
 
     ctx.reportProgress(1, 'Black hole ready');
@@ -779,7 +786,19 @@ function readTrajectoryUrlOverride(): TrajectoryBackendPreference | null {
   return parseTrajectoryUrlOverride(new URLSearchParams(window.location.search).get('trajectory'));
 }
 
-async function loadShippedLutFamily(): Promise<{
+/**
+ * Best-effort discovery + load of the shipped Schwarzschild LUT family.
+ *
+ * Any failure returns `null` — the numerical paths remain the source of truth.
+ * The abort signal is honoured so a destination retarget (or a director stall
+ * abort) cancels the in-flight requests instead of leaving them pending, and
+ * `report` publishes genuine network events so the atlas stall gate can tell a
+ * slow transfer from a hung one.
+ */
+async function loadShippedLutFamily(options: {
+  signal: AbortSignal;
+  report?: (fraction01: number, label?: string) => void;
+}): Promise<{
   resources: import('../../phenomena/black-hole/lut/textures.js').LutGpuResources;
   storedSpanRad: number;
   bCriticalRg: number;
@@ -787,13 +806,19 @@ async function loadShippedLutFamily(): Promise<{
   familyDir: string;
   webgl2Filterable: boolean;
 } | null> {
-  const indexResponse = await fetch('/luts/index.json');
+  const { signal } = options;
+  const report = options.report ?? ((): void => undefined);
+
+  const indexResponse = await fetch('/luts/index.json', { signal });
   if (!indexResponse.ok) return null;
+  // Response headers arrived: a progress event on its own.
+  report(0.25, 'Reading LUT index');
   const index = (await indexResponse.json()) as Record<string, string>;
   const familyDir = index['schwarzschild-v1'];
   if (familyDir === undefined) return null;
-  const manifestResponse = await fetch(`/luts/${familyDir}/manifest.json`);
+  const manifestResponse = await fetch(`/luts/${familyDir}/manifest.json`, { signal });
   if (!manifestResponse.ok) return null;
+  report(0.3, 'Reading LUT manifest');
   const manifestJson = await manifestResponse.json();
   const manifest = manifestJson as {
     textures: Array<{ id: string; file: string; format: string }>;
@@ -805,11 +830,26 @@ async function loadShippedLutFamily(): Promise<{
   const auxEntry = manifest.textures.find((t) => t.id === 'aux');
   if (trajEntry === undefined || auxEntry === undefined) return null;
   const assets = new Map<string, Uint8Array>();
+  // Two textures, each a real network event: report between and inside them so
+  // Two textures, each a real network event: report between and inside them so
+  // a multi-second texture download never reads as a stall. Every fraction is a
+  // STRICT increase over the previous report (0.15/0.2 module, 0.25 index,
+  // 0.3 manifest): a backwards fraction is a label change, not progress.
+  const textureSpan = 0.25 / 2;
+  let loaded = 0;
   for (const entry of [trajEntry, auxEntry]) {
-    const assetResponse = await fetch(`/luts/${familyDir}/${entry.file}`);
+    const assetResponse = await fetch(`/luts/${familyDir}/${entry.file}`, { signal });
     if (!assetResponse.ok) return null;
-    assets.set(entry.file, new Uint8Array(await assetResponse.arrayBuffer()));
+    const base = 0.3 + loaded * textureSpan;
+    loaded += 1;
+    report(base, `Downloading ${entry.id} table`);
+    const buffer = await readBodyWithProgress(assetResponse, (received, total) => {
+      const share = total !== null && total > 0 ? Math.min(1, received / total) : 0.5;
+      report(base + textureSpan * share, `Downloading ${entry.id} table`);
+    });
+    assets.set(entry.file, new Uint8Array(buffer));
   }
+  report(0.55, 'Validating LUT family');
   const result = await loadLutFamily(manifestJson, assets);
   if (!result.ok) return null;
   const domainSpan = (

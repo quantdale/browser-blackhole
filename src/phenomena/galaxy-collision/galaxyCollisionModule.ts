@@ -241,7 +241,10 @@ class GalaxyCollisionModule implements PhenomenonModule {
     const dataset = await loadGc1Dataset(ASSET_ID, { signal: ctx.signal });
     throwIfAborted(ctx.signal);
 
-    ctx.reportProgress(0.6, 'Building tracer point cloud');
+    // The loader reports 0.1…0.8; the module's own reports must stay STRICT
+    // increases above that ceiling, because a backwards fraction is a label
+    // change rather than a progress event (atlas-error-reporting).
+    ctx.reportProgress(0.85, 'Building tracer point cloud');
     const tracerCount = dataset.tracerCount;
     const tracers = buildSpriteCloud(tracerCount);
     interpolateTracers(dataset, dataset.tStart, tracers.positions);

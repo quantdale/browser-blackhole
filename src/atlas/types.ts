@@ -969,12 +969,60 @@ export interface PhaseMapping {
 
 export type TransitionPhase = 'preparing' | 'outgoing' | 'hyperspace' | 'arriving';
 
+/**
+ * Stable machine-readable transition error codes (docs/FAILURE_RECOVERY.md
+ * §17: codes stay stable, UI text may evolve).
+ */
+export const TRANSITION_ERROR_CODES = {
+  /** The requested destination/preset could not be resolved. */
+  TRANSITION_RESOLVE_FAILED: 'TRANSITION_RESOLVE_FAILED',
+  /** A destination's `prepare()` rejected. */
+  TRANSITION_PREPARE_FAILED: 'TRANSITION_PREPARE_FAILED',
+  /** An abortable preparation emitted no progress event for the stall window. */
+  TRANSITION_STALLED: 'TRANSITION_STALLED',
+  /** The outgoing scene's `exit()` rejected. */
+  TRANSITION_EXIT_FAILED: 'TRANSITION_EXIT_FAILED',
+  /** The prepared target's `enter()` rejected. */
+  TRANSITION_ACTIVATION_FAILED: 'TRANSITION_ACTIVATION_FAILED',
+  /** Outgoing disposal failed during the occlusion handoff (transition continues). */
+  TRANSITION_DISPOSAL_FAILED: 'TRANSITION_DISPOSAL_FAILED',
+  /** The occlusion handoff found no prepared target (defensive, unreachable). */
+  TRANSITION_HANDOFF_FAILED: 'TRANSITION_HANDOFF_FAILED'
+} as const;
+
+export type TransitionErrorCode =
+  (typeof TRANSITION_ERROR_CODES)[keyof typeof TRANSITION_ERROR_CODES];
+
+/**
+ * The last transition error, published as part of the public state so the
+ * shell never has to read director internals to render a failure.
+ */
+export interface TransitionError {
+  /** Stable machine-readable code (docs/FAILURE_RECOVERY.md §17). */
+  code: TransitionErrorCode;
+  /** Authored, user-displayable summary — never a raw loader string. */
+  message: string;
+  /** Destination the failure is attributed to, when known. */
+  destinationId: DestinationId | null;
+  /**
+   * True when the director could not restore the active scene — a terminal
+   * condition. Recoverable failures (previous destination still live) are
+   * false and carry a retry affordance.
+   */
+  fatal: boolean;
+}
+
 export interface TransitionPublicState {
   active: boolean;
   phase: TransitionPhase | null;
   progress: number;
   /** True only while the hyperspace envelope is mathematically opaque. */
   destinationOccluded: boolean;
+  /**
+   * Last transition error, or null while the machine is healthy. Cleared by a
+   * successful transition completion and by a new transition request.
+   */
+  error: TransitionError | null;
 }
 
 export interface AtlasCameraPublicState {

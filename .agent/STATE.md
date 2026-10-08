@@ -1,3 +1,87 @@
+## 2026-10-09 session — Phase 1 change 3: transition-error-user-visibility implemented, validated and CLOSED
+
+Status: **COMPLETE.** Third of the four Phase 1 changes in `docs/MASTER_PLAN.md` §6/§7.
+Implementing `openspec/changes/transition-error-user-visibility/` (E-01, E-02, E-03, E-05; the
+atlas-error-reporting capability). Per-row evidence is in that change's `tasks.md` §0-§8.
+
+**What the user-visible defect was.** When a destination failed to prepare — a deploy that renamed a
+hashed chunk, an offline laptop, a blocked or truncated data fetch, or any throw inside a module's
+`prepare()` — the transition silently reverted to the previous destination and the only trace was a
+`console.error`. `TransitionPublicState` had no error field, `host.ts` subscribed to `onError` purely
+to log, and `atlasApp.ts` never read the director's error at all. A second, related gap: a hung data
+request left the app in `preparing` forever, because the only abort paths were retarget, cancel and
+dispose.
+
+Implemented:
+
+- **E-01/E-03** `TransitionPublicState.error: TransitionError | null` — a stable machine code, authored
+  display copy, the failing destination id and a `fatal` flag, published by `emitError` (the single
+  point the director already used), cleared on successful completion and superseded by a new request.
+  `emitError` now splits the technical message (console channel) from the authored copy
+  (`buildTransitionFailureMessage` in `src/atlas/hostStatus.ts`), so no loader string or stack trace
+  reaches the DOM.
+- **E-01** the shell renders an assertive `role="alert"` banner OUTSIDE the collapsible panel's hiding
+  subtree and outside the panel rebuild path, so a collapse or a rebuild can neither hide nor destroy
+  the error. It is absolutely positioned and `hidden` by default, so the pinned shell geometry the
+  goldens depend on cannot move. Recovery actions: **Try again** (re-requests the same destination),
+  **Reload page** (fatal only), **Dismiss** in both cases. Retry is user-initiated only — no
+  automatic retry, so a failing retry re-presents the same error and cannot loop.
+- **E-02** `buildUnsupportedMessage` had ZERO callers; it is now wired into the product boot-failure
+  path (subscription registered before `host.init()`, plus an idempotent render in the boot catch).
+  The product route now presents the same remediation standard as the legacy route. A latent gap was
+  fixed on the way: the subscription was registered AFTER init, so a boot that failed could never
+  have rendered anything.
+- **E-05** a stall gate on the director: `stallThresholdMs` defaults to 10x `slowLoadThresholdMs`
+  (9 s vs 900 ms) and the constructor throws if it does not exceed the slow-load threshold. A
+  PROGRESS EVENT is settlement, a first-or-strictly-increased finite `reportProgress` fraction,
+  response headers, or an increase in received response bytes; a label change alone is not progress.
+  Expiry aborts through the same `AbortController` a retarget uses (so every generation/stale guard
+  runs unchanged), records `stalledGeneration`, and publishes a recoverable `TRANSITION_STALLED`
+  failure with a retry action instead of resetting silently.
+- **Supporting fix found while implementing the gate.** Three real defects in the progress-reporting
+  layer: the two data loaders awaited a single `arrayBuffer()` (so a slow multi-second download was
+  indistinguishable from a hung one), `loadShippedLutFamily`'s three fetches were not cancellable at
+  all, and module-level fractions went BACKWARDS after a loader download (0.6 after the loader's
+  0.8) — which is a label change, not progress, and would have silently disarmed the gate for the
+  step that followed. Fixed with a new `src/phenomena/shared/assetTransfer.ts`
+  (`readBodyWithProgress`), `onProgress` on both loaders, the abort signal threaded into the LUT
+  loader, and monotonic fraction ranges.
+
+Evidence:
+
+- Fail-first (browser): all seven new rows FAIL pre-fix. Verified in one stash round-trip against a
+  pre-fix build — the alert region does not exist in the DOM at all, and the stall row stayed
+  `preparing` for its whole 60 s budget (the E-05 defect itself).
+- Fail-first (unit): `transitionFailurePublication.test.ts` 10/10 green post-fix; reverting
+  `getPublicState().error` fails 10/10 and reverting `checkPrepareStall()` fails 4/6.
+- `npm run check`: exit 0 — format, lint, typecheck, **55 files / 676 unit tests**, build.
+- Browser (`--project=default --workers=1`, msedge, 1280x800):
+  - `atlas-navigation` + `accessibility` **19 passed** (including the new mobile-drawer row);
+  - `atlas-navigation` + `accessibility` + `atlas-webgl2` + `smoke` **27 passed**;
+  - **full non-golden browser suite 236 passed / 1 skipped / 0 failed (30.9m)** — the single skip
+    is the documented WebGPU-only LUT parity row.
+- `dist/` hygiene: no `TODO`/`FIXME`/`HACK`, no `.map` files, no local paths, no secrets.
+- Refero MCP research for this campaign's UX decision: `refero_search_styles` (dark technical
+  console) and `refero_search_screens` ("error state banner with retry action on dark dashboard").
+  Convergent pattern across the references: a dark surface with a single primary recovery CTA
+  ("Try again"), explanatory text, and a dismiss affordance — implemented originally with the
+  existing token set, not cloned.*
+- `visual-goldens` **43/43** and `cinematic-goldens` **8/8** with **no re-baselining** (51 total).
+  A later combined golden run first reported 2 failures — both `net::ERR_CONNECTION_REFUSED`
+  (the Playwright-managed preview server died mid-run); re-running on a clean port gave
+  **43/43** and the same 51-row set. No golden was re-baselined in either run.
+- `openspec validate transition-error-user-visibility --type change --strict`: valid;
+  `--changes --strict` 11/0 and `--all --strict` 17/0.
+- **One recorded flake, not silenced.** `accessibility.spec.ts:146` (range inputs) failed once in a
+  4-spec combination and passed 3/3 on HEAD, 18/18 with `atlas-navigation`, and 27/27 in the same
+  4-spec combination on re-run. Mechanism: MASTER_PLAN **U-09** (confirmed, P1) says focus is
+  destroyed on destination-switch panel rebuilds, so the row's `before`/`after` reads can straddle a
+  rebuild. Not caused by this change (no change-3 code path touches slider state or panel DOM);
+  owned by `destination-control-truthfulness`. **Not re-baselined or retried into green.**
+
+Next action: strike E-01…E-05 from `docs/MASTER_PLAN.md` and start Phase 1 change 4,
+`destination-control-truthfulness` (U-01…U-19, including U-09 and the flake's root cause). No push.
+
 ## 2026-10-03 session — Phase 1 change 2: quality-ladder-resolution-integrity implemented, validated and CLOSED
 
 Status: **COMPLETE (committed `274c591`).** Second of the four Phase 1 changes in

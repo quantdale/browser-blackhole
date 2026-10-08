@@ -171,6 +171,49 @@ test.describe('M11-05 accessibility', () => {
     expect(errors).toEqual([]);
   });
 
+  test('a transition failure is announced assertively and is not colour-only', async ({ page }) => {
+    const errors = collectErrors(page);
+    await gotoAtlasBlackHole(page);
+
+    // Force the production condition: a broken lazy chunk.
+    await page.route('**/galaxyCollisionModule-*.js', (route) => route.abort());
+    await page.evaluate(() => window.__ATLAS_APP__!.navigate('galaxy-collision'));
+
+    const region = page.locator('.atlas-alert-region');
+    await expect(region).toBeVisible({ timeout: 30_000 });
+    // Errors are announced assertively (role=alert); progress keeps its polite
+    // role=status channel and is not reused.
+    await expect(region).toHaveAttribute('role', 'alert');
+    await expect(page.locator('.atlas-status')).toHaveAttribute('role', 'status');
+
+    // The meaning is available as TEXT: what failed, that the app continues,
+    // and the remediation — none of it dependent on colour.
+    const alert = page.locator('.atlas-alert');
+    await expect(alert).toContainText('Galaxy Collision');
+    await expect(alert).toContainText('still active');
+
+    // The recovery action is reachable and operable from the keyboard.
+    const retry = page.getByRole('button', { name: 'Try again' });
+    await expect(retry).toBeVisible();
+    await retry.focus();
+    const focusInAlert = await page.evaluate(() => {
+      const el = document.activeElement;
+      return el !== null && el.closest('.atlas-alert') !== null;
+    });
+    expect(focusInAlert).toBe(true);
+
+    // The surface is NOT inside the collapsible panel's hiding subtree, so a
+    // panel rebuild cannot destroy the error state either.
+    const insidePanel = await page.evaluate(
+      () => document.querySelector('.atlas-alert')?.closest('#panel') !== null
+    );
+    expect(insidePanel).toBe(false);
+    // The console diagnostic is RETAINED as the technical-detail channel — it
+    // must exist, and must not be the only channel (the alert above is the
+    // user-visible one).
+    expect(errors.join('\n')).toContain('transition error');
+  });
+
   test('focus lands on a real element after a destination switch', async ({ page }) => {
     const errors = collectErrors(page);
     await gotoAtlasBlackHole(page);

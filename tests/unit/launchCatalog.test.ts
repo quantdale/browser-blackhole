@@ -114,6 +114,14 @@ describe('launch catalog completeness', () => {
     }
   });
 
+  // V-17 (docs/MASTER_PLAN.md): this row sequentially imports every
+  // phenomenon presets/module and destination file, transitively loading the
+  // 1 MB `three/webgpu` graph in one test. Measured 1.8 s standalone but
+  // 5.0 s under full-suite parallel load, i.e. right on Vitest's 5000 ms
+  // default — the audit recorded 2-of-3 full-suite failures from exactly this.
+  // The timeout is declared proportionate to that work; no assertion, subject
+  // or threshold is weakened. `verification-gate-integrity` (V-17) owns the
+  // structural fix (splitting the heavy graph out of this row).
   it('every registered destination descriptor appears in the catalog', async () => {
     const descriptorIds = await collectDescriptorIds();
     expect(descriptorIds.size).toBeGreaterThanOrEqual(8); // 7 production + diagnostic
@@ -125,5 +133,5 @@ describe('launch catalog completeness', () => {
       if (!catalogIds.has(id)) missing.push(`${id} (${file})`);
     }
     expect(missing).toEqual([]);
-  });
+  }, 30_000);
 });

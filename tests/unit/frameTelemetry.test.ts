@@ -97,7 +97,13 @@ describe('debug inventory telemetry transport', () => {
       devicePixelRatio: 1,
       renderScale: 0.76
     },
-    transition: { active: false, phase: null, progress: 0, destinationOccluded: false },
+    transition: {
+      active: false,
+      phase: null,
+      progress: 0,
+      destinationOccluded: false,
+      error: null
+    },
     volume: {
       liveVolumes: 2,
       visibleVolumes: 1,

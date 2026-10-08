@@ -439,6 +439,22 @@ optional B high-quality resources stream in
 
 Do not keep every destination's full GPU state resident for instant travel.
 
+### 11.1 Transition failure boundary
+
+The transition host boundary publishes failures on `TransitionPublicState.error`
+(`src/atlas/types.ts`). The director sets that field wherever it sets its
+internal error, so public and internal state cannot diverge, and the shell
+reads public state only — it never reaches into `getRuntimeState()`.
+
+The field carries a stable machine code, authored display copy, the failing
+destination id and a `fatal` flag. It is cleared by a successful transition
+completion and superseded by a new transition request; it is never serialized,
+so restored share/route state always deserializes as healthy.
+
+A stall bound (§10.2 of `docs/FAILURE_RECOVERY.md`) terminates an outstanding
+preparation that emits no progress event for the stall window, aborting through
+the same path a retargeting navigation uses.
+
 ## 12. Cache policy
 
 Keep bounded shared caches for:

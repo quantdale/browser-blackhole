@@ -12,7 +12,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 0 | `specification-baseline-review-corrections` | **complete and archived** (`a9a0713` apply, `008966a` archive) |
 | 1a | `kerr-gpu-initializer-correctness` | **complete** (`4a252b9`) — Q-01…Q-05, Q-07 struck |
 | 1b | `quality-ladder-resolution-integrity` | **complete** (`274c591`, close-out `e364437`) — A-01…A-06 struck |
-| 1c | `transition-error-user-visibility` | **active** — E-01…E-05 in scope |
+| 1c | `transition-error-user-visibility` | **complete** (2026-10-09) — E-01, E-02, E-03, E-05 struck; E-04 remains open |
 | 1d | `destination-control-truthfulness` | pending (starts only after 1c) — U-01…U-19 in scope |
 | 2 | `shared-renderer-service-lifecycle` | pending (starts only after 1b and 1c) — R-01…R-12 in scope |
 | 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
@@ -290,9 +290,11 @@ correctness/reliability/architecture/product defect · **P2** material hardening
 **P3** polish. Confidence: `confirmed` = verified in source during this audit; `indicated` = strong
 code evidence needing a runtime check; `suspected` = plausible, needs investigation.
 
-Every finding below is implemented by a named OpenSpec change. IDs are stable.
-
-### Q — Physics / numerics (change: `kerr-gpu-initializer-correctness`)
+| E-01 | Destination preparation failure is console-only; no public error channel exists | P1 | **RESOLVED 2026-10-09** change 3 | `types.ts:942-948` (`TransitionPublicState` has no `error`), `host.ts:499-509`, `atlasApp.ts` never reads it — `TransitionPublicState.error` now carries `{code, message, destinationId, fatal}`; published by `emitError`, cleared on completion and superseded by a new request |
+| E-02 | The atlas shell's own remediation builder has no callers; the product terminal state is a code + raw message | P1 | **RESOLVED 2026-10-09** change 3 | `hostStatus.ts:497` vs `atlasApp.ts:1227-1235` — `buildUnsupportedMessage` is now wired into the product boot-failure path (subscription registered BEFORE `host.init()`; the old one ran after it and could never observe a failure) plus an idempotent render in the boot catch |
+| E-03 | A failed lazy-chunk load (bad deploy / offline) silently reverts with no user explanation | P1 | **RESOLVED 2026-10-09** change 3 | `TransitionDirector.ts:578-581` + `host.ts:499-509` — the shell renders an assertive `role="alert"` banner outside the panel's hiding subtree, with retry/dismiss actions and authored copy |
+| E-04 | Overlay can be left frozen opaque if device loss occurs during `outgoing` | P2 | suspected — **open** | `TransitionDirector.renderOverlay` early-returns on null renderer |
+| E-05 | A stalled destination preparation never terminates: no prepare timeout exists, so a hung data request leaves the app in `preparing` forever | P1 | **RESOLVED 2026-10-09** change 3 | `TransitionDirector.ts:277` sets only `slowLoadThresholdMs` (900 ms), which merely emits a status event (`:602-610`); the only `abort()` calls are retarget (`:416`), cancel (`:471`) and dispose (`:986`); the loaders pass the signal to `fetch` (`galaxy-collision/loader.ts:74,90`, `black-hole-merger/loader.ts:70,86`) but nothing times it out — a `stallThresholdMs` gate (10x slow-load) now aborts through the SAME `AbortController` on progress-event expiry and publishes a recoverable `TRANSITION_STALLED` failure |
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |

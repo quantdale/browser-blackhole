@@ -159,7 +159,13 @@ export function createDefaultAtlasState(
       activePreset: DEFAULT_ACTIVE_PRESET,
       targetDestination: null,
       targetPreset: null,
-      transition: { active: false, phase: null, progress: 0, destinationOccluded: false }
+      transition: {
+        active: false,
+        phase: null,
+        progress: 0,
+        destinationOccluded: false,
+        error: null
+      }
     },
     sharedVisual: {
       exposure: 1,
@@ -281,7 +287,11 @@ export function validateAtlasState(
     progress: clampFinite(transitionRaw['progress'], 0, 1, 0),
     // Occlusion is a derived transition semantic, never a free-standing
     // persisted flag. The runtime director is the sole source of truth.
-    destinationOccluded: transitionActive && transitionPhase === 'hyperspace'
+    destinationOccluded: transitionActive && transitionPhase === 'hyperspace',
+    // A published failure is runtime-only and deliberately not serialized:
+    // share/restore state never carries an error, so a restored state always
+    // deserializes as healthy (atlas-error-reporting).
+    error: null
   };
 
   // --- sharedVisual ----------------------------------------------------------
@@ -519,7 +529,13 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
       activePreset: preset ?? DEFAULT_ACTIVE_PRESET,
       targetDestination: null,
       targetPreset: null,
-      transition: { active: false, phase: null, progress: 0, destinationOccluded: false }
+      transition: {
+        active: false,
+        phase: null,
+        progress: 0,
+        destinationOccluded: false,
+        error: null
+      }
     };
   }
 

@@ -531,3 +531,68 @@ export function buildUnsupportedMessage(
     code
   };
 }
+
+// ---------------------------------------------------------------------------
+// Transition failure message builder
+// ---------------------------------------------------------------------------
+
+export interface TransitionFailureMessageInput {
+  /** Stable machine-readable code (types.ts TRANSITION_ERROR_CODES). */
+  code: string;
+  /** Destination title, or id when no descriptor is available. */
+  destinationTitle: string;
+  /** True when the director could not restore the previous scene. */
+  fatal: boolean;
+  /** Stall window in ms; only used by the stall code. */
+  stallThresholdMs?: number;
+}
+
+/**
+ * Authored, user-displayable copy for a transition failure.
+ *
+ * `docs/FAILURE_RECOVERY.md` §3 requires every message to state what failed,
+ * whether the application can continue, the active degraded mode, and one
+ * useful remediation — and forbids dumping loader strings or stack traces into
+ * ordinary UI. The technical detail stays on the console channel; only this
+ * copy reaches the DOM.
+ */
+export function buildTransitionFailureMessage(input: TransitionFailureMessageInput): string {
+  //
+  // Two subject frames. For codes where the TARGET never opened, the subject is
+  // that destination. For codes that arise AFTER the target opened successfully
+  // (a failed outgoing exit, or a failed disposal during the handoff), the
+  // subject is the departure instead — saying "'X' could not be opened" for a
+  // failure that happened because X DID open would be false copy.
+  //
+  const opened = `'${input.destinationTitle}' could not be opened`;
+  const departing = `A problem occurred on the way to '${input.destinationTitle}'`;
+  const continues = input.fatal
+    ? 'The current scene could not be restored, so the atlas has stopped.'
+    : 'The scene you were viewing is still active, and the rest of the atlas remains usable.';
+  const stalledFor =
+    input.stallThresholdMs === undefined
+      ? 'a while'
+      : `${Math.max(1, Math.round(input.stallThresholdMs / 1000))} s`;
+
+  switch (input.code) {
+    case 'TRANSITION_STALLED':
+      return `${opened}: its preparation stopped reporting progress for ${stalledFor} and was cancelled. ${continues} Try again, or pick a different destination from the top bar.`;
+    case 'TRANSITION_RESOLVE_FAILED':
+      return `${opened}: that destination or preset is not available in this build. ${continues} Pick a destination from the top bar.`;
+    case 'TRANSITION_ACTIVATION_FAILED':
+      return input.fatal
+        ? `${opened}: the scene started but could not be activated. ${continues} Reload the page to start over.`
+        : `${opened}: the scene could not be started. ${continues} Try again — reloading the page also clears it.`;
+    case 'TRANSITION_EXIT_FAILED':
+      // Only reachable as fatal: the director routes this through failFatal, so
+      // the copy always states the terminal condition rather than inventing an
+      // unreachable recoverable framing.
+      return `${departing}: the previous scene could not be released cleanly. The current scene could not be restored, so the atlas has stopped on the scene you were viewing. Reload the page to start over.`;
+    case 'TRANSITION_DISPOSAL_FAILED':
+      return `${departing}: some resources of the previous scene could not be released during the handoff. Nothing was lost and the transition itself completed. ${continues}`;
+    case 'TRANSITION_HANDOFF_FAILED':
+      return `${opened}: the scene handoff found nothing to show. ${continues} Try again, or reload the page.`;
+    default:
+      return `${opened}: it failed to load. ${continues} Try again — an interrupted network request is the most common cause.`;
+  }
+}

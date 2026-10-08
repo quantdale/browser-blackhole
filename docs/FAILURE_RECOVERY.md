@@ -156,7 +156,36 @@ Background/environment failure should degrade to deterministic procedural fallba
 
 External runtime dependencies should be minimized; production assets should normally ship with the app.
 
+### 10.1 Product-route implementation (§3 on the atlas shell)
+
+The Cosmic Atlas product route (`/atlas/*`) implements §3 as follows:
+
+| §3 requirement | Product-route implementation |
+| --- | --- |
+| what failed | `TransitionPublicState.error.destinationId` identifies the destination; the banner title names the failure class. |
+| whether the app can continue | `TransitionError.fatal` selects the copy: a recoverable failure states that the previous scene is still active and the atlas remains usable; a fatal one states the session stopped. Device loss keeps its own terminal path (§5) and is never rendered as a recoverable transition error. |
+| active fallback/degraded mode | The message names the numerical/fallback mode only where the code chose it (the black-hole LUT path continues numerical); otherwise the degraded mode is "the previous destination, unchanged". |
+| one useful remediation | A recovery action: **Try again** (re-requests the same destination as an ordinary preparation) for recoverable failures, **Reload page** for fatal ones, and **Dismiss** in both cases. |
+
+The error is published on `TransitionPublicState` (`src/atlas/types.ts`) by `TransitionDirector` at the point it sets its internal error, so the shell reads public state rather than director internals. The banner is rendered outside the collapsible panel's hiding subtree with `role="alert"`, so collapsing the panel or rebuilding it can neither hide nor destroy the error state. Authored copy comes from `buildTransitionFailureMessage` in `src/atlas/hostStatus.ts`; raw loader detail and stack traces stay on the console channel, which is retained as the technical-detail channel.
+
+A stalled preparation (§10.2) terminates in the same recoverable presentation. A successful transition clears the published error, and a new transition request supersedes it.
+
+### 10.2 Stall threshold
+
+A destination preparation must not hang forever. The transition director bounds an outstanding preparation with a stall window — at least ten times the slow-load reporting threshold (9 s by default against a 900 ms slow-load threshold) — and the two thresholds stay distinct: the slow-load event is a status report on a healthy preparation, whereas only expiry of the stall window aborts.
+
+A **progress event** is one of:
+
+- settlement of the prepare operation;
+- a `reportProgress` report whose finite fraction is the first report or is strictly greater than the last accepted fraction (a changed label alone is not progress);
+- receipt of response headers for the outstanding fetch;
+- an increase in received response bytes.
+
+Elapsed time alone is never progress, and a preparation that keeps emitting progress events is not aborted however long it runs. Expiry aborts through the same `AbortController` path a retargeting navigation uses, so the generation and stale guards run unchanged, and the result is an ordinary recoverable failure with a retry action rather than a silent reset. Every production prepare path already emits progress reports; the two network-backed loaders were extended to report genuine byte-level transfer progress so a slow multi-second download reads as progress rather than a stall.
+
 ## 11. Preset/state recovery
+
 
 If persisted/shared state cannot validate:
 

@@ -198,6 +198,30 @@ Loading simulation data 2/3
 
 Only expose percentages when actual byte/step progress is known.
 
+### 8.1 Failure presentation
+
+A preparation that fails must terminate in a state the user can see and act on —
+never a silent revert with a console error only. The atlas shell renders a
+non-blocking `role="alert"` banner that:
+
+- names the destination that failed;
+- states that the previous destination is still active and the atlas remains
+  usable (recoverable), or that the session has stopped (fatal — device loss
+  keeps its own terminal path and is never presented as a recoverable
+  preparation failure);
+- carries a stable machine code for bug reports;
+- offers **Try again** (recoverable only), **Reload page** (fatal only) and
+  **Dismiss**;
+- lives outside the collapsible control panel's hiding subtree, so collapsing
+  the panel or rebuilding it cannot hide or destroy the error;
+- conveys its meaning as text, never by colour alone.
+
+Retry is user-initiated only: there is no automatic retry, so a failing retry
+re-presents the same error with the same actions and cannot loop. A preparation
+that keeps reporting progress is never aborted; see
+`docs/FAILURE_RECOVERY.md` §10.2 for the progress-event definition and the stall
+threshold.
+
 ## 9. Cancellation and rapid reselection
 
 Users may click multiple destinations quickly.

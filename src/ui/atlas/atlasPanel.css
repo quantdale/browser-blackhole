@@ -837,6 +837,146 @@
   color: var(--error);
 }
 
+/* --- failure surfaces (atlas-error-reporting) ---------------------------------
+   Two user-visible failure surfaces live here, both OUTSIDE the collapsible
+   panel so a collapse cannot hide them and a panel rebuild cannot destroy
+   them:
+     .atlas-terminal    boot failure (no render backend) — blocking card;
+     .atlas-alert-region transition failure — non-blocking banner.
+   Both are absolutely positioned and therefore cannot perturb the pinned shell
+   geometry (topbar height, viewport, panel width) that the goldens depend on. */
+
+.atlas-terminal {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  padding: var(--sp-6);
+  background: rgba(4, 6, 10, 0.92);
+  overflow-y: auto;
+}
+
+.atlas-terminal[hidden] {
+  display: none;
+}
+
+.atlas-terminal-card {
+  max-width: 46ch;
+  padding: var(--sp-7);
+  background: var(--surface-1);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+}
+
+.atlas-terminal-title {
+  margin: 0 0 var(--sp-4);
+  font-size: var(--fs-lg);
+  font-weight: 600;
+  line-height: var(--lh-tight);
+  color: var(--error);
+}
+
+.atlas-terminal-detail {
+  margin: 0 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+
+.atlas-terminal-reasons {
+  margin: 0 0 var(--sp-3);
+  padding-left: var(--sp-5);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+
+.atlas-terminal-reasons li + li {
+  margin-top: var(--sp-2);
+}
+
+.atlas-terminal-code {
+  margin: 0;
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+.atlas-alert-region {
+  position: absolute;
+  left: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: 30;
+  max-width: min(42ch, calc(100% - 2 * var(--sp-6)));
+  pointer-events: none;
+}
+
+.atlas-alert-region[hidden] {
+  display: none;
+}
+
+.atlas-alert {
+  pointer-events: auto;
+  padding: var(--sp-5);
+  background: var(--surface-float);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line-strong);
+  border-left: 3px solid var(--error);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+}
+
+.atlas-alert[data-severity='fatal'] {
+  border-left-color: var(--error);
+}
+
+.atlas-alert-title {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.atlas-alert-body {
+  margin: 0 0 var(--sp-2);
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+
+.atlas-alert-code {
+  margin: 0 0 var(--sp-4);
+  font-family: var(--font-mono);
+  font-size: var(--fs-micro);
+  letter-spacing: var(--tracking-micro);
+  text-transform: uppercase;
+  color: var(--text-3);
+}
+
+/* The action row reuses the panel's button kit; only the layout gap changes. */
+.atlas-alert .atlas-row--buttons {
+  gap: var(--sp-3);
+}
+
+/* Narrow viewports: the control panel becomes a BOTTOM drawer (max-height 46vh,
+   z-index 20), so a bottom-anchored banner would cover it. Anchor the failure
+   surface to the top of the content area instead — it stays visible without
+   colliding with the drawer in either state. */
+@media (max-width: 720px) {
+  .atlas-alert-region {
+    left: var(--sp-4);
+    right: var(--sp-4);
+    bottom: auto;
+    top: var(--sp-4);
+    max-width: none;
+  }
+}
+
 /* --- explanatory note -------------------------------------------------------- */
 
 .atlas-note {

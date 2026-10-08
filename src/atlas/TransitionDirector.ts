@@ -63,11 +63,15 @@ import type {
   QualityTier,
   RendererLike,
   ResourceScope,
+  TransitionError,
+  TransitionErrorCode,
   TransitionPhase,
   TransitionPublicState,
   TransitionRuntimeState
 } from './types';
+import { TRANSITION_ERROR_CODES } from './types.js';
 import type { ResourceManager } from './ResourceManager';
+import { buildTransitionFailureMessage } from './hostStatus.js';
 
 // ---------------------------------------------------------------------------
 // Public configuration types
@@ -97,6 +101,15 @@ export interface TransitionDirectorOptions {
   slowLoadThresholdMs?: number;
   /** Repeat interval of slow-load status events while still preparing. */
   slowLoadRepeatMs?: number;
+  /**
+   * Seconds-without-a-progress-event bound on an outstanding preparation
+   * (atlas-error-reporting: a stalled preparation SHALL terminate). Unlike
+   * `slowLoadThresholdMs` this is not a status cadence — expiry aborts the
+   * preparation and publishes a recoverable failure. Must stay well above
+   * the slow-load threshold: a preparation that keeps reporting progress is
+   * never aborted by it. Defaults to 10x the slow-load threshold.
+   */
+  stallThresholdMs?: number;
   /**
    * Resolves the quality mode restored in the governor when motion ends
    * (CA1-06, quality-ladder-resolution-integrity D2). Read at motion END —
@@ -200,6 +213,8 @@ export interface TransitionErrorEvent {
   generation: number;
   /** True when the active scene could not be restored by the director. */
   fatal: boolean;
+  /** Stable machine-readable code mirrored into the public state. */
+  code: TransitionErrorCode;
 }
 
 /** A travel request: destination id plus optional preset id. */
@@ -223,6 +238,7 @@ export class TransitionDirector {
   private readonly timings: TransitionPhaseTimings;
   private readonly slowLoadThresholdMs: number;
   private readonly slowLoadRepeatMs: number;
+  private readonly stallThresholdMs: number;
   private readonly resolveBaseQualityMode: () => QualityMode;
   private readonly seed: number;
 
@@ -240,6 +256,12 @@ export class TransitionDirector {
   private preparedTarget: PreparedPhenomenon | null = null;
   private minimumReady = false;
   private error: string | null = null;
+  /**
+   * The published error. Set wherever a transition error is emitted so the
+   * shell can render a failure without reading director internals
+   * (E-01/E-02); cleared by a successful completion and a new request.
+   */
+  private publicError: TransitionError | null = null;
   private reducedMotion = false;
   private outgoingSnapshot: Texture | null = null;
 
@@ -260,6 +282,21 @@ export class TransitionDirector {
   private arrivalApplied = false;
   private prepareElapsedMs = 0;
   private lastSlowLoadAtMs = 0;
+  /**
+   * Wall-clock timestamp of the last accepted PROGRESS EVENT. A progress event
+   * is one of: the prepare promise settling; a `reportProgress` report whose
+   * finite fraction is the first report or strictly greater than the last
+   * accepted one; response headers arriving for the outstanding fetch; or an
+   * increase in received response bytes (atlas-error-reporting §stall).
+   * Elapsed time alone is deliberately NOT a progress event.
+   */
+  private lastProgressEventAtMs = 0;
+  /**
+   * Generation of the preparation the director itself stalled. A stall is
+   * director-initiated (not a user cancel), so the resulting abort must
+   * publish a recoverable failure rather than reset silently.
+   */
+  private stalledGeneration: number | null = null;
   private latestProgress: { fraction01: number; label: string | null } | null = null;
   private disposed = false;
 
@@ -278,6 +315,16 @@ export class TransitionDirector {
     this.timings = { ...DEFAULT_TRANSITION_TIMINGS, ...options.timings };
     this.slowLoadThresholdMs = options.slowLoadThresholdMs ?? DEFAULT_SLOW_LOAD_THRESHOLD_MS;
     this.slowLoadRepeatMs = options.slowLoadRepeatMs ?? DEFAULT_SLOW_LOAD_REPEAT_MS;
+    // A stall must be far more permissive than the slow-load STATUS cadence:
+    // the slow-load event fires on a healthy prepare, so gating an abort on it
+    // would kill every normal preparation. 10x is the documented minimum.
+    const stall = options.stallThresholdMs ?? this.slowLoadThresholdMs * 10;
+    if (!(stall > this.slowLoadThresholdMs)) {
+      throw new Error(
+        `TransitionDirector: stallThresholdMs (${stall}) must exceed slowLoadThresholdMs (${this.slowLoadThresholdMs})`
+      );
+    }
+    this.stallThresholdMs = stall;
     this.resolveBaseQualityMode = options.resolveBaseQualityMode ?? (() => 'auto');
     this.seed = options.seed ?? 0x9e3779b9;
     // ASSUMED API: ResourceManager.createScope(name): ResourceScope.
@@ -320,7 +367,11 @@ export class TransitionDirector {
       // The whole hyperspace phase uses the opaque envelope. Keep this
       // semantic state owned by the director instead of making the renderer
       // infer occlusion from an artistic opacity threshold.
-      destinationOccluded: this.phase === 'hyperspace'
+      destinationOccluded: this.phase === 'hyperspace',
+      // Published so the shell can render a failure without reaching into
+      // director internals (E-01). Event-only delivery is not enough: an event
+      // fires once and is not replayed on a panel rebuild.
+      error: this.publicError
     };
   }
 
@@ -426,13 +477,27 @@ export class TransitionDirector {
     this.minimumReady = false;
     this.latestProgress = null;
     this.error = null;
+    // A new attempt supersedes any published failure: the banner must not
+    // outlive the request that replaced it (atlas-error-reporting).
+    this.publicError = null;
+    this.stalledGeneration = null;
 
     let resolved: { descriptor: PhenomenonDescriptor; preset: PresetDescriptor };
     try {
       resolved = this.deps.callbacks.resolveTarget(request.destinationId, request.presetId);
     } catch (err) {
-      this.error = `Failed to resolve destination '${request.destinationId}': ${errorMessage(err)}`;
-      this.emitError(this.error, request.destinationId, gen, false);
+      const message = `Failed to resolve destination '${request.destinationId}': ${errorMessage(err)}`;
+      this.emitError({
+        message,
+        displayMessage: buildTransitionFailureMessage({
+          code: TRANSITION_ERROR_CODES.TRANSITION_RESOLVE_FAILED,
+          destinationTitle: request.destinationId,
+          fatal: false
+        }),
+        destinationId: request.destinationId,
+        fatal: false,
+        code: TRANSITION_ERROR_CODES.TRANSITION_RESOLVE_FAILED
+      });
       // Never strand the machine in a preparing phase with no active prepare.
       this.resetToIdle(gen);
       return;
@@ -447,6 +512,12 @@ export class TransitionDirector {
     this.phaseStartedAtMs = performance.now();
     this.prepareElapsedMs = 0;
     this.lastSlowLoadAtMs = 0;
+    // The stall clock is wall-clock (an outstanding fetch does not care about
+    // our frame cadence) and starts at the first PROGRESS EVENT, which is the
+    // start report every production prepare path emits before the stall gate
+    // can apply to it (atlas-error-reporting).
+    this.lastProgressEventAtMs = performance.now();
+    this.stalledGeneration = null;
     this.prepareAbort = new AbortController();
     const controller = this.prepareAbort;
     this.emitPhase();
@@ -499,6 +570,7 @@ export class TransitionDirector {
       case 'preparing': {
         this.prepareElapsedMs += dtMs;
         this.maybeEmitSlowLoad();
+        this.checkPrepareStall();
         return;
       }
 
@@ -570,16 +642,46 @@ export class TransitionDirector {
       // activation-ready signal; optional streaming continues module-side.
       this.preparedTarget = prepared;
       this.minimumReady = true;
+      this.stalledGeneration = null;
       this.beginDeparture(gen);
     } catch (err) {
       if (this.stale(gen)) return; // superseded attempt owns the machine now
       if (controller.signal.aborted) {
+        // The director itself stalled this attempt: expiry of the stall window
+        // is a FAILURE the user must see and be able to retry, not a silent
+        // reset (atlas-error-reporting: a stalled preparation terminates in a
+        // user-visible failure with a recovery action).
+        if (this.stalledGeneration === gen) {
+          const message = `Preparation of '${descriptor.id}' was stopped: no progress event for ${Math.round(this.stallThresholdMs)} ms`;
+          this.emitError({
+            message,
+            displayMessage: buildTransitionFailureMessage({
+              code: TRANSITION_ERROR_CODES.TRANSITION_STALLED,
+              destinationTitle: this.targetTitle || descriptor.id,
+              fatal: false,
+              stallThresholdMs: this.stallThresholdMs
+            }),
+            destinationId: descriptor.id,
+            fatal: false,
+            code: TRANSITION_ERROR_CODES.TRANSITION_STALLED
+          });
+          this.stalledGeneration = null;
+        }
         this.resetToIdle(gen);
         return;
       }
       const message = `Preparation of '${descriptor.id}' failed: ${errorMessage(err)}`;
-      this.error = message;
-      this.emitError(message, descriptor.id, gen, false);
+      this.emitError({
+        message,
+        displayMessage: buildTransitionFailureMessage({
+          code: TRANSITION_ERROR_CODES.TRANSITION_PREPARE_FAILED,
+          destinationTitle: this.targetTitle || descriptor.id,
+          fatal: false
+        }),
+        destinationId: descriptor.id,
+        fatal: false,
+        code: TRANSITION_ERROR_CODES.TRANSITION_PREPARE_FAILED
+      });
       this.resetToIdle(gen);
     }
   }
@@ -591,13 +693,57 @@ export class TransitionDirector {
     label?: string
   ): void {
     if (this.stale(gen)) return; // stale reports never reach the UI
-    this.latestProgress = { fraction01: clamp01(fraction01), label: label ?? null };
+    // A progress EVENT is the first report, or a strictly increased FINITE
+    // fraction. A repeated or non-finite fraction is a label change and is not
+    // progress (atlas-error-reporting): it must not re-arm the stall clock.
+    const fraction = clamp01(fraction01);
+    const previous = this.latestProgress?.fraction01;
+    const isProgressEvent =
+      Number.isFinite(fraction01) && (previous === undefined || fraction > previous);
+    if (isProgressEvent) {
+      this.lastProgressEventAtMs = performance.now();
+    }
+    this.latestProgress = { fraction01: fraction, label: label ?? null };
     this.emitProgress({
       destinationId,
-      fraction01: clamp01(fraction01),
+      fraction01: fraction,
       label: label ?? null,
       generation: gen
     });
+  }
+
+  /**
+   * Stall gate: expiry of the stall window aborts the outstanding preparation
+   * through the SAME AbortController path a retarget uses, so every existing
+   * stale/abort guard runs unchanged. Only a preparation with no progress event
+   * for the whole window is aborted — one that keeps reporting progress is never
+   * aborted, however long it runs.
+writeFileSync(TARGET, s, 'utf8');
+   * Why this cannot misfire on a slow-but-healthy synchronous build: the gate is
+   * evaluated from `update(dt)`, which only runs between awaits, so a genuinely
+   * long step is not observed as an elapsed gap — the measurement exists
+   * precisely to catch an await that never resumes. Every production prepare
+   * path also reports progress before each of its steps (verified across all
+   * eight destinations), so an outstanding request is the only condition that
+   * can leave the window empty.
+   */
+  private checkPrepareStall(): void {
+    if (this.phase !== 'preparing') return;
+    if (this.prepareAbort === null || this.prepareAbort.signal.aborted) return;
+    const nowMs = performance.now();
+    if (nowMs - this.lastProgressEventAtMs < this.stallThresholdMs) return;
+    // Record the generation BEFORE aborting so runPrepare's catch can tell a
+    // director-initiated stall from a user cancel and publish the failure.
+    this.stalledGeneration = this.generation;
+    this.emitStatus({
+      kind: 'slow-load',
+      message: `Preparing ${this.targetTitle}… stopped after no progress for ${Math.round(this.stallThresholdMs)} ms`,
+      detailLabel: this.latestProgress?.label ?? null,
+      fraction01: this.latestProgress?.fraction01 ?? null,
+      elapsedMs: this.prepareElapsedMs,
+      destinationId: this.targetId
+    });
+    this.prepareAbort.abort();
   }
 
   /** Slow-load status once past the threshold, then periodically (§8). */
@@ -656,7 +802,10 @@ export class TransitionDirector {
       await this.deps.callbacks.exitActive({ freezeForTransition: true });
     } catch (err) {
       if (this.stale(gen)) return;
-      this.failFatal(`Outgoing scene exit failed: ${errorMessage(err)}`);
+      this.failFatal({
+        message: `Outgoing scene exit failed: ${errorMessage(err)}`,
+        code: TRANSITION_ERROR_CODES.TRANSITION_EXIT_FAILED
+      });
       return;
     }
     // Retargeting cannot bump the generation while in motion, so only
@@ -682,7 +831,10 @@ export class TransitionDirector {
     const prepared = this.preparedTarget;
     if (!prepared) {
       // Unreachable: departure is gated on a prepared target. Defensive only.
-      this.failFatal('Occlusion handoff found no prepared target');
+      this.failFatal({
+        message: 'Occlusion handoff found no prepared target',
+        code: TRANSITION_ERROR_CODES.TRANSITION_HANDOFF_FAILED
+      });
       return;
     }
 
@@ -692,12 +844,18 @@ export class TransitionDirector {
       // scene-local heavy resources now (PRODUCT_UX §6 OCCLUDE).
       this.deps.callbacks.disposeActive();
     } catch (err) {
-      this.emitError(
-        `Outgoing disposal failed during handoff: ${errorMessage(err)}`,
-        this.sourceId,
-        gen,
-        false
-      );
+      const message = `Outgoing disposal failed during handoff: ${errorMessage(err)}`;
+      this.emitError({
+        message,
+        displayMessage: buildTransitionFailureMessage({
+          code: TRANSITION_ERROR_CODES.TRANSITION_DISPOSAL_FAILED,
+          destinationTitle: this.targetTitle || this.sourceId || 'the previous scene',
+          fatal: false
+        }),
+        destinationId: this.sourceId,
+        fatal: false,
+        code: TRANSITION_ERROR_CODES.TRANSITION_DISPOSAL_FAILED
+      });
     }
     this.sourceId = null;
     void this.activatePrepared(gen, prepared);
@@ -708,7 +866,10 @@ export class TransitionDirector {
       await this.deps.callbacks.activate(prepared, { reducedMotion: this.reducedMotion });
     } catch (err) {
       if (this.stale(gen)) return;
-      this.failFatal(`Target activation failed: ${errorMessage(err)}`);
+      this.failFatal({
+        message: `Target activation failed: ${errorMessage(err)}`,
+        code: TRANSITION_ERROR_CODES.TRANSITION_ACTIVATION_FAILED
+      });
       return;
     }
     if (this.stale(gen)) {
@@ -783,6 +944,9 @@ export class TransitionDirector {
     this.minimumReady = false;
     this.departureTransform = null;
     this.error = null;
+    // A successful arrival clears any previously published failure
+    // (atlas-error-reporting: a successful transition clears a previous error).
+    this.publicError = null;
     this.travelSpeed = 0;
     this.lastOverlayOpacity = 0;
     this.phase = 'idle';
@@ -919,8 +1083,18 @@ export class TransitionDirector {
    * Catastrophic path: the active scene cannot be restored by the director
    * alone. Best-effort cleanup, fatal error event; the host owns recovery UI.
    */
-  private failFatal(message: string): void {
-    this.error = message;
+  private failFatal(error: { message: string; code: TransitionErrorCode }): void {
+    this.emitError({
+      message: error.message,
+      displayMessage: buildTransitionFailureMessage({
+        code: error.code,
+        destinationTitle: this.targetTitle || this.targetId || 'the destination',
+        fatal: true
+      }),
+      destinationId: this.targetId,
+      fatal: true,
+      code: error.code
+    });
     this.exitMotionQuality();
     try {
       this.deps.cameraRig.setControlsEnabled(true);
@@ -934,7 +1108,6 @@ export class TransitionDirector {
     this.phase = 'idle';
     this.phaseElapsedMs = 0;
     this.emitPhase();
-    this.emitError(message, this.targetId, this.generation, true);
   }
 
   private stale(gen: number): boolean {
@@ -963,13 +1136,34 @@ export class TransitionDirector {
     for (const cb of Array.from(this.statusListeners)) cb(event);
   }
 
-  private emitError(
-    message: string,
-    destinationId: DestinationId | null,
-    generation: number,
-    fatal: boolean
-  ): void {
-    const event: TransitionErrorEvent = { message, destinationId, generation, fatal };
+  /**
+   * Single publish point for a transition error. `message` is the technical
+   * detail (console channel); `displayMessage` is authored copy for the
+   * user-visible surface (docs/FAILURE_RECOVERY.md §3 forbids dumping loader
+   * strings or stack traces into ordinary UI). The code is stable and
+   * testable; both strings may evolve.
+   */
+  private emitError(options: {
+    message: string;
+    displayMessage: string;
+    destinationId: DestinationId | null;
+    fatal: boolean;
+    code: TransitionErrorCode;
+  }): void {
+    this.error = options.message;
+    this.publicError = {
+      code: options.code,
+      message: options.displayMessage,
+      destinationId: options.destinationId,
+      fatal: options.fatal
+    };
+    const event: TransitionErrorEvent = {
+      message: options.message,
+      destinationId: options.destinationId,
+      generation: this.generation,
+      fatal: options.fatal,
+      code: options.code
+    };
     for (const cb of Array.from(this.errorListeners)) cb(event);
   }
 

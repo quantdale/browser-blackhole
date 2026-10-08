@@ -278,13 +278,19 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     // --- CA8-10: validated lazy load (manifest -> checksummed binary) ------
     ctx.reportProgress(0.05, 'Fetching NR reference dataset');
     const assetId = ASSET_ID_BY_EVENT[stateValue.referenceEvent] ?? 'sxs-bbh-0001-lev5';
-    dataset = await loadBbmDataset(assetId, { signal: ctx.signal }).catch((error) => {
+    dataset = await loadBbmDataset(assetId, {
+      signal: ctx.signal,
+      onProgress: (fraction01, label) => ctx.reportProgress(fraction01, label)
+    }).catch((error) => {
       if (ctx.signal.aborted) {
         throw new DOMException('black-hole-merger: prepare aborted (asset fetch)', 'AbortError');
       }
       throw error;
     });
-    ctx.reportProgress(0.55, 'Validating NR reference dataset');
+    // The loader reports 0.1…0.8; the module's own reports must stay STRICT
+    // increases above that ceiling, because a backwards fraction is a label
+    // change rather than a progress event (atlas-error-reporting).
+    ctx.reportProgress(0.85, 'Validating NR reference dataset');
     abortGuard('dataset');
     const ds = requireDataset();
 
@@ -316,7 +322,7 @@ export function createBlackHoleMergerModule(): PhenomenonModule {
     backdrop = cinematicBackdrop;
 
     // --- INSPIRAL system -----------------------------------------------------
-    ctx.reportProgress(0.6, 'Building binary presentation');
+    ctx.reportProgress(0.9, 'Building binary presentation');
     inspiralGroup = new THREE.Group();
     inspiralGroup.name = 'bbm-inspiral';
 

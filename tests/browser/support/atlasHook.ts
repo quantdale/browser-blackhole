@@ -21,6 +21,12 @@ interface AtlasStateView {
       phase: string | null;
       progress: number;
       destinationOccluded: boolean;
+      error: {
+        code: string;
+        message: string;
+        destinationId: string | null;
+        fatal: boolean;
+      } | null;
     };
   };
   /** Atlas rendering domain (quality/trajectory-backend preferences). */
@@ -34,6 +40,8 @@ interface InventoryView {
   totalEstimatedGpuBytes: number;
   totalResourceCounts: { texture: number };
   pendingPrepares: number;
+  /** Live (prepared + activated) destination id, or null before first arrival. */
+  activeDestinationId: string | null;
   /** Present when a backend engaged; null during boot or before first frame. */
   backend: { api: string; adapterName: string; timestampQuery: boolean } | null;
   /** Monotonic renderer generation (bumped on device loss / re-init). */
@@ -65,6 +73,12 @@ interface InventoryView {
       phase: string | null;
       progress: number;
       destinationOccluded: boolean;
+      error: {
+        code: string;
+        message: string;
+        destinationId: string | null;
+        fatal: boolean;
+      } | null;
     };
     volume: {
       liveVolumes: number;

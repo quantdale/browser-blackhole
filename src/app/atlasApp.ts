@@ -43,8 +43,9 @@ import {
   parseFromUrl
 } from '../atlas/atlasState.js';
 import { INVALIDATION_REASON } from '../atlas/types.js';
-import type { ExperienceMode } from '../atlas/types.js';
+import type { ExperienceMode, TransitionError } from '../atlas/types.js';
 import { CosmicAtlasHost, type CosmicAtlasHostOptions } from '../atlas/host.js';
+import { buildUnsupportedMessage } from '../atlas/hostStatus.js';
 import { DEBUG_DESTINATION_ID, productionDestinationIds } from '../atlas/launchCatalog.js';
 import type { NavigationIntent } from '../atlas/navigation.js';
 import { getCachedDataset } from '../phenomena/black-hole-merger/dataset.js';
@@ -61,6 +62,7 @@ import {
   createTimelineTransport,
   createToggleRow,
   createWaveformPanel,
+  type ButtonAction,
   type ReadoutListHandle,
   type TimelineTransportHandle,
   type WaveformPanelHandle
@@ -242,6 +244,131 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   };
   setStatus('Atlas: starting', 'busy');
 
+  // --- terminal boot-failure surface (atlas-error-reporting) -----------------
+  // Reached when `host.init()` rejects (no render backend, failed renderer
+  // init). Renders the repository's remediation copy — `buildUnsupportedMessage`
+  // — instead of a bare error code, matching the standard the legacy route
+  // already presents (E-02).
+  const terminal = document.createElement('div');
+  terminal.className = 'atlas-terminal';
+  terminal.setAttribute('role', 'alert');
+  terminal.hidden = true;
+  const renderTerminal = (code: string | null, message: string): void => {
+    const backend = host.debugInventory().backend;
+    const copy = buildUnsupportedMessage(backend, code ?? '');
+    const card = document.createElement('div');
+    card.className = 'atlas-terminal-card';
+    const title = document.createElement('h1');
+    title.className = 'atlas-terminal-title';
+    title.textContent = copy.title;
+    const detail = document.createElement('p');
+    detail.className = 'atlas-terminal-detail';
+    detail.textContent = message;
+    const guidance = document.createElement('p');
+    guidance.className = 'atlas-terminal-detail';
+    guidance.textContent = copy.detail;
+    card.append(title, detail, guidance);
+    if (copy.suggestions.length > 0) {
+      const reasons = document.createElement('ul');
+      reasons.className = 'atlas-terminal-reasons';
+      for (const suggestion of copy.suggestions) {
+        const item = document.createElement('li');
+        item.textContent = suggestion;
+        reasons.append(item);
+      }
+      card.append(reasons);
+    }
+    const footer = document.createElement('p');
+    footer.className = 'atlas-terminal-code';
+    footer.textContent = `Code: ${copy.code}`;
+    card.append(footer);
+    terminal.replaceChildren(card);
+    terminal.hidden = false;
+  };
+  content.append(terminal);
+
+  // --- transition failure surface (atlas-error-reporting) ---------------------
+  // A failed destination preparation MUST reach the user, not only the console
+  // (E-01). Deliberately NOT a child of `#panel`: the panel is collapsible and
+  // is rebuilt on every destination change, so an error rendered inside it
+  // would be hidden by a collapse and destroyed by a rebuild. This surface is
+  // created once, lives outside the panel's hiding subtree, and is absolutely
+  // positioned so it cannot perturb the pinned shell geometry the goldens
+  // depend on (topbar 73px / viewport / panel width).
+  const alertRegion = document.createElement('div');
+  alertRegion.className = 'atlas-alert-region';
+  alertRegion.setAttribute('role', 'alert');
+  alertRegion.hidden = true;
+  /** Signature of the error currently rendered, or null when nothing is shown. */
+  let renderedAlertSignature: string | null = null;
+  /** Signature the user dismissed; the same error must not re-announce itself. */
+  let dismissedAlertSignature: string | null = null;
+  /** Destination to re-request when the user retries. */
+  let alertDestinationId: string | null = null;
+
+  const dismissTransitionAlert = (): void => {
+    if (renderedAlertSignature !== null) dismissedAlertSignature = renderedAlertSignature;
+    renderedAlertSignature = null;
+    alertDestinationId = null;
+    alertRegion.replaceChildren();
+    alertRegion.hidden = true;
+  };
+
+  const renderTransitionAlert = (error: TransitionError): void => {
+    alertDestinationId = error.destinationId;
+    const card = document.createElement('div');
+    card.className = 'atlas-alert';
+    card.setAttribute('data-severity', error.fatal ? 'fatal' : 'recoverable');
+
+    const title = document.createElement('p');
+    title.className = 'atlas-alert-title';
+    title.textContent = error.fatal
+      ? 'Atlas stopped — reload to continue'
+      : 'Destination did not open';
+
+    // The authored body carries the whole meaning in text: what failed, that
+    // the app continues, and one remediation. Nothing here depends on colour
+    // (atlas-error-reporting: not conveyed by colour alone).
+    const body = document.createElement('p');
+    body.className = 'atlas-alert-body';
+    body.textContent = error.message;
+
+    const meta = document.createElement('p');
+    meta.className = 'atlas-alert-code';
+    meta.textContent = `Code: ${error.code}`;
+
+    // Retry re-requests the SAME destination as an ordinary preparation.
+    // There is no automatic retry: a failing retry re-presents the same error
+    // with the same actions and never loops.
+    const actions: ButtonAction[] = error.fatal
+      ? [
+          {
+            text: 'Reload page',
+            primary: true,
+            onClick: (): void => {
+              window.location.reload();
+            }
+          }
+        ]
+      : alertDestinationId === null
+        ? []
+        : [
+            {
+              text: 'Try again',
+              primary: true,
+              onClick: (): void => {
+                host.navigate(alertDestinationId as string);
+              }
+            }
+          ];
+    actions.push({ text: 'Dismiss', primary: false, onClick: dismissTransitionAlert });
+
+    card.append(title, body, meta, createButtonRow(actions));
+    alertRegion.replaceChildren(card);
+    alertRegion.hidden = false;
+  };
+  content.append(alertRegion);
+
   // Dev/test-only ?backend= override (docs/CI_CD.md §6): forward webgpu|webgl2
   // to the kernel so the atlas fallback path is exercisable on capable machines.
   // 'unsupported' is a root-app terminal-UX concept; the atlas shell reports
@@ -252,6 +379,22 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     hostOptions.forcedBackend = forcedBackend;
   }
   const host = new CosmicAtlasHost(canvas, hostOptions);
+
+  // Boot-failure rendering (atlas-error-reporting). Registered BEFORE
+  // `host.init()` so a failure the tracker reports is rendered as it happens.
+  // The explicit catch in the boot block below is the belt-and-braces path for
+  // a thrower that never transitions the tracker; both routes render the same
+  // terminal card, so calling it twice is idempotent.
+  const unsubscribeStatus = host.status.subscribe((snapshot) => {
+    if (snapshot.failed) {
+      // The product route renders the repository's remediation copy, not a
+      // bare code (E-02).
+      renderTerminal(snapshot.errorCode, `Atlas could not start: ${snapshot.message}`);
+      setStatus(`Atlas error [${snapshot.errorCode ?? 'UNKNOWN'}]: ${snapshot.message}`, 'error');
+    } else if (!snapshot.ready) {
+      setStatus(`Atlas: ${snapshot.message}`, 'busy');
+    }
+  });
 
   // --- destination chips -----------------------------------------------------
   /** Rebuild chips from launch catalog + registry state; Diagnostic only under Debug mode. */
@@ -1004,7 +1147,23 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   try {
     await host.init();
   } catch (err) {
-    setStatus(`Atlas failed to initialize: ${String(err)}`, 'error');
+    // atlas-error-reporting: a boot failure is a user-visible terminal state,
+    // never a bare code or a console-only message. The status subscription
+    // above may already have rendered it (it runs before this point), but the
+    // tracker is not guaranteed to have transitioned for every thrower, so
+    // render from the tracker snapshot here as well — idempotent.
+    const snapshot = host.status.snapshot();
+    if (!snapshot.failed) {
+      host.status.fail('BOOT_UNSUPPORTED', String(err));
+    }
+    renderTerminal(
+      host.status.snapshot().errorCode,
+      `Atlas could not start: ${host.status.snapshot().message}`
+    );
+    setStatus(
+      `Atlas error [${host.status.snapshot().errorCode ?? 'UNKNOWN'}]: ${host.status.snapshot().message}`,
+      'error'
+    );
     throw err;
   }
   setStatus('Atlas ready', 'ok');
@@ -1125,6 +1284,25 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     uiTimer += dtSeconds;
     if (uiTimer >= UI_SYNC_INTERVAL_SECONDS) {
       uiTimer = 0;
+      // atlas-error-reporting: the published transition error drives the
+      // user-visible failure surface. Read from public state every tick, so a
+      // panel rebuild can never destroy it and a retry that fails again
+      // re-presents it with the same actions.
+      const transitionError = host.state.atlas.transition.error;
+      if (transitionError === null) {
+        if (renderedAlertSignature !== null) {
+          renderedAlertSignature = null;
+          alertDestinationId = null;
+          alertRegion.replaceChildren();
+          alertRegion.hidden = true;
+        }
+      } else {
+        const signature = `${transitionError.code}|${transitionError.message}|${transitionError.destinationId ?? ''}|${String(transitionError.fatal)}`;
+        if (signature !== renderedAlertSignature && signature !== dismissedAlertSignature) {
+          renderedAlertSignature = signature;
+          renderTransitionAlert(transitionError);
+        }
+      }
       // M11: destination state is seeded from preset/share state when the
       // arrival transition completes — AFTER the first panel build. Deep-link
       // boots (/?preset=...) would otherwise show stale control values forever
@@ -1224,14 +1402,6 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   window.addEventListener('beforeunload', onTeardown);
   window.addEventListener('pagehide', onPageHide);
 
-  const unsubscribeStatus = host.status.subscribe((snapshot) => {
-    if (snapshot.failed) {
-      setStatus(`Atlas error [${snapshot.errorCode ?? 'UNKNOWN'}]: ${snapshot.message}`, 'error');
-    } else if (!snapshot.ready) {
-      setStatus(`Atlas: ${snapshot.message}`, 'busy');
-    }
-  });
-
   // M11-03 device-loss terminal state: the status line is the app's
   // user-visible error surface (same presentation as boot failures). Frame
   // submission stops — the kernel refuses work on a lost device and the
@@ -1242,7 +1412,6 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       'error'
     );
   });
-
   // Test/inspection hook (mirrors __BLACKHOLE_TEST__ convention from main.ts).
   // Shape is load-bearing for tests/browser/support/atlasHook.ts — do not change
   // without updating that declaration and the specs that consume it.
