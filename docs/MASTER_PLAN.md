@@ -4,6 +4,28 @@ Status: **audit-derived execution specification, revised after proposal review.*
 read-only audit of product code at `main@dc0b3ba`, then corrected against current source at
 `c0ee5f5`. No product code was modified to produce or revise this document.
 
+## Execution progress
+
+| Phase | Change | State |
+| --- | --- | --- |
+| 0 | `specification-baseline-hygiene` | **complete** (`5bbd2cc`) |
+| 0 | `specification-baseline-review-corrections` | **complete and archived** (`a9a0713` apply, `008966a` archive) |
+| 1a | `kerr-gpu-initializer-correctness` | **complete** (`4a252b9`) — Q-01…Q-05, Q-07 struck |
+| 1b | `quality-ladder-resolution-integrity` | **complete** (`274c591`, close-out `e364437`) — A-01…A-06 struck |
+| 1c | `transition-error-user-visibility` | **active** — E-01…E-05 in scope |
+| 1d | `destination-control-truthfulness` | pending (starts only after 1c) — U-01…U-19 in scope |
+| 2 | `shared-renderer-service-lifecycle` | pending (starts only after 1b and 1c) — R-01…R-12 in scope |
+| 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
+| 4 | `benchmark-harness-integrity` | pending — B-01…B-07 in scope |
+| 5a | `operations-and-deployment-readiness` | pending — O-01…O-09 in scope |
+| 5b | `documentation-truthfulness-realignment` | pending — D-06…D-15 in scope |
+| 6 | final certification | pending |
+
+Still open and unowned by any listed change: **A-07** (P3, render-scale table duplication),
+**Q-06** (P2, dead remaining-deflection proxy), **Q-08** (P3, duplicated physical constants),
+**L-01/L-02** (deferred legacy shell). `spatial-atlas-continuous-navigation` remains planning at
+0/123 tasks behind this lane; it is not part of this plan's phase order.
+
 Audit base: `main@dc0b3ba`. Planning revisions through `c0ee5f5` did not change product code, but
 **every cited line must be re-derived at the current HEAD before implementation.** Do not treat an
 audit line number as authoritative after the tree moves.
@@ -274,13 +296,13 @@ Every finding below is implemented by a named OpenSpec change. IDs are stable.
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| Q-01 | Kerr GPU camera-side Kerr quartic `A` computed as `(r+a)²` instead of `(r²+a²)²` | P0 | resolved | `kerrIntegrator.ts:464` vs `:555`, `reference.ts:215`, `photonInit.ts:282`, `metric.ts:38` |
-| Q-02 | Kerr GPU static `L_z` uses `g_tφ/f_s`; ADR and all CPU paths require `g_tφ/√f_s` | P0 | resolved | `kerrIntegrator.ts:486` vs `reference.ts:453`, `docs/KERR_BACKEND_ADR.md:145` |
-| Q-03 | Kerr g-factor divides by `\|E\|` unconditionally, diverging from the gated Schwarzschild form | P1 | resolved | `kerrIntegrator.ts` ~700 vs `schwarzschildIntegrator.ts:432-437` |
-| Q-04 | LUT capture sentinel is read through a linear filter, so classification is interpolated at `b_c` | P1 | resolved | `lensingGpu.ts:399-405`, `textures.ts:66-69`, `generate.ts:455-461` |
-| Q-05 | LUT GPU hard-codes the `x→u` axis mapping; the manifest's `axisX` never reaches the shader | P2 | resolved | `lensingGpu.ts:200-205` vs `lut/domain.ts:20-22` |
+| Q-01 | Kerr GPU camera-side Kerr quartic `A` computed as `(r+a)²` instead of `(r²+a²)²` | P0 | **RESOLVED 2026-10-03** `4a252b9` | `kerrIntegrator.ts:464` vs `:555`, `reference.ts:215`, `photonInit.ts:282`, `metric.ts:38` |
+| Q-02 | Kerr GPU static `L_z` uses `g_tφ/f_s`; ADR and all CPU paths require `g_tφ/√f_s` | P0 | **RESOLVED 2026-10-03** `4a252b9` | `kerrIntegrator.ts:486` vs `reference.ts:453`, `docs/KERR_BACKEND_ADR.md:145` |
+| Q-03 | Kerr g-factor divides by `\|E\|` unconditionally, diverging from the gated Schwarzschild form | P1 | **RESOLVED 2026-10-03** `4a252b9` | `kerrIntegrator.ts` ~700 vs `schwarzschildIntegrator.ts:432-437` |
+| Q-04 | LUT capture sentinel is read through a linear filter, so classification is interpolated at `b_c` | P1 | **RESOLVED 2026-10-03** `4a252b9` | `lensingGpu.ts:399-405`, `textures.ts:66-69`, `generate.ts:455-461` |
+| Q-05 | LUT GPU hard-codes the `x→u` axis mapping; the manifest's `axisX` never reaches the shader | P2 | **RESOLVED 2026-10-03** `4a252b9` | `lensingGpu.ts:200-205` vs `lut/domain.ts:20-22` |
 | Q-06 | Escape criterion is radius+momentum only; the documented remaining-deflection proxy is dead code | P2 | confirmed | `docs/NUMERICAL_METHODS.md:151` vs `schwarzschild.ts:460-468` (no production caller) |
-| Q-07 | Kerr `massRg ≠ 1` mixes `a*` and `a = a*·M` (latent; `massRg` is pinned to 1 today) | P3 | resolved | `kerrIntegrator.ts:458-464` vs `reference.ts:207-213` |
+| Q-07 | Kerr `massRg ≠ 1` mixes `a*` and `a = a*·M` (latent; `massRg` is pinned to 1 today) | P3 | **RESOLVED 2026-10-03** `4a252b9` | `kerrIntegrator.ts:458-464` vs `reference.ts:207-213` |
 | Q-08 | Physical constants duplicated 4–5× (spin clamp, capture ε, ISCO, `B_CRITICAL_RG`) | P3 | confirmed | `state.ts:152`, `controlState.ts:95`, `characteristics.ts:40`, `kerrIntegrator.ts:160` |
 
 ### E — Reliability / error surfacing (change: `transition-error-user-visibility`)
