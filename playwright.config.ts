@@ -90,9 +90,16 @@ export default defineConfig({
     }
   ],
   webServer: {
-    command: `npm run preview -- --host 127.0.0.1 --port ${e2ePort} --strictPort`,
+    // U-04: the browser suite needs the `__ATLAS_APP__` test hook, which a
+    // production build must not contain. So the e2e run builds its OWN bundle
+    // (`npm run build:e2e` sets `VITE_ATLAS_TEST_HOOKS=1`, baked in as
+    // `__ATLAS_TEST_HOOKS_OPT_IN__`) and serves that. Building here rather than
+    // reusing whatever `dist/` happens to hold removes the stale-artifact
+    // failure mode where a plain production build silently strips every hook
+    // and every spec fails on a missing `window.__ATLAS_APP__`.
+    command: `npm run build:e2e && npm run preview -- --host 127.0.0.1 --port ${e2ePort} --strictPort`,
     url: `http://127.0.0.1:${e2ePort}`,
-    reuseExistingServer: !process.env.CI,
-    timeout: 30_000
+    reuseExistingServer: false,
+    timeout: 120_000
   }
 });

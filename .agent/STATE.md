@@ -1,3 +1,78 @@
+## 2026-10-09 session — Phase 1 change 4: destination-control-truthfulness (U-01, U-04, U-09, U-10) IN PROGRESS
+
+Status: **implemented and locally validated; full non-golden suite running.**
+Fourth Phase 1 change in `docs/MASTER_PLAN.md` §6/§7, scoped to the four findings that are
+user-visible, single-line and high blast-radius. U-02 and U-03 are NOT in this slice — see
+"Deliberately deferred" below.
+
+Implemented:
+
+- **U-01 (AGN torus invisible after a zone change).** The zone machine in `update()` changes
+  `activeZone` and calls only `applyZoneVisibility()` (group gating). The torus's own
+  `setVisible` was written by `applyStateToResources()`, which runs only from `prepare()` and
+  `applyControlState()` — so a zoom-driven zone change never re-applied it, and the torus
+  stayed hidden while `visibleGroups` reported `['nuclear']` and the debug snapshot reported
+  `torusVisible: true`: diagnostics actively contradicting the frame. Fixed by re-applying
+  per-resource visibility on every zone change, and by making the torus flag a pure function of
+  `state.torusVisible` (group gating already provides the exclusivity). Fail-first verified by
+  removing only the re-application call: `torus must return after re-entering nuclear` fails.
+- **U-04 (`__ATLAS_APP__` shipped unguarded).** The hook exposed the host — including
+  `forceContinuousRenderForTest()` and a synchronous framebuffer readback — to any script on the
+  page, while `host.ts` documented the forced-render path as "not reachable from production
+  UI". Now gated on `import.meta.env.DEV || __ATLAS_TEST_HOOKS_OPT_IN__`, where Vite substitutes
+  the latter from `VITE_ATLAS_TEST_HOOKS=1` at BUILD time. `npm run build` — the artifact CI
+  validates and any deployment serves — contains no hook at all and no unsubstituted define.
+  The Playwright `webServer` now builds its own bundle via `npm run build:e2e` instead of reusing
+  whatever `dist/` happens to hold, removing the stale-artifact failure mode where a production
+  build silently strips every hook and all ~200 specs fail. `scripts/check-no-test-hook.mjs`
+  asserts the production property and runs as the last step of `npm run check`;
+  `tests/browser/production-hygiene.spec.ts` covers the invariant that holds for every bundle
+  (define always substituted) plus "the hook IS reachable in the e2e bundle".
+- **U-09 (focus destroyed on every rebuild).** `replaceChildren` threw keyboard focus to
+  `<body>` on every destination switch and every panel rebuild. Added a stable focus identity
+  (role-bearing tag + type + accessible name) captured BEFORE any destructive step and restored
+  after, scoped to the shell root because the control the user last touched is usually the
+  destination chip — which `refreshNav()` rebuilds too. An implementation-order bug was found
+  and fixed during the work: capturing after `refreshNav()` had already lost focus to `<body>`.
+  Fail-first verified: `focus must not fall back to <body>` fails without the restore.
+- **U-10 (collapsed mobile drawer stayed in the a11y tree).** Below 720px the drawer is
+  translated off-canvas rather than `display: none`, so it kept its tab order. It is now `inert`
+  when collapsed, removing it from the a11y tree and tab order without touching the slide
+  transition. A latent test assumption surfaced by this fix was repaired: `mobile-touch.spec.ts`
+  tapped "Controls" unconditionally, which closed the already-open panel and then tried to tap
+  inside the now-unreachable drawer.
+
+Evidence (all on the final tree):
+
+- `npm run check`: exit 0 — 55 unit files / **677 tests**, plus the new production test-hook gate.
+- Full non-golden browser suite: **243 passed / 1 skipped / 0 failed (30.4m)**. The single skip is
+  the documented WebGPU-only LUT parity row.
+- `visual-goldens --workers=1`: **43/43**, no re-baselining.
+- `cinematic-goldens`: **8/8**, no re-baselining. One first-run failure of `CIN_GALAXY_BRIDGE` was a
+  readiness timeout (`Expected "ready", Received "waiting"` at a 30 s ceiling), not a pixel
+  difference: the row passes standalone with byte-identical metrics to the earlier green run, and
+  the whole suite then passed 8/8 on a clean port. **No golden was re-baselined.**
+- `dist/` hygiene on the production artifact: 0 source maps, 0 machine-local paths, 0 TODO markers,
+  0 `__ATLAS_APP__` assignments, 0 unsubstituted `VITE_ATLAS_TEST_HOOKS` leaks. The e2e artifact has
+  exactly 1 hook assignment, as designed.
+- `openspec validate`: the change is valid; `--all --strict` green.
+- Fail-first verified in both directions: removing the AGN zone re-application fails
+  `torus must return after re-entering nuclear`; removing the focus restore fails
+  `focus must not fall back to <body>`.
+- Refero MCP research (U-09/U-10): `refero_search_screens` on "error state banner with retry action
+  on dark dashboard" and `refero_search_styles` on dark technical consoles. The convergent real-product
+  pattern is a non-blocking alert with one primary recovery CTA and a dismiss affordance, plus an
+  assertive live region — which is what the change-3 banner implements. No branding or layout was
+  copied; findings informed the accessibility and interaction decisions only.
+
+Deliberately deferred (documented, not skipped):
+
+- **U-02** binds the Neutron-Star `observerInclinationDeg` control to the camera rig — a
+  two-way binding with real regression risk on the observer-mode presets. Needs its own slice.
+- **U-03** corrects the Neutron-Star fidelity note to describe the shipped DIRECT surface-ray
+  path — documentation only, but it touches the Fidelity contract and wants its own review.
+- **U-05…U-19** remain as scoped in `openspec/changes/destination-control-truthfulness/`.
+
 ## 2026-10-09 session — Phase 1 change 3: transition-error-user-visibility implemented, validated and CLOSED
 
 Status: **COMPLETE.** Third of the four Phase 1 changes in `docs/MASTER_PLAN.md` §6/§7.

@@ -169,7 +169,15 @@ test.describe('M11-02 mobile/touch/DPR hardening', () => {
     // Open the controls panel (tap-equivalent click), then the observer
     // section, then change the mode through the select — the production
     // control channel must reflect it in canonical state.
-    await page.getByRole('button', { name: 'Controls' }).tap();
+    //
+    // The panel starts OPEN by default, so a bare tap would CLOSE it. Toggle
+    // only when it is actually collapsed, otherwise the observer section is
+    // inside an inert (correctly unreachable) drawer and the tap cannot land.
+    const controlsToggle = page.getByRole('button', { name: 'Controls' });
+    if ((await controlsToggle.getAttribute('aria-expanded')) !== 'true') {
+      await controlsToggle.tap();
+    }
+    await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
     const observerSection = page.getByRole('button', { name: 'Observer (relativistic)' });
     if ((await observerSection.getAttribute('aria-expanded')) !== 'true') {
       await observerSection.tap();

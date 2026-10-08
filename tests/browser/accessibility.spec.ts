@@ -214,6 +214,113 @@ test.describe('M11-05 accessibility', () => {
     expect(errors.join('\n')).toContain('transition error');
   });
 
+  test('focus is preserved across a destination switch (U-09)', async ({ page }) => {
+    const errors = collectErrors(page);
+    await gotoAtlasBlackHole(page);
+
+    // Put focus on a named control in the panel, then switch destination: the
+    // panel is rebuilt wholesale, and the same control must still hold focus.
+    const controlsToggle = page.getByRole('button', { name: 'Controls' });
+    if ((await controlsToggle.getAttribute('aria-expanded')) !== 'true') {
+      await controlsToggle.focus();
+      await page.keyboard.press('Enter');
+    }
+    const cameraSection = page.getByRole('button', { name: 'Observer', exact: true });
+    await expect(cameraSection).toBeVisible();
+    await cameraSection.focus();
+    expect(await page.evaluate(() => document.activeElement?.tagName)).toBe('BUTTON');
+
+    // Activate a destination exactly as a keyboard user would: focus the chip,
+    // then press it. Focus is on the NAV chip at the moment the panel and the
+    // nav are rebuilt, so that is what must survive.
+    await page.getByRole('button', { name: 'Stellar Explosion' }).focus();
+    await page.keyboard.press('Enter');
+    await expect
+      .poll(
+        async () => page.evaluate(() => window.__ATLAS_APP__!.host.state.atlas.activeDestination),
+        { timeout: ARRIVAL_TIMEOUT_MS, intervals: [250] }
+      )
+      .toBe('stellar-explosion');
+
+    // Wait until the panel has actually been REBUILT for the new destination:
+    // the panel header carries the destination's fidelity class, which only
+    // appears once the rebuild has run. Without this the assertion can race
+    // the rebuild and read focus that has not been destroyed yet.
+    await expect(page.locator('#panel')).toContainText('PROCEDURAL_SCIENTIFIC', {
+      timeout: 10_000
+    });
+    // The UI sync runs at 4 Hz, so give the rebuild a couple of ticks.
+    await page.waitForTimeout(700);
+
+    // The rebuild finished and focus survived it on an equivalent control.
+    const focused = await page.evaluate(() => {
+      const el = document.activeElement;
+      return {
+        tag: el?.tagName ?? 'NONE',
+        inDocument: el ? el.isConnected : false,
+        isBody: el === document.body,
+        text: el?.textContent?.trim() ?? ''
+      };
+    });
+    expect(focused.inDocument, 'focus must not sit in a disposed node').toBe(true);
+    expect(focused.isBody, 'focus must not fall back to <body>').toBe(false);
+    expect(focused.tag).toBe('BUTTON');
+    // The chip the user activated keeps focus, so a second Enter would toggle
+    // the same destination rather than nothing.
+    expect(focused.text).toContain('Stellar Explosion');
+    expect(errors).toEqual([]);
+  });
+
+  test('a collapsed control drawer leaves the accessibility tree (U-10)', async ({ page }) => {
+    const errors = collectErrors(page);
+    // 390x844 is below the 720px breakpoint where the drawer slides off-canvas
+    // instead of being `display: none`.
+    await page.setViewportSize({ width: 390, height: 844 });
+    await gotoAtlasBlackHole(page);
+
+    const controlsToggle = page.getByRole('button', { name: 'Controls' });
+    await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
+    await controlsToggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(controlsToggle).toHaveAttribute('aria-expanded', 'false');
+
+    // The drawer must be inert, so its controls are neither announced nor
+    // reachable by Tab even though they are still laid out for the transition.
+    const state = await page.evaluate(() => {
+      const panel = document.querySelector('#panel') as (HTMLElement & { inert?: boolean }) | null;
+      return {
+        inert: panel?.inert ?? null,
+        hidden: panel?.hasAttribute('hidden') ?? null
+      };
+    });
+    expect(state.inert).toBe(true);
+
+    // Tab from the toggle must move to the next focusable OUTSIDE the panel.
+    await controlsToggle.focus();
+    await page.keyboard.press('Tab');
+    const landed = await page.evaluate(() => {
+      const el = document.activeElement;
+      return {
+        inPanel: el?.closest('#panel') !== null && el !== null,
+        label: el?.textContent ?? ''
+      };
+    });
+    expect(landed.inPanel, 'Tab must not enter a collapsed drawer').toBe(false);
+
+    // Reopening restores reachability.
+    await controlsToggle.focus();
+    await page.keyboard.press('Enter');
+    await expect(controlsToggle).toHaveAttribute('aria-expanded', 'true');
+    expect(
+      await page.evaluate(() => {
+        const panel = document.querySelector('#panel') as
+          (HTMLElement & { inert?: boolean }) | null;
+        return panel?.inert ?? null;
+      })
+    ).toBe(false);
+    expect(errors).toEqual([]);
+  });
+
   test('focus lands on a real element after a destination switch', async ({ page }) => {
     const errors = collectErrors(page);
     await gotoAtlasBlackHole(page);

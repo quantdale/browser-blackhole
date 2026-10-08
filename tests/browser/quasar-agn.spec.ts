@@ -73,6 +73,8 @@ interface AgnSnapshot {
   observerAngleToJetDeg?: unknown;
   lobeBrightnessRatio?: unknown;
   scaleReadout?: { kpcInRg?: unknown };
+  torusVisible?: unknown;
+  volumeWork?: { torus?: { visible?: unknown } };
 }
 
 async function agnSnapshot(page: Page): Promise<AgnSnapshot> {
@@ -135,6 +137,71 @@ test.describe('Quasar/AGN destination', () => {
     expect(snap.grPassActive).toBe(true);
     expect(snap.doubleRenderGuard).toBe('ok');
     expect(await page.evaluate(() => window.__ATLAS_APP__!.captureFrame())).not.toBeNull();
+    expect(errors).toEqual([]);
+  });
+
+  test('the torus is visible exactly when the nuclear zone is active (U-01)', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/quasar-agn?preset=quasar-reference');
+    await waitForArrival(page, 'quasar-agn', 'quasar-reference');
+
+    // Enter the nuclear zone: the torus is a documented, controllable feature
+    // of that zone, so it must actually render there.
+    await page.evaluate((z) => {
+      window.__ATLAS_APP__!.host.setDestinationControl('quasar-agn', { zoom01: z });
+    }, 0.58);
+    await expect
+      .poll(async () => (await agnSnapshot(page)).zone, { timeout: 10_000, intervals: [200] })
+      .toBe('nuclear');
+    let snap = await agnSnapshot(page);
+    expect(snap.torusVisible).toBe(true);
+    // The live volume's own visibility flag must agree with state — the
+    // pre-fix defect left it false while the snapshot reported true.
+    expect(
+      snap.volumeWork?.torus?.visible,
+      'torus volume must be visible in the nuclear zone'
+    ).toBe(true);
+    expect(snap.visibleGroups).toEqual(['nuclear']);
+
+    // Leave and come back: the flag must be re-applied on every zone change,
+    // not only when a control happens to re-run the state push.
+    await page.evaluate((z) => {
+      window.__ATLAS_APP__!.host.setDestinationControl('quasar-agn', { zoom01: z });
+    }, 0.1);
+    await expect
+      .poll(async () => (await agnSnapshot(page)).zone, { timeout: 10_000, intervals: [200] })
+      .toBe('inner');
+
+    await page.evaluate((z) => {
+      window.__ATLAS_APP__!.host.setDestinationControl('quasar-agn', { zoom01: z });
+    }, 0.58);
+    await expect
+      .poll(async () => (await agnSnapshot(page)).zone, { timeout: 10_000, intervals: [200] })
+      .toBe('nuclear');
+    snap = await agnSnapshot(page);
+    expect(snap.volumeWork?.torus?.visible, 'torus must return after re-entering nuclear').toBe(
+      true
+    );
+    expect(errors).toEqual([]);
+  });
+
+  test('a disabled torus stays disabled after zone changes (U-01)', async ({ page }) => {
+    const errors = collectErrors(page);
+    await page.goto('/atlas/quasar-agn?preset=quasar-reference');
+    await waitForArrival(page, 'quasar-agn', 'quasar-reference');
+
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.setDestinationControl('quasar-agn', { torusVisible: false });
+    });
+    await page.evaluate((z) => {
+      window.__ATLAS_APP__!.host.setDestinationControl('quasar-agn', { zoom01: z });
+    }, 0.58);
+    await expect
+      .poll(async () => (await agnSnapshot(page)).zone, { timeout: 10_000, intervals: [200] })
+      .toBe('nuclear');
+    const snap = await agnSnapshot(page);
+    expect(snap.torusVisible).toBe(false);
+    expect(snap.volumeWork?.torus?.visible).toBe(false);
     expect(errors).toEqual([]);
   });
 

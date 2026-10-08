@@ -81,6 +81,14 @@ interface AtlasAppWindowHook {
 }
 
 /**
+ * Build-time test-hook opt-in, injected by `vite.config.ts#define` from
+ * `VITE_ATLAS_TEST_HOOKS=1` (`npm run build:e2e`). A plain `npm run build`
+ * substitutes `false`, so the production bundle carries no `__ATLAS_APP__`
+ * surface at all (U-04).
+ */
+declare const __ATLAS_TEST_HOOKS_OPT_IN__: boolean;
+
+/**
  * Top-bar destination chips are derived from the LAUNCH CATALOG + the live
  * registry (CA8 integration-debt fix). Labels come from registry descriptors;
  * the debug-only Diagnostic chip is appended under Debug mode only.
@@ -214,6 +222,13 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     panelElement.classList.toggle('atlas-panel--collapsed', !panelOpen);
     panelElement.classList.toggle('atlas-panel--open', panelOpen);
     panelToggle.setAttribute('aria-expanded', panelOpen ? 'true' : 'false');
+    // U-10: below 720px the collapsed drawer is translated off-canvas rather
+    // than `display: none` (the transform keeps the slide transition), so it
+    // stays in the accessibility tree and the tab order — a keyboard user tabs
+    // into an invisible panel. `inert` removes it from both without touching
+    // the visual transition, and it is the supported way to express "present
+    // but unreachable".
+    panelElement.inert = !panelOpen;
   };
   panelToggle.addEventListener('click', () => {
     panelOpen = !panelOpen;
@@ -490,6 +505,79 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   const markPanelDirty = (): void => {
     panelSignature = '';
   };
+
+  /**
+   * U-09: `replaceChildren` destroys the focused node, so a destination
+   * switch or a panel rebuild throws keyboard focus to `<body>` and the user
+   * has to walk the whole panel again. Capture a stable identity for the
+   * focused control BEFORE any rebuild, and restore it after, so the same
+   * control keeps focus across a rebuild even though the node is new.
+   *
+   * Identity is (role-bearing tag, type, accessible name) — the same triple
+   * `getByRole(...).name(...)` resolves by. It deliberately does NOT use a
+   * node reference (destroyed) or an index (order can change legitimately).
+   */
+  interface FocusIdentity {
+    readonly tag: string;
+    readonly type: string;
+    readonly name: string;
+  }
+
+  function focusIdentityOf(element: Element | null): FocusIdentity | null {
+    if (element === null) return null;
+    const tag = element.tagName.toLowerCase();
+    // Landmark/structural nodes are not restorable controls; skip them so a
+    // stray focus on a section header does not produce a bogus match.
+    const restorable = ['button', 'input', 'select', 'textarea', 'a'];
+    if (!restorable.includes(tag)) return null;
+    const input = element as HTMLInputElement;
+    const type = typeof input.type === 'string' ? input.type : '';
+    const label = element.getAttribute('aria-label');
+    const labelledBy = element.getAttribute('aria-labelledby');
+    let name = label ?? '';
+    if (name.length === 0 && labelledBy !== null) {
+      const target = document.getElementById(labelledBy);
+      name = target?.textContent?.trim() ?? '';
+    }
+    if (name.length === 0) {
+      const labelled = element.closest('label');
+      name = labelled?.textContent?.trim() ?? '';
+    }
+    if (name.length === 0) name = element.textContent?.trim() ?? '';
+    if (name.length === 0) return null;
+    return { tag, type, name };
+  }
+
+  function elementMatchesIdentity(element: Element, identity: FocusIdentity): boolean {
+    if (element.tagName.toLowerCase() !== identity.tag) return false;
+    const input = element as HTMLInputElement;
+    if (identity.type.length > 0 && input.type !== identity.type) return false;
+    return focusIdentityOf(element)?.name === identity.name;
+  }
+
+  /** Captures the focused control inside `root`, if any. */
+  function captureFocus(root: HTMLElement): FocusIdentity | null {
+    const active = document.activeElement;
+    if (active === null || active === document.body) return null;
+    if (!root.contains(active)) return null;
+    return focusIdentityOf(active);
+  }
+
+  /**
+   * Restores focus to the control matching `identity` anywhere inside `root`,
+   * and only when focus would otherwise be lost (i.e. it is not already inside
+   * `root`). Returns true when focus was restored.
+   */
+  function restoreFocus(root: HTMLElement, identity: FocusIdentity | null): boolean {
+    if (identity === null) return false;
+    const active = document.activeElement;
+    if (active !== null && active !== document.body && root.contains(active)) return false;
+    const candidates = Array.from(root.querySelectorAll('*'));
+    const match = candidates.find((element) => elementMatchesIdentity(element, identity));
+    if (match === undefined) return false;
+    (match as HTMLElement).focus({ preventScroll: true });
+    return true;
+  }
 
   function activeSelection(): { destId: string; presetId: string } {
     const s = host.state.atlas;
@@ -1326,8 +1414,14 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       if (signature !== panelSignature) {
         panelSignature = signature;
         modeSwitch.setValue(host.experienceMode);
+        // U-09: capture focus BEFORE either subtree is rebuilt — `refreshNav()`
+        // destroys the nav chips and `buildPanel()` destroys the panel, so a
+        // capture taken after either one has already seen focus fall to
+        // <body>. Then rebuild both and restore focus to the equivalent control.
+        const focusIdentity = captureFocus(root);
         refreshNav();
         buildPanel();
+        restoreFocus(root, focusIdentity);
       }
       if (transport !== null) {
         transport.setPlaying(!host.time.snapshot().paused);
@@ -1445,12 +1539,25 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     }
     return pts;
   };
+  // Test/inspection hook (mirrors __BLACKHOLE_TEST__ convention from main.ts).
+  // Shape is load-bearing for tests/browser/support/atlasHook.ts — do not change
+  // without updating that declaration and the specs that consume it.
+  //
+  // U-04: this hook hands the whole host — including `forceContinuousRenderForTest()`
+  // and a synchronous framebuffer readback — to any script on the page, so it
+  // must not exist in a production build. Vite replaces
+  // `__ATLAS_TEST_HOOKS_OPT_IN__` with a build-time literal (vite.config.ts);
+  // the eliminated branch is then absent from the shipped bundle. The opt-in is
+  // a BUILD input (`npm run build:e2e`), never a runtime toggle a visitor could
+  // discover or enable.
   const hook: AtlasAppWindowHook = {
     host,
     navigate: (destinationId, presetId) => host.navigate(destinationId, presetId),
     captureFrame
   };
-  (window as unknown as Record<string, unknown>)['__ATLAS_APP__'] = hook;
+  if (import.meta.env.DEV || __ATLAS_TEST_HOOKS_OPT_IN__) {
+    (window as unknown as Record<string, unknown>)['__ATLAS_APP__'] = hook;
+  }
 
   return {
     dispose(): void {
@@ -1467,7 +1574,12 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       window.removeEventListener('pagehide', onPageHide);
       unsubscribeStatus();
       unsubscribeFatal();
-      delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];
+      // Only the guard that installed it removes it: a production build never
+      // had it, and deleting an absent key would be a no-op anyway — but the
+      // explicit guard keeps the two sites provably symmetric (U-04).
+      if (import.meta.env.DEV || __ATLAS_TEST_HOOKS_OPT_IN__) {
+        delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];
+      }
       waveformPanel?.dispose();
       waveformPanel = null;
       host.dispose();

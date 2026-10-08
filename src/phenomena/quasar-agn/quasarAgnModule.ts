@@ -865,6 +865,15 @@ export class QuasarAgnModule implements PhenomenonModule {
     for (const [id, group] of Object.entries(this.groups) as Array<[AgnZoneId, Group]>) {
       group.visible = id === this.activeZone;
     }
+    // U-01: a zone change must also re-apply the per-resource visibility that
+    // `applyStateToResources` writes. Without this, the torus's own flag is
+    // never corrected when the zone machine in `update()` changes
+    // `activeZone`: zooming into the nuclear zone leaves the engine visible
+    // with no torus, while the debug snapshot keeps reporting `torusVisible:
+    // true` from raw state — diagnostics actively contradicting the frame.
+    // Group gating already provides the exclusivity, so the flag itself is a
+    // pure function of `state.torusVisible`.
+    this.applyStateToResources();
   }
 
   /** Push toggles/population scales into live resources (state -> scene). */
