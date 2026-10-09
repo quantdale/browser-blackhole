@@ -1,6 +1,6 @@
 ## 2026-10-09 session — openspec apply: `atlas-terminal-state-visibility` implemented, validated, CLOSED and ARCHIVED
 
-Status: **COMPLETE — committed `bbf66ea`, archived; NOT pushed.** Applied the change
+Status: **COMPLETE — committed `bbf66ea`, archived, and pushed to `origin/main`.** Applied the change
 `openspec/changes/atlas-terminal-state-visibility/` (18/18 tasks). Per-row evidence is in that
 change's `tasks.md` §1–§5; the E-04 probe result that closes it is §4.1–4.3.
 
@@ -94,10 +94,10 @@ Evidence (all on the final tree, msedge 1280x800):
 - `openspec validate atlas-terminal-state-visibility --strict`: **valid**.
 
 **Landed state (close-out).** The change is **committed at `bbf66ea`** — "feat(atlas): implement
-atlas-terminal-state-visibility", main, ahead of `origin/main` by that plus the five earlier
-Phase 1 checkpoints. **It was NOT pushed**: no operator authorization existed in this session,
-and the Phase 1 entries above consistently record "no push". The push decision is recorded
-here, not taken.
+atlas-terminal-state-visibility". The close-out is `8cc9d81`. On 2026-10-09 the operator
+authorized a normal push, and `git push origin main` fast-forwarded `origin/main` from
+`274c591` to `8cc9d81` (the seven local commits, including this change and its archive). Older
+session notes below that say "no push" are historical; they are not the current remote state.
 
 E-04 is no longer an open fix. The gated overlay probe (tasks.md §4) measured device loss in both
 `outgoing` and `hyperspace` and found the terminal card is the topmost element at its own centre,
