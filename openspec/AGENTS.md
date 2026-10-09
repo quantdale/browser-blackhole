@@ -2,18 +2,19 @@
 
 ## Current status
 
-The repository holds 18 change folders: 7 complete archived under `openspec/changes/archive/2026-10-03-*` and 11 active. Of the 11 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, and the remaining ten are nine unfinished hardening changes plus `spatial-atlas-continuous-navigation` (excluded from this campaign). Post-archive at this checkpoint: `--changes --strict` 11 passed / 0 failed, `--specs --strict` 6 passed / 0 failed, `--all --strict` 17 passed / 0 failed. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
+The repository holds 19 change folders: 8 complete archived under `openspec/changes/archive/` and 11 active. Of the 11 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, and the remaining ten are nine unfinished hardening changes plus `spatial-atlas-continuous-navigation` (excluded from this campaign). Post-archive at this checkpoint (after `atlas-terminal-state-visibility` landed at `bbf66ea`): `--changes --strict` 11 passed / 0 failed, `--specs --strict` 7 passed / 0 failed, `--all --strict` 18 passed / 0 failed. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
 
 Baseline correction record: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` supersedes the two erroneous archived cinematic headers (`2fc1b5d` → final restored-scope certified checkpoint `17c4644`) and the Phase 0 state entry's revision/count claims. Active validation/inventory claims must be quoted with command, population and lifecycle stage.
 
 - Phase 0 (complete, checklist-landed 2026-10-03): `specification-baseline-hygiene` (46/46, awaiting archive).
 - Phase 0 review corrections (landed and archived 2026-10-03): `specification-baseline-review-corrections`; erratum at `docs/SPECIFICATION_BASELINE_CORRECTIONS.md`.
-- Phase 1, one writer at a time: `kerr-gpu-initializer-correctness` (owns `src/phenomena/black-hole/{kerr,lut,observer}/**`), then `quality-ladder-resolution-integrity`, then `transition-error-user-visibility`, then `destination-control-truthfulness`.
+- Phase 1, one writer at a time: `kerr-gpu-initializer-correctness` (owns `src/phenomena/black-hole/{kerr,lut,observer}/**`), then `quality-ladder-resolution-integrity`, then `transition-error-user-visibility`, then `destination-control-truthfulness`. Plus `atlas-terminal-state-visibility` (`bbf66ea`), an unplanned follow-on to `transition-error-user-visibility` and `destination-control-truthfulness` that closes the device-loss and slow-load presentation gap those two left; its gated overlay probe (tasks.md §4) showed the suspected occluding-overlay defect does **not** reproduce, so overlay rendering was left unchanged and no golden was re-baselined.
 - Phase 2: `shared-renderer-service-lifecycle` (only after quality-ladder and transition-error land).
 - Phase 3: `verification-gate-integrity`.
 - Phase 4: `benchmark-harness-integrity`.
 - Phase 5: `operations-and-deployment-readiness`, then `documentation-truthfulness-realignment`.
-- Archived, complete: `m12-neutron-star-surface-lensing`, `m12-repository-integrity`, `ca9-galaxy-collision`, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, `whole-atlas-performance-optimization` (complete-with-deferrals).
+- Archived, complete: `m12-neutron-star-surface-lensing`, `m12-repository-integrity`, `ca9-galaxy-collision`, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, `whole-atlas-performance-optimization` (complete-with-deferrals), and `atlas-terminal-state-visibility` (2026-10-09, `bbf66ea`).
+- `shared-renderer-service-lifecycle` (Phase 2) now owns `src/atlas/host.ts`; it must preserve `TransitionPublicState.slowLoad`, the outside-panel device-loss card, and that card's reload-only action set. See the preservation note in `openspec/changes/destination-control-truthfulness/tasks.md` and the newest `.agent/STATE.md` section.
 - Not started: `spatial-atlas-continuous-navigation` (0/123; do not implement in this campaign).
 
 Restarting M0–M12, CA9, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, or `whole-atlas-performance-optimization` is a defect.

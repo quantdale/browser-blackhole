@@ -1,3 +1,10 @@
+# Proposal — Atlas terminal state visibility
+
+Change ID: `atlas-terminal-state-visibility`
+Status: **COMPLETE — implemented at `bbf66ea` and archived.** All 18 tasks closed with evidence
+in `tasks.md` §1–§5; the capability is now the baseline spec
+`openspec/specs/atlas-terminal-state-visibility/spec.md`. Corrections land in a new change.
+
 ## Why
 
 A lost graphics device and a slow destination open can still leave the user looking at a frozen canvas with no explanation. Transition failures already have an alert outside the collapsible panel. Device loss does not: the shell writes a status string into `#panel`, which is rebuilt on every destination change and removed from the accessibility tree when collapsed. Slow-load events are emitted by the transition director and then ignored, so the user gets no "still opening" state before a stall becomes an error. A device loss during the outgoing overlay is also an unverified way to freeze that overlay opaque.

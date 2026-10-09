@@ -1,7 +1,8 @@
-## 2026-10-09 session — openspec apply: `atlas-terminal-state-visibility` implemented, validated and CLOSED
+## 2026-10-09 session — openspec apply: `atlas-terminal-state-visibility` implemented, validated, CLOSED and ARCHIVED
 
-Status: **COMPLETE.** Applied the change `openspec/changes/atlas-terminal-state-visibility/`
-(18/18 tasks). Per-row evidence is in that change's `tasks.md` §1–§5.
+Status: **COMPLETE — committed `bbf66ea`, archived; NOT pushed.** Applied the change
+`openspec/changes/atlas-terminal-state-visibility/` (18/18 tasks). Per-row evidence is in that
+change's `tasks.md` §1–§5; the E-04 probe result that closes it is §4.1–4.3.
 
 This was a **native-continuation apply**, not a resumed planner campaign:
 `.agent/EXECUTION_PROMPT.md` is `COMPLETED AND SUPERSEDED` (successors
@@ -92,9 +93,36 @@ Evidence (all on the final tree, msedge 1280x800):
   same 14 rows in 2.8 s instead of 12 s, and no longer load-dependent.
 - `openspec validate atlas-terminal-state-visibility --strict`: **valid**.
 
-Next action: commit this change as one coherent checkpoint. No push from this
-session (consistent with the Phase 1 entries above). The next Phase 2 change,
-`shared-renderer-service-lifecycle`, now owns `src/atlas/host.ts`.
+**Landed state (close-out).** The change is **committed at `bbf66ea`** — "feat(atlas): implement
+atlas-terminal-state-visibility", main, ahead of `origin/main` by that plus the five earlier
+Phase 1 checkpoints. **It was NOT pushed**: no operator authorization existed in this session,
+and the Phase 1 entries above consistently record "no push". The push decision is recorded
+here, not taken.
+
+E-04 is no longer an open fix. The gated overlay probe (tasks.md §4) measured device loss in both
+`outgoing` and `hyperspace` and found the terminal card is the topmost element at its own centre,
+outside `#panel` and outside any inert subtree, in each — the held overlay draws under the DOM
+surface and never covers it. Overlay rendering was intentionally left unchanged; nothing was
+re-implemented and no golden was re-baselined.
+
+**Next live lane:** the remaining `destination-control-truthfulness` tasks — **U-02, U-03,
+U-05…U-19** (Neutron-Star inclination binding, the fidelity note, the share/control-reflection
+family, the focus/aria rows, the smaller confirmed fixes) — then `shared-renderer-service-lifecycle`
+(R-01…R-12).
+
+**What Phase 2 must preserve.** `shared-renderer-service-lifecycle` now owns `src/atlas/host.ts`
+and may rewrite the renderer/kernel services this change leans on, so these three properties are
+contractual, not incidental:
+
+1. `TransitionPublicState.slowLoad` must remain the channel the shell reads for the slow-open
+   notice. The whole point of the notice is that it rides the existing transition snapshot on the
+   tick the shell already runs — no second status bus, no private-director polling. Replacing it
+   with an event-only path would regress a panel rebuild.
+2. The terminal device-loss card must stay in the outside-panel `.atlas-alert-region` and must not
+   be cleared when `transition.error` is null. That guard (`deviceLossTerminalActive`) is what
+   survives a post-loss navigation; removing it hands the user a frozen canvas with no
+   explanation.
+3. The device-loss card must keep reload as its only action, with no dismiss.
 
 ---
 

@@ -9,6 +9,25 @@
 > on the observer presets, a documentation change touching the Fidelity contract, or a distinct
 > control-reflection refactor that deserves its own campaign rather than being folded in here.
 > See `.agent/STATE.md` for the delivered evidence.
+>
+> **Preservation note (2026-10-09) — from the archived `atlas-terminal-state-visibility`.**
+> The remaining `src/app/atlasApp.ts` work in this change (U-02, U-03, U-05…U-19, notably the
+> control-reflection refactor in 5.1–5.2 which moves destination-control reflection from build time
+> into the interface tick, and the U-09 focus-restore work in 6.x) rebuilds `#panel` wholesale.
+> That is exactly the path the session-terminal surfaces were placed outside of, so any remaining
+> `atlasApp.ts` edit MUST:
+>
+> 1. keep `.atlas-alert-region` and `.atlas-slowprep` **outside `#panel`**. They are created once as
+>    siblings of the panel and are the only surfaces that survive a collapse, a rebuild and an
+>    `inert` drawer. Moving either one into `#panel` re-creates the defect both changes exist to fix.
+> 2. NOT clear the device-loss card when `transition.error` is null. The `deviceLossTerminalActive`
+>    guard is what makes the card survive a post-loss navigation (whose public state reads null);
+>    clearing on null hands the user a frozen canvas with no explanation.
+> 3. NOT add a **Dismiss** action to the device-loss card. Dismissing the only explanation returns
+>    the user to the frozen canvas; reload must remain its sole action.
+>
+> U-09's focus restore must also leave focus-identity capture scoped to the shell root, since the
+> card and the notice are part of that same subtree.
 
 ## 0. Baseline
 

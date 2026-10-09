@@ -1,6 +1,6 @@
 # Tasks — Atlas terminal state visibility
 
-> **Status (2026-10-09).** Sections 1–4 implemented and validated; §5 evidence is below.
+> **Status: COMPLETE — all 18 tasks closed, implemented at `bbf66ea`, archived.** Evidence below.
 > The file-ownership gates in §1 were confirmed BEFORE any edit: the
 > `destination-control-truthfulness` scoped slice had landed (`87deee3`, close-out
 > `661f6d5`) so `src/app/atlasApp.ts` was free, and `shared-renderer-service-lifecycle`
@@ -94,7 +94,7 @@
   `host.simulateDeviceLoss()` the instant the target phase opens, so no round-trip
   latency lets the phase advance past the window. Measured the presented frame
   (16×16 grid over `#viewport`), `destinationOccluded`, and the DOM state of the
-  terminal card. **Recorded result — the OCRUSION SUSPICION IS NOT REPRODUCED:**
+  terminal card. **Recorded result — the OCCLUSION SUSPICION IS NOT REPRODUCED:**
   - `outgoing`: `destinationOccluded=false`, presented frame 972×727,
     near-black fraction 0.50, 69 distinct colours; `alertRegionVisible=true`,
     `alertInsidePanel=false`, `alertInInertSubtree=false`, and

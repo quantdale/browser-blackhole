@@ -36,6 +36,20 @@ interface Harness {
   settlePrepare(payload?: unknown, error?: unknown): void;
   /** Advance the director by `ms` of REAL time (the stall gate reads the wall clock). */
   tick(ms: number): Promise<void>;
+  /**
+   * Report progress and advance the frame in ONE step — no wall-clock gap
+   * between them.
+   *
+   * The stall gate reads `performance.now()`, so `reportProgress` then `await
+   * tick()` lets a loaded host inflate the setTimeout gap past the stall window
+   * and abort a preparation that is genuinely progressing: the interruption is
+   * an artifact of the test's timing, not of the machine. Reporting and ticking
+   * atomically is a valid production pattern (every prepare step reports before
+   * it yields), and it makes the "progressing preparations are never aborted"
+   * row deterministic instead of load-dependent.
+   */
+  tickWithProgress(fraction01: number, label?: string): void;
+
   /** Directly invoke the newest prepare request's progress reporter. */
   reportProgress(fraction01: number, label?: string): void;
   /** The newest prepare request the director issued. */
@@ -181,6 +195,12 @@ function createHarness(
       await new Promise((resolve) => setTimeout(resolve, ms));
       director.update(ms / 1000);
     },
+    tickWithProgress(fraction01, label) {
+      // Report FIRST so the stall clock is armed at this instant, then advance
+      // the frame with no wall-clock sleep between the two.
+      this.reportProgress(fraction01, label);
+      director.update(0.01);
+    },
     reportProgress(fraction01, label) {
       pending[pending.length - 1]?.request.reportProgress(fraction01, label);
     },
@@ -311,11 +331,11 @@ describe('preparation stall gate', () => {
     const h = createHarness({ slowLoadThresholdMs: SLOW, stallThresholdMs: STALL });
     h.director.requestTransition({ destinationId: DESTINATION_ID });
 
-    // A strictly increasing finite fraction every tick — inside the window —
-    // for far longer than the stall duration would allow.
+    // A strictly increasing finite fraction on every tick — inside the window
+    // — for far longer than the stall duration would allow. Reported and
+    // ticked atomically so host load cannot inflate the gap past the window.
     for (let i = 1; i <= 60; i += 1) {
-      h.reportProgress(i / 100, `step ${i}`);
-      await h.tick(TICK);
+      h.tickWithProgress(i / 100, `step ${i}`);
     }
 
     const state = h.director.getPublicState();
@@ -377,8 +397,15 @@ describe('preparation stall gate', () => {
  */
 describe('slow-preparation notice', () => {
   const SLOW = 5;
-  const STALL = 200;
   const TICK = 10;
+  // Generous stall window: these rows observe the NOTICE, and the stall gate
+  // would clear it. The window only has to outlive the setup ticks, but it is
+  // read from the WALL clock, so under host load a tight window (e.g. 200 ms
+  // with 3 real 10 ms sleeps) can expire mid-setup and turn the row into a
+  // stall test. The slow-load threshold is frame-delta based (10 ms per tick),
+  // so one tick already crosses SLOW — the window can therefore be large
+  // without changing what the row measures.
+  const STALL = 5000;
 
   it('names the destination once preparation passes the slow-load threshold', async () => {
     const h = createHarness({ slowLoadThresholdMs: SLOW, stallThresholdMs: STALL });
