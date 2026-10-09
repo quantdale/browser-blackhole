@@ -14,6 +14,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 1b | `quality-ladder-resolution-integrity` | **complete** (`274c591`, close-out `e364437`) — A-01…A-06 struck |
 | 1c | `transition-error-user-visibility` | **complete** (2026-10-09) — E-01, E-02, E-03, E-05 struck; E-04 remains open |
 | 1d | `destination-control-truthfulness` | **scoped slice complete** (`87deee3`, 2026-10-09) — U-01, U-04, U-09, U-10 struck; U-02, U-03, U-05…U-19 remain scoped in the change |
+| 1d+ | `atlas-terminal-state-visibility` | **complete** (2026-10-09) — unplanned follow-on to 1c/1d; closes the device-loss and slow-load presentation gap that `transition-error-user-visibility` did not cover. Overlay suspicion probed and **not** reproduced (§4 of its `tasks.md`); overlay rendering unchanged. |
 | 2 | `shared-renderer-service-lifecycle` | pending (starts only after 1b and 1c) — R-01…R-12 in scope |
 | 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
 | 4 | `benchmark-harness-integrity` | pending — B-01…B-07 in scope |
@@ -41,6 +42,12 @@ Executable OpenSpec changes implementing this plan live under `openspec/changes/
 is the canonical **why/what/order** record; the OpenSpec changes are the canonical **behavioural
 contracts and task lists**. Where the two disagree, the OpenSpec change artifacts win for behaviour
 and this document wins for priority and sequencing.
+
+**Amendment (2026-10-09).** `atlas-terminal-state-visibility` was implemented as a
+follow-on to Phase 1 changes 1c/1d, not as part of the original plan text. Its
+scope, file ownership and gated overlay probe are recorded in its own change
+artifacts; the probe found the suspected occluding-overlay defect **does not
+reproduce**, so no overlay rendering changed and no golden was re-baselined.
 
 ---
 

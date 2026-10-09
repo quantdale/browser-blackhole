@@ -40,6 +40,17 @@ interface Harness {
   reportProgress(fraction01: number, label?: string): void;
   /** The newest prepare request the director issued. */
   lastRequest(): TransitionPrepareRequest | null;
+  /**
+   * Drive the motion phases (outgoing/hyperspace/arriving) to completion.
+   *
+   * Pumps `update()` directly instead of sleeping real time: nothing in the
+   * post-prepare phases reads the wall clock (`checkPrepareStall` only runs in
+   * `preparing`), so a real sleep per frame is pure overhead — it made these
+   * rows slower under load and pushed them past the default 5s budget (~6.4s
+   * of sleeps for ~2.3s of deterministic frames). Microtasks are yielded each
+   * frame so the async activation and occlusion-handoff continuations land.
+   */
+  pumpMotion(): Promise<void>;
 }
 
 const DESTINATION_ID: DestinationId = 'galaxy-collision';
@@ -175,6 +186,12 @@ function createHarness(
     },
     lastRequest() {
       return pending[pending.length - 1]?.request ?? null;
+    },
+    async pumpMotion() {
+      for (let i = 0; i < 600 && director.getPublicState().active; i += 1) {
+        director.update(0.016);
+        await Promise.resolve();
+      }
     }
   };
 }
@@ -240,10 +257,7 @@ describe('transition error publication', () => {
     await Promise.resolve();
 
     // Drive the motion phases to completion.
-    for (let i = 0; i < 400 && h.director.getPublicState().active; i += 1) {
-      await h.tick(16);
-      await Promise.resolve();
-    }
+    await h.pumpMotion();
     expect(h.director.getPublicState().active).toBe(false);
     expect(h.director.getPublicState().error).toBeNull();
   });
@@ -348,5 +362,82 @@ describe('preparation stall gate', () => {
     }
 
     expect(h.director.getPublicState().error?.code).toBe('TRANSITION_STALLED');
+  });
+});
+
+/**
+ * atlas-terminal-state-visibility — the slow-preparation notice.
+ *
+ * The user must be told a destination is still opening BEFORE the stall gate
+ * turns a true hang into a failure. The notice is public state (the shell
+ * reads it on the tick it already runs, so no second status bus), it names the
+ * destination being opened, and it must never outlive the attempt it
+ * describes: not past a successful arrival, not past a newer request, and not
+ * alongside a published failure.
+ */
+describe('slow-preparation notice', () => {
+  const SLOW = 5;
+  const STALL = 200;
+  const TICK = 10;
+
+  it('names the destination once preparation passes the slow-load threshold', async () => {
+    const h = createHarness({ slowLoadThresholdMs: SLOW, stallThresholdMs: STALL });
+    h.director.requestTransition({ destinationId: DESTINATION_ID });
+
+    // A fast-open preparation must not nag: nothing is shown yet.
+    expect(h.director.getPublicState().slowLoad).toBeNull();
+
+    for (let i = 0; i < 3; i += 1) await h.tick(TICK);
+
+    const notice = h.director.getPublicState().slowLoad;
+    expect(notice).not.toBeNull();
+    expect(notice?.destinationId).toBe('galaxy-collision');
+    expect(notice?.destinationTitle).toBe('Galaxy Collision');
+    // A slow open is not a failure, so no error is published with it.
+    expect(h.director.getPublicState().error).toBeNull();
+  });
+
+  it('follows a newer request instead of naming the superseded destination', async () => {
+    const h = createHarness({ slowLoadThresholdMs: SLOW, stallThresholdMs: STALL });
+    h.director.requestTransition({ destinationId: DESTINATION_ID });
+    for (let i = 0; i < 3; i += 1) await h.tick(TICK);
+    expect(h.director.getPublicState().slowLoad?.destinationId).toBe('galaxy-collision');
+
+    h.director.requestTransition({ destinationId: 'neutron-star' });
+
+    // The notice names the request that was CURRENT when it fired, so it must
+    // not survive the retarget.
+    expect(h.director.getPublicState().slowLoad).toBeNull();
+  });
+
+  it('is replaced by a published failure rather than competing with it', async () => {
+    const h = createHarness({ slowLoadThresholdMs: SLOW, stallThresholdMs: STALL });
+    h.director.requestTransition({ destinationId: DESTINATION_ID });
+    for (let i = 0; i < 3; i += 1) await h.tick(TICK);
+    expect(h.director.getPublicState().slowLoad).not.toBeNull();
+
+    h.settlePrepare(undefined, new Error('manifest fetch failed: 404'));
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+
+    const state = h.director.getPublicState();
+    expect(state.error?.code).toBe('TRANSITION_PREPARE_FAILED');
+    // Two competing explanations of the same wait would be worse than either.
+    expect(state.slowLoad).toBeNull();
+  });
+
+  it('is cleared when the destination becomes interactive', async () => {
+    const h = createHarness({ slowLoadThresholdMs: SLOW, stallThresholdMs: STALL });
+    h.director.requestTransition({ destinationId: DESTINATION_ID });
+    for (let i = 0; i < 3; i += 1) await h.tick(TICK);
+    expect(h.director.getPublicState().slowLoad).not.toBeNull();
+
+    h.settlePrepare();
+    for (let i = 0; i < 4; i += 1) await Promise.resolve();
+    await h.pumpMotion();
+
+    const state = h.director.getPublicState();
+    expect(state.active).toBe(false);
+    // The destination exists and is interactive: "still opening" would be a lie.
+    expect(state.slowLoad).toBeNull();
   });
 });

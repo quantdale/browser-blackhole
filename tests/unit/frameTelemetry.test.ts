@@ -102,7 +102,8 @@ describe('debug inventory telemetry transport', () => {
       phase: null,
       progress: 0,
       destinationOccluded: false,
-      error: null
+      error: null,
+      slowLoad: null
     },
     volume: {
       liveVolumes: 2,

@@ -838,12 +838,12 @@
 }
 
 /* --- failure surfaces (atlas-error-reporting) ---------------------------------
-   Two user-visible failure surfaces live here, both OUTSIDE the collapsible
-   panel so a collapse cannot hide them and a panel rebuild cannot destroy
-   them:
+   Three user-visible surfaces live here, all OUTSIDE the collapsible panel so a
+   collapse cannot hide them and a panel rebuild cannot destroy them:
      .atlas-terminal    boot failure (no render backend) — blocking card;
-     .atlas-alert-region transition failure — non-blocking banner.
-   Both are absolutely positioned and therefore cannot perturb the pinned shell
+     .atlas-alert-region transition failure AND terminal device loss;
+     .atlas-slowprep    a slow destination open — a notice, not an error.
+   All are absolutely positioned and therefore cannot perturb the pinned shell
    geometry (topbar height, viewport, panel width) that the goldens depend on. */
 
 .atlas-terminal {
@@ -973,6 +973,57 @@
     right: var(--sp-4);
     bottom: auto;
     top: var(--sp-4);
+    max-width: none;
+  }
+}
+
+/* Slow-preparation notice (atlas-terminal-state-visibility). A polite status,
+   not an alert: the open is still in progress, the previous view stays
+   available, and the stall gate is what turns a real hang into a failure.
+   Anchored top-right so it cannot collide with the bottom-anchored failure
+   banner; absolutely positioned so showing it never moves the chrome. */
+.atlas-slowprep {
+  position: absolute;
+  right: var(--sp-6);
+  top: var(--sp-6);
+  z-index: 30;
+  max-width: min(38ch, calc(100% - 2 * var(--sp-6)));
+  pointer-events: none;
+}
+
+.atlas-slowprep[hidden] {
+  display: none;
+}
+
+.atlas-slowprep-card {
+  padding: var(--sp-4) var(--sp-5);
+  background: var(--surface-float);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-3);
+  box-shadow: var(--shadow-2);
+}
+
+.atlas-slowprep-title {
+  margin: 0 0 var(--sp-1);
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  letter-spacing: var(--tracking-tight);
+  color: var(--text);
+}
+
+.atlas-slowprep-body {
+  margin: 0;
+  font-size: var(--fs-xs);
+  line-height: var(--lh-body);
+  color: var(--text-2);
+}
+
+@media (max-width: 720px) {
+  .atlas-slowprep {
+    left: var(--sp-4);
+    right: var(--sp-4);
+    top: calc(var(--sp-4) + 88px);
     max-width: none;
   }
 }

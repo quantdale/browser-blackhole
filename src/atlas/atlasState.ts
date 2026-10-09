@@ -164,7 +164,9 @@ export function createDefaultAtlasState(
         phase: null,
         progress: 0,
         destinationOccluded: false,
-        error: null
+        error: null,
+        // A canonical/persisted state has no preparation in flight.
+        slowLoad: null
       }
     },
     sharedVisual: {
@@ -290,8 +292,11 @@ export function validateAtlasState(
     destinationOccluded: transitionActive && transitionPhase === 'hyperspace',
     // A published failure is runtime-only and deliberately not serialized:
     // share/restore state never carries an error, so a restored state always
-    // deserializes as healthy (atlas-error-reporting).
-    error: null
+    // deserializes as healthy (atlas-error-reporting). The slow-preparation
+    // notice is runtime-only for the same reason: a restored state has no
+    // preparation in flight (atlas-terminal-state-visibility).
+    error: null,
+    slowLoad: null
   };
 
   // --- sharedVisual ----------------------------------------------------------
@@ -534,7 +539,8 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
         phase: null,
         progress: 0,
         destinationOccluded: false,
-        error: null
+        error: null,
+        slowLoad: null
       }
     };
   }

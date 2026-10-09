@@ -67,7 +67,8 @@ import type {
   TransitionErrorCode,
   TransitionPhase,
   TransitionPublicState,
-  TransitionRuntimeState
+  TransitionRuntimeState,
+  TransitionSlowLoadNotice
 } from './types';
 import { TRANSITION_ERROR_CODES } from './types.js';
 import type { ResourceManager } from './ResourceManager';
@@ -262,6 +263,13 @@ export class TransitionDirector {
    * (E-01/E-02); cleared by a successful completion and a new request.
    */
   private publicError: TransitionError | null = null;
+  /**
+   * In-progress slow preparation (atlas-terminal-state-visibility). Set when
+   * the preparation passes the slow-load threshold, cleared by a successful
+   * arrival, a newer request, or a published error — the same lifecycle as
+   * `publicError`, because a failure is the surface that replaces it.
+   */
+  private slowLoadNotice: TransitionSlowLoadNotice | null = null;
   private reducedMotion = false;
   private outgoingSnapshot: Texture | null = null;
 
@@ -371,7 +379,12 @@ export class TransitionDirector {
       // Published so the shell can render a failure without reaching into
       // director internals (E-01). Event-only delivery is not enough: an event
       // fires once and is not replayed on a panel rebuild.
-      error: this.publicError
+      error: this.publicError,
+      // Same reasoning for the slow-preparation notice
+      // (atlas-terminal-state-visibility): the shell reads it on the tick it
+      // already runs, so a panel rebuild cannot lose it and the notice cannot
+      // outlive the attempt it describes.
+      slowLoad: this.slowLoadNotice
     };
   }
 
@@ -478,8 +491,12 @@ export class TransitionDirector {
     this.latestProgress = null;
     this.error = null;
     // A new attempt supersedes any published failure: the banner must not
-    // outlive the request that replaced it (atlas-error-reporting).
+    // outlive the request that replaced it (atlas-error-reporting). The
+    // slow-preparation notice follows the same rule — it names the request
+    // that was current when it fired, and must not keep naming a superseded
+    // destination.
     this.publicError = null;
+    this.slowLoadNotice = null;
     this.stalledGeneration = null;
 
     let resolved: { descriptor: PhenomenonDescriptor; preset: PresetDescriptor };
@@ -756,6 +773,14 @@ writeFileSync(TARGET, s, 'utf8');
       return;
     }
     this.lastSlowLoadAtMs = this.prepareElapsedMs;
+    // `targetId` is only null outside a preparing phase, and this method runs
+    // only inside one; the guard keeps the field honest instead of asserting.
+    if (this.targetId !== null) {
+      this.slowLoadNotice = {
+        destinationId: this.targetId,
+        destinationTitle: this.targetTitle
+      };
+    }
     this.emitStatus({
       kind: 'slow-load',
       message: `Preparing ${this.targetTitle}…`,
@@ -946,7 +971,10 @@ writeFileSync(TARGET, s, 'utf8');
     this.error = null;
     // A successful arrival clears any previously published failure
     // (atlas-error-reporting: a successful transition clears a previous error).
+    // It also clears the slow-preparation notice: the destination is now
+    // interactive, so "still opening" would be a lie.
     this.publicError = null;
+    this.slowLoadNotice = null;
     this.travelSpeed = 0;
     this.lastOverlayOpacity = 0;
     this.phase = 'idle';
@@ -1076,6 +1104,8 @@ writeFileSync(TARGET, s, 'utf8');
     this.targetTitle = '';
     this.minimumReady = false;
     this.latestProgress = null;
+    // Cancelled: there is nothing left to wait for.
+    this.slowLoadNotice = null;
     this.emitPhase();
   }
 
@@ -1157,6 +1187,9 @@ writeFileSync(TARGET, s, 'utf8');
       destinationId: options.destinationId,
       fatal: options.fatal
     };
+    // A published failure is the actionable surface. Two competing explanations
+    // of the same wait would be worse than either alone.
+    this.slowLoadNotice = null;
     const event: TransitionErrorEvent = {
       message: options.message,
       destinationId: options.destinationId,

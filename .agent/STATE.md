@@ -1,3 +1,103 @@
+## 2026-10-09 session — openspec apply: `atlas-terminal-state-visibility` implemented, validated and CLOSED
+
+Status: **COMPLETE.** Applied the change `openspec/changes/atlas-terminal-state-visibility/`
+(18/18 tasks). Per-row evidence is in that change's `tasks.md` §1–§5.
+
+This was a **native-continuation apply**, not a resumed planner campaign:
+`.agent/EXECUTION_PROMPT.md` is `COMPLETED AND SUPERSEDED` (successors
+`docs/MASTER_PLAN.md` + `.agent/START_HERE.md`), so per `.agent/PLANNER_HANDOFF.md`
+the native continuation semantics applied and the assigned change was the one whose
+artifacts were complete and unchecked — the OpenSpec change artifacts.
+
+**Ownership gates were verified before any edit** (tasks.md §1): the
+`destination-control-truthfulness` scoped slice had landed (`87deee3`, close-out
+`661f6d5`) so `src/app/atlasApp.ts` was free; `shared-renderer-service-lifecycle`
+was at 0/59 tasks and therefore not an active writer of `src/atlas/host.ts` or
+`TransitionDirector.ts`. Both files were taken directly rather than deferring to a
+shell-only half.
+
+**What the user-visible defects were.** A lost graphics device and a slow destination
+open left the user looking at a frozen canvas with no explanation:
+
+1. **Device loss.** The shell's only presentation was a status string written into
+   `#panel` — the panel is rebuilt on every destination change and set `inert`
+   when collapsed, so the terminal fact was unreachable exactly when the user most
+   needed it. `buildUnsupportedMessage` already had authored `GPU_DEVICE_LOST` copy
+   with zero product callers on the post-boot loss path.
+2. **Slow open.** The director emitted `slow-load` status; `host.ts` subscribed to
+   `onStatus` and handled only `route-commit`, so the event was dropped. The shell
+   never read it, and the user got no "still opening" state before a stall became
+   an error.
+
+Implemented:
+
+- **Terminal surface (tasks §2).** `renderDeviceLossTerminal()` renders the fatal
+  card in the existing outside-panel `.atlas-alert-region` from the single `onFatal`
+  subscription, using `buildUnsupportedMessage(backend, 'GPU_DEVICE_LOST')` — the
+  same authored vocabulary the boot failure uses, not a second one. Reload is the
+  only action; there is deliberately no dismiss, because dismissing the only
+  explanation returns the user to the frozen canvas this change exists to prevent.
+  It sets `deviceLossTerminalActive`, which is what stops the UI tick from clearing
+  the surface when the published transition error later reads `null` — the state a
+  post-loss navigation leaves behind. The `.atlas-status` mirror is kept unchanged.
+- **Slow-preparation notice (tasks §3).** The director publishes
+  `TransitionPublicState.slowLoad` (set in `maybeEmitSlowLoad()`, cleared wherever
+  `publicError` clears plus on completion and cancel), and the shell renders it as a
+  separate absolutely-positioned `role="status"` region, hidden by default, sibling
+  of the alert region and outside `#panel`. It is hidden in the same tick as a
+  published error or a device-loss alert. `host.ts`'s existing `onStatus`
+  subscription now handles `slow-load` instead of dropping it, keeping the
+  debug-diagnostics console line. **No second status bus was added** and no private
+  director field is polled.
+- **Overlay suspicion — probed, and NOT reproduced (tasks §4).** This is the
+  interesting result. `renderOverlay` returns early on a null renderer, holding the
+  last valid overlay texture, and a loss during `outgoing`/`hyperspace` therefore
+  freezes a mid-transition frame. Measured in both phases with an in-page rAF
+  watcher that injects the loss the instant the phase opens (no round-trip latency
+  to let the window pass):
+  - `outgoing`: `destinationOccluded=false`, near-black 0.50, 69 distinct colours;
+    `elementFromPoint(card centre)` → **`atlas-alert-body`**.
+  - `hyperspace`: `destinationOccluded=true` (opaque by design there), near-black
+    0.04, 240 distinct colours; the card is again the topmost element at its own
+    centre, outside `#panel`, outside any inert subtree.
+  In both phases the held overlay never covers the terminal surface. So **overlay
+  rendering was left unchanged** — no fix was applied to a defect that does not
+  reproduce, and no golden was disturbed by it. The negative result is recorded in
+  the change's `tasks.md` and pinned by two permanent rows that would fail if a
+  later change buried the card under the canvas or moved it into the panel.
+
+Evidence (all on the final tree, msedge 1280x800):
+
+- **Fail-first, both directions.** Before implementation the three terminal-surface
+  rows failed with `element(s) not found` for `.atlas-alert` — the card did not exist
+  in the DOM at all — while the three pre-existing M11-03 rows passed. After the
+  device-loss card landed, disabling only the slow-prep rendering failed all three
+  slow-preparation rows. Unit: stubbing the `getPublicState()` publication failed
+  4/4 new `slow-preparation notice` rows while the 10 pre-existing rows passed.
+- `npm run check`: **exit 0** — format, lint, typecheck, **55 files / 681 unit
+  tests**, build, production test-hook gate.
+- `device-loss.spec.ts`: **8/8** (3 pre-existing + 3 terminal + 2 overlay).
+- `atlas-navigation accessibility mobile-touch slow-preparation production-hygiene
+  --project=default --workers=1`: **31/31 passed (3.9m)** — every pre-existing
+  transition-failure row, the collapsed-panel failure row, the mobile drawer row,
+  and both U-04 hygiene rows pass unchanged.
+- `visual-goldens --project=default --workers=1`: **43/43 passed (6.8m)**, no
+  re-baselining. `cinematic-goldens` deliberately not run (no overlay/motion code
+  changed; see tasks.md 5.3).
+- One pre-existing test defect repaired on the way: the real-time frame loop in
+  `transitionFailurePublication.test.ts` awaited ~400 × 16 ms of sleeps (~6.4 s)
+  against a 5 s default budget and failed under the extra full-suite load this
+  change introduced. Nothing in the post-prepare phases reads the wall clock, so
+  the loop now pumps `update()` through a new deterministic `pumpMotion()` helper —
+  same 14 rows in 2.8 s instead of 12 s, and no longer load-dependent.
+- `openspec validate atlas-terminal-state-visibility --strict`: **valid**.
+
+Next action: commit this change as one coherent checkpoint. No push from this
+session (consistent with the Phase 1 entries above). The next Phase 2 change,
+`shared-renderer-service-lifecycle`, now owns `src/atlas/host.ts`.
+
+---
+
 ## 2026-10-09 session — Phase 1 change 4: destination-control-truthfulness (U-01, U-04, U-09, U-10) IN PROGRESS
 
 Status: **implemented and locally validated; full non-golden suite running.**

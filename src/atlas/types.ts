@@ -1012,6 +1012,19 @@ export interface TransitionError {
   fatal: boolean;
 }
 
+/**
+ * A destination preparation that is still progressing but has passed the
+ * product's slow-load threshold. Published as part of the public state so the
+ * shell can say "still opening" BEFORE the stall gate turns a true hang into a
+ * failure, without the shell needing any director internals.
+ */
+export interface TransitionSlowLoadNotice {
+  /** Destination being opened, so the notice names it rather than showing a spinner. */
+  destinationId: DestinationId;
+  /** Destination title as shown in navigation, for display copy. */
+  destinationTitle: string;
+}
+
 export interface TransitionPublicState {
   active: boolean;
   phase: TransitionPhase | null;
@@ -1023,6 +1036,13 @@ export interface TransitionPublicState {
    * successful transition completion and by a new transition request.
    */
   error: TransitionError | null;
+  /**
+   * In-progress slow preparation, or null when nothing is slow. Cleared by a
+   * successful arrival, by a newer navigation request, and by a published
+   * transition error — a published failure is the actionable surface and must
+   * not compete with this notice.
+   */
+  slowLoad: TransitionSlowLoadNotice | null;
 }
 
 export interface AtlasCameraPublicState {

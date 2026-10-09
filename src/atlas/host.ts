@@ -508,6 +508,19 @@ export class CosmicAtlasHost {
         const selection = this.navigation.getSelection();
         this.navigation.commitRoute(event.destinationId, selection?.presetId);
       }
+      // atlas-terminal-state-visibility: `slow-load` was previously DROPPED
+      // here, so the emitted event never reached anything the user could see.
+      // The director already publishes the same fact on its public state
+      // (`transition.slowLoad`), which is the status/state channel the shell
+      // already reads every UI tick — so it is forwarded there and NOT
+      // re-broadcast on a second bus. This arm keeps the console diagnostic
+      // that was the previous (only) handling.
+      if (event.kind === 'slow-load' && this.diagnosticsEnabledValue) {
+        console.info(
+          `[CosmicAtlasHost] slow preparation: ${event.message}` +
+            (event.detailLabel === null ? '' : ` (${event.detailLabel})`)
+        );
+      }
     });
     this.director.onError((event) => {
       // A page that is unloading cancels its own in-flight module fetches;

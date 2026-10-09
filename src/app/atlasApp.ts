@@ -302,6 +302,28 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   };
   content.append(terminal);
 
+  // --- slow-preparation notice (atlas-terminal-state-visibility) --------------
+  // A destination that is merely SLOW must say so before the stall gate turns a
+  // true hang into a failure. This is a different thing from an error, so it
+  // gets its own polite `role="status"` region rather than borrowing the
+  // assertive failure channel — announcing "still opening" as an alert would
+  // cry wolf. It is absolutely positioned and hidden by default, so it cannot
+  // move the pinned shell geometry, and it sits outside `#panel` for the same
+  // collapse/rebuild reasons as the alert region.
+  const slowPrepRegion = document.createElement('div');
+  slowPrepRegion.className = 'atlas-slowprep';
+  slowPrepRegion.setAttribute('role', 'status');
+  slowPrepRegion.hidden = true;
+  /** Destination the notice currently names; null when nothing is shown. */
+  let slowPrepDestination: string | null = null;
+
+  const hideSlowPreparationNotice = (): void => {
+    slowPrepDestination = null;
+    slowPrepRegion.replaceChildren();
+    slowPrepRegion.hidden = true;
+  };
+  content.append(slowPrepRegion);
+
   // --- transition failure surface (atlas-error-reporting) ---------------------
   // A failed destination preparation MUST reach the user, not only the console
   // (E-01). Deliberately NOT a child of `#panel`: the panel is collapsible and
@@ -320,6 +342,14 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   let dismissedAlertSignature: string | null = null;
   /** Destination to re-request when the user retries. */
   let alertDestinationId: string | null = null;
+  /**
+   * atlas-terminal-state-visibility: true once the session-terminal device-loss
+   * card is on screen. A lost device cannot be dismissed or retried — the only
+   * exit is a reload — so the machine must never clear this surface for the
+   * rest of the document's life, including when a navigation after the loss
+   * moves the selection and rebuilds the panel.
+   */
+  let deviceLossTerminalActive = false;
 
   const dismissTransitionAlert = (): void => {
     if (renderedAlertSignature !== null) dismissedAlertSignature = renderedAlertSignature;
@@ -383,6 +413,55 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     alertRegion.hidden = false;
   };
   content.append(alertRegion);
+
+  // --- terminal device-loss surface (atlas-terminal-state-visibility) --------
+  // The panel status line already mirrors device loss, but it is the FIRST
+  // CHILD of `#panel`: collapsing the drawer makes it inert (off-canvas below
+  // 720px), and every destination change rebuilds the panel. So the
+  // session-terminal fact also gets the outside-panel alert region, rendered
+  // from the same authored `GPU_DEVICE_LOST` remediation copy the boot failure
+  // uses — one vocabulary, no second one. Reload is the only action: the device
+  // is gone for good and there is nothing to retry.
+  const renderDeviceLossTerminal = (): void => {
+    const copy = buildUnsupportedMessage(host.debugInventory().backend, 'GPU_DEVICE_LOST');
+    const card = document.createElement('div');
+    card.className = 'atlas-alert';
+    // Same fatal treatment as a fatal transition error, but it is NOT that: the
+    // spec forbids presenting device loss as a destination-preparation failure.
+    card.setAttribute('data-severity', 'fatal');
+
+    const title = document.createElement('p');
+    title.className = 'atlas-alert-title';
+    title.textContent = copy.title;
+
+    // The authored body states that rendering cannot continue, in text, so the
+    // meaning never depends on colour alone.
+    const body = document.createElement('p');
+    body.className = 'atlas-alert-body';
+    body.textContent = copy.detail;
+
+    const meta = document.createElement('p');
+    meta.className = 'atlas-alert-code';
+    meta.textContent = `Code: ${copy.code}`;
+
+    const actions: ButtonAction[] = [
+      {
+        text: 'Reload page',
+        primary: true,
+        onClick: (): void => {
+          window.location.reload();
+        }
+      }
+    ];
+
+    card.append(title, body, meta, createButtonRow(actions));
+    alertRegion.replaceChildren(card);
+    alertRegion.hidden = false;
+    deviceLossTerminalActive = true;
+    // The terminal fact outranks any in-progress slow open: two competing
+    // explanations on screen at once would be worse than either alone.
+    hideSlowPreparationNotice();
+  };
 
   // Dev/test-only ?backend= override (docs/CI_CD.md §6): forward webgpu|webgl2
   // to the kernel so the atlas fallback path is exercisable on capable machines.
@@ -1376,8 +1455,16 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       // user-visible failure surface. Read from public state every tick, so a
       // panel rebuild can never destroy it and a retry that fails again
       // re-presents it with the same actions.
+      //
+      // atlas-terminal-state-visibility: the device-loss terminal surface is
+      // NOT cleared by the machine. A lost device is session-terminal, so the
+      // card must outlive a null transition error (which is the state a
+      // post-loss navigation leaves behind) — clearing it would hand the user
+      // back a frozen canvas with no explanation.
       const transitionError = host.state.atlas.transition.error;
-      if (transitionError === null) {
+      if (deviceLossTerminalActive) {
+        // Nothing to do: the surface is up and stays up until reload.
+      } else if (transitionError === null) {
         if (renderedAlertSignature !== null) {
           renderedAlertSignature = null;
           alertDestinationId = null;
@@ -1387,9 +1474,38 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       } else {
         const signature = `${transitionError.code}|${transitionError.message}|${transitionError.destinationId ?? ''}|${String(transitionError.fatal)}`;
         if (signature !== renderedAlertSignature && signature !== dismissedAlertSignature) {
+          renderedAlertSignature = null;
+          alertDestinationId = null;
+          // A published failure replaces the slow-preparation notice: two
+          // competing explanations of the same wait is worse than either
+          // alone, and the failure is the actionable one.
+          hideSlowPreparationNotice();
           renderedAlertSignature = signature;
           renderTransitionAlert(transitionError);
         }
+      }
+
+      // A slow open is a notice, not an error — but it must follow the CURRENT
+      // request. The director publishes it on the same transition snapshot the
+      // shell already reads (no second status bus), and names the destination
+      // being opened so the notice is meaningful rather than a spinner.
+      const slowPrep = host.state.atlas.transition.slowLoad;
+      if (slowPrep === null || transitionError !== null || deviceLossTerminalActive) {
+        hideSlowPreparationNotice();
+      } else if (slowPrep.destinationId !== slowPrepDestination) {
+        slowPrepDestination = slowPrep.destinationId;
+        const card = document.createElement('div');
+        card.className = 'atlas-slowprep-card';
+        const title = document.createElement('p');
+        title.className = 'atlas-slowprep-title';
+        title.textContent = `Opening ${slowPrep.destinationTitle}…`;
+        const body = document.createElement('p');
+        body.className = 'atlas-slowprep-body';
+        body.textContent =
+          'Preparation is taking longer than usual. The current view stays available while it finishes.';
+        card.append(title, body);
+        slowPrepRegion.replaceChildren(card);
+        slowPrepRegion.hidden = false;
       }
       // M11: destination state is seeded from preset/share state when the
       // arrival transition completes — AFTER the first panel build. Deep-link
@@ -1497,14 +1613,21 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   window.addEventListener('pagehide', onPageHide);
 
   // M11-03 device-loss terminal state: the status line is the app's
-  // user-visible error surface (same presentation as boot failures). Frame
+  // original user-visible surface (same presentation as boot failures). Frame
   // submission stops — the kernel refuses work on a lost device and the
   // tick skips host.frame so the governor stops sampling a dead pipeline.
+  //
+  // atlas-terminal-state-visibility: the status line lives inside `#panel`, so
+  // it is unreachable when the panel is collapsed and destroyed when it is
+  // rebuilt. It stays as a MIRROR; the outside-panel terminal surface above is
+  // what actually guarantees the user can perceive the loss. Both come from the
+  // single `onFatal` subscription — one latch, two presentations.
   const unsubscribeFatal = host.onFatal(() => {
     setStatus(
       'Atlas error [GPU_DEVICE_LOST]: Graphics device was lost — reload the page to restart with a fresh device.',
       'error'
     );
+    renderDeviceLossTerminal();
   });
   // Test/inspection hook (mirrors __BLACKHOLE_TEST__ convention from main.ts).
   // Shape is load-bearing for tests/browser/support/atlasHook.ts — do not change
