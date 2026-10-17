@@ -194,15 +194,23 @@ class VolumeImpl implements VolumeHandle {
   private readonly rendererSizeScratch = new THREE.Vector2();
   /** Internal march-target size of the last executed march (null before one). */
   private marchTargetSize: { width: number; height: number } | null = null;
+  /** 7.6: the march-size record is reused — never allocated per frame. */
+  private readonly marchTargetSizeScratch = { width: 0, height: 0 };
+  /** 7.5: last depth texture applied to THIS volume's uniforms (guard input). */
+  private appliedDepthTexture: THREE.Texture | null | undefined = undefined;
 
   private disposed = false;
+  /** R-06: unlink callback so a disposed volume leaves the service set. */
+  private readonly onRelease: () => void;
 
   constructor(
     config: VolumeConfig,
     internalScaleState: { value: number },
     dprCap: number,
-    depthTextureState: { value: THREE.Texture | null }
+    depthTextureState: { value: THREE.Texture | null },
+    onRelease: () => void
   ) {
+    this.onRelease = onRelease;
     // dprCap participates in the byte estimate only; the march itself is
     // resolution-independent world-space math.
     void dprCap;
@@ -592,7 +600,9 @@ class VolumeImpl implements VolumeHandle {
     if (this.target.width !== w || this.target.height !== h) {
       this.target.setSize(w, h);
     }
-    this.marchTargetSize = { width: this.target.width, height: this.target.height };
+    this.marchTargetSize ??= this.marchTargetSizeScratch;
+    this.marchTargetSize.width = this.target.width;
+    this.marchTargetSize.height = this.target.height;
     this.compositeTexelSize.value.set(1 / this.target.width, 1 / this.target.height);
     if (this.depthTextureNode !== null) {
       this.depthTextureNode.value = this.depthTextureState.value ?? this.emptyDepthTexture;
@@ -612,6 +622,9 @@ class VolumeImpl implements VolumeHandle {
   setStepScale(scale: number): void {
     if (this.disposed) return;
     const safeScale = Number.isFinite(scale) ? Math.max(1e-5, scale) : 1;
+    // 7.5: value guard — this setter is on the per-frame fan-out; an
+    // unchanged scale must not touch uniforms or derived state.
+    if (this.uStepScale.value === safeScale) return;
     this.uStepScale.value = safeScale;
     this.activeStepCount = Math.max(
       1,
@@ -622,27 +635,42 @@ class VolumeImpl implements VolumeHandle {
 
   setDetailOctaves(octaves: number): void {
     if (this.disposed) return;
-    this.uDetailOctaves.value = clampInt(octaves, 1, this.detailOctaveCeiling);
+    const next = clampInt(octaves, 1, this.detailOctaveCeiling);
+    if (this.uDetailOctaves.value === next) return; // 7.5: value guard
+    this.uDetailOctaves.value = next;
   }
 
   setLightingTaps(taps: number): void {
     if (this.disposed) return;
-    this.uLightingTaps.value = clampInt(taps, 0, 2);
+    const next = clampInt(taps, 0, 2);
+    if (this.uLightingTaps.value === next) return; // 7.5: value guard
+    this.uLightingTaps.value = next;
   }
 
   setTemporalJitter(enabled: boolean): void {
     if (this.disposed) return;
-    this.uJitterEnabled.value = enabled ? 1 : 0;
+    const next = enabled ? 1 : 0;
+    if (this.uJitterEnabled.value === next) return; // 7.5: value guard
+    this.uJitterEnabled.value = next;
   }
 
   setTemporalFrame(frameIndex: number): void {
     if (this.disposed) return;
     const index = Number.isFinite(frameIndex) ? Math.max(0, Math.floor(frameIndex)) : 0;
-    this.uJitterFrame.value = (index * JITTER_FRAME_STRIDE) % 1;
+    const next = (index * JITTER_FRAME_STRIDE) % 1;
+    if (this.uJitterFrame.value === next) return; // 7.5: value guard
+    this.uJitterFrame.value = next;
   }
 
   setSceneDepthTexture(textureValue: THREE.Texture | null): void {
     if (this.disposed) return;
+    // 7.5: value guard — the fan-out passes the same texture every frame. The
+    // comparison is against THIS volume's last-applied texture: the shared
+    // sceneDepthState.value is written by the service BEFORE this call, so
+    // comparing against it would early-return every time and strand
+    // uDepthValid/depthTextureNode at their construction values.
+    if (textureValue === this.appliedDepthTexture) return;
+    this.appliedDepthTexture = textureValue;
     this.depthTextureState.value = textureValue;
     this.uDepthValid.value = textureValue === null ? 0 : 1;
     if (this.depthTextureNode !== null) {
@@ -708,6 +736,10 @@ class VolumeImpl implements VolumeHandle {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    // R-06: unlink from the owning service (Ribbon/Strand discipline) so a
+    // disposed volume cannot linger in the fan-out; the read-time
+    // `fields.disposed` filter remains as a safety net only.
+    this.onRelease();
     this.mesh.onBeforeRender = () => {};
     this.mesh.removeFromParent();
     this.marchScene?.clear();
@@ -830,11 +862,17 @@ export class VolumeService implements IVolumeService {
     if (!Number.isFinite(config.baseMaxSteps) || config.baseMaxSteps < 1) {
       throw new Error(`VolumeService: invalid baseMaxSteps ${config.baseMaxSteps}.`);
     }
+    // R-06: released handles unlink themselves (closure captures the handle
+    // and runs only at dispose, long after assignment).
     const volume = new VolumeImpl(
       config,
       this.internalScaleState,
       this.dprCap,
-      this.sceneDepthState
+      this.sceneDepthState,
+      () => {
+        const index = this.volumes.indexOf(volume);
+        if (index >= 0) this.volumes.splice(index, 1);
+      }
     );
     this.volumes.push(volume);
     return volume;
@@ -922,7 +960,9 @@ export class VolumeService implements IVolumeService {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const volume of this.volumes) volume.dispose();
+    // Snapshot: released handles unlink themselves (splicing the live array
+    // during iteration would skip entries).
+    for (const volume of [...this.volumes]) volume.dispose();
     this.volumes.length = 0;
   }
 }

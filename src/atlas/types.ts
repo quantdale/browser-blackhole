@@ -701,14 +701,22 @@ export interface FrameWorkTelemetry {
 
 /** Renderer.info mirror (WS0/tasks.md §1). Null fields = backend not reporting. */
 export interface RendererInfoTelemetry {
+  /**
+   * Per-orchestrated-frame deltas (R-04): sampled by explicit reset-and-read
+   * around the frame inside `renderFrame`. Null when no frame has been
+   * submitted — per-frame counters are NOT APPLICABLE to a skipped/absent
+   * frame and must never be reported as the session-cumulative numbers an
+   * un-reset `renderer.info` produced in the Atlas lane.
+   */
   readonly render: {
     readonly frameCalls: number;
     readonly drawCalls: number;
     readonly triangles: number;
     readonly points: number;
     readonly lines: number;
-  };
-  readonly compute: { readonly frameCalls: number };
+  } | null;
+  readonly compute: { readonly frameCalls: number } | null;
+  /** Absolute live totals (three keeps memory counters as lifetime state). */
   readonly memory: {
     readonly geometries: number;
     readonly textures: number;

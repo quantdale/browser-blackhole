@@ -97,6 +97,8 @@ class StrandHandleImpl implements StrandHandle {
   private readonly binormals: THREE.Vector3[];
   private readonly scratch = new THREE.Vector3();
   private quality = 1;
+  /** Requested visibility (setQuality must never override it — R-02). */
+  private requestedVisible = true;
   private pointCount = 0;
   private released = false;
   /** Last applied spine coordinates (value compare before any rebuild). */
@@ -329,11 +331,19 @@ class StrandHandleImpl implements StrandHandle {
   }
 
   setQuality(quality: number): void {
-    this.quality = clamp(Number.isFinite(quality) ? quality : 1, 0, 1);
+    const next = clamp(Number.isFinite(quality) ? quality : 1, 0, 1);
+    // R-02: idempotent — this setter runs every frame from the host fan-out,
+    // so re-applying an unchanged quality must do NO work. The old body also
+    // force-flagged `colorAttribute.needsUpdate` every call, re-uploading the
+    // colour buffer per frame; task 4.3 resolved that dependency question:
+    // quality maps to MATERIAL OPACITY only and the colour arrays are written
+    // solely by setSpine (which flags its own uploads), so the flag had no
+    // correct purpose and is removed rather than guarded.
+    if (next === this.quality) return;
+    this.quality = next;
     this.material.opacity = this.quality;
     this.coreMaterial.opacity = this.config.coreOpacity! * this.quality;
-    this.root.visible = this.quality > 0.02;
-    if (this.pointCount > 1) this.colorAttribute.needsUpdate = true;
+    this.applyVisibility();
   }
 
   object3d(): THREE.Object3D {
@@ -341,7 +351,16 @@ class StrandHandleImpl implements StrandHandle {
   }
 
   setVisible(visible: boolean): void {
-    this.root.visible = visible && this.quality > 0.02;
+    // R-02: visibility has two independent inputs — the caller's request and
+    // the quality threshold. Each setter owns ONE input and recomputes the
+    // single effective value; previously setQuality wrote `root.visible`
+    // outright and resurrected a hidden strand.
+    this.requestedVisible = visible;
+    this.applyVisibility();
+  }
+
+  private applyVisibility(): void {
+    this.root.visible = this.requestedVisible && this.quality > 0.02;
   }
 
   getDebugSnapshot(): Record<string, unknown> {
@@ -419,6 +438,11 @@ export class StrandService implements IStrandService {
 
   setQuality(quality: number): void {
     for (const handle of this.handles) handle.setQuality(quality);
+  }
+
+  /** Live handles (contract-test observability; R-02 unlink discipline). */
+  get liveHandleCount(): number {
+    return this.handles.size;
   }
 
   dispose(): void {

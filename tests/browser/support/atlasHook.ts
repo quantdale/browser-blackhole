@@ -146,6 +146,8 @@ interface AtlasHook {
       setExposure(exposure: number): void;
       setBloom(enabled: boolean, strength: number): void;
       setToneMapping(mode: 'aces-filmic' | 'agx' | 'neutral' | 'linear'): void;
+      setCinematicStyle(enabled: boolean): void;
+      getDebugSnapshot(): Record<string, unknown>;
     };
     /** Canonical experience mode (scientific | cinematic | debug). */
     readonly experienceMode: string;

@@ -1228,6 +1228,14 @@ export class CosmicAtlasHost {
 
   /** Assemble the CA0-09 debug inventory from live host pieces. */
   debugInventory(): DebugInventoryView {
+    // 6.3: per-frame counter deltas describe the most recent SUBMITTED frame.
+    // On a skipped tick (WS1 idle skip) they are NOT APPLICABLE and read as
+    // null — never a stale delta presented as this frame's work.
+    const rendererInfoRaw = this.kernel.readRendererInfo();
+    const rendererInfo =
+      rendererInfoRaw !== null && !this.lastFrameRenderedValue
+        ? { ...rendererInfoRaw, render: null, compute: null }
+        : rendererInfoRaw;
     return collectInventory({
       resources: { debugInventory: () => this.resources.debugInventory() },
       activeDestinationId: this.activePrepared?.module.descriptor.id ?? null,
@@ -1238,7 +1246,7 @@ export class CosmicAtlasHost {
       gpuFrameMs: this.kernel.gpuFrameMs,
       gpuComputeMs: this.kernel.gpuComputeMs,
       frame: this.frameTelemetry(),
-      rendererInfo: this.kernel.readRendererInfo(),
+      rendererInfo,
       visualWorkBudget: this.governor.getVisualWorkBudget(),
       runtime: this.runtimeTelemetry()
     });

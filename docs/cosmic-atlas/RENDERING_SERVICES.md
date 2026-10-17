@@ -452,3 +452,46 @@ successful resize, and never substitutes the tier's nominal scale
 (quality-ladder-resolution-integrity A-03).
 
 Debug instrumentation must not require readback of huge GPU buffers each frame.
+
+## 17. Service lifecycle contract (2026-10 hardening)
+
+One contract, applied to every GPU service in `src/renderer/shared/`
+(StrandService, RibbonService, ParticleService, VolumeService, LensingService)
+and enforced by one table-driven test
+(`tests/unit/serviceLifecycleContract.test.ts`). A convention that only some
+implementers follow is not a convention.
+
+1. **Creation after `dispose()` is refused** — every `create*` method throws.
+   `LensingService` previously had no disposed state at all; a pass created
+   after disposal leaked because nothing would ever release it.
+2. **Released handles unlink themselves** from their owning service (the
+   `RibbonService`/`StrandService` discipline). `ParticleService` and
+   `VolumeService` previously retained disposed handles for the page
+   lifetime, filtering them only at read time.
+3. **Handle and service disposal are idempotent** — no double dispose.
+4. **Live counters return to zero** after service disposal.
+
+Per-frame discipline (same change):
+
+- presentation setters (`StrandService.setQuality`, the `VolumeService`
+  uniform fan-out) carry value-comparison guards: an unchanged input is a
+  complete no-op, so the per-frame fan-out touches nothing while settled;
+- `StrandService` combines two visibility inputs (explicit request AND the
+  quality threshold) in one place — `setQuality` never resurrects a hidden
+  strand;
+- the temporal interaction weight is `min(0.94, min(historyAge, activeCap) /
+  settledCap * 0.94) * confidence` (the numerator is bounded by the ACTIVE
+  cap and divided by the SETTLED cap); the forbidden saturated forms
+  `historyAge / loweredMaxAge` and `min(historyAge, previousMaxAge) /
+  loweredMaxAge` must not be reintroduced;
+- the present/copy display graphs bind ONE persistent scene-texture node,
+  re-pointed per frame and keyed on the stable temporal output PAIR — a
+  settled frame loop rebuilds nothing (`displayGraphRebuilds` in the SharedPost
+  debug snapshot pins this);
+- the particle compute dispatch is bounded to the active population via
+  `ComputeNode.count` (three re-derives the dispatch size and its bounds-check
+  uniform per call), and the CPU advection indexes each SoA channel by its own
+  stride (`advanceParticlePosition`);
+- the galaxy-collision loader keeps a bounded decoded-dataset cache (the
+  black-hole-merger CA8-19 rules); only FULLY validated assets are inserted,
+  so eviction can never expose a partially validated one.

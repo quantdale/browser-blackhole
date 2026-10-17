@@ -220,6 +220,16 @@ Handle zero-size/hidden canvas containers without allocating zero/invalid textur
 
 Clamp internal dimensions to renderer/device limits and surface if requested size is reduced.
 
+Implemented (2026-10 hardening, R-09/R-10):
+
+- the `maxTextureSize` clamp is no longer silent — the kernel records
+  `resizeReport()` with the requested and applied pixel ratios plus the clamp
+  flag, and emits a `console.warn` carrying both values whenever the clamp
+  actually reduces the ratio;
+- `handleResize` is gated on device loss: a lost device receives no renderer
+  work at all (resize is renderer work — `setSize`/`setPixelRatio` reallocate
+  the drawing buffer), so no resize is attempted between loss and reload.
+
 ## 15. Memory pressure strategy
 
 If resource allocation fails or device reports loss around heavy settings:

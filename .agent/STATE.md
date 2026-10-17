@@ -1,3 +1,88 @@
+## 2026-10-17 session (2) — `shared-renderer-service-lifecycle` COMPLETED (R-01…R-12)
+
+Status: **COMPLETE** — all 11/11 task sections of
+`openspec/changes/shared-renderer-service-lifecycle/tasks.md` checked with per-row evidence;
+`--strict` validation passes; every R-finding struck from `docs/MASTER_PLAN.md` §4.
+
+**One lifecycle contract, one test, applied to every GPU service** (the change's D1 — "a
+convention that only some implementers follow is not a convention"):
+
+1. **R-05/R-06 (P2).** `LensingService` had NO disposed state — a pass created after dispose()
+   leaked. Every `create*` now refuses post-dispose (the shared contract test drives all five
+   services). `ParticleService`/`VolumeService` retained disposed handles for the page lifetime;
+   released handles now unlink themselves (constructor-injected `onRelease`, the Ribbon/Strand
+   discipline). The contract test caught its own implementation bug: `dispose()` iterating the
+   live array while unlinking spliced it — entries were skipped (1 claimed of 2); both services
+   now iterate snapshots.
+2. **R-01 (P1).** The temporal interaction weight stayed pinned at the 0.94 ceiling exactly when
+   the shorter interaction cap should REDUCE history contribution (a saturated age divided by
+   the LOWERED cap is >= 1). Now `min(0.94, min(historyAge, activeCap) / settledCap * 0.94) *
+   confidence` per design D2 — the forbidden saturated forms are named in the code and were the
+   fail-first revert. The snapshot reports `activeHistoryCap` + `appliedHistoryWeight`; the
+   interaction flip needs no history reset. Zero golden/metric drift (settled-scene weights are
+   arithmetically identical).
+3. **R-02 (P1).** `StrandService.setQuality` ran every frame and (a) re-uploaded the colour
+   buffer unconditionally (the quality→colour dependency was checked and does NOT exist —
+   quality maps to material opacity only; upload removed, reason recorded) and (b) clobbered
+   `setVisible(false)`. Now idempotent + two-input visibility (`requestedVisible &&
+   quality > 0.02`). Fail-first verified both rows.
+4. **R-04/R-09/R-10 (P2/P3).** `renderer.info` "per-frame" counters were session-cumulative
+   (three resets only inside its own animation loop). The kernel now samples by explicit
+   reset-and-read around the orchestrated frame (`autoReset` disabled at adoption); a skipped
+   tick reports the per-frame block as NULL — not applicable. The `maxTextureSize` clamp is
+   surfaced with requested/applied values (`resizeReport()` + console warn); `handleResize` is
+   gated on device loss.
+5. **R-07/R-08 (P2).** The display graphs rebuilt EVERY FRAME (two unconditional `graphKey =
+   null` in per-frame paths + a single-texture-id key that alternated with the temporal
+   read/write swap). Now: one persistent scene-texture node re-pointed per frame, keyed on the
+   stable output PAIR. The R-07 browser row found two MORE per-frame invalidations
+   (`renderSelectiveHighlights`/`clearSelectiveHighlights`) during its first run — measured
+   126→141 rebuilds per 6 frames before, 0 after. Hot-path allocation eliminated: per-resolve
+   camera-update allocations 8→0 (module-scope scratch), per-frame debug-snapshot build→scalar
+   `isEnabled()`, jitter accessor by reference, persistent projection backup.
+6. **R-03/R-11 (P2/P3).** The compute dispatch now honors the population throttle — API
+   CONFIRMED SUPPORTING (three r180 `ComputeNode.count` is re-read per dispatch and its
+   bounds-check uniform is object-update). The CPU advection indexes each SoA channel by its own
+   stride (exported `advanceParticlePosition`, tested with divergent strides).
+7. **R-12 (P3).** GC1 loader caches decoded datasets (BBM CA8-19 rules; insert-only-after-
+   validation so eviction can never expose a partial asset); the second arrival issues zero
+   requests (counted-fetch test).
+8. **7.5/7.6** — value guards on the per-frame volume-uniform fan-out and a reused march-size
+   record. NOTE: the first depth-texture guard compared against the SHARED state (written by the
+   service before the per-volume setter) and dead-stripped the setter — caught by the volumetric
+   depth-composition rows in the 10.3 gate before landing; the guard now tracks the volume's
+   last-applied texture.
+
+**Evidence:**
+
+| Gate | Result |
+| --- | --- |
+| `npm run check` | PASS — **59 files / 716 unit tests**; build + hook gate ok |
+| §10.3 targeted browser set (temporal, particle, strand, shared-post, frame-invalidation, volumetrics) | **39/39 (5.7m)** |
+| `resource-leak` | **4/4** |
+| `visual-goldens` | **43/43 — zero drift** |
+| Full suite `--project=default` | **309 passed / 1 documented skip / 0 failed (9.5m)** |
+| `openspec validate --strict` | valid |
+
+Fail-first verified: R-01 and R-02 rows fail against temporary reverts of their fixes; R-07's
+row measured the pre-fix rebuild storm live; the contract rows fail against the pre-change
+services. New tests: `serviceLifecycleContract.test.ts` (17 rows), `galaxyCollisionLoader.test.ts`
+(3 rows), +3 browser rows +2 unit extensions.
+
+**Harness measurement (7.8, honest scope):** the cinematic golden suite dropped 20.6m → 1.4m
+after `captureMetrics` stopped serializing ~2.8M pixel values PER FRAME over the CDP bridge
+(the metric math now runs in-page, verified byte-identical output: CIN_BH_CLASSIC metrics match
+to the last digit). This is a HARNESS measurement. For the product path only work-count deltas
+are claimed (allocations 8→0/resolve, snapshot builds 1→0/frame, graph rebuilds ~2.5/frame→0,
+counter reads cumulative→per-frame-delta); per AGENTS rule "never optimize from intuition", NO
+GPU frame-time percentage is claimed — that A/B belongs to the benchmark lane (Phase 4).
+
+**Next live lane:** Phase 3 `verification-gate-integrity` (V-01…V-17 — including the V-17 unit-
+gate load flake and the V-01 `void angErr` missing assertion), then Phase 4
+`benchmark-harness-integrity`, Phase 5a/5b, Phase 6 certification.
+
+---
+
 ## 2026-10-17 session — `destination-control-truthfulness` COMPLETED (U-02, U-03, U-05…U-19)
 
 Status: **COMPLETE — committed `1812601`** (implementation) + close-out. All 18/18 task rows of

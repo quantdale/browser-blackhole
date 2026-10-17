@@ -141,3 +141,46 @@ test.describe('SharedPost V2 snapshot and HDR transition lifecycle', () => {
     });
   }
 });
+
+/**
+ * shared-renderer-service-lifecycle R-07 (task 1.4) — display-graph caching.
+ *
+ * Two unconditional `graphKey = null` statements in the per-frame path
+ * (resolveTemporal/clearTemporalOutput) and a single-texture-id key defeated
+ * the graph cache: every frame rebuilt the present/copy TSL graphs. The
+ * scene binding is now one persistent texture node re-pointed per frame,
+ * keyed on the stable temporal output PAIR; a settle loop must show a flat
+ * rebuild count, and a real graph-input change must rebuild exactly once.
+ */
+test.describe('display graph rebuild discipline (R-07)', () => {
+  test('a settle loop shows no rebuilds and an input change rebuilds once', async ({ page }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+
+    const rebuilds = (): Promise<number> =>
+      page.evaluate(() =>
+        Number(window.__ATLAS_APP__!.host.post.getDebugSnapshot()['displayGraphRebuilds'] ?? 0)
+      );
+
+    const forceFrames = async (count: number): Promise<void> => {
+      for (let i = 0; i < count; i += 1) {
+        await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
+      }
+    };
+
+    // Warm-up: arrival/presentation flips may rebuild legitimately.
+    await forceFrames(4);
+    const before = await rebuilds();
+    await forceFrames(6);
+    const after = await rebuilds();
+    // Non-increasing per the design: a settled loop rebuilds nothing.
+    expect(after, 'a settled frame loop must not rebuild the display graph').toBe(before);
+
+    // A real graph-input change (the bloom toggle changes graph shape)
+    // rebuilds exactly once — and never again afterwards.
+    await page.evaluate(() => window.__ATLAS_APP__!.host.post.setBloom(true, 0.6));
+    await forceFrames(4);
+    const changed = await rebuilds();
+    expect(changed, 'one graph-input change = one rebuild').toBe(before + 1);
+  });
+});

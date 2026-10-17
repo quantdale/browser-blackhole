@@ -482,6 +482,11 @@ export class RibbonService implements IRibbonService {
     return handle;
   }
 
+  /** Live handles (contract-test observability; unlink discipline). */
+  get liveHandleCount(): number {
+    return this.handles.size;
+  }
+
   dispose(): void {
     if (this.disposed) {
       return;

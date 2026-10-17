@@ -1,6 +1,10 @@
 import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
 import type { BufferAttribute, InstancedBufferGeometry } from 'three';
-import { ParticleService, mulberry32 } from '../../src/renderer/shared/ParticleService.js';
+import {
+  ParticleService,
+  advanceParticlePosition,
+  mulberry32
+} from '../../src/renderer/shared/ParticleService.js';
 import type { ParticleSystemConfig, ParticleSystemHandle } from '../../src/atlas/types.js';
 
 /**
@@ -532,5 +536,50 @@ describe('ParticleService active-prefix simulation (WS6 §11.1)', () => {
       lastSkipReason: 'static'
     });
     service.dispose();
+  });
+});
+
+/**
+ * shared-renderer-service-lifecycle R-11 (task 5.4) — stride contract.
+ *
+ * The CPU advection loop indexed velocity at the POSITION stride, which is
+ * correct only while the channel strides coincide. `advanceParticlePosition`
+ * is exported exactly so this row can drive DIVERGENT strides and prove each
+ * particle moves by ITS OWN velocity.
+ */
+describe('ParticleService CPU advection stride contract (R-11)', () => {
+  it('advances each particle by its own velocity under differing channel strides', () => {
+    // posStride 4, velStride 3: the old `vel[i * posStride]` indexing would
+    // read the wrong particle's velocity here.
+    const posStride = 4;
+    const velStride = 3;
+    const count = 3;
+    const pos = new Float32Array(count * posStride);
+    const vel = new Float32Array(count * velStride);
+    for (let i = 0; i < count; i += 1) {
+      pos[i * posStride] = 0;
+      pos[i * posStride + 1] = 0;
+      pos[i * posStride + 2] = 0;
+      vel[i * velStride] = i + 1; // x velocity 1, 2, 3
+      vel[i * velStride + 1] = 10 * (i + 1);
+      vel[i * velStride + 2] = -1 * (i + 1);
+    }
+    for (let i = 0; i < count; i += 1) {
+      advanceParticlePosition(pos, posStride, vel, velStride, i, 0.5);
+    }
+    for (let i = 0; i < count; i += 1) {
+      expect(pos[i * posStride]).toBeCloseTo((i + 1) * 0.5, 6);
+      expect(pos[i * posStride + 1]).toBeCloseTo(10 * (i + 1) * 0.5, 6);
+      expect(pos[i * posStride + 2]).toBeCloseTo(-1 * (i + 1) * 0.5, 6);
+    }
+
+    // The inverse layout (velStride 4, posStride 3) must behave the same.
+    const pos2 = new Float32Array(count * 3);
+    const vel2 = new Float32Array(count * 4);
+    for (let i = 0; i < count; i += 1) vel2[i * 4] = i + 1;
+    for (let i = 0; i < count; i += 1) advanceParticlePosition(pos2, 3, vel2, 4, i, 2);
+    for (let i = 0; i < count; i += 1) {
+      expect(pos2[i * 3]).toBeCloseTo((i + 1) * 2, 6);
+    }
   });
 });

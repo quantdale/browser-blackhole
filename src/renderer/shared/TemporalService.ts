@@ -50,6 +50,10 @@ export interface TemporalDebugSnapshot {
   historyAge: number;
   historyFrames: number;
   interactionHistoryFrames: number;
+  /** R-01/3.2: the cap actually in force this resolve (settled or interaction). */
+  activeHistoryCap: number;
+  /** R-01/3.2: the history blend weight actually applied by the last resolve. */
+  appliedHistoryWeight: number;
   jitterIndex: number;
   jitter: [number, number];
   reprojectionOffset: [number, number];
@@ -67,6 +71,21 @@ const MAX_HISTORY_FRAMES = 64;
 const MAX_JITTER_SCALE = 1;
 const CAMERA_CUT_DISTANCE = 1.5;
 const CAMERA_CUT_DOT = 0.82;
+
+// R-08 (design D7): module-scope scratch for the per-resolve camera update.
+// The old code cloned a matrix and allocated five vectors/two tuples per
+// frame on the present path; steady-state resolve now allocates nothing.
+const scratchMatrix = new THREE.Matrix4();
+const scratchForward = new THREE.Vector3();
+const scratchPosition = new THREE.Vector3();
+const scratchRight = new THREE.Vector3();
+const scratchUp = new THREE.Vector3();
+const scratchDeltaForward = new THREE.Vector3();
+const scratchOffset: [number, number] = [0, 0];
+const scratchCameraState: { offset: [number, number]; confidence: number } = {
+  offset: scratchOffset,
+  confidence: 1
+};
 
 function clampHistory(value: number, fallback: number): number {
   return Number.isFinite(value)
@@ -126,6 +145,8 @@ export class TemporalService {
   private interaction = false;
   private valid = false;
   private historyAge = 0;
+  private lastActiveHistoryCap = 1;
+  private lastAppliedHistoryWeight = 0;
   private jitterIndex = 0;
   private currentJitter: [number, number] = [0, 0];
   private lastReprojectionOffset: [number, number] = [0, 0];
@@ -209,7 +230,9 @@ export class TemporalService {
     if (this.disposed || !this.policy.enabled) return [0, 0];
     this.currentJitter = temporalJitter(this.jitterIndex, this.policy.jitterScale);
     this.jitterIndex = (this.jitterIndex + 1) % 4096;
-    return [...this.currentJitter];
+    // By reference (R-08/D7): the tuple is replaced wholesale above, so a
+    // held reference never observes a half-written value. Callers read-only.
+    return this.currentJitter;
   }
 
   /** Resolve current scene HDR into history and make it the presentation source. */
@@ -228,17 +251,29 @@ export class TemporalService {
     if (this.currentTextureNode === null || this.historyTextureNode === null) return;
 
     const cameraState = this.updateCameraState(camera);
-    const activeHistoryFrames = this.interaction
-      ? Math.min(this.policy.historyFrames, this.policy.interactionHistoryFrames ?? 1)
-      : this.policy.historyFrames;
-    const maxAge = Math.max(1, activeHistoryFrames);
+    const settledCap = Math.max(1, this.policy.historyFrames);
+    const activeCap = this.interaction
+      ? Math.max(1, Math.min(this.policy.historyFrames, this.policy.interactionHistoryFrames ?? 1))
+      : settledCap;
+    // R-01 (design D2): bound the NUMERATOR by the active cap and divide by
+    // the SETTLED cap. The old `historyAge / activeCap` saturated — a history
+    // accumulated under the long cap divided by the LOWERED interaction cap
+    // is >= 1, so the weight stayed pinned at the 0.94 ceiling exactly when
+    // the shorter interaction cap should REDUCE the history's contribution.
+    // Forbidden forms that must not be reintroduced: `historyAge /
+    // loweredMaxAge` and `min(historyAge, previousMaxAge) / loweredMaxAge` —
+    // both stay at the ceiling while history is saturated.
     const historyWeight =
       this.valid && this.historyAge > 0
-        ? Math.min(0.94, (this.historyAge / maxAge) * 0.94) * cameraState.confidence
+        ? Math.min(0.94, (Math.min(this.historyAge, activeCap) / settledCap) * 0.94) *
+          cameraState.confidence
         : 0;
+    this.lastActiveHistoryCap = activeCap;
+    this.lastAppliedHistoryWeight = historyWeight;
     this.historyWeight.value = historyWeight;
     this.reprojectionOffset.value.set(cameraState.offset[0], cameraState.offset[1]);
-    this.lastReprojectionOffset = [...cameraState.offset];
+    this.lastReprojectionOffset[0] = cameraState.offset[0];
+    this.lastReprojectionOffset[1] = cameraState.offset[1];
     this.currentTextureNode.value = currentTexture;
     this.historyTextureNode.value = this.historyRead.texture;
 
@@ -253,7 +288,10 @@ export class TemporalService {
     const swap = this.historyRead;
     this.historyRead = this.historyWrite;
     this.historyWrite = swap;
-    this.historyAge = Math.min(maxAge, this.historyAge + 1);
+    // Age accumulates under the ACTIVE cap (it records how many frames the
+    // history holds); the weight formula above is what bounds a saturated age
+    // on the frame the cap drops, so no history reset is required (D2).
+    this.historyAge = Math.min(activeCap, this.historyAge + 1);
     this.valid = true;
     this.resolvedFrames += 1;
   }
@@ -282,6 +320,33 @@ export class TemporalService {
     return [...this.currentJitter];
   }
 
+  /**
+   * R-08 (D7): non-copying jitter accessor for the per-frame present path.
+   * Returns the internal tuple BY REFERENCE — callers must not mutate it.
+   * (`beginFrame` replaces the tuple wholesale, so a held reference never
+   * observes a half-written value.)
+   */
+  getJitterRef(): [number, number] {
+    return this.currentJitter;
+  }
+
+  /** R-08 (D7): scalar enabled accessor — never build a snapshot for this. */
+  isEnabled(): boolean {
+    return this.policy.enabled && !this.disposed;
+  }
+
+  /**
+   * R-07 (D6): stable identity of the temporal OUTPUT PAIR. resolve() swaps
+   * read/write every frame, so a single texture id alternates and would force
+   * a presentation-graph rebuild per frame; the unordered pair is constant.
+   */
+  outputPairKey(): string {
+    if (this.historyRead === null || this.historyWrite === null) return '';
+    const a = this.historyRead.texture.id;
+    const b = this.historyWrite.texture.id;
+    return a < b ? `${a}:${b}` : `${b}:${a}`;
+  }
+
   getDebugSnapshot(): TemporalDebugSnapshot {
     return {
       enabled: this.policy.enabled,
@@ -289,6 +354,8 @@ export class TemporalService {
       historyAge: this.historyAge,
       historyFrames: this.policy.historyFrames,
       interactionHistoryFrames: this.policy.interactionHistoryFrames ?? 1,
+      activeHistoryCap: this.lastActiveHistoryCap,
+      appliedHistoryWeight: this.lastAppliedHistoryWeight,
       jitterIndex: this.jitterIndex,
       jitter: [...this.currentJitter],
       reprojectionOffset: [...this.lastReprojectionOffset],
@@ -361,21 +428,24 @@ export class TemporalService {
     confidence: number;
   } {
     camera.updateMatrixWorld();
-    const matrix = camera.matrixWorld.clone();
-    const forward = camera.getWorldDirection(new THREE.Vector3());
-    const position = camera.getWorldPosition(new THREE.Vector3());
-    let offset: [number, number] = [0, 0];
+    const matrix = scratchMatrix.copy(camera.matrixWorld);
+    const forward = camera.getWorldDirection(scratchForward);
+    const position = camera.getWorldPosition(scratchPosition);
+    scratchOffset[0] = 0;
+    scratchOffset[1] = 0;
     let confidence = 1;
     if (this.hasPreviousCamera) {
-      const right = new THREE.Vector3(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
-      const up = new THREE.Vector3(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
-      const deltaForward = this.previousForward.clone().sub(forward);
-      offset = [deltaForward.dot(right) * 0.5, deltaForward.dot(up) * 0.5];
+      const right = scratchRight.set(1, 0, 0).applyQuaternion(camera.quaternion).normalize();
+      const up = scratchUp.set(0, 1, 0).applyQuaternion(camera.quaternion).normalize();
+      const deltaForward = scratchDeltaForward.copy(this.previousForward).sub(forward);
+      scratchOffset[0] = deltaForward.dot(right) * 0.5;
+      scratchOffset[1] = deltaForward.dot(up) * 0.5;
       const displacement = position.distanceTo(this.previousPosition);
       const facing = this.previousForward.dot(forward);
       if (displacement > CAMERA_CUT_DISTANCE || facing < CAMERA_CUT_DOT) {
         this.reset('camera-cut');
-        offset = [0, 0];
+        scratchOffset[0] = 0;
+        scratchOffset[1] = 0;
         confidence = 0;
       } else {
         confidence = THREE.MathUtils.clamp(facing, 0.08, 1);
@@ -383,11 +453,18 @@ export class TemporalService {
     }
     this.previousPosition.copy(position);
     this.previousForward.copy(forward);
-    if (this.currentCamera === null) this.previousCamera = matrix.clone();
-    else this.previousCamera = this.currentCamera.clone();
-    this.currentCamera = matrix;
+    // Camera history matrices persist and are COPY-managed (never cloned per
+    // frame); they are re-allocated only after a reset clears them (D7).
+    if (this.previousCamera === null || this.currentCamera === null) {
+      this.previousCamera = matrix.clone();
+      this.currentCamera = matrix.clone();
+    } else {
+      this.previousCamera.copy(this.currentCamera);
+      this.currentCamera.copy(matrix);
+    }
     this.hasPreviousCamera = true;
-    return { offset, confidence };
+    scratchCameraState.confidence = confidence;
+    return scratchCameraState;
   }
 
   private createHistoryTarget(

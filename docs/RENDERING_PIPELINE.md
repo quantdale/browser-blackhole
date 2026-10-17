@@ -113,6 +113,19 @@ display graph in `SharedPost` and are excluded from Scientific/Debug graphs.
 
 Record the exact Three.js color-management/tone-mapping setup in code and visual tests so dependency upgrades do not silently shift golden images.
 
+### Frame counter sampling (R-04, 2026-10 hardening)
+
+Per-frame renderer counters (`renderer.info` `render.*` / `compute.*`) are
+sampled by an **explicit reset-and-read around the orchestrated frame** inside
+`SharedRendererKernel.renderFrame` (the kernel disables the backends'
+`autoReset` at adoption). three resets `info` only inside its own animation
+loop, which the Atlas lane never drives, so an un-reset read was a
+session-cumulative number masquerading as per-frame telemetry. The stored
+delta covers every `render()`/`compute()` call of the frame exactly once
+(destination, post passes, particle dispatch); `memory.*` stays absolute. A
+skipped tick reports the per-frame block as `null` — not applicable — instead
+of a stale delta. See `docs/OBSERVABILITY_DIAGNOSTICS.md`.
+
 ## 6. TSL/WebGPU strategy
 
 Use Three.js TSL/node APIs for the primary WebGPU renderer so application integration stays inside supported `WebGPURenderer` patterns. Encapsulate complex math into named shader functions/modules rather than one monolithic node graph.

@@ -800,3 +800,63 @@ test.describe('frame invalidation: on-demand rendering (WS1)', () => {
     }
   });
 });
+
+/**
+ * shared-renderer-service-lifecycle R-04 (task 1.3) — per-frame counters.
+ *
+ * `renderer.info` was read as per-frame telemetry but never reset in the
+ * Atlas lane (three resets only inside its own animation loop), so the
+ * "per-frame" numbers were session-cumulative and grew every frame. The
+ * kernel now samples by explicit reset-and-read around the orchestrated
+ * frame; a skipped tick reports per-frame counters as NOT APPLICABLE (6.3).
+ */
+test.describe('per-frame renderer counter sampling (R-04)', () => {
+  test('two consecutive rendered frames report comparable draw counts', async ({ page }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+
+    const sample = () =>
+      page.evaluate(() => {
+        window.__ATLAS_APP__!.captureFrame();
+        return window.__ATLAS_APP__!.host.debugInventory().rendererInfo?.render ?? null;
+      });
+
+    // Warm up (first frame may compile/upload), then sample two frames.
+    await sample();
+    const first = await sample();
+    const second = await sample();
+    expect(first, 'per-frame counters must exist after a rendered frame').not.toBeNull();
+    expect(second).not.toBeNull();
+    expect(second!.drawCalls).toBeGreaterThan(0);
+    // Same settled scene: a per-frame DELTA repeats, a cumulative counter
+    // would double (fail-first: pre-fix the ratio was ~2).
+    expect(second!.drawCalls).toBeLessThan(first!.drawCalls * 1.5);
+    expect(second!.frameCalls).toBeLessThan(first!.frameCalls * 1.5);
+  });
+
+  test('per-frame counters read not-applicable on a skipped tick', async ({ page }) => {
+    await page.goto('/atlas/black-hole');
+    await waitForArrival(page);
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.time.pause();
+    });
+    await sampleFrames(page, 2);
+    // Let the WS1 idle skip engage: once ticks stop rendering, the per-frame
+    // block must read null — never the last frame's delta dressed as now.
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            () => window.__ATLAS_APP__!.host.debugInventory().rendererInfo?.render ?? null
+          ),
+        { timeout: 15_000, intervals: [250] }
+      )
+      .toBeNull();
+  });
+});
+
+async function sampleFrames(page: import('@playwright/test').Page, count: number): Promise<void> {
+  for (let i = 0; i < count; i += 1) {
+    await page.evaluate(() => window.__ATLAS_APP__!.captureFrame());
+  }
+}

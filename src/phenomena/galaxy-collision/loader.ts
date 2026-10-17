@@ -65,6 +65,40 @@ async function sha256Hex(buffer: ArrayBuffer): Promise<string> {
  */
 export type Gc1ProgressCallback = (fraction01: number, label: string) => void;
 
+// ---------------------------------------------------------------------------
+// Bounded decoded-dataset cache (R-12; mirrors the black-hole-merger loader's
+// CA8-19 rules: LRU by insertion, MAX_CACHED_DATASETS entries).
+// ---------------------------------------------------------------------------
+
+const MAX_CACHED_DATASETS = 2;
+const datasetCache = new Map<string, Gc1Dataset>();
+
+/**
+ * Insert a FULLY VALIDATED, decoded dataset (R-12/8.3), keyed by the asset id
+ * the load was requested for. Called only after decodeGc1's fail-closed
+ * byte-length and SHA-256 checks and the manifest count checks have all
+ * passed, so eviction can never expose a partially validated asset — a failed
+ * load throws before reaching this point.
+ */
+export function cacheDataset(assetId: string, dataset: Gc1Dataset): void {
+  datasetCache.delete(assetId);
+  datasetCache.set(assetId, dataset);
+  while (datasetCache.size > MAX_CACHED_DATASETS) {
+    const oldest = datasetCache.keys().next().value;
+    if (oldest === undefined) break;
+    datasetCache.delete(oldest);
+  }
+}
+
+/** Cached dataset by asset id, or null (UI/debug reads this). */
+export function getCachedDataset(assetId: string): Gc1Dataset | null {
+  return datasetCache.get(assetId) ?? null;
+}
+
+export function clearDatasetCache(): void {
+  datasetCache.clear();
+}
+
 export interface LoadGc1Options {
   readonly signal?: AbortSignal | null;
   /** Override for tests/tools; defaults to the same-origin static root. */
@@ -78,6 +112,13 @@ export async function loadGc1Dataset(
   assetId: string,
   options: LoadGc1Options = {}
 ): Promise<Gc1Dataset> {
+  // R-12: a repeated arrival must not re-fetch and re-hash 4.6 MB. Cache
+  // hits return the already-validated dataset without any network activity.
+  const cached = datasetCache.get(assetId);
+  if (cached !== undefined) {
+    options.onProgress?.(1, 'Dataset cache hit');
+    return cached;
+  }
   const base = options.baseUrl ?? '/data/galaxy-collision';
   const signal = options.signal ?? null;
   const report = options.onProgress ?? null;
@@ -146,5 +187,6 @@ export async function loadGc1Dataset(
   ) {
     throw new Gc1LoadError('bad-byte-length', 'manifest/binary count mismatch');
   }
+  cacheDataset(assetId, dataset);
   return dataset;
 }

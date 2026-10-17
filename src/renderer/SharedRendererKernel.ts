@@ -25,6 +25,7 @@
  */
 
 import type * as THREE from 'three';
+import { Vector2 } from 'three';
 import type {
   FrameWorkTelemetry,
   RendererInfoTelemetry,
@@ -107,13 +108,16 @@ function extractCapabilities(renderer: RendererLike): { maxTextureSize?: number 
  * three r180 supports both practical shapes: the RenderTarget instance itself
  * (flagged `isRenderTarget`) or its color texture (which carries a
  * `.renderTarget` back-reference assigned by RenderTarget's constructor).
+ * Narrowed through `unknown` once at this boundary; no unchecked double
+ * assertion.
  */
 function resolveRenderTarget(texture: THREE.Texture | null): THREE.RenderTarget | null {
   if (texture === null) return null;
-  if ((texture as unknown as { isRenderTarget?: boolean }).isRenderTarget === true) {
-    return texture as unknown as THREE.RenderTarget;
-  }
-  const linked = (texture as unknown as { renderTarget?: THREE.RenderTarget }).renderTarget;
+  const raw: unknown = texture;
+  if (typeof raw !== 'object') return null;
+  const flagged = raw as { isRenderTarget?: boolean; renderTarget?: THREE.RenderTarget };
+  if (flagged.isRenderTarget === true) return raw as THREE.RenderTarget;
+  const linked = flagged.renderTarget;
   if (
     linked !== null &&
     linked !== undefined &&
@@ -164,6 +168,51 @@ export interface SharedRendererKernelOptions {
   forcedBackend?: 'webgpu' | 'webgl2';
 }
 
+/** Loose, backend-agnostic read of the renderer's `info` counter block. */
+interface RendererInfoSurface {
+  autoReset?: boolean;
+  reset?: () => void;
+  render?: Record<string, number>;
+  compute?: Record<string, number>;
+  memory?: Record<string, number>;
+}
+
+/** R-09: requested vs applied sizing of one resize (truthful clamp reporting). */
+export interface ResizeReport {
+  readonly requestedPixelRatio: number;
+  readonly appliedPixelRatio: number;
+  readonly clampedByMaxTextureSize: boolean;
+  readonly maxTextureSize: number;
+}
+
+function infoSurface(renderer: RendererLike): RendererInfoSurface | null {
+  const raw: unknown = renderer.info;
+  if (typeof raw !== 'object' || raw === null) return null;
+  return raw as RendererInfoSurface;
+}
+
+function readFrameCounters(info: RendererInfoSurface | null): {
+  render: RendererInfoTelemetry['render'];
+  compute: RendererInfoTelemetry['compute'];
+} {
+  const num = (value: number | undefined): number => (typeof value === 'number' ? value : 0);
+  const render = info?.render ?? {};
+  const compute = info?.compute ?? {};
+  return {
+    render: {
+      frameCalls: num(render['frameCalls']),
+      drawCalls: num(render['drawCalls']),
+      triangles: num(render['triangles']),
+      points: num(render['points']),
+      lines: num(render['lines'])
+    },
+    compute: { frameCalls: num(compute['frameCalls']) }
+  };
+}
+
+/** Scratch for allocation-free drawing-buffer reads (module scope). */
+const scratchDrawingBufferSize = new Vector2();
+
 export class SharedRendererKernel implements IRendererKernel {
   private readonly options: SharedRendererKernelOptions;
 
@@ -206,6 +255,17 @@ export class SharedRendererKernel implements IRendererKernel {
     destinationDrawn: false,
     postPresented: false
   };
+  /**
+   * R-04: per-orchestrated-frame counter deltas from the explicit
+   * reset-and-read in {@link renderFrame}; null until the first submitted
+   * frame (never a session-cumulative number mislabeled as per-frame).
+   */
+  private lastFrameInfoSample: {
+    render: RendererInfoTelemetry['render'];
+    compute: RendererInfoTelemetry['compute'];
+  } | null = null;
+  /** R-09: requested/applied sizing of the last resize, incl. clamp truth. */
+  private lastResizeReportValue: ResizeReport | null = null;
   /** Render-pass GPU ms of the most recently resolved frame. */
   private lastGpuFrameMs: number | null = null;
   /** Compute-pass GPU ms of the most recently resolved frame (null when none). */
@@ -531,7 +591,9 @@ export class SharedRendererKernel implements IRendererKernel {
    */
   handleResize(cssWidth: number, cssHeight: number, renderScale: number): void {
     const renderer = this.rendererValue;
-    if (renderer === null || this.disposed) return;
+    // R-10: a lost device must receive no renderer work at all — resize is
+    // renderer work (setSize/setPixelRatio reallocate the drawing buffer).
+    if (renderer === null || this.disposed || this.deviceLost) return;
     if (
       !Number.isFinite(cssWidth) ||
       !Number.isFinite(cssHeight) ||
@@ -548,10 +610,19 @@ export class SharedRendererKernel implements IRendererKernel {
     const dprCap = configuredCap > 0 ? configuredCap : DEFAULT_DPR_CAP;
     const baseDpr = Math.min(readDevicePixelRatio(), dprCap);
     let pixelRatio = baseDpr * scale;
+    const requestedPixelRatio = pixelRatio;
 
+    // R-09: the maxTextureSize clamp is no longer silent — requested and
+    // applied pixel ratios are recorded and the reduction is surfaced
+    // (FAILURE_RECOVERY §15 contract).
     const maxTextureSize = this.backendValue?.maxTextureSize ?? 0;
+    let clampedByMaxTextureSize = false;
     if (maxTextureSize > 0) {
-      pixelRatio = Math.min(pixelRatio, maxTextureSize / Math.max(cssWidth, cssHeight));
+      const clampRatio = maxTextureSize / Math.max(cssWidth, cssHeight);
+      if (pixelRatio > clampRatio) {
+        pixelRatio = clampRatio;
+        clampedByMaxTextureSize = true;
+      }
     }
     if (!Number.isFinite(pixelRatio) || pixelRatio <= 0) pixelRatio = 1;
     renderer.setPixelRatio(pixelRatio);
@@ -570,7 +641,25 @@ export class SharedRendererKernel implements IRendererKernel {
       heightPx: bufferHeightPx
     };
     this.appliedRenderScaleValue = baseDpr > 0 ? pixelRatio / baseDpr : scale;
+    this.lastResizeReportValue = {
+      requestedPixelRatio,
+      appliedPixelRatio: pixelRatio,
+      clampedByMaxTextureSize,
+      maxTextureSize
+    };
+    if (clampedByMaxTextureSize) {
+      console.warn(
+        `[SharedRendererKernel] maxTextureSize clamp reduced the pixel ratio: ` +
+          `requested ${requestedPixelRatio.toFixed(4)} -> applied ${pixelRatio.toFixed(4)} ` +
+          `(maxTextureSize ${maxTextureSize}, css ${cssWidth}x${cssHeight}).`
+      );
+    }
     this.options.post.ensureSize(bufferWidthPx, bufferHeightPx, 1);
+  }
+
+  /** R-09: requested/applied sizing of the last resize (null before one). */
+  resizeReport(): ResizeReport | null {
+    return this.lastResizeReportValue;
   }
 
   /**
@@ -596,46 +685,15 @@ export class SharedRendererKernel implements IRendererKernel {
     // viewport-derived or canvas-default number (quality-ladder-
     // resolution-integrity tasks 5.2).
     if (this.drawingBufferSizeValue === null) return null;
-    const read = (
-      renderer as unknown as {
-        getDrawingBufferSize?: (target: {
-          x: number;
-          y: number;
-          set?: (x: number, y: number) => { x: number; y: number; floor(): unknown };
-          floor?: () => unknown;
-        }) => unknown;
+    // Both renderer flavors type `getDrawingBufferSize(target: Vector2)`;
+    // call it directly with a module-scope scratch (no allocation, no cast).
+    try {
+      const size = renderer.getDrawingBufferSize(scratchDrawingBufferSize.set(0, 0));
+      if (Number.isFinite(size.x) && size.x > 0 && Number.isFinite(size.y) && size.y > 0) {
+        return { widthPx: Math.round(size.x), heightPx: Math.round(size.y) };
       }
-    ).getDrawingBufferSize;
-    if (typeof read === 'function') {
-      try {
-        // three's implementation calls `target.set(...).floor()`, so the duck
-        // target must expose both methods.
-        const target = {
-          x: 0,
-          y: 0,
-          set(x: number, y: number) {
-            this.x = x;
-            this.y = y;
-            return this;
-          },
-          floor() {
-            this.x = Math.floor(this.x);
-            this.y = Math.floor(this.y);
-            return this;
-          }
-        };
-        read.call(renderer, target);
-        if (
-          Number.isFinite(target.x) &&
-          target.x > 0 &&
-          Number.isFinite(target.y) &&
-          target.y > 0
-        ) {
-          return { widthPx: Math.round(target.x), heightPx: Math.round(target.y) };
-        }
-      } catch {
-        // Fall through to the size computed by handleResize.
-      }
+    } catch {
+      // Fall through to the size computed by handleResize.
     }
     return this.drawingBufferSizeValue;
   }
@@ -662,6 +720,14 @@ export class SharedRendererKernel implements IRendererKernel {
     let destinationDrawn = false;
     let postPresented = false;
     const governor = this.options.governor;
+    // R-04 (design D5): explicit reset-and-read around the orchestrated frame.
+    // three resets `info` only inside its own animation loop, which the Atlas
+    // never uses, so an un-reset read was a session-cumulative number dressed
+    // as per-frame telemetry. The delta below covers every render() and
+    // compute() call of THIS frame (destination, post passes, particle
+    // dispatch) exactly once.
+    const frameInfo = infoSurface(renderer);
+    frameInfo?.reset?.();
     governor.beginFrame();
     try {
       const destination = plan.destination;
@@ -735,6 +801,7 @@ export class SharedRendererKernel implements IRendererKernel {
     } finally {
       governor.endFrame();
       this.lastFrameWorkValue = { destinationUpdated, destinationDrawn, postPresented };
+      this.lastFrameInfoSample = readFrameCounters(frameInfo);
     }
     return true;
   }
@@ -750,32 +817,21 @@ export class SharedRendererKernel implements IRendererKernel {
   }
 
   /**
-   * Mirror of `renderer.info` (WS0/tasks.md §1). Returns null when no
-   * renderer is live. `render.*` counters are per-frame (three resets them
-   * each render), `memory.*` are live totals; both are read straight from the
-   * renderer rather than re-derived, so they cannot drift from the truth.
+   * Renderer counter telemetry (R-04). `render`/`compute` are PER-ORCHESTRATED-
+   * FRAME deltas sampled by explicit reset-and-read inside {@link renderFrame}
+   * — null until the first submitted frame, and the host nulls them for a
+   * skipped tick so they can never describe work that did not run. `memory`
+   * counters are absolute live totals (three keeps them as lifetime state).
    */
   readRendererInfo(): RendererInfoTelemetry | null {
     const renderer = this.rendererValue;
     if (renderer === null) return null;
-    const info = renderer.info as unknown as {
-      render?: Record<string, number>;
-      compute?: Record<string, number>;
-      memory?: Record<string, number>;
-    };
-    const render = info.render ?? {};
-    const compute = info.compute ?? {};
-    const memory = info.memory ?? {};
+    const info = infoSurface(renderer);
+    const memory = info?.memory ?? {};
     const num = (value: number | undefined): number => (typeof value === 'number' ? value : 0);
     return {
-      render: {
-        frameCalls: num(render['frameCalls']),
-        drawCalls: num(render['drawCalls']),
-        triangles: num(render['triangles']),
-        points: num(render['points']),
-        lines: num(render['lines'])
-      },
-      compute: { frameCalls: num(compute['frameCalls']) },
+      render: this.lastFrameInfoSample?.render ?? null,
+      compute: this.lastFrameInfoSample?.compute ?? null,
       memory: {
         geometries: num(memory['geometries']),
         textures: num(memory['textures']),
@@ -907,6 +963,13 @@ export class SharedRendererKernel implements IRendererKernel {
     this.rendererValue = renderer;
     this.deviceLost = false;
     this.lossNotifiedGeneration = -1;
+    // R-04 (design D5): per-frame counters are sampled by EXPLICIT
+    // reset-and-read around the orchestrated frame (renderFrame), so the
+    // backends' own auto-reset must be off — WebGL's autoReset resets inside
+    // each render() call (a frame runs several), and the WebGPU `Info` docs
+    // prescribe manual `reset()` once per frame for exactly this pattern.
+    const info = infoSurface(renderer);
+    if (info !== null) info.autoReset = false;
 
     const probe = this.buildProbe(renderer);
     this.capabilityFlags = detectCapabilityFlags(probe);

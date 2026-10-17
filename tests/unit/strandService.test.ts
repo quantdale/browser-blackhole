@@ -142,3 +142,59 @@ describe('StrandService revision gating and conservative bounds (WS6 §11.2)', (
     service.dispose();
   });
 });
+
+/**
+ * shared-renderer-service-lifecycle R-02 (task 1.2) — fail-first rows.
+ *
+ * `setQuality` runs every frame from the host fan-out. Before the fix it
+ * (a) re-flagged the colour buffer for upload on every call and (b) wrote
+ * `root.visible` outright, resurrecting a strand hidden by `setVisible(false)`.
+ */
+describe('StrandService quality/visibility contract (R-02)', () => {
+  const spine = [
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(1, 0.2, 0.4),
+    new THREE.Vector3(2, 0.7, 0.5),
+    new THREE.Vector3(3, 1.3, 0.1),
+    new THREE.Vector3(4, 1.6, -0.4)
+  ];
+
+  function colorVersion(strand: ReturnType<StrandService['createStrand']>): number {
+    const mesh = strand.object3d().children[0] as THREE.Mesh;
+    // StrandService builds the colour attribute as a plain BufferAttribute.
+    const attribute = (mesh.geometry as THREE.BufferGeometry).getAttribute('color');
+    return (attribute as THREE.BufferAttribute).version;
+  }
+
+  it('re-applying the same quality performs no buffer re-upload', () => {
+    const service = new StrandService();
+    const strand = service.createStrand(config());
+    strand.setSpine(spine);
+    const before = colorVersion(strand);
+    strand.setQuality(0.5); // changed value: opacity work only, no colour upload
+    const afterFirst = colorVersion(strand);
+    strand.setQuality(0.5); // identical value: must be a complete no-op
+    strand.setQuality(0.5);
+    expect(afterFirst).toBe(before); // quality never touches the colour buffer
+    expect(colorVersion(strand)).toBe(before);
+    service.dispose();
+  });
+
+  it('setQuality never resurrects a hidden strand (visibility has two owners)', () => {
+    const service = new StrandService();
+    const strand = service.createStrand(config());
+    strand.setSpine(spine);
+    expect(strand.object3d().visible).toBe(true);
+    strand.setVisible(false);
+    expect(strand.object3d().visible).toBe(false);
+    // A quality ABOVE the threshold must not override the explicit hide.
+    strand.setQuality(0.9);
+    expect(strand.object3d().visible).toBe(false);
+    // Re-showing applies both inputs; the quality threshold still gates.
+    strand.setVisible(true);
+    expect(strand.object3d().visible).toBe(true);
+    strand.setQuality(0.01);
+    expect(strand.object3d().visible).toBe(false);
+    service.dispose();
+  });
+});

@@ -308,111 +308,114 @@ async function settleCamera(page: Page): Promise<void> {
   );
 }
 
-async function decodeImage(
-  page: Page,
-  buffer: Buffer
-): Promise<{ width: number; height: number; data: number[] }> {
-  return page.evaluate(async (base64) => {
-    const response = await fetch(`data:image/png;base64,${base64}`);
-    const bitmap = await createImageBitmap(await response.blob());
-    const canvas = document.createElement('canvas');
-    canvas.width = bitmap.width;
-    canvas.height = bitmap.height;
-    const context = canvas.getContext('2d', { willReadFrequently: true });
-    if (!context) throw new Error('2D context unavailable');
-    context.drawImage(bitmap, 0, 0);
-    const data = context.getImageData(0, 0, bitmap.width, bitmap.height).data;
-    const output = { width: bitmap.width, height: bitmap.height, data: Array.from(data) };
-    bitmap.close();
-    return output;
-  }, buffer.toString('base64')) as Promise<{
-    width: number;
-    height: number;
-    data: number[];
-  }>;
-}
-
+/**
+ * Compute the cinematic metrics for the captured frames. The entire metric
+ * computation runs IN-PAGE over the decoded PNGs and only the scalar metrics
+ * cross the CDP bridge: the previous version serialized ~2.8M pixel values
+ * per frame (10 frames) through the protocol to compute the same math in
+ * Node, which timed out the heaviest row under full-suite load. The formulas
+ * below are a verbatim port — same pixels, same numbers, different location.
+ */
 async function captureMetrics(page: Page, frames: Buffer[]): Promise<CinematicMetrics> {
-  const decoded = await Promise.all(frames.map((frame) => decodeImage(page, frame)));
-  const first = decoded[0]!;
-  const luma = new Float32Array(first.width * first.height);
-  let sum = 0;
-  let sumSq = 0;
-  let saturated = 0;
-  let crushed = 0;
-  for (let i = 0; i < luma.length; i += 1) {
-    const offset = i * 4;
-    const r = first.data[offset] ?? 0;
-    const g = first.data[offset + 1] ?? 0;
-    const b = first.data[offset + 2] ?? 0;
-    const value = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-    luma[i] = value;
-    sum += value;
-    sumSq += value * value;
-    if (Math.max(r, g, b) >= 250) saturated += 1;
-    if (value <= 3) crushed += 1;
-  }
-  const sorted = Array.from(luma).sort((a, b) => a - b);
-  const percentile = (q: number) =>
-    sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0;
-  let lumaDelta = 0;
-  let edgeDelta = 0;
-  let edgeCount = 0;
-  for (let frame = 1; frame < decoded.length; frame += 1) {
-    const previous = decoded[frame - 1]!;
-    const current = decoded[frame]!;
-    for (let y = 1; y < current.height - 1; y += 2) {
-      for (let x = 1; x < current.width - 1; x += 2) {
-        const offset = (y * current.width + x) * 4;
-        const previousLuma =
-          0.2126 * (previous.data[offset] ?? 0) +
-          0.7152 * (previous.data[offset + 1] ?? 0) +
-          0.0722 * (previous.data[offset + 2] ?? 0);
-        const currentLuma =
-          0.2126 * (current.data[offset] ?? 0) +
-          0.7152 * (current.data[offset + 1] ?? 0) +
-          0.0722 * (current.data[offset + 2] ?? 0);
-        lumaDelta += Math.abs(currentLuma - previousLuma);
-        const left = offset - 4;
-        const right = offset + 4;
-        const up = offset - current.width * 4;
-        const down = offset + current.width * 4;
-        const gradient =
-          Math.abs((current.data[right] ?? 0) - (current.data[left] ?? 0)) +
-          Math.abs((current.data[up] ?? 0) - (current.data[down] ?? 0));
-        if (gradient >= 80) {
-          edgeCount += 1;
-          const previousGradient =
-            Math.abs((previous.data[right] ?? 0) - (previous.data[left] ?? 0)) +
-            Math.abs((previous.data[up] ?? 0) - (previous.data[down] ?? 0));
-          edgeDelta += Math.abs(gradient - previousGradient);
+  return page.evaluate(
+    async (base64Frames: string[]) => {
+      async function decode(base64: string): Promise<ImageData> {
+        const response = await fetch(`data:image/png;base64,${base64}`);
+        const bitmap = await createImageBitmap(await response.blob());
+        const canvas = document.createElement('canvas');
+        canvas.width = bitmap.width;
+        canvas.height = bitmap.height;
+        const context = canvas.getContext('2d', { willReadFrequently: true });
+        if (!context) throw new Error('2D context unavailable');
+        context.drawImage(bitmap, 0, 0);
+        const data = context.getImageData(0, 0, bitmap.width, bitmap.height);
+        bitmap.close();
+        return data;
+      }
+      const decoded: ImageData[] = [];
+      for (const base64 of base64Frames) decoded.push(await decode(base64));
+      const first = decoded[0]!;
+      const luma = new Float32Array(first.width * first.height);
+      let sum = 0;
+      let sumSq = 0;
+      let saturated = 0;
+      let crushed = 0;
+      for (let i = 0; i < luma.length; i += 1) {
+        const offset = i * 4;
+        const r = first.data[offset] ?? 0;
+        const g = first.data[offset + 1] ?? 0;
+        const b = first.data[offset + 2] ?? 0;
+        const value = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        luma[i] = value;
+        sum += value;
+        sumSq += value * value;
+        if (Math.max(r, g, b) >= 250) saturated += 1;
+        if (value <= 3) crushed += 1;
+      }
+      const sorted = Array.from(luma).sort((a, b) => a - b);
+      const percentile = (q: number) =>
+        sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * q))] ?? 0;
+      let lumaDelta = 0;
+      let edgeDelta = 0;
+      let edgeCount = 0;
+      for (let frame = 1; frame < decoded.length; frame += 1) {
+        const previous = decoded[frame - 1]!;
+        const current = decoded[frame]!;
+        for (let y = 1; y < current.height - 1; y += 2) {
+          for (let x = 1; x < current.width - 1; x += 2) {
+            const offset = (y * current.width + x) * 4;
+            const previousLuma =
+              0.2126 * (previous.data[offset] ?? 0) +
+              0.7152 * (previous.data[offset + 1] ?? 0) +
+              0.0722 * (previous.data[offset + 2] ?? 0);
+            const currentLuma =
+              0.2126 * (current.data[offset] ?? 0) +
+              0.7152 * (current.data[offset + 1] ?? 0) +
+              0.0722 * (current.data[offset + 2] ?? 0);
+            lumaDelta += Math.abs(currentLuma - previousLuma);
+            const left = offset - 4;
+            const right = offset + 4;
+            const up = offset - current.width * 4;
+            const down = offset + current.width * 4;
+            const gradient =
+              Math.abs((current.data[right] ?? 0) - (current.data[left] ?? 0)) +
+              Math.abs((current.data[up] ?? 0) - (current.data[down] ?? 0));
+            if (gradient >= 80) {
+              edgeCount += 1;
+              const previousGradient =
+                Math.abs((previous.data[right] ?? 0) - (previous.data[left] ?? 0)) +
+                Math.abs((previous.data[up] ?? 0) - (previous.data[down] ?? 0));
+              edgeDelta += Math.abs(gradient - previousGradient);
+            }
+          }
         }
       }
-    }
-  }
-  const comparisons = Math.max(
-    1,
-    (decoded.length - 1) * Math.ceil(first.width / 2) * Math.ceil(first.height / 2)
-  );
-  return {
-    width: first.width,
-    height: first.height,
-    meanLuma: sum / luma.length,
-    stdevLuma: Math.sqrt(Math.max(0, sumSq / luma.length - (sum / luma.length) ** 2)),
-    saturationPercent: (saturated / luma.length) * 100,
-    blackCrushPercent: (crushed / luma.length) * 100,
-    luminancePercentiles: {
-      p01: percentile(0.01),
-      p50: percentile(0.5),
-      p90: percentile(0.9),
-      p99: percentile(0.99)
+      const comparisons = Math.max(
+        1,
+        (decoded.length - 1) * Math.ceil(first.width / 2) * Math.ceil(first.height / 2)
+      );
+      return {
+        width: first.width,
+        height: first.height,
+        meanLuma: sum / luma.length,
+        stdevLuma: Math.sqrt(Math.max(0, sumSq / luma.length - (sum / luma.length) ** 2)),
+        saturationPercent: (saturated / luma.length) * 100,
+        blackCrushPercent: (crushed / luma.length) * 100,
+        luminancePercentiles: {
+          p01: percentile(0.01),
+          p50: percentile(0.5),
+          p90: percentile(0.9),
+          p99: percentile(0.99)
+        },
+        temporal: {
+          frames: decoded.length,
+          meanLumaDelta: lumaDelta / comparisons,
+          edgeFlickerPercent: edgeCount > 0 ? (edgeDelta / edgeCount / 255) * 100 : 0
+        }
+      };
     },
-    temporal: {
-      frames: decoded.length,
-      meanLumaDelta: lumaDelta / comparisons,
-      edgeFlickerPercent: edgeCount > 0 ? (edgeDelta / edgeCount / 255) * 100 : 0
-    }
-  };
+    frames.map((frame) => frame.toString('base64'))
+  ) as Promise<CinematicMetrics>;
 }
 
 async function comparePngs(page: Page, current: Buffer, golden: Buffer) {

@@ -58,11 +58,16 @@ sections added by the whole-atlas performance campaign
   `framesSkipped` plus a per-reason frame count. `host.resetFrameTelemetry()`
   zeroes the cumulative counters so a measurement window is the difference of
   two reads.
-- **`rendererInfo`** (`RendererInfoTelemetry`): a straight mirror of
-  `renderer.info` — per-frame `render.frameCalls` / `drawCalls` / primitives,
-  `compute.frameCalls`, and live `memory` totals (geometries, textures,
-  programs, render targets, storage attributes, uniform buffers, total bytes).
-  Null when no renderer is live.
+- **`rendererInfo`** (`RendererInfoTelemetry`): `render.frameCalls` /
+  `drawCalls` / primitives and `compute.frameCalls` are PER-ORCHESTRATED-FRAME
+  deltas sampled by an explicit reset-and-read around the frame inside
+  `renderFrame` (R-04 — three resets `info` only inside its own animation loop,
+  which the Atlas lane never uses, so an un-reset read was a session-cumulative
+  number mislabeled as per-frame). They read `null` — NOT APPLICABLE — before
+  the first submitted frame and on a skipped tick (WS1 idle skip), never a
+  stale delta presented as the current frame's work. `memory` counters are
+  absolute live totals (geometries, textures, programs, render targets, storage
+  attributes, uniform buffers, total bytes). Null when no renderer is live.
 
 Both are counts, not timings, and that is the point: they say how much work
 was eliminated in a form that means the same thing on every machine, so a

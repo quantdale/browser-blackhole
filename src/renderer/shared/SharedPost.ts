@@ -102,12 +102,24 @@ export class SharedPost implements ISharedPost {
 
   /** Cached composite inputs; rebuilds the TSL graphs when any part changes. */
   private graphKey: string | null = null;
+  /** R-07 observability: display-graph rebuild count (task 1.4 asserts it). */
+  private displayGraphRebuilds = 0;
+  /**
+   * R-07 (D6): one persistent scene-texture node, re-pointed per frame. The
+   * graph binds the node (not a texture object), so the temporal read/write
+   * swap changes only `.value` — never the graph.
+   */
+  private sceneTextureNode: ReturnType<typeof texture> | null = null;
+  /** R-07 (D6): last resolved temporal policy+interaction (value guard). */
+  private temporalPolicyKey = '';
   private overlayTexture: THREE.Texture | null = null;
   private bloomNode: BloomNodeObject | null = null;
   private highlightRendered = false;
   private bloomResolutionScale = 0.5;
   private temporalPresentationActive = false;
-  private temporalProjectionBackup: THREE.Matrix4 | null = null;
+  /** R-08 (D7): persistent projection backup (copy-managed, never cloned). */
+  private readonly temporalProjectionBackup = new THREE.Matrix4();
+  private temporalProjectionBackedUp = false;
   private readonly lastStageTimingMs = {
     depthCopy: 0,
     selectiveHighlights: 0,
@@ -287,8 +299,15 @@ export class SharedPost implements ISharedPost {
   }
 
   setTemporalPolicy(policy: TemporalPolicy, interaction = false): void {
+    // R-07 (D6): value guard (the setBloom/setBloomResolutionScale
+    // discipline) — re-applying an identical policy+interaction is a no-op.
+    // And NO graph invalidation: a policy change never moves the scene output
+    // binding (the pair-stable key in syncGraphs captures everything the
+    // graph actually depends on).
+    const nextKey = `${policy.enabled ? 1 : 0}|${policy.historyFrames}|${policy.jitterScale}|${policy.interactionHistoryFrames ?? 1}|${interaction ? 1 : 0}`;
+    if (nextKey === this.temporalPolicyKey) return;
+    this.temporalPolicyKey = nextKey;
     this.temporal.setPolicy(policy, interaction);
-    this.graphKey = null;
   }
 
   invalidateTemporal(reason: string): void {
@@ -296,16 +315,19 @@ export class SharedPost implements ISharedPost {
     this.temporal.reset(knownReason);
     this.temporalPresentationActive = false;
     this.invalidateDepthHistory();
-    this.graphKey = null;
+    // R-07: no graphKey invalidation — the presentation-active flip changes
+    // the pair-stable key on the next syncGraphs naturally.
   }
 
   beginTemporalFrame(camera: THREE.PerspectiveCamera): void {
     this.temporalPresentationActive = false;
-    this.temporalProjectionBackup = null;
-    const state = this.temporal.getDebugSnapshot();
-    if (!state.enabled || this.hdrTarget === null) return;
+    this.temporalProjectionBackedUp = false;
+    // R-08 (D7): scalar accessor — never build a whole debug snapshot on the
+    // present path just to read one boolean.
+    if (!this.temporal.isEnabled() || this.hdrTarget === null) return;
     const jitter = this.temporal.beginFrame();
-    this.temporalProjectionBackup = camera.projectionMatrix.clone();
+    this.temporalProjectionBackup.copy(camera.projectionMatrix);
+    this.temporalProjectionBackedUp = true;
     const elements = camera.projectionMatrix.elements;
     elements[8] = (elements[8] ?? 0) + (2 * jitter[0]) / this.hdrTarget.width;
     elements[9] = (elements[9] ?? 0) + (2 * jitter[1]) / this.hdrTarget.height;
@@ -313,7 +335,8 @@ export class SharedPost implements ISharedPost {
   }
 
   getTemporalJitter(): [number, number] {
-    return this.temporal.getJitter();
+    // R-08 (D7): non-copying accessor on the per-frame path (read-only use).
+    return this.temporal.getJitterRef();
   }
 
   resolveTemporal(camera: THREE.PerspectiveCamera): void {
@@ -324,20 +347,22 @@ export class SharedPost implements ISharedPost {
     }
     this.temporal.resolve(this.hdrTarget.texture, camera);
     this.temporalPresentationActive = this.temporal.getResolvedTexture() !== null;
-    this.graphKey = null;
+    // R-07: the read/write swap is absorbed by the persistent scene node and
+    // the pair-stable key — no per-frame graph invalidation.
     this.lastStageTimingMs.temporalResolve = nowMs() - started;
   }
 
   clearTemporalOutput(): void {
     this.temporalPresentationActive = false;
-    this.graphKey = null;
+    // R-07: the presentation flip changes the pair-stable key on the next
+    // syncGraphs; nothing to invalidate here.
   }
 
   endTemporalFrame(camera: THREE.PerspectiveCamera): void {
-    if (this.temporalProjectionBackup === null) return;
+    if (!this.temporalProjectionBackedUp) return;
     camera.projectionMatrix.copy(this.temporalProjectionBackup);
     camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
-    this.temporalProjectionBackup = null;
+    this.temporalProjectionBackedUp = false;
   }
 
   setExposure(exposure: number): void {
@@ -381,8 +406,9 @@ export class SharedPost implements ISharedPost {
    */
   renderSelectiveHighlights(scene: THREE.Scene, camera: THREE.PerspectiveCamera): void {
     const started = nowMs();
+    // R-07: `highlightRendered` feeds the graph key via bloomSourceKind —
+    // no invalidation needed when the selective pass state flips.
     this.highlightRendered = false;
-    this.graphKey = null;
     if (this.disposed || this.highlightTarget === null || !this.bloomEnabled) {
       this.lastStageTimingMs.selectiveHighlights = 0;
       return;
@@ -419,8 +445,8 @@ export class SharedPost implements ISharedPost {
   }
 
   clearSelectiveHighlights(): void {
+    // R-07: the flip is captured by the bloomSourceKind key term.
     this.highlightRendered = false;
-    this.graphKey = null;
   }
 
   present(transitionOverlay: THREE.Texture | null, transitionOpacity: number): void {
@@ -520,6 +546,7 @@ export class SharedPost implements ISharedPost {
     // The kernel intentionally exposes a union for its public fallback
     // contract, but both supported node paths use WebGPURenderer (forceWebGL
     // selects its WebGLBackend). The r185 RenderPipeline type is narrower.
+    // SAFETY: both supported node paths run WebGPURenderer at runtime (forceWebGL selects its WebGLBackend); the kernel union exists only for the public fallback contract.
     const pipeline = new RenderPipeline(
       renderer as unknown as import('three/webgpu').WebGPURenderer,
       texture(sourceTarget.texture)
@@ -668,22 +695,32 @@ export class SharedPost implements ISharedPost {
       ? this.temporal.getResolvedTexture()
       : null;
     const sceneTexture = temporalTexture ?? hdrTexture;
+    // R-07 (D6): the scene binding is ONE persistent texture node re-pointed
+    // per frame, and the key uses the stable output PAIR (the temporal
+    // resolve swaps read/write every frame, so a single texture id would
+    // alternates and force a rebuild per frame).
+    if (this.sceneTextureNode === null) this.sceneTextureNode = texture(sceneTexture);
+    else this.sceneTextureNode.value = sceneTexture;
+    const sceneNode = this.sceneTextureNode;
     const overlayTexture = this.overlayTexture;
     const highlightTexture = this.highlightTarget?.texture ?? null;
     const bloomSourceKind =
       this.highlightRendered && highlightTexture !== null ? 'selective' : 'legacy';
 
-    const key = `${sceneTexture.id}|${hdrTexture.id}|${highlightTexture?.id ?? -1}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}|${bloomSourceKind}|${this.cinematicStyleEnabled ? 1 : 0}`;
+    const sceneKey =
+      temporalTexture !== null ? `t:${this.temporal.outputPairKey()}` : `h:${hdrTexture.id}`;
+    const key = `${sceneKey}|${hdrTexture.id}|${highlightTexture?.id ?? -1}|${overlayTexture !== null ? overlayTexture.id : -1}|${this.bloomEnabled ? 1 : 0}|${bloomSourceKind}|${this.cinematicStyleEnabled ? 1 : 0}`;
     if (key === this.graphKey) return;
     this.graphKey = key;
+    this.displayGraphRebuilds += 1;
 
     // Raw copy graph for captureSnapshot().
-    this.copyMaterial.fragmentNode = texture(sceneTexture);
+    this.copyMaterial.fragmentNode = sceneNode;
     this.copyMaterial.needsUpdate = true;
 
     // Present graph: HDR -> (+ additive bloom) -> overlay lerp -> tonemap/sRGB
     // (the last step is the renderer's automatic canvas-present transform).
-    const hdrNode = texture(sceneTexture);
+    const hdrNode = sceneNode;
     let rgb = hdrNode.rgb;
 
     if (this.bloomEnabled) {
@@ -830,6 +867,9 @@ export class SharedPost implements ISharedPost {
 
   getDebugSnapshot(): Record<string, unknown> {
     return {
+      // R-07: per-frame present must NOT increment this while inputs are
+      // unchanged (task 1.4 asserts non-increasing counts over a settle loop).
+      displayGraphRebuilds: this.displayGraphRebuilds,
       stages: [
         'scene-hdr',
         this.temporal.getDebugSnapshot().enabled ? 'temporal-resolve' : 'temporal-resolve:off',

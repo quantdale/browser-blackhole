@@ -15,7 +15,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 1c | `transition-error-user-visibility` | **complete** (2026-10-09) — E-01, E-02, E-03, E-05 struck; E-04 **probed and NOT reproduced at `bbf66ea`** (see §4) — it was never an open implementation task |
 | 1d | `destination-control-truthfulness` | **complete** (`87deee3` scoped slice + `1812601` completion, 2026-10-17) — U-01…U-19 struck |
 | 1d+ | `atlas-terminal-state-visibility` | **complete and archived** (2026-10-09, `bbf66ea` + close-out) — unplanned follow-on to 1c/1d; closes the device-loss and slow-load presentation gap that `transition-error-user-visibility` did not cover. Its gated overlay probe (tasks.md §4) found the suspected occluding-overlay defect **does not reproduce**; overlay rendering intentionally unchanged and no golden re-baselined. |
-| 2 | `shared-renderer-service-lifecycle` | pending (starts only after 1b and 1c) — R-01…R-12 in scope |
+| 2 | `shared-renderer-service-lifecycle` | **complete** (2026-10-17 session) — R-01…R-12 struck |
 | 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
 | 4 | `benchmark-harness-integrity` | pending — B-01…B-07 in scope |
 | 5a | `operations-and-deployment-readiness` | pending — O-01…O-09 in scope |
@@ -364,18 +364,18 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| R-01 | Lowering the interaction history cap does not reduce saturated blend weight: `historyAge / loweredMaxAge` remains at the 0.94 ceiling | P1 | confirmed | `TemporalService.ts:232-240,265`; the cap is selected, but the ratio is saturated. Do not “fix” it by dividing accumulated age by the lowered cap |
-| R-02 | `StrandService.setQuality` re-uploads the colour buffer every frame and overrides `setVisible(false)` | P1 | confirmed | `StrandService.ts:331-337,343`; called every frame from `host.ts:741` |
-| R-03 | `ParticleService` compute dispatch ignores the population throttle (full capacity every frame) | P2 | confirmed | `ParticleService.ts:621` (fixed at build) vs `:838-850` |
-| R-04 | `renderer.info` is read as per-frame telemetry but never reset in the Atlas lane | P2 | confirmed | `SharedRendererKernel` `readRendererInfo`; three resets only inside `setAnimationLoop`, which the Atlas never uses |
-| R-05 | `LensingService` has no post-dispose creation guard; a pass created after `dispose()` leaks | P2 | confirmed | `LensingService.ts:158-176` vs `RibbonService`/`StrandService` |
-| R-06 | `ParticleService`/`VolumeService` retain disposed handles for the page lifetime | P2 | confirmed | `ParticleService.ts:1034,1099-1100`; filtered only at read time |
-| R-07 | Present/copy TSL graphs rebuilt every frame (two unconditional `graphKey = null`) | P2 | confirmed | `SharedPost.ts:289-292,319-329,664-735`; `host.ts:713` |
-| R-08 | Per-frame debug/allocation churn on the present path | P2 | indicated | `SharedPost.ts:305`, `TemporalService.ts:281,359-392` |
-| R-09 | Resize silently clamps to `maxTextureSize` without surfacing the reduction | P3 | confirmed | `SharedRendererKernel.ts:544-547` vs `docs/FAILURE_RECOVERY.md:192` |
-| R-10 | `handleResize` is not gated on `deviceLost` | P3 | confirmed | `SharedRendererKernel.ts:526-527` vs `:389-394` |
-| R-11 | CPU particle loop indexes velocity at the position stride (correct only while the strides coincide) | P3 | confirmed | `ParticleService.ts:802-804` vs `:270-275` |
-| R-12 | Galaxy-Collision loader has no dataset cache; every arrival re-fetches and re-hashes 4.6 MB | P3 | confirmed | `galaxy-collision/loader.ts` vs `black-hole-merger/loader.ts:97` |
+| R-01 | Lowering the interaction history cap does not reduce saturated blend weight: `historyAge / loweredMaxAge` remains at the 0.94 ceiling | P1 | **RESOLVED 2026-10-17** session | `TemporalService.ts:232-240,265`; the cap is selected, but the ratio is saturated. Do not “fix” it by dividing accumulated age by the lowered cap |
+| R-02 | `StrandService.setQuality` re-uploads the colour buffer every frame and overrides `setVisible(false)` | P1 | **RESOLVED 2026-10-17** session | `StrandService.ts:331-337,343`; called every frame from `host.ts:741` |
+| R-03 | `ParticleService` compute dispatch ignores the population throttle (full capacity every frame) | P2 | **RESOLVED 2026-10-17** session | `ParticleService.ts:621` (fixed at build) vs `:838-850` |
+| R-04 | `renderer.info` is read as per-frame telemetry but never reset in the Atlas lane | P2 | **RESOLVED 2026-10-17** session | `SharedRendererKernel` `readRendererInfo`; three resets only inside `setAnimationLoop`, which the Atlas never uses |
+| R-05 | `LensingService` has no post-dispose creation guard; a pass created after `dispose()` leaks | P2 | **RESOLVED 2026-10-17** session | `LensingService.ts:158-176` vs `RibbonService`/`StrandService` |
+| R-06 | `ParticleService`/`VolumeService` retain disposed handles for the page lifetime | P2 | **RESOLVED 2026-10-17** session | `ParticleService.ts:1034,1099-1100`; filtered only at read time |
+| R-07 | Present/copy TSL graphs rebuilt every frame (two unconditional `graphKey = null`) | P2 | **RESOLVED 2026-10-17** session | `SharedPost.ts:289-292,319-329,664-735`; `host.ts:713` |
+| R-08 | Per-frame debug/allocation churn on the present path | P2 | **RESOLVED 2026-10-17** session | `SharedPost.ts:305`, `TemporalService.ts:281,359-392` |
+| R-09 | Resize silently clamps to `maxTextureSize` without surfacing the reduction | P3 | **RESOLVED 2026-10-17** session | `SharedRendererKernel.ts:544-547` vs `docs/FAILURE_RECOVERY.md:192` |
+| R-10 | `handleResize` is not gated on `deviceLost` | P3 | **RESOLVED 2026-10-17** session | `SharedRendererKernel.ts:526-527` vs `:389-394` |
+| R-11 | CPU particle loop indexes velocity at the position stride (correct only while the strides coincide) | P3 | **RESOLVED 2026-10-17** session | `ParticleService.ts:802-804` vs `:270-275` |
+| R-12 | Galaxy-Collision loader has no dataset cache; every arrival re-fetches and re-hashes 4.6 MB | P3 | **RESOLVED 2026-10-17** session | `galaxy-collision/loader.ts` vs `black-hole-merger/loader.ts:97` |
 
 ### V — Verification integrity (change: `verification-gate-integrity`)
 

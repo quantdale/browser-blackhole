@@ -342,12 +342,18 @@ class ParticleSystemImpl implements ParticleSystemHandle {
    * defined instead of resuming a frozen pre-growth snapshot.
    */
   private pendingRespawnFrom = -1;
+  private readonly onRelease: () => void;
 
-  constructor(config: ParticleSystemConfig, rendererRef: RendererLike | null) {
+  constructor(
+    config: ParticleSystemConfig,
+    rendererRef: RendererLike | null,
+    onRelease: () => void
+  ) {
     if (!Number.isFinite(config.capacity) || config.capacity < 1) {
       throw new Error(`ParticleService: invalid capacity ${config.capacity}.`);
     }
     this.config = config;
+    this.onRelease = onRelease;
     this.profile = config.profile ?? 'generic-soft';
     this.emissiveIntensity = Number.isFinite(config.emissiveIntensity)
       ? Math.min(32, Math.max(0, config.emissiveIntensity!))
@@ -762,10 +768,16 @@ class ParticleSystemImpl implements ParticleSystemHandle {
 
     if (this.useCompute && this.computeUpdate !== null) {
       // GPU path: set dt, dispatch, done. No CPU readback, no attribute upload.
+      // R-03 (task 5.1, API CONFIRMED SUPPORTING): bound the dispatch to the
+      // ACTIVE population. `ComputeNode.count` is read per dispatch (three
+      // r180 `WebGPUBackend`) and its bounds-check uniform is an object-update
+      // uniform re-reading `this.count` (`ComputeNode.setup`), so lowering it
+      // here shrinks the dispatched workgroups AND the guarded range — the
+      // population throttle now bounds PERFORMED work, not only drawn
+      // instances. Zero population already early-returns above.
       this.dtUniform.value = dt;
-      const r = this.rendererRef as unknown as {
-        compute: (node: object) => Promise<void> | undefined;
-      };
+      this.computeUpdate.count = Math.min(this.drawnCount, this.capacity);
+      const r = this.rendererRef as ComputeCapableRenderer;
       void r.compute(this.computeUpdate);
       return;
     }
@@ -798,10 +810,7 @@ class ParticleSystemImpl implements ParticleSystemHandle {
         continue;
       }
       life[lo] = age1;
-      const po = i * POS_STRIDE;
-      pos[po] = (pos[po] ?? 0) + (vel[po] ?? 0) * dt;
-      pos[po + 1] = (pos[po + 1] ?? 0) + (vel[po + 1] ?? 0) * dt;
-      pos[po + 2] = (pos[po + 2] ?? 0) + (vel[po + 2] ?? 0) * dt;
+      advanceParticlePosition(pos, POS_STRIDE, vel, VEL_STRIDE, i, dt);
     }
     this.uploadActiveRanges(cap, anyRespawn);
   }
@@ -870,6 +879,10 @@ class ParticleSystemImpl implements ParticleSystemHandle {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    // R-06: unlink from the owning service (Ribbon/Strand discipline) so a
+    // disposed system cannot linger in the iteration set; the read-time
+    // `fields.disposed` filter remains as a safety net only.
+    this.onRelease();
     this.mesh.removeFromParent();
     this.geometry.dispose(); // releases attribute GPU buffers via the backend
     this.material.dispose();
@@ -917,6 +930,38 @@ class ParticleSystemImpl implements ParticleSystemHandle {
 /** Scratch vectors for CPU spawn math (module-local, no allocation per call). */
 const _v1 = new THREE.Vector3();
 const _v2 = new THREE.Vector3();
+
+/**
+ * Structural extension of the kernel renderer surface for the compute path:
+ * the WebGPU backend exposes `compute(node)`. The constructor probes exactly
+ * this method (`typeof rendererRef.compute === 'function'`) before enabling
+ * `useCompute`, so the cast at the dispatch site is only reachable when the
+ * method exists. `ComputeNode.count` is dispatched as the work size.
+ */
+type ComputeCapableRenderer = RendererLike & {
+  compute(node: ComputeNode): Promise<void> | undefined;
+};
+
+/**
+ * Pure CPU advection of particle `i` over the SoA channels (R-11, task 5.3).
+ * Each channel is indexed by ITS OWN stride: the old loop indexed velocity at
+ * the position stride, which is correct only while the strides coincide.
+ * Exported for the stride-contract test (task 5.4).
+ */
+export function advanceParticlePosition(
+  pos: Float32Array,
+  posStride: number,
+  vel: Float32Array,
+  velStride: number,
+  i: number,
+  dt: number
+): void {
+  const po = i * posStride;
+  const vo = i * velStride;
+  pos[po] = (pos[po] ?? 0) + (vel[vo] ?? 0) * dt;
+  pos[po + 1] = (pos[po + 1] ?? 0) + (vel[vo + 1] ?? 0) * dt;
+  pos[po + 2] = (pos[po + 2] ?? 0) + (vel[vo + 2] ?? 0) * dt;
+}
 
 /** Uniform unit-sphere direction from two uniforms (GPU twin of sphereDirCpu). */
 function sphereDirGpu(u: TslFloat, v: TslFloat): Node<'vec3'> {
@@ -1030,7 +1075,10 @@ export class ParticleService implements IParticleService {
     if (this.disposed) {
       throw new Error('ParticleService: createSystem called after dispose().');
     }
-    const system = new ParticleSystemImpl(config, this.rendererRef);
+    const system = new ParticleSystemImpl(config, this.rendererRef, () => {
+      const index = this.systems.indexOf(system);
+      if (index >= 0) this.systems.splice(index, 1);
+    });
     this.systems.push(system);
     return system;
   }
@@ -1096,7 +1144,9 @@ export class ParticleService implements IParticleService {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
-    for (const system of this.systems) system.dispose();
+    // Snapshot: released systems unlink themselves (splicing the live array
+    // during iteration would skip entries).
+    for (const system of [...this.systems]) system.dispose();
     this.systems.length = 0;
   }
 }

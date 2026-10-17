@@ -160,6 +160,18 @@ export class LensingService implements ILensingService {
   /** Live passes, so dispose() releases every created GPU resource. */
   private readonly passes: LiveLensingPass[] = [];
   private environmentDetail = 0;
+  /** R-05/2.2: creation-after-dispose must refuse, like every sibling service. */
+  private disposed = false;
+
+  /**
+   * Shared post-dispose guard (R-05). A pass created after dispose() would
+   * leak: nothing would ever release it — the service's own disposal already
+   * ran. Sibling services (Ribbon/Strand/Particle/Volume) refuse loudly;
+   * LensingService had no disposed state at all.
+   */
+  private assertNotDisposed(): void {
+    if (this.disposed) throw new Error('LensingService: create called after dispose().');
+  }
 
   /**
    * Full Schwarzschild backwards-ray-tracing pass (black-hole destination).
@@ -175,6 +187,7 @@ export class LensingService implements ILensingService {
     setUniformsFromState(state: Record<string, unknown>): void;
     dispose(): void;
   } {
+    this.assertNotDisposed();
     const delegate = createLensingMaterial(params);
     return this.wrapLensingHandle(delegate.material, delegate, params, 'numerical');
   }
@@ -191,6 +204,7 @@ export class LensingService implements ILensingService {
     setUniformsFromState(state: Record<string, unknown>): void;
     dispose(): void;
   } {
+    this.assertNotDisposed();
     const delegate = createKerrLensingMaterial(params);
     return this.wrapLensingHandle(delegate.material, delegate, params, 'kerr');
   }
@@ -214,6 +228,7 @@ export class LensingService implements ILensingService {
     dispose(): void;
     lutMaterial(): LutLensingMaterial;
   } {
+    this.assertNotDisposed();
     const delegate = createLutLensingMaterial({
       ...params,
       trajectoryTexture: lut.resources.trajectoryTexture,
@@ -323,6 +338,7 @@ export class LensingService implements ILensingService {
    * it ignores capture, photon-sphere, and strong-field amplification.
    */
   createThinLensDisplacement(massRg: number, impactParameterScale: number): TslDensityFn {
+    this.assertNotDisposed();
     // Bake constants into the JS closure; they become literal WGSL constants.
     const twoMassRg = 2 * massRg;
     const scale = impactParameterScale;
@@ -351,6 +367,8 @@ export class LensingService implements ILensingService {
 
   /** Dispose every still-live lensing pass created by this service. */
   dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
     for (const pass of this.passes.slice()) {
       pass.handle.dispose();
     }
