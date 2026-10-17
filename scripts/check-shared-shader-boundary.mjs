@@ -1,63 +1,141 @@
 /**
  * Shared-shader / legacy-state boundary check (hosted-product-boot-coverage
- * 1.3; capability `shared-module-legacy-boundary`).
+ * 1.3 + review re-check; capability `shared-module-legacy-boundary`).
  *
- * A shader module shared by the product SHALL NOT import types or values
- * from the legacy application state module (`src/app/state.ts`). The legacy
- * shell's own renderer files (`src/renderer/BlackHoleRenderer.ts`,
- * `src/renderer/RenderCoordinator.ts`) MAY keep that import, so only the
- * modules under `src/shaders/` are scanned — the legacy renderer files are
- * not part of the shared product path.
+ * Spec scenario: **a shader module outside the legacy shell that imports the
+ * legacy application state module fails the check** — including indirectly
+ * through any neutral module a shader imports. The legacy shell's own
+ * renderer files (`src/renderer/BlackHoleRenderer.ts`,
+ * `src/renderer/RenderCoordinator.ts`) MAY keep that import, so the check
+ * must not fail *for those files*.
  *
- * Failure names the file and line; a missing import never fails the job.
+ * Implementation: this is a CLOSURE scan, not a directory scan. Every module
+ * under `src/shaders/` is a seed; each seed's relative-import graph is
+ * walked. A violation is ANY import of the legacy application state module
+ * (`src/app/state.ts`) made by a non-exempt module reachable from the seed
+ * set. Walking stops at the exempt legacy-shell files: their own `app/state`
+ * imports are the sanctioned legacy behavior and their graphs stay outside
+ * the product shader boundary. A spec string that references `app/state` but
+ * does not resolve is also a violation (an unresolved import is broken code,
+ * never harmless).
  *
- * Usage: node scripts/check-shared-shader-boundary.mjs
+ * Usage: node scripts/check-shared-shader-boundary.mjs [<srcRoot>]
+ * (default: `src`; `<srcRoot>` must contain `shaders/`)
  */
 
-import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { join, relative } from 'node:path';
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
+import { dirname, join, normalize, relative } from 'node:path';
 
-const SHADERS = 'src/shaders';
-const LEGACY_STATE = 'app/state';
+const srcRoot = normalize(process.argv[2] === undefined ? 'src' : process.argv[2]);
 
-function scan(dir, acc) {
+function listTypeScript(dir, acc) {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const path = join(dir, entry.name);
-    if (entry.isDirectory()) scan(path, acc);
-    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) acc.push(path);
+    if (entry.isDirectory()) listTypeScript(path, acc);
+    else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) acc.push(normalize(path));
   }
   return acc;
 }
 
-const files = statSync(SHADERS).isDirectory() ? scan(SHADERS, []) : [];
+const shadersDir = join(srcRoot, 'shaders');
+let statTry = null;
+try {
+  statTry = statSync(shadersDir);
+} catch {
+  statTry = null;
+}
+if (statTry === null || !statTry.isDirectory()) {
+  console.error(`check-shared-shader-boundary: cannot read shader seed directory ${shadersDir}`);
+  process.exit(2);
+}
+const seeds = listTypeScript(shadersDir, []);
+
+/** Legacy-shell files are exempt: they ARE the sanctioned legacy diagnostic app. */
+const EXEMPT = new Set(
+  ['renderer/BlackHoleRenderer.ts', 'renderer/RenderCoordinator.ts'].map((p) =>
+    normalize(join(srcRoot, p))
+  )
+);
+
+/** The legacy application state module, in every text file form it may take. */
+const STATE_FILES = new Set(
+  ['state.ts', 'state.tsx', 'state.js'].map((name) => normalize(join(srcRoot, 'app', name)))
+);
+
+/** Resolve a relative import specifier to an actual sibling TypeScript file. */
+function resolveImport(fromFile, spec) {
+  if (!spec.startsWith('.')) return null; // bare/external (three/webgpu, vite, ...)
+  const base = normalize(join(dirname(fromFile), spec));
+  const candidates = [base, base.replace(/\.js$/, '.ts'), base.replace(/\.js$/, '.tsx')];
+  if (/\.tsx?$/.test(base)) {
+    // explicit extension: base is already a candidate
+  } else {
+    candidates.push(`${base}.ts`, `${base}.tsx`, join(base, 'index.ts'));
+  }
+  for (const candidate of candidates) {
+    if (existsSync(candidate) && statSync(candidate).isFile()) return candidate;
+  }
+  return null;
+}
+
+/**
+ * Does the import (resolved file, or the raw unresolved spec text) point at
+ * the legacy state module? Separator-insensitive on the raw-text fallback.
+ */
+function targetsStateModule(spec, resolved) {
+  if (resolved !== null) return STATE_FILES.has(resolved);
+  const raw = normalize(spec.replace(/\.js$/, '').replace(/\.[cm]?tsx?$/, '')).replace(/\\/g, '/');
+  return /(^|\/)app\/state$/.test(raw);
+}
+
+/** Extract import specifiers (import / export-from / side-effect) from a line. */
+function importSpecs(line) {
+  const specs = [];
+  const from = /from\s+['"]([^'"]+)['"]/.exec(line);
+  if (from !== null) specs.push(from[1]);
+  const sideEffect = /^\s*import\s+['"]([^'"]+)['"]/.exec(line);
+  if (sideEffect !== null) specs.push(sideEffect[1]);
+  return specs;
+}
 
 const violations = [];
-for (const file of files) {
+const walked = new Set();
+const queue = seeds.map((f) => f);
+while (queue.length > 0) {
+  const file = queue.pop();
+  if (walked.has(file)) continue;
+  walked.add(file);
+  const isExempt = EXEMPT.has(file);
   const lines = readFileSync(file, 'utf8').split('\n');
-  lines.forEach((line, i) => {
-    // import/export-from path that points at the legacy state module
-    // (relative or aliased, with or without the .js extension).
-    const from = /from\s+['"]([^'"]+)['"]/.exec(line);
-    if (from && from[1].includes(`${LEGACY_STATE}.js`)) {
-      violations.push(`${relative('.', file)}:${i + 1}: ${line.trim()}`);
-      return;
+  for (let i = 0; i < lines.length; i += 1) {
+    for (const spec of importSpecs(lines[i])) {
+      const resolved = resolveImport(file, spec);
+      if (!isExempt && targetsStateModule(spec, resolved)) {
+        violations.push(
+          `${relative('.', file)}:${i + 1}: ${lines[i].trim().replace(/\s+/g, ' ').slice(0, 110)}` +
+            ` (via ${shadersDir}${seeds.includes(file) ? ' seed' : ' import graph'})`
+        );
+      }
+      if (resolved === null || isExempt || walked.has(resolved)) continue;
+      queue.push(resolved);
     }
-    // Side-effect style `import '../app/state.js'` (no `from`).
-    const direct = /^\s*import\s+['"]([^'"]+)['"]/.exec(line);
-    if (direct && direct[1].includes(`${LEGACY_STATE}.js`)) {
-      violations.push(`${relative('.', file)}:${i + 1}: ${line.trim()}`);
-    }
-  });
+  }
 }
 
 console.log(
-  `check-shared-shader-boundary: scanned ${files.length} module(s) under ${SHADERS}\\ for '${LEGACY_STATE}' imports`
+  `check-shared-shader-boundary: scanned ${walked.size} module(s) in the ${shadersDir} import ` +
+    `closure (${seeds.length} seed(s)) for legacy-app/state imports ` +
+    `(${EXEMPT.size} legacy-shell file(s) exempt)`
 );
 
 if (violations.length > 0) {
   console.error(
-    `check-shared-shader-boundary: FAIL — a shared shader module imports the legacy application state module:\n${violations.join('\n')}`
+    'check-shared-shader-boundary: FAIL — a module in the shared-shader import graph ' +
+      'imports the legacy application state module:\n' +
+      violations.join('\n')
   );
   process.exit(1);
 }
-console.log('check-shared-shader-boundary: ok (no shared shader module imports app/state)');
+console.log(
+  'check-shared-shader-boundary: ok (no module in the shader import graph imports app/state)'
+);
