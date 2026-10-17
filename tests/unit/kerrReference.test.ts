@@ -23,6 +23,7 @@ import {
   kerrHamiltonian2,
   kerrNullResidual,
   kerrRhs,
+  terminalLocalDirection,
   type KerrState,
   type Vec3
 } from '../../src/phenomena/black-hole/kerr/reference.js';
@@ -150,6 +151,47 @@ describe('static frame-dragging normalisation (kerr-oracle-comment-truth D2)', (
     expect(separation).toBeGreaterThan(0.01); // the lapse lies below 1
     expect(init.lZ).toBeCloseTo(expectedSqrtForm, 11);
     expect(init.lZ).not.toBeCloseTo(wrongLapseDivision, 3); // not g_tphi/f_s
+  });
+});
+
+describe('terminal azimuthal-reconstruction normalisation (kerr-oracle-comment-truth re-check)', () => {
+  // The spec's requirement covers BOTH adjacent commentary sites: the static
+  // extraction (locked above) AND the terminal azimuthal reconstruction
+  // (terminalLocalDirection reference.ts n_ph term). Same equatorial values
+  // as the D2 lock (r=8, a*=0.5, M=1): Sigma=64, f_s=0.75 (lapse BELOW 1),
+  // g_tphi=-0.125, Delta=48.25. Terminal momenta carry a pure polar impulse
+  // (pr=0, p_theta=1, E=1, L_z=0) so at phi=0 the world direction is the
+  // theta-hat axis mixed with the phi-hat frame-dragging term, and the final
+  // normalization preserves the component RATIO — exactly what any scale
+  // error in the azimuthal term moves. Swapping the executable
+  // g_tphi/sqrt(f_s) to division by the lapse moves the phi fraction by
+  // ~0.0245 — twelve orders above binary64 noise — so this row FAILS.
+  it('locks the terminal term at g_tphi/sqrt(f_s), not g_tphi/f_s', () => {
+    const state: KerrState = { r: 8, theta: Math.PI / 2, phi: 0, pr: 0, ptheta: 1 };
+    const dir = terminalLocalDirection(state, 1, 0, 0.5, 1);
+    expect(dir).not.toBeNull();
+    expect(dir![0]).toBeCloseTo(0, 11); // nR = 0 and eR has no z-y mix here
+
+    const fS = 0.75; // static lapse below 1 (spec scenario)
+    const sigma = 64;
+    const gTphi = -0.125;
+    const delta = 48.25;
+    const kappaInv = Math.sqrt(fS) / 1; // kappa = E / sqrt(f_s), E = 1
+    const nTh = (1 / Math.sqrt(sigma)) * kappaInv; // p_theta / sqrt(Sigma)
+    const nPhSqrt = (0 * Math.sqrt(fS) - gTphi / Math.sqrt(fS)) * Math.sqrt(fS / delta);
+    const nPhLapse = (0 * Math.sqrt(fS) - gTphi / fS) * Math.sqrt(fS / delta);
+    const worldize = (nPh: number): [number, number, number] => {
+      const n = Math.hypot(nTh, nPh); // nR = 0; eTh=[0,-1,0], ePh=[0,0,1] at phi=0
+      return [0, -nTh / n, nPh / n];
+    };
+    const expectedSqrtForm = worldize(nPhSqrt);
+    const wrongLapseDivision = worldize(nPhLapse);
+    const separation = Math.abs(expectedSqrtForm[2] - wrongLapseDivision[2]);
+    expect(separation).toBeGreaterThan(0.01); // the lapse lies below 1
+
+    expect(dir![1]).toBeCloseTo(expectedSqrtForm[1], 9);
+    expect(dir![2]).toBeCloseTo(expectedSqrtForm[2], 9);
+    expect(dir![2]).not.toBeCloseTo(wrongLapseDivision[2], 3); // not g_tphi/f_s
   });
 });
 

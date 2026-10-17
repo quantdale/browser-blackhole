@@ -13,3 +13,9 @@
 
 - [x] 3.1 Re-run the new unit test and confirm the executable term did not change. — post-comment-edit `npx vitest run tests/unit/kerrReference.test.ts`: **26/26 passed** (2.81s); the lock row still evaluates the unchanged executable lines.
 - [x] 3.2 Run `openspec validate --change kerr-oracle-comment-truth --strict`. — `openspec validate kerr-oracle-comment-truth --type change --strict`: **valid**.
+
+## 4. Review follow-up (spec re-check)
+
+- [x] 4.1 The requirement covers BOTH commentary sites: static extraction and terminal azimuthal reconstruction. The original lock only covered `initKerrRay().lZ`; the terminal site (`terminalLocalDirection` n_ph line) was changeable to `/fS` without any test failing. Add a second lock. — new describe `terminal azimuthal-reconstruction normalisation (kerr-oracle-comment-truth re-check)` in `tests/unit/kerrReference.test.ts`: drives `terminalLocalDirection({r:8, theta:pi/2, phi:0, pr:0, ptheta:1}, E=1, L_z=0, a*=0.5, M=1)` — f_s = 0.75 (lapse below 1), g_tφ = −0.125, Σ = 64, Δ = 48.25 — and asserts the returned world direction matches the closed-form `g_tφ/√f_s` composition (dy,dz to 1e-9) and NOT the `g_tφ/f_s` composition (the two phi fractions separate by 0.0245).
+- [x] 4.2 The lock must actually fail on the corruption it guards (test-the-test). — temporarily changed reference.ts:603 to `gTphi / fS`: `npx vitest run tests/unit/kerrReference.test.ts` → **1 failed (the new terminal row), 26 passed**; restored the line → **27/27 passed**.
+- [x] 4.3 Re-run the suite and re-validate. — `npx vitest run tests/unit/kerrReference.test.ts`: **27/27**; `openspec validate kerr-oracle-comment-truth --type change --strict`: **valid**. `git diff` on `reference.ts` is empty (comments only, as §2 requires).
