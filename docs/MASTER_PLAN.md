@@ -13,7 +13,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 1a | `kerr-gpu-initializer-correctness` | **complete** (`4a252b9`) — Q-01…Q-05, Q-07 struck |
 | 1b | `quality-ladder-resolution-integrity` | **complete** (`274c591`, close-out `e364437`) — A-01…A-06 struck |
 | 1c | `transition-error-user-visibility` | **complete** (2026-10-09) — E-01, E-02, E-03, E-05 struck; E-04 **probed and NOT reproduced at `bbf66ea`** (see §4) — it was never an open implementation task |
-| 1d | `destination-control-truthfulness` | **scoped slice complete** (`87deee3`, 2026-10-09) — U-01, U-04, U-09, U-10 struck; U-02, U-03, U-05…U-19 remain scoped in the change |
+| 1d | `destination-control-truthfulness` | **complete** (`87deee3` scoped slice + `1812601` completion, 2026-10-17) — U-01…U-19 struck |
 | 1d+ | `atlas-terminal-state-visibility` | **complete and archived** (2026-10-09, `bbf66ea` + close-out) — unplanned follow-on to 1c/1d; closes the device-loss and slow-load presentation gap that `transition-error-user-visibility` did not cover. Its gated overlay probe (tasks.md §4) found the suspected occluding-overlay defect **does not reproduce**; overlay rendering intentionally unchanged and no golden re-baselined. |
 | 2 | `shared-renderer-service-lifecycle` | pending (starts only after 1b and 1c) — R-01…R-12 in scope |
 | 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
@@ -341,24 +341,24 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
 | U-01 | AGN torus never renders after a zone change: `setVisible` is evaluated against a stale `activeZone` | P1 | **RESOLVED 2026-10-09** change 4 | `quasarAgnModule.ts:873` vs the zone machine at `:699-701` and `applyZoneVisibility` at `:864-868` — `applyStateToResources()` (the only writer of the torus flag) ran only from `prepare()`/`applyControlState()`, so a zoom-driven zone change never re-applied it. Zone changes now re-apply per-resource visibility, and the flag is a pure function of `state.torusVisible` since group gating already provides exclusivity |
-| U-02 | Neutron-Star `observerInclinationDeg` never reaches a uniform or transform; it is a passive readout | P1 | confirmed | `neutronStarModule.ts:201,297,627,789,873`; observer direction comes from `getOrbit()` at `:733-742` |
-| U-03 | Neutron-Star preset fidelity note claims "no ray-bent limb yet" while the shipped DIRECT path produces one | P1 | confirmed | `neutron-star/presets.ts:47-49`, `physics.ts:24-26` vs `surfaceLensingGpu.ts:513-633` |
+| U-02 | Neutron-Star `observerInclinationDeg` never reaches a uniform or transform; it is a passive readout | P1 | **RESOLVED 2026-10-17** `1812601` | `neutronStarModule.ts:201,297,627,789,873`; observer direction comes from `getOrbit()` at `:733-742` |
+| U-03 | Neutron-Star preset fidelity note claims "no ray-bent limb yet" while the shipped DIRECT path produces one | P1 | **RESOLVED 2026-10-17** `1812601` | `neutron-star/presets.ts:47-49`, `physics.ts:24-26` vs `surfaceLensingGpu.ts:513-633` |
 | U-04 | `__ATLAS_APP__` test hook ships unguarded in production; exposes forced continuous render, pixel readback and navigation | P1 | **RESOLVED 2026-10-09** change 4 | `atlasApp.ts:1277-1284`, `host.ts:779` — gated on `import.meta.env.DEV \|\| __ATLAS_TEST_HOOKS_OPT_IN__` (Vite `define` from `VITE_ATLAS_TEST_HOOKS=1`, set only by `npm run build:e2e`). A plain `npm run build` carries no hook and no unsubstituted define; enforced by `scripts/check-no-test-hook.mjs` as the last step of `npm run check`, with the Playwright webServer building its own e2e bundle |
-| U-05 | Share `mode=` overwrites share `e`/`b`/`bs`/`t=` values | P2 | confirmed | `atlasApp.ts:1021-1031` + `host.ts:941-948` |
-| U-06 | Deep-linked `dc=` controls are not reflected in the panel for six of eight destinations | P2 | confirmed | `atlasApp.ts:1065-1076` vs `:558-562,778-782,854-857` |
-| U-07 | Dynamic-resolution toggle and Render-scale slider mutate one field with no reflection | P2 | confirmed | `atlasApp.ts:518-535` vs `host.ts:1153` |
-| U-08 | Timeline rate select permanently displays `0.25x` while the clock runs at `1x`; `setRateLabel` has zero callers | P2 | confirmed | `components.ts:611-617,640-642` vs `TimeController.ts:156` |
+| U-05 | Share `mode=` overwrites share `e`/`b`/`bs`/`t=` values | P2 | **RESOLVED 2026-10-17** `1812601` | `atlasApp.ts:1021-1031` + `host.ts:941-948` |
+| U-06 | Deep-linked `dc=` controls are not reflected in the panel for six of eight destinations | P2 | **RESOLVED 2026-10-17** `1812601` | `atlasApp.ts:1065-1076` vs `:558-562,778-782,854-857` |
+| U-07 | Dynamic-resolution toggle and Render-scale slider mutate one field with no reflection | P2 | **RESOLVED 2026-10-17** `1812601` | `atlasApp.ts:518-535` vs `host.ts:1153` |
+| U-08 | Timeline rate select permanently displays `0.25x` while the clock runs at `1x`; `setRateLabel` has zero callers | P2 | **RESOLVED 2026-10-17** `1812601` | `components.ts:611-617,640-642` vs `TimeController.ts:156` |
 | U-09 | Focus is destroyed on every destination switch and on panel rebuilds | P1 | **RESOLVED 2026-10-09** change 4 | `atlasApp.ts:260` (`replaceChildren`), `:363`, signature at `:1185-1190` — a stable focus identity (tag + type + accessible name) is captured before any destructive step and restored after, scoped to the shell root so the destination chip survives `refreshNav()` too |
 | U-10 | Collapsed mobile drawer stays in the accessibility tree and tab order | P2 | **RESOLVED 2026-10-09** change 4 | `atlasPanel.css:900-908` (`display:block`) vs the comment at `:763` claiming `[hidden]` — the drawer is now `inert` when collapsed, which removes it from the a11y tree and tab order without touching the slide transition |
-| U-11 | Collapsible regions' `aria-labelledby` points at the region's own id | P3 | confirmed | `components.ts:131-132` vs `UI_DESIGN_SYSTEM.md:73` |
-| U-12 | Slider value badges are not programmatically associated with their input | P3 | confirmed | `components.ts:262,269-273` |
-| U-13 | `?rm=1` is parsed then discarded; `setReducedMotion` has no external caller | P3 | confirmed | `atlasState.ts:585-591`, `atlasApp.ts:1015-1032` |
-| U-14 | FOV slider range (20–120) contradicts the canonical range (10–150) | P3 | confirmed | `atlasApp.ts:415-425` vs `atlasState.ts:50` |
-| U-15 | `serializeForUrl` writes `p=`; the route parser reads `?preset=` | P3 | confirmed | `atlasState.ts:434-436` vs `routes.ts:163-176` |
-| U-16 | AGN time coordinate is the only one without a finiteness guard | P2 | confirmed | `quasarAgnModule` `update()` vs four sibling modules |
-| U-17 | Galaxy-Collision rebuilds and uploads a 3,200-instance cloud in a mode that hides it | P2 | confirmed | `galaxyCollisionModule` `applyPhase()` vs `update()` |
-| U-18 | Compact-merger `STAR_TINT` literal 6×10⁵ K silently saturates at the helper's 4×10⁴ K ceiling | P2 | confirmed | `compactMergerModule.ts:109` vs `compact-merger/emission.ts:68` |
-| U-19 | Three divergent temperature→linear-RGB implementations | P3 | confirmed | `compact-merger/emission.ts:67`, `stellar-explosion/emission.ts:58`, `neutron-star` local helper |
+| U-11 | Collapsible regions' `aria-labelledby` points at the region's own id | P3 | **RESOLVED 2026-10-17** `1812601` | `components.ts:131-132` vs `UI_DESIGN_SYSTEM.md:73` |
+| U-12 | Slider value badges are not programmatically associated with their input | P3 | **RESOLVED 2026-10-17** `1812601` | `components.ts:262,269-273` |
+| U-13 | `?rm=1` is parsed then discarded; `setReducedMotion` has no external caller | P3 | **RESOLVED 2026-10-17** `1812601` | `atlasState.ts:585-591`, `atlasApp.ts:1015-1032` |
+| U-14 | FOV slider range (20–120) contradicts the canonical range (10–150) | P3 | **RESOLVED 2026-10-17** `1812601` | `atlasApp.ts:415-425` vs `atlasState.ts:50` |
+| U-15 | `serializeForUrl` writes `p=`; the route parser reads `?preset=` | P3 | **RESOLVED 2026-10-17** `1812601` | `atlasState.ts:434-436` vs `routes.ts:163-176` |
+| U-16 | AGN time coordinate is the only one without a finiteness guard | P2 | **RESOLVED 2026-10-17** `1812601` | `quasarAgnModule` `update()` vs four sibling modules |
+| U-17 | Galaxy-Collision rebuilds and uploads a 3,200-instance cloud in a mode that hides it | P2 | **RESOLVED 2026-10-17** `1812601` | `galaxyCollisionModule` `applyPhase()` vs `update()` |
+| U-18 | Compact-merger `STAR_TINT` literal 6×10⁵ K silently saturates at the helper's 4×10⁴ K ceiling | P2 | **RESOLVED 2026-10-17** `1812601` | `compactMergerModule.ts:109` vs `compact-merger/emission.ts:68` |
+| U-19 | Three divergent temperature→linear-RGB implementations | P3 | **RESOLVED 2026-10-17** `1812601` | `compact-merger/emission.ts:67`, `stellar-explosion/emission.ts:58`, `neutron-star` local helper |
 
 ### R — Renderer services / lifecycle (change: `shared-renderer-service-lifecycle`)
 

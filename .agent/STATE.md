@@ -1,3 +1,89 @@
+## 2026-10-17 session — `destination-control-truthfulness` COMPLETED (U-02, U-03, U-05…U-19)
+
+Status: **COMPLETE — committed `1812601`** (implementation) + close-out. All 18/18 task rows of
+`openspec/changes/destination-control-truthfulness/tasks.md` are now checked with per-row
+evidence; the change's `--strict` validation passes. This closes **every U-finding** in
+`docs/MASTER_PLAN.md` §4 (U-01…U-19 struck).
+
+**What was wrong and what changed** (the unifying rule: one source of truth per user-visible
+value; no visible claim that contradicts the runtime):
+
+1. **U-02 (NS inclination, P1).** `observerInclinationDeg` was written to state/runtime/snapshot
+   and never reached a uniform, a transform or the beam calculation — a labelled, inert control.
+   Now: `applyControlState` writes the CAMERA RIG's polar angle; `update()` reads the rig back
+   into canonical state + debug snapshot (held during arrival eases so a transient pose never
+   masquerades as a chosen inclination); the new panel slider spans the rig's achievable polar
+   envelope (9°–171°). Fail-first proven by disabling ONLY the read-back.
+2. **U-03 (fidelity note, P1).** The surface preset note claimed "no ray-bent limb yet" and
+   `physics.ts` credited a future shared-LensingService pass; the shipped
+   `surfaceLensingGpu.ts` ray-bends the limb and lensed background per pixel. Notes corrected;
+   still-true omissions (Doppler/aberration/frame dragging/atmosphere) preserved.
+3. **U-05 (share order, P2).** `setExperienceMode` ran AFTER `sharedVisual` and clobbered the
+   encoded display values — `mode=` silently discarded the fields beside it. Order flipped so
+   the more specific encoded values win. Fail-first proven by restoring the pre-fix order.
+4. **U-06 (dc= reflection, P2).** Control values were captured at build time; deep-linked `dc=`
+   payloads never showed in the panel. All destination-control rows now reflect canonical state
+   on the existing 4 Hz interface tick (`liveSyncs` registry). The row ALSO exposed a second,
+   deeper defect: `parseFromUrl` keyed a `d=`-less `dc` payload to the DEFAULT destination, so a
+   hand-written deep link `/atlas/<dest>?dc=…` was never applied at all — fixed via a
+   route-derived fallback key. Fail-first observed live ("Expected 33, Received 75").
+5. **U-07/U-08/U-13/U-14/U-15 (P2/P3).** Resolution-pair controls reflect the one shared value;
+   `setRateLabel` wired from the canonical playback rate and the select relabelled as a
+   multiplier; `?rm=1` actually applies `setReducedMotion`; FOV slider spans the canonical
+   `CAMERA_FOV_DEG_RANGE` and reflects the camera (reset action visible); the `p=`/`preset=`
+   serialise/parse key mismatch is fixed with mutual aliases (canonical key wins).
+6. **U-11/U-12 + toggle role (P3).** Regions labelled by the title node (no self-reference);
+   slider value badges wired into `aria-describedby`; toggle rows really carry `role="switch"`
+   (their own documented contract — a browser row querying `role=switch` could not find the
+   control before the fix). Also: expanded/collapsed region set preserved across rebuilds (6.3),
+   mode-switch options joined the coarse-pointer touch-target rule (6.8).
+7. **U-16…U-19 + 7.3/7.4.** AGN time finiteness guard (sibling convention); galaxy-collision
+   secondary cloud rebuilt only while drawn (deferred-rebuild staleness flag); compact-merger
+   star tint expressed AT the helper's 4e4 K ceiling instead of silently clamped; the three
+   divergent temperature→RGB implementations collapsed into ONE shared algorithm
+   (`src/phenomena/shared/temperatureRamp.ts`) with disclosed per-destination calibrations —
+   output-identical (pinned at every calibration anchor by `tests/unit/temperatureRamp.test.ts`);
+   waveform cursor no longer one tick stale; preset label no longer builds a RegExp from data.
+
+**Evidence (all on the final tree):**
+
+| Gate | Result |
+| --- | --- |
+| `npm run check` | PASS — format/lint/tsc clean; **57 files / 692 unit tests**; build + `check-no-test-hook` ok |
+| Targeted specs (atlas-navigation accessibility mobile-touch quasar-agn quasar-agn-v2 neutron-star) | **57/57 (8.1m)** |
+| `visual-goldens --workers=1` | **43/43 — zero drift, no re-baselining** |
+| `cinematic-goldens` | **8/8 — no re-baselining** (one recorded gate-parameter normalization: row wall-clock budget 180s→300s, reasoning in the spec header; thresholds/baselines untouched; in-suite vs standalone comparison metrics byte-identical) |
+| Full suite `--project=default` | **306 passed / 1 documented skip / 0 failed (24.3m)** |
+| Firefox project | **4/4** |
+| `openspec validate --strict` | valid |
+
+Fail-first verified both ways for U-02 (read-back removed → row fails) and U-05 (pre-fix order →
+row fails); U-06 failed live before its fix set completed. New rows: 2 unit files + 4 browser rows.
+
+**Environment fact measured this session — read before any future browser gate.** The Playwright
+config resolves `channel: 'msedge'` only when `CI` is UNSET; with `CI=1` it silently falls back to
+Playwright's bundled Chromium, which has NO GPU on this machine (software WebGL2: black-hole
+1.6 s/frame, neutron-star 2.3 s/frame vs ~50 ms on the hardware channel). Under software
+rendering the frame-budget tests (presented-motion rows, `captureFrame` rows) time out in ways
+that look like product regressions — three such failures vanished instantly on the hardware
+channel. **Run browser gates here WITHOUT `CI=1` (msedge, hardware WebGPU `nvidia lovelace`) or
+set `PLAYWRIGHT_BROWSER_CHANNEL=msedge` explicitly.** The earlier standing rule saying "run
+`CI=1`" is WRONG for this machine and is superseded by this entry.
+
+Also diagnosed and closed: `cinematic-goldens.spec.ts` had a per-row 180s wall-clock budget while
+the heaviest row (CIN_BH_CLASSIC) measures 175–228s on this runner — it passed standalone and
+timed out deterministically under full-suite load BEFORE any comparison assertion ran (3 full-suite
+reproductions, then green at 300s with byte-identical comparison metrics). Budget normalized to
+the 300s its sibling heavy rows already use; recorded per MASTER_PLAN §9 rule 7.
+
+**Next live lane:** Phase 2 `shared-renderer-service-lifecycle` (R-01…R-12, files
+`src/atlas/host.ts`, `src/renderer/SharedRendererKernel.ts`, `src/renderer/shared/**`), then
+Phase 3 `verification-gate-integrity` (V-01…V-17 — including the V-17 unit-gate load flake
+observed once this session), Phase 4 `benchmark-harness-integrity`, Phase 5a/5b, then Phase 6
+certification. Unowned strays still open: A-07, Q-06, Q-08 (L-01/L-02 remain deferred by plan).
+
+---
+
 ## 2026-10-09 session — openspec apply: `atlas-terminal-state-visibility` implemented, validated, CLOSED and ARCHIVED
 
 Status: **COMPLETE — committed `bbf66ea`, archived, and pushed to `origin/main`.** Applied the change
