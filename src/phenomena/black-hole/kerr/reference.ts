@@ -446,7 +446,7 @@ export function initKerrRay(pos: Vec3, dir: Vec3, aStar: number, massRg = 1): Ke
   // 0), giving the exact covariant extraction below — machine-null by
   // construction and exact in the a -> 0 limit:
   //   E   = sqrt(f_s),  f_s = (Sigma - 2Mr)/Sigma
-  //   L_z = nPhi * sin(theta) * sqrt(Delta / f_s) + g_tphi / f_s
+  //   L_z = nPhi * sin(theta) * sqrt(Delta / f_s) + g_tphi / sqrt(f_s)
   //   p_r = sqrt(Sigma/Delta) n_r,   p_theta = sqrt(Sigma) n_theta
   const fS = (sigma - 2 * massRg * polar.r) / sigma; // > 0 outside ergosphere
   const gTphi = (-2 * massRg * a * polar.r * s2) / sigma;
@@ -592,7 +592,7 @@ export function terminalLocalDirection(
   // the conserved scale is kappa = E / sqrt(f_s), so local components read
   //   n_r  = kappa^-1 p_r sqrt(Delta/Sigma)
   //   n_th = kappa^-1 p_theta / sqrt(Sigma)
-  //   n_ph = [ (L_z/E) sqrt(f_s) - g_tphi/f_s ] sqrt(f_s/Delta) / sin(theta)
+  //   n_ph = [ (L_z/E) sqrt(f_s) - g_tphi/sqrt(f_s) ] sqrt(f_s/Delta) / sin(theta)
   const fS = (sigma - 2 * massRg * x.r) / sigma;
   if (!(fS > 0)) return null; // projection undefined inside the ergosphere
   const kappaInv = Math.sqrt(fS) / energy;

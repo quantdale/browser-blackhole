@@ -131,6 +131,28 @@ describe('tetrad initialization (ADR §1.8)', () => {
   });
 });
 
+describe('static frame-dragging normalisation (kerr-oracle-comment-truth D2)', () => {
+  // Equatorial, tangential +phi probe chosen so every quantity is a closed
+  // decimal: pos [8,0,0] (theta=pi/2, phi=0), dir [0,0,1] -> nR=nTh=0, nPh=1.
+  // a* = 0.5, M = 1: Sigma = r^2 = 64, f_s = (Sigma-2Mr)/Sigma = 0.75 (a
+  // lapse BELOW 1), g_tphi = -2 M a r sin^2/Sigma = -0.125, Delta = 48.25.
+  // The executable static extraction (reference.ts) composes
+  //   L_z = nPhi sin(theta) sqrt(Delta/f_s) + g_tphi / sqrt(f_s).
+  // If any future edit swaps that term to plain division by the lapse
+  // (g_tphi / f_s), lZ drops by |g_tphi|(1 - f_s)/sqrt(f_s) = 0.0223 —
+  // twelve orders of magnitude above binary64 noise — so this row FAILS.
+  it('locks the executable term at g_tphi/sqrt(f_s), not g_tphi/f_s', () => {
+    const init = initKerrRay([8, 0, 0], [0, 0, 1], 0.5, 1);
+    const common = Math.sqrt(48.25 / 0.75); // nPh sin(theta) sqrt(Delta/f_s)
+    const expectedSqrtForm = common + -0.125 / Math.sqrt(0.75); // g_tphi/sqrt(f_s)
+    const wrongLapseDivision = common + -0.125 / 0.75; // g_tphi/f_s
+    const separation = Math.abs(expectedSqrtForm - wrongLapseDivision);
+    expect(separation).toBeGreaterThan(0.01); // the lapse lies below 1
+    expect(init.lZ).toBeCloseTo(expectedSqrtForm, 11);
+    expect(init.lZ).not.toBeCloseTo(wrongLapseDivision, 3); // not g_tphi/f_s
+  });
+});
+
 describe('conservation invariants along traces', () => {
   const corpus: Array<{ pos: Vec3; dir: Vec3; label: string }> = [
     { pos: [24, 3, 0], dir: [-1, -0.08, 0.06], label: 'moderate-inward' },
