@@ -461,3 +461,72 @@ test.describe('Atlas transition failure visibility', () => {
     expect(boxes!.alertBottom).toBeLessThanOrEqual(boxes!.panelTop);
   });
 });
+
+/**
+ * destination-control-truthfulness — U-05/U-06 display-vs-state rows.
+ *
+ * Fail-first history (task §1.4/§1.6): before the interface-tick reflection
+ * existed, a deep-linked `dc=` payload was applied to canonical state but the
+ * panel kept its build-time default forever; and `mode=` clobbered the
+ * encoded display values it was supposed to accompany.
+ */
+test.describe('Share and control reflection', () => {
+  let errors: string[];
+
+  test.beforeEach(({ page }) => {
+    errors = collectErrors(page);
+  });
+
+  test('a deep-linked dc= payload is reflected in the destination control (U-06)', async ({
+    page
+  }) => {
+    const dc = encodeURIComponent(JSON.stringify({ viewingAngleDeg: 33 }));
+    await page.goto(`/atlas/compact-merger?dc=${dc}`);
+    await waitForArrival(page, 'compact-merger');
+
+    // The Merger section is collapsed by default; expand it (keyboard path).
+    const mergerSection = page.getByRole('button', { name: 'Merger', exact: true });
+    await expect(mergerSection).toBeVisible();
+    if ((await mergerSection.getAttribute('aria-expanded')) !== 'true') {
+      await mergerSection.focus();
+      await page.keyboard.press('Enter');
+    }
+
+    // The displayed control value must equal the ENCODED canonical value —
+    // this held the build-time default (75) forever before the fix.
+    const slider = page.getByRole('slider', { name: 'Viewing angle' });
+    await expect(slider).toBeVisible();
+    await expect
+      .poll(async () => slider.inputValue(), { timeout: 10_000, intervals: [200] })
+      .toBe('33');
+    expect(errors).toEqual([]);
+  });
+
+  test('share mode= does not overwrite the encoded display values (U-05)', async ({ page }) => {
+    // Cinematic mode + explicit exposure 1.35 + bloom off: the more specific
+    // encoded values must win over the mode's display defaults.
+    await page.goto('/atlas/black-hole?mode=cinematic&e=1.35&b=0');
+    await waitForArrival(page, 'black-hole');
+
+    const visualSection = page.getByRole('button', { name: 'Visual', exact: true });
+    await expect(visualSection).toBeVisible();
+    if ((await visualSection.getAttribute('aria-expanded')) !== 'true') {
+      await visualSection.focus();
+      await page.keyboard.press('Enter');
+    }
+
+    const exposure = page.getByRole('slider', { name: 'Exposure' });
+    await expect(exposure).toBeVisible();
+    await expect
+      .poll(async () => exposure.inputValue(), { timeout: 10_000, intervals: [200] })
+      .toBe('1.35');
+
+    const bloom = page.getByRole('switch', { name: 'Bloom' });
+    await expect(bloom).toHaveAttribute('aria-checked', 'false');
+
+    // Canonical state agrees with the displayed values (one source of truth).
+    const mode = await page.evaluate(() => window.__ATLAS_APP__!.host.experienceMode);
+    expect(mode).toBe('cinematic');
+    expect(errors).toEqual([]);
+  });
+});

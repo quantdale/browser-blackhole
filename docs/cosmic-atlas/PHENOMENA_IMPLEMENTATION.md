@@ -46,6 +46,14 @@ It is the closest strong-gravity sibling to Black Hole yet introduces a physical
 - magnetosphere/field lines: `PROCEDURAL_SCIENTIFIC`;
 - flare visuals: `PROCEDURAL_SCIENTIFIC`.
 
+The shipped DIRECT renderer is `src/phenomena/neutron-star/surfaceLensingGpu.ts`:
+per-pixel Schwarzschild null geodesics with a bisected material-surface
+crossing, branching to surface-hit vs escaped-background (ray-bent limb and
+lensed background included; no mesh, not the shared LensingService). The
+preset fidelity notes and the `physics.ts` header were corrected in 2026-10
+to describe this path; still deliberately omitted and disclosed:
+Doppler/aberration, frame dragging, atmosphere/radiative transfer.
+
 ### Minimum viable visualization
 
 - spherical compact surface at radius `R > 2 r_g`;

@@ -70,16 +70,16 @@ parsing (Gate G injection policy). The module imports nothing from
 
 | Component | Root class | Semantics |
 | --- | --- | --- |
-| Collapsible section | `.atlas-section` | `<button aria-expanded aria-controls>` + labelled region |
+| Collapsible section | `.atlas-section` | `<button aria-expanded aria-controls>` + region labelled by the section TITLE node (never the region's own id — U-11) |
 | Domain group | `.atlas-group` | Decorative `<p>` caption; never interactive |
 | Panel header | `.atlas-panel-head` | Destination identity block |
-| Slider row | `.atlas-row--slider` | `<label for>` + `<input type=range>` + `.atlas-slider-value` |
+| Slider row | `.atlas-row--slider` | `<label for>` + `<input type=range>` + `.atlas-slider-value`; the value badge is wired into `aria-describedby` so the formatted value and its unit are obtainable (U-12) |
 | Select row | `.atlas-row--select` | `<label for>` + native `<select>` (role=combobox) |
-| Toggle row | `.atlas-row--toggle` | `<button role=switch aria-checked>` |
+| Toggle row | `.atlas-row--toggle` | `<button role=switch aria-checked>` (the role is load-bearing, not decorative) |
 | Button row | `.atlas-row--buttons` | `.atlas-btn`, `.atlas-btn--primary` |
 | Readout list | `.atlas-readouts` | `<dl>`/`<dt>`/`<dd>` telemetry |
-| Timeline transport | `.atlas-timeline` | Icon buttons + scrubber + rate select |
-| Mode switch | `.atlas-mode-switch` | `role=radiogroup` of real radios |
+| Timeline transport | `.atlas-timeline` | Icon buttons + scrubber + rate select ("Playback speed multiplier" — the select chooses a multiplier of the effective rate, U-08) |
+| Mode switch | `.atlas-mode-switch` | `role=radiogroup` of real radios; `.atlas-mode-option` participates in the coarse-pointer touch-target rule (task 6.8) |
 | Waveform panel | `.bbm-waveform` | 2D canvas + text readout (BH Merger) |
 | Icon | `.atlas-icon` | Inline `<svg>`, `aria-hidden` |
 

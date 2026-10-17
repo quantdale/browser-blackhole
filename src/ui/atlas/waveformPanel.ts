@@ -187,10 +187,13 @@ export function createWaveformPanel(): WaveformPanelHandle {
         return;
       }
       resizeCanvas();
+      // Record THIS tick's time BEFORE redrawing: assigning after the redraw
+      // drew the cursor one UI tick stale while the text readout already
+      // showed the new time (the two must agree).
+      lastTimeM = timeM;
       // Redraw includes the cursor; a single bounded 2D-canvas pass per UI
       // tick (4 Hz), never per animation frame.
       redraw();
-      lastTimeM = timeM;
 
       const index = indexForTime(timeM);
       const hRe = series.h22Re[index] ?? 0;

@@ -109,6 +109,27 @@ window.__BLACKHOLE_TEST__ = {
 
 Keep this API small and documented. Production may omit it if feasible.
 
+### Atlas test-hook opt-in (U-04)
+
+The atlas shell's `window.__ATLAS_APP__` hook (host access, forced continuous
+render, synchronous framebuffer readback) is gated on a BUILD-TIME opt-in,
+never a runtime toggle:
+
+- `npm run build` (the artifact CI validates and any deployment serves)
+  substitutes `__ATLAS_TEST_HOOKS_OPT_IN__` with `false`; the bundle carries
+  **no hook at all** and no unsubstituted define. Enforced by
+  `scripts/check-no-test-hook.mjs`, which runs as the last step of
+  `npm run check`.
+- `npm run build:e2e` sets `VITE_ATLAS_TEST_HOOKS=1`; Vite's `define`
+  substitutes the gate so the hook is installed. The Playwright `webServer`
+  builds its own e2e bundle via `npm run build:e2e && npm run preview`, so
+  the browser suite always runs against a hook-bearing artifact and a plain
+  production build can never silently disable the suite.
+
+Any new spec that drives `__ATLAS_APP__` must therefore run against the
+webServer-managed bundle (the default for `npx playwright test`), not against
+a stale `dist/` from a production build.
+
 ### URL decision overrides
 
 Dev/test-only query parameters force backend/debug decisions so fallback UX

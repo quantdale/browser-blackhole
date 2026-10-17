@@ -63,6 +63,26 @@ exposed; the remaining catalogue entries arrive with their destinations.
 Component-level details, the design-token layer, the layout geometry contract
 and the accessibility/text-case rules live in `docs/UI_DESIGN_SYSTEM.md`.
 
+### Value reflection and rebuild behaviour (2026-10 hardening)
+
+- **Per-tick reflection.** Every destination control, the paired
+  dynamic-resolution/render-scale controls, the FOV slider and the playback-
+  rate select are re-read from canonical state on the 4 Hz interface tick.
+  A deep-linked `dc=` payload, a share link or a module-side state write is
+  therefore always visible in the panel without a rebuild, and no displayed
+  value can permanently disagree with canonical state (U-05…U-08, U-14).
+- **Share application order.** Experience mode is applied before `sharedVisual`
+  so the more specific encoded display values win over mode defaults (U-05).
+- **Focus preservation.** A panel/nav rebuild captures the focused control's
+  stable identity (role-bearing tag, type, accessible name) before any
+  destructive DOM step and restores it after, scoped to the shell root so the
+  destination chip survives `refreshNav()` too (U-09).
+- **Region state preservation.** The open/closed set of collapsible sections
+  is captured before a rebuild and replayed after it (task 6.3).
+- **Collapsed drawer.** The narrow-viewport drawer is `inert` while collapsed,
+  removing it from the accessibility tree and tab order without touching the
+  slide transition (U-10).
+
 ## 4. Initial presets
 
 Create deterministic presets as milestones make them possible:

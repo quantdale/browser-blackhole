@@ -128,6 +128,8 @@ Initial exterior model may use Schwarzschild outside a spherical star with confi
 
 **M12-NS status (2026-08-26): DIRECT** exterior Schwarzschild backwards ray tracing to the material surface is now implemented and validated (surface hit/escape with refined crossing, starfield background, redshift `g = sqrt(1-2r_g/R)`). Hot-spot emission is evaluated at the geodesic hit coordinate. Still deliberately omitted and disclosed: Doppler/aberration from rotating surface elements, Hartle-Thorne frame dragging, atmosphere/radiative transfer, oblate figure, interior metric/time-of-flight.
 
+The renderer is `src/phenomena/neutron-star/surfaceLensingGpu.ts` (per-pixel Schwarzschild null geodesics, ray-bent limb and lensed background included). Preset fidelity notes and module headers describing “no ray-bent limb yet” or a future shared-LensingService pass were stale and were corrected against this implementation in 2026-10 (U-03); a fidelity note must never contradict the shipped path.
+
 If rapid-rotation spacetime effects are not included, say so.
 
 Pulsar beam and magnetic field-line visuals are illustrative magnetosphere representations unless a specific validated model is implemented.

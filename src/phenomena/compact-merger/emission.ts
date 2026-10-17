@@ -63,6 +63,13 @@ export function kilonovaTemperatureK(tauSeconds: number): number {
  * locus fit over 1000..40000 K; presentation only, same discipline as the
  * stellar-explosion emission module). Output components are finite, >= 0,
  * <= 1, and the chromaticity moves redward monotonically as T falls.
+ *
+ * CALIBRATION NOTE (U-19): this is a closed-form locus FIT, deliberately
+ * distinct from the shared anchor-table ramp in
+ * src/phenomena/shared/temperatureRamp.ts (which is tuned for 1e3..1e7 K
+ * surfaces and would restyle the kilonova). Its valid domain ENDS at the
+ * 4e4 K ceiling below — call sites must not pass hotter temperatures
+ * expecting a distinguishable result (see compactMergerModule STAR_TINT).
  */
 export function kelvinToLinearRgb(kelvin: number): [number, number, number] {
   const t = Number.isFinite(kelvin) ? Math.min(40000, Math.max(1000, kelvin)) : 6000;

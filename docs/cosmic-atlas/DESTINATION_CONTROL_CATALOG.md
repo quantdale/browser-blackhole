@@ -50,6 +50,17 @@ Atlas must reuse existing control semantics rather than redefining mass/spin/dis
 - Hot-spot latitude/longitude
 - Surface temperature/emission preset
 
+#### Observer inclination — source of truth (U-02)
+
+The camera rig owns the observer direction. The `observerInclinationDeg`
+control is LIVE and bound to the rig's polar angle: a control change sets the
+rig, every orbit change (user gesture, camera reset, an arrived preset seed)
+reads the rig's polar angle back into canonical state and the displayed
+control, and a preset seeds the rig on enter only. The field is never a
+second live source and never a passive readout. The control's range is the
+rig's polar envelope (9°–171°); the state schema's wider clamp is not a
+promise the rig can keep.
+
 ### Scenario
 
 - Standard neutron star

@@ -45,8 +45,10 @@ const SURFACE_PRESET: PresetDescriptor = {
   stateSchemaVersion: 1,
   fidelityNote:
     'Exterior Schwarzschild DIRECT: surface redshift g=sqrt(1-2rg/R) and pulse geometry are ' +
-    'analytic. Visible surface is direct emission (no ray-bent limb yet). Dipole field lines ' +
-    'and flares are PROCEDURAL_SCIENTIFIC.',
+    'analytic. The visible surface and the background come from per-pixel Schwarzschild null ' +
+    'geodesics (surfaceLensingGpu): the limb is ray-bent and the background is lensed. Omitted: ' +
+    'Doppler/aberration, frame dragging, atmosphere. Dipole field lines and flares are ' +
+    'PROCEDURAL_SCIENTIFIC.',
   state: {
     preset: 'surface',
     mass: 1.4,

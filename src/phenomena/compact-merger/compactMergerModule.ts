@@ -103,8 +103,14 @@ import { AutoFramer } from '../../renderer/shared/AutoFramer.js';
 const FLASH_DURATION_S = 0.02;
 /** Flash peak emissive gain (presentation; bloom carries it further). */
 const FLASH_PEAK_GAIN = 6;
-/** Star surface tint (hot NS photosphere proxy), linear RGB. */
-const STAR_TINT = kelvinToLinearRgb(6e5);
+/**
+ * Star surface tint (hot NS photosphere proxy), linear RGB. The physical
+ * photosphere is ~6e5 K, far above `kelvinToLinearRgb`'s empirical-fit
+ * ceiling of 4e4 K, where the locus is already saturated blue-white — so the
+ * tint is expressed AT that ceiling (identical output to the clamped 6e5 K
+ * call) instead of relying on the helper's silent clamp (U-18).
+ */
+const STAR_TINT = kelvinToLinearRgb(4e4);
 /**
  * Cinematic-only multiplier for the reduced kilonova luminosity proxy. The
  * model's luminosity stays in the debug/Scientific path; this bounded display

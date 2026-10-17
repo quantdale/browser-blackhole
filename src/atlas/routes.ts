@@ -160,12 +160,19 @@ export function parseRoute(pathname: string, search: string): ParsedRoute {
   let preset: string | null = null;
   try {
     const params = new URLSearchParams(queryString);
-    for (const value of params.getAll('preset')) {
-      const trimmed = value.trim();
-      if (trimmed.length > 0) {
-        preset = trimmed;
-        break;
+    // Canonical key is `preset` (buildRoute). `p` is the compact share key
+    // (serializeForUrl, STATE_AND_ROUTES §9) and is accepted as an alias so a
+    // serialised share string is readable by the route parser — the two keys
+    // used to mismatch, leaving a serialised preset unreadable (U-15).
+    for (const key of ['preset', 'p']) {
+      for (const value of params.getAll(key)) {
+        const trimmed = value.trim();
+        if (trimmed.length > 0) {
+          preset = trimmed;
+          break;
+        }
       }
+      if (preset !== null) break;
     }
   } catch {
     preset = null;

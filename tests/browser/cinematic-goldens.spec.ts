@@ -14,7 +14,18 @@ import {
 } from './support/cinematicGoldenHarness.js';
 
 test.describe.configure({ mode: 'serial' });
-test.setTimeout(180_000);
+// Budget normalization (destination-control-truthfulness close-out, recorded
+// per MASTER_PLAN §9 rule 7): the per-row work here is condition-driven
+// (arrival -> scrub -> settle -> 10 captured frames -> metrics -> comparison)
+// but its WALL-CLOCK cost is machine-speed bound. Measured on the current
+// capable runner (hardware WebGPU) the heaviest row (CIN_BH_CLASSIC) runs
+// ~175 s standalone against this former 180 s budget — so it passed in
+// isolation and timed out deterministically under full-suite load, with the
+// timeout landing before any comparison assertion ran. Sibling heavy rows
+// (neutron-star motion, kerr integration) already use 300 s for the same
+// reason. Only the wall-clock budget changes: every comparison threshold,
+// tolerance, settle-protocol count and golden baseline is untouched.
+test.setTimeout(300_000);
 
 const requestedBackend = process.env.CINEMATIC_GOLDEN_BACKEND;
 if (

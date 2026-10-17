@@ -27,16 +27,23 @@ import { uniform, vec3, vec4 } from 'three/tsl';
 
 import { luminosityProxy, photosphericTemperatureK, TEMPERATURE_FLOOR_K } from './physics.js';
 import type { ResolvedScenario } from './types.js';
+import {
+  interpolateTemperatureRamp,
+  type TemperatureRampAnchor
+} from '../shared/temperatureRamp.js';
 
 // ---------------------------------------------------------------------------
 // Temperature -> linear-light RGB ramp
 // ---------------------------------------------------------------------------
 
-/** Ramp anchors over log10(T). Hand-picked Planck-inspired palette. */
-const TEMPERATURE_RAMP_ANCHORS: ReadonlyArray<{
-  readonly logT: number;
-  readonly rgb: readonly [number, number, number];
-}> = [
+/**
+ * CALIBRATION (U-19): this destination's hand-picked Planck-inspired palette
+ * over log10(T), tuned for photospheric evolution 1e3..1e7 K (shock-flash
+ * blues asymptote at logT 7). The interpolation ALGORITHM is shared with the
+ * neutron-star ramp (src/phenomena/shared/temperatureRamp.ts); only the
+ * anchors are destination-specific. Sorted by logT ascending.
+ */
+const TEMPERATURE_RAMP_ANCHORS: ReadonlyArray<TemperatureRampAnchor> = [
   { logT: 3.0, rgb: [1.0, 0.18, 0.02] }, // 1000 K, deep ember red
   { logT: 3.48, rgb: [1.0, 0.36, 0.09] }, // ~3000 K, dull red-orange
   { logT: 3.78, rgb: [1.0, 0.87, 0.72] }, // ~6000 K, warm white
@@ -50,34 +57,13 @@ export const KELVIN_RAMP_MIN_K = 1000;
 export const KELVIN_RAMP_MAX_K = 1e7;
 
 /**
- * Map a photospheric temperature to linear-light RGB via piecewise-linear
- * interpolation of {@link TEMPERATURE_RAMP_ANCHORS} over log10(T).
- * NOT Planck integration (see header disclosure). Total function: clamps,
- * never throws, always returns finite components in [0, 1].
+ * Map a photospheric temperature to linear-light RGB via the shared
+ * piecewise-linear interpolation of {@link TEMPERATURE_RAMP_ANCHORS} over
+ * log10(T) (U-19). NOT Planck integration (see header disclosure). Total
+ * function: clamps, never throws, always returns finite components in [0, 1].
  */
 export function kelvinToLinearRgb(temperatureK: number): [number, number, number] {
-  const t = Number.isFinite(temperatureK)
-    ? Math.min(KELVIN_RAMP_MAX_K, Math.max(KELVIN_RAMP_MIN_K, temperatureK))
-    : KELVIN_RAMP_MIN_K;
-  const logT = Math.log10(t);
-  const anchors = TEMPERATURE_RAMP_ANCHORS;
-  const first = anchors[0]!;
-  const last = anchors[anchors.length - 1]!;
-  if (logT <= first.logT) return [...first.rgb];
-  if (logT >= last.logT) return [...last.rgb];
-  for (let i = 0; i < anchors.length - 1; i++) {
-    const a = anchors[i]!;
-    const b = anchors[i + 1]!;
-    if (logT >= a.logT && logT <= b.logT) {
-      const f = (logT - a.logT) / (b.logT - a.logT);
-      return [
-        a.rgb[0] + (b.rgb[0] - a.rgb[0]) * f,
-        a.rgb[1] + (b.rgb[1] - a.rgb[1]) * f,
-        a.rgb[2] + (b.rgb[2] - a.rgb[2]) * f
-      ];
-    }
-  }
-  return [1, 1, 1]; // unreachable given the clamps above
+  return interpolateTemperatureRamp(TEMPERATURE_RAMP_ANCHORS, temperatureK);
 }
 
 // ---------------------------------------------------------------------------

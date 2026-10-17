@@ -596,3 +596,83 @@ test.describe('Neutron Star timeline is paced and endless (phenomena-animation)'
     expect(consoleErrors.concat(pageErrors)).toEqual([]);
   });
 });
+
+/**
+ * destination-control-truthfulness U-02 — observer-inclination binding.
+ *
+ * The camera rig is the ONE live source for the observer direction: a control
+ * change writes the rig's polar angle, and every orbit change reads back into
+ * canonical state (runtime -> serializeShareState + debug snapshot). Before
+ * the binding, `observerInclinationDeg` was written to state/runtime/snapshot
+ * and never reached a uniform, a transform or the beam calculation — the
+ * reported value stayed at the preset seed forever.
+ */
+test.describe('Observer-inclination binding (U-02)', () => {
+  test('the reported observer inclination equals the camera orbit polar angle after an orbit change', async ({
+    page
+  }) => {
+    await page.goto('/atlas/neutron-star?preset=surface');
+    await waitForArrival(page, 'neutron-star', 'surface');
+
+    // Orbit change at the rig (the same primitive a user gesture uses).
+    await page.evaluate(() => {
+      window.__ATLAS_APP__!.host.cameraRig.setOrbit(35, 42, 60);
+    });
+
+    // The rig applied the change...
+    await expect
+      .poll(async () =>
+        page.evaluate(() => window.__ATLAS_APP__!.host.cameraRig.getOrbit().polarDeg)
+      )
+      .toBeCloseTo(42, 6);
+
+    // ...and the reported inclination is the rig's polar angle (fail-first:
+    // this reported the preset seed (80) before the binding existed).
+    await expect
+      .poll(
+        async () => {
+          const snapshot = await readDebugSnapshot(page);
+          return Number(snapshot['observerInclinationDeg']);
+        },
+        { timeout: 10_000, intervals: [200] }
+      )
+      .toBeCloseTo(42, 6);
+  });
+
+  test('the observer-inclination control sets the camera rig polar angle', async ({ page }) => {
+    await page.goto('/atlas/neutron-star?preset=surface');
+    await waitForArrival(page, 'neutron-star', 'surface');
+
+    // The Star / Observer section is collapsed by default; expand it.
+    const section = page.getByRole('button', { name: 'Star / Observer', exact: true });
+    await expect(section).toBeVisible();
+    if ((await section.getAttribute('aria-expanded')) !== 'true') {
+      await section.focus();
+      await page.keyboard.press('Enter');
+    }
+
+    // Operate the control through the keyboard (the accessible path).
+    const slider = page.getByRole('slider', { name: 'Observer inclination' });
+    await expect(slider).toBeVisible();
+    await slider.focus();
+    const before = Number(await slider.inputValue());
+    await page.keyboard.press('ArrowRight');
+    const after = Number(await slider.inputValue());
+    expect(after).not.toBe(before);
+
+    // The control reached the rig — not just canonical state. Assert the
+    // BINDING (rig polar == displayed value), not step arithmetic.
+    await expect
+      .poll(
+        async () => page.evaluate(() => window.__ATLAS_APP__!.host.cameraRig.getOrbit().polarDeg),
+        { timeout: 10_000, intervals: [200] }
+      )
+      .toBeCloseTo(after, 6);
+
+    // And the displayed value equals the rig's polar angle.
+    const polar = await page.evaluate(
+      () => window.__ATLAS_APP__!.host.cameraRig.getOrbit().polarDeg
+    );
+    expect(Number(await slider.inputValue())).toBeCloseTo(polar, 6);
+  });
+});

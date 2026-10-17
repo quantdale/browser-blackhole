@@ -36,6 +36,7 @@
 import '../ui/atlas/atlasPanel.css';
 import {
   BLOOM_STRENGTH_RANGE,
+  CAMERA_FOV_DEG_RANGE,
   EXPOSURE_RANGE,
   RENDER_SCALE_OVERRIDE_RANGE,
   TONE_MAPPING_VALUES,
@@ -544,8 +545,32 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // refresh survive rebuilds through the closures below.
   let transport: TimelineTransportHandle | null = null;
   let readouts: ReadoutListHandle | null = null;
-  /** M11: per-tick observer-control value sync (set by the BH panel build). */
-  let observerSync: (() => void) | null = null;
+  /**
+   * U-06 (design D6): per-tick control reflection closures, registered by the
+   * panel build and run on every 4 Hz UI tick. Displayed control values are
+   * re-read from canonical state here — never captured only at build time —
+   * so deep-link `dc=` payloads, share state and module-side writes (e.g. the
+   * neutron-star orbit read-back) all self-correct without a rebuild. The
+   * black-hole observer rows were the first user of this pattern (M11).
+   */
+  let liveSyncs: Array<() => void> = [];
+  /**
+   * 6.3: open/closed state of every panel section, captured from the DOM
+   * before a rebuild and replayed after it, so a panel rebuild does not
+   * silently fold away the regions the user had open. Sections not present
+   * before the rebuild keep their default state.
+   */
+  let sectionStatesBeforeBuild = new Map<string, boolean>();
+
+  const captureSectionStates = (): Map<string, boolean> => {
+    const states = new Map<string, boolean>();
+    for (const toggle of panelElement.querySelectorAll('.atlas-section-toggle')) {
+      const title = toggle.querySelector('.atlas-section-title')?.textContent?.trim();
+      if (title === undefined || title.length === 0) continue;
+      states.set(title, toggle.getAttribute('aria-expanded') === 'true');
+    }
+    return states;
+  };
   /** CA8-13 waveform panel (Black-Hole Merger only); rebuilt with the panel. */
   let waveformPanel: WaveformPanelHandle | null = null;
   /** Asset id currently bound into the panel (null = unbound). */
@@ -666,7 +691,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   function buildPanel(): void {
     transport = null;
     readouts = null;
-    observerSync = null;
+    liveSyncs = [];
     waveformPanel?.dispose();
     waveformPanel = null;
     waveformBoundAssetId = null;
@@ -678,8 +703,13 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     const activePreset = entry.presetById.get(presetId);
 
     /** Preset label with the redundant "<Destination> — " prefix stripped. */
-    const presetLabel = (displayName: string): string =>
-      displayName.replace(new RegExp(`^${entry.descriptor.title} — `), '');
+    const presetLabel = (displayName: string): string => {
+      // Literal prefix strip (7.4): the descriptor title is DATA, not a
+      // pattern — building a RegExp from it breaks on titles containing
+      // regex metacharacters (and silently mislabels the presets).
+      const prefix = `${entry.descriptor.title} — `;
+      return displayName.startsWith(prefix) ? displayName.slice(prefix.length) : displayName;
+    };
 
     // -- Panel header: destination identity (PRODUCT_UX_AND_TRANSITIONS §13) --
     const header = createPanelHeader();
@@ -719,19 +749,28 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
 
     // -- Observer -------------------------------------------------------------
     const observerSection = createCollapsibleSection({ title: 'Observer', open: false });
+    // U-14: the slider spans the CANONICAL camera range (CAMERA_FOV_DEG_RANGE,
+    // the same clamp the state normalizer enforces) instead of a narrower
+    // private range that contradicted it. The value is reflected per tick
+    // (U-06 design D6) so the Reset-camera action — which restores the
+    // preset's fovDeg through the rig — shows up in the control.
+    const fovRow = createSliderRow({
+      label: 'Field of view',
+      description: 'Vertical field of view of the observer camera.',
+      min: CAMERA_FOV_DEG_RANGE.min,
+      max: CAMERA_FOV_DEG_RANGE.max,
+      step: 1,
+      value: host.camera.fov,
+      unit: '°',
+      onInput: (value) => {
+        host.cameraRig.setFov(value);
+      }
+    });
+    liveSyncs.push(() => {
+      fovRow.setValue(host.camera.fov);
+    });
     observerSection.body.append(
-      createSliderRow({
-        label: 'Field of view',
-        description: 'Vertical field of view of the observer camera.',
-        min: 20,
-        max: 120,
-        step: 1,
-        value: host.camera.fov,
-        unit: '°',
-        onInput: (value) => {
-          host.cameraRig.setFov(value);
-        }
-      }).root,
+      fovRow.root,
       createButtonRow([
         {
           text: 'Reset camera',
@@ -794,6 +833,33 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     );
 
     // -- Rendering --------------------------------------------------------------
+    // U-07 (design D6): the dynamic-resolution toggle and the render-scale
+    // slider mutate ONE field (the render-scale override; null = dynamic), so
+    // both are reflected from the shared underlying value every tick — the
+    // toggle from `dynamicResolution`, the slider from the effective scale.
+    const dynamicResolutionToggle = createToggleRow({
+      label: 'Dynamic resolution',
+      description: 'Lets the governor choose the render scale automatically.',
+      checked: host.state.rendering.dynamicResolution,
+      onChange: (checked) => {
+        host.setRenderScaleOverride(checked ? null : host.governor.renderScale);
+      }
+    });
+    const renderScaleSlider = createSliderRow({
+      label: 'Render scale',
+      description: 'Internal render-resolution multiplier.',
+      min: RENDER_SCALE_OVERRIDE_RANGE.min,
+      max: RENDER_SCALE_OVERRIDE_RANGE.max,
+      step: 0.05,
+      value: host.renderScaleOverride ?? host.governor.renderScale,
+      onInput: (value) => {
+        host.setRenderScaleOverride(value);
+      }
+    });
+    liveSyncs.push(() => {
+      dynamicResolutionToggle.setChecked(host.state.rendering.dynamicResolution);
+      renderScaleSlider.setValue(host.renderScaleOverride ?? host.governor.renderScale);
+    });
     const renderingSection = createCollapsibleSection({ title: 'Rendering', open: false });
     renderingSection.body.append(
       createSelectRow({
@@ -824,25 +890,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
           if (fps === 30 || fps === 60) host.setTargetFps(fps);
         }
       }).root,
-      createToggleRow({
-        label: 'Dynamic resolution',
-        description: 'Lets the governor choose the render scale automatically.',
-        checked: host.state.rendering.dynamicResolution,
-        onChange: (checked) => {
-          host.setRenderScaleOverride(checked ? null : host.governor.renderScale);
-        }
-      }).root,
-      createSliderRow({
-        label: 'Render scale',
-        description: 'Internal render-resolution multiplier.',
-        min: RENDER_SCALE_OVERRIDE_RANGE.min,
-        max: RENDER_SCALE_OVERRIDE_RANGE.max,
-        step: 0.05,
-        value: host.renderScaleOverride ?? host.governor.renderScale,
-        onInput: (value) => {
-          host.setRenderScaleOverride(value);
-        }
-      }).root,
+      dynamicResolutionToggle.root,
+      renderScaleSlider.root,
       createSelectRow({
         label: 'Trajectory backend',
         description:
@@ -864,54 +913,100 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     // preset-bound state only (documented control-scoping decision).
     if (destId === 'compact-merger') {
       const mergerSection = createCollapsibleSection({ title: 'Merger', open: false });
-      const share = (host.state.destinations['compact-merger']?.state ?? {}) as Record<
-        string,
-        unknown
-      >;
-      mergerSection.body.append(
-        createSliderRow({
-          label: 'Viewing angle',
-          description: 'Inclination of the viewing direction to the orbital plane.',
-          min: 0,
-          max: 90,
-          step: 1,
-          value: typeof share['viewingAngleDeg'] === 'number' ? share['viewingAngleDeg'] : 75,
-          unit: '°',
-          onInput: (value) => {
-            host.setDestinationControl('compact-merger', { viewingAngleDeg: value });
-          }
-        }).root,
-        createSelectRow({
-          label: 'Remnant',
-          description: 'Post-merger outcome the ejecta and jet models are built for.',
-          options: [
-            { value: 'massive-ns', label: 'Massive NS' },
-            { value: 'prompt-bh', label: 'Prompt BH' },
-            { value: 'delayed-collapse', label: 'Delayed collapse' }
-          ],
-          value:
-            typeof share['remnantScenario'] === 'string' ? share['remnantScenario'] : 'massive-ns',
-          onChange: (value) => {
-            host.setDestinationControl('compact-merger', { remnantScenario: value });
-            markPanelDirty();
-          }
-        }).root,
-        createSelectRow({
-          label: 'Jet',
-          description: 'Opening angle of the relativistic jet, if any.',
-          options: [
-            { value: 'none', label: 'None' },
-            { value: 'thin', label: 'Thin (8°)' },
-            { value: 'wide', label: 'Wide (20°)' }
-          ],
-          value: typeof share['jetScenario'] === 'string' ? share['jetScenario'] : 'none',
-          onChange: (value) => {
-            host.setDestinationControl('compact-merger', { jetScenario: value });
-            markPanelDirty();
-          }
-        }).root
-      );
+      const readShare = (): Record<string, unknown> =>
+        (host.state.destinations['compact-merger']?.state ?? {}) as Record<string, unknown>;
+      const share = readShare();
+      // U-06: rows are retained so the interface tick can reflect canonical
+      // state into them (deep-link dc= payloads, share state, reset paths).
+      const viewingAngleRow = createSliderRow({
+        label: 'Viewing angle',
+        description: 'Inclination of the viewing direction to the orbital plane.',
+        min: 0,
+        max: 90,
+        step: 1,
+        value: typeof share['viewingAngleDeg'] === 'number' ? share['viewingAngleDeg'] : 75,
+        unit: '°',
+        onInput: (value) => {
+          host.setDestinationControl('compact-merger', { viewingAngleDeg: value });
+        }
+      });
+      const remnantRow = createSelectRow({
+        label: 'Remnant',
+        description: 'Post-merger outcome the ejecta and jet models are built for.',
+        options: [
+          { value: 'massive-ns', label: 'Massive NS' },
+          { value: 'prompt-bh', label: 'Prompt BH' },
+          { value: 'delayed-collapse', label: 'Delayed collapse' }
+        ],
+        value:
+          typeof share['remnantScenario'] === 'string' ? share['remnantScenario'] : 'massive-ns',
+        onChange: (value) => {
+          host.setDestinationControl('compact-merger', { remnantScenario: value });
+          markPanelDirty();
+        }
+      });
+      const jetRow = createSelectRow({
+        label: 'Jet',
+        description: 'Opening angle of the relativistic jet, if any.',
+        options: [
+          { value: 'none', label: 'None' },
+          { value: 'thin', label: 'Thin (8°)' },
+          { value: 'wide', label: 'Wide (20°)' }
+        ],
+        value: typeof share['jetScenario'] === 'string' ? share['jetScenario'] : 'none',
+        onChange: (value) => {
+          host.setDestinationControl('compact-merger', { jetScenario: value });
+          markPanelDirty();
+        }
+      });
+      mergerSection.body.append(viewingAngleRow.root, remnantRow.root, jetRow.root);
+      liveSyncs.push(() => {
+        const state = readShare();
+        const angle = state['viewingAngleDeg'];
+        if (typeof angle === 'number') viewingAngleRow.setValue(angle);
+        const remnant = state['remnantScenario'];
+        if (typeof remnant === 'string') remnantRow.setValue(remnant);
+        const jet = state['jetScenario'];
+        if (typeof jet === 'string') jetRow.setValue(jet);
+      });
       destSections.push(mergerSection.root);
+    }
+
+    // -- Neutron Star controls (canonical applyControlState channel) --------
+    // U-02: the observer-inclination control is bound to the CAMERA RIG — a
+    // change sets the rig's polar angle (module applyControlState) and the
+    // module reads the rig back into canonical state every frame, so the
+    // slider can never display a value that disagrees with the render.
+    if (destId === 'neutron-star') {
+      const nsSection = createCollapsibleSection({ title: 'Star / Observer', open: false });
+      const readNs = (): Record<string, unknown> =>
+        (host.state.destinations['neutron-star']?.state ?? {}) as Record<string, unknown>;
+      const nsShare = readNs();
+      const inclinationRow = createSliderRow({
+        label: 'Observer inclination',
+        description: 'Angle between the spin axis and the viewing direction.',
+        // The achievable range is the camera rig's polar envelope (CameraRig
+        // clamps polar to [9°, 171°]); the state schema's wider clamp is not
+        // a promise the rig can keep, and a slider must only offer values the
+        // scene can actually express.
+        min: 9,
+        max: 171,
+        step: 1,
+        value:
+          typeof nsShare['observerInclinationDeg'] === 'number'
+            ? nsShare['observerInclinationDeg']
+            : 80,
+        unit: '°',
+        onInput: (value) => {
+          host.setDestinationControl('neutron-star', { observerInclinationDeg: value });
+        }
+      });
+      nsSection.body.append(inclinationRow.root);
+      liveSyncs.push(() => {
+        const inclination = readNs()['observerInclinationDeg'];
+        if (typeof inclination === 'number') inclinationRow.setValue(inclination);
+      });
+      destSections.push(nsSection.root);
     }
 
     // -- Black-hole M10 observer controls (canonical applyControlState) ------
@@ -1066,7 +1161,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       // Per-tick reflection: preset/control changes made OUTSIDE this panel
       // (preset load, share state, reset) update the visible values without a
       // rebuild. Mode changes rebuild via the signature term below.
-      observerSync = (): void => {
+      liveSyncs.push((): void => {
         const modeNow = String(readObs()['mode'] ?? 'camera');
         modeSelect.setValue(
           modeNow === 'static' ||
@@ -1077,80 +1172,93 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
             : 'camera'
         );
         for (const row of liveRows) row.apply(row.read());
-      };
+      });
       destSections.push(bhSection.root);
     }
 
     // -- Tidal Disruption controls (canonical applyControlState channel) ------
     if (destId === 'tidal-disruption') {
       const tdeSection = createCollapsibleSection({ title: 'Encounter', open: false });
-      const share = (host.state.destinations['tidal-disruption']?.state ?? {}) as Record<
-        string,
-        unknown
-      >;
+      const readShare = (): Record<string, unknown> =>
+        (host.state.destinations['tidal-disruption']?.state ?? {}) as Record<string, unknown>;
+      const share = readShare();
       const bhLog10 =
         typeof share['blackHoleMassSolar'] === 'number'
           ? Math.log10(share['blackHoleMassSolar'])
           : 6;
-      tdeSection.body.append(
-        createSliderRow({
-          label: 'BH mass (log10 solar)',
-          description: 'Black-hole mass on a logarithmic solar-mass scale.',
-          min: 5,
-          max: 7.7,
-          step: 0.01,
-          value: bhLog10,
-          onInput: (value) => {
-            host.setDestinationControl('tidal-disruption', {
-              blackHoleMassSolar: Number((10 ** value).toPrecision(4))
-            });
-          }
-        }).root,
-        createSelectRow({
-          label: 'Star',
-          description: 'Stellar structure preset for the disrupted star.',
-          options: [
-            { value: 'solar-type', label: 'Solar type' },
-            { value: 'low-mass-k', label: 'Low-mass K dwarf' },
-            { value: 'evolved-subgiant', label: 'Evolved subgiant' }
-          ],
-          value: typeof share['stellarPreset'] === 'string' ? share['stellarPreset'] : 'solar-type',
-          onChange: (value) => {
-            host.setDestinationControl('tidal-disruption', { stellarPreset: value });
-          }
-        }).root,
-        createSelectRow({
-          label: 'Penetration',
-          description: 'Pericentre distance relative to the tidal radius (β).',
-          options: [
-            { value: 'grazing', label: 'Grazing (β 0.85)' },
-            { value: 'canonical', label: 'Canonical (β 1.0)' },
-            { value: 'deep', label: 'Deep (β 2.5)' }
-          ],
-          value:
-            typeof share['penetrationScenario'] === 'string'
-              ? share['penetrationScenario']
-              : 'canonical',
-          onChange: (value) => {
-            host.setDestinationControl('tidal-disruption', { penetrationScenario: value });
-          }
-        }).root,
-        createSliderRow({
-          label: 'Observer orientation',
-          description: 'Inclination of the viewing direction to the orbital plane.',
-          min: 0,
-          max: 90,
-          step: 1,
-          value:
-            typeof share['observerInclinationDeg'] === 'number'
-              ? share['observerInclinationDeg']
-              : 62,
-          unit: '°',
-          onInput: (value) => {
-            host.setDestinationControl('tidal-disruption', { observerInclinationDeg: value });
-          }
-        }).root
-      );
+      // U-06: retained row handles; the interface tick reflects canonical
+      // state into them (see liveSyncs).
+      const massRow = createSliderRow({
+        label: 'BH mass (log10 solar)',
+        description: 'Black-hole mass on a logarithmic solar-mass scale.',
+        min: 5,
+        max: 7.7,
+        step: 0.01,
+        value: bhLog10,
+        onInput: (value) => {
+          host.setDestinationControl('tidal-disruption', {
+            blackHoleMassSolar: Number((10 ** value).toPrecision(4))
+          });
+        }
+      });
+      const starRow = createSelectRow({
+        label: 'Star',
+        description: 'Stellar structure preset for the disrupted star.',
+        options: [
+          { value: 'solar-type', label: 'Solar type' },
+          { value: 'low-mass-k', label: 'Low-mass K dwarf' },
+          { value: 'evolved-subgiant', label: 'Evolved subgiant' }
+        ],
+        value: typeof share['stellarPreset'] === 'string' ? share['stellarPreset'] : 'solar-type',
+        onChange: (value) => {
+          host.setDestinationControl('tidal-disruption', { stellarPreset: value });
+        }
+      });
+      const penetrationRow = createSelectRow({
+        label: 'Penetration',
+        description: 'Pericentre distance relative to the tidal radius (β).',
+        options: [
+          { value: 'grazing', label: 'Grazing (β 0.85)' },
+          { value: 'canonical', label: 'Canonical (β 1.0)' },
+          { value: 'deep', label: 'Deep (β 2.5)' }
+        ],
+        value:
+          typeof share['penetrationScenario'] === 'string'
+            ? share['penetrationScenario']
+            : 'canonical',
+        onChange: (value) => {
+          host.setDestinationControl('tidal-disruption', { penetrationScenario: value });
+        }
+      });
+      const orientationRow = createSliderRow({
+        label: 'Observer orientation',
+        description: 'Inclination of the viewing direction to the orbital plane.',
+        min: 0,
+        max: 90,
+        step: 1,
+        value:
+          typeof share['observerInclinationDeg'] === 'number'
+            ? share['observerInclinationDeg']
+            : 62,
+        unit: '°',
+        onInput: (value) => {
+          host.setDestinationControl('tidal-disruption', { observerInclinationDeg: value });
+        }
+      });
+      tdeSection.body.append(massRow.root, starRow.root, penetrationRow.root, orientationRow.root);
+      liveSyncs.push(() => {
+        const state = readShare();
+        const massSolar = state['blackHoleMassSolar'];
+        if (typeof massSolar === 'number' && massSolar > 0) {
+          massRow.setValue(Math.log10(massSolar));
+        }
+        const star = state['stellarPreset'];
+        if (typeof star === 'string') starRow.setValue(star);
+        const penetration = state['penetrationScenario'];
+        if (typeof penetration === 'string') penetrationRow.setValue(penetration);
+        const orientation = state['observerInclinationDeg'];
+        if (typeof orientation === 'number') orientationRow.setValue(orientation);
+      });
       destSections.push(tdeSection.root);
     }
 
@@ -1161,25 +1269,34 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         unknown
       >;
       const mergerSection = createCollapsibleSection({ title: 'Merger', open: false });
-      mergerSection.body.append(
-        createToggleRow({
-          label: 'Orbit trails',
-          description: 'Draw the inspiral orbital paths from the dataset.',
-          checked: share['showOrbitTrails'] !== false,
-          onChange: (checked) => {
-            host.setDestinationControl('black-hole-merger', { showOrbitTrails: checked });
-          }
-        }).root,
-        createToggleRow({
-          label: 'Illustrative lens accents',
-          description:
-            'Non-physical lensing accents. Turning this off leaves the dataset-driven view.',
-          checked: share['illustrativeLensing'] !== false,
-          onChange: (checked) => {
-            host.setDestinationControl('black-hole-merger', { illustrativeLensing: checked });
-          }
-        }).root
-      );
+      // U-06: retained toggle handles; the interface tick reflects canonical
+      // state into them (see liveSyncs).
+      const orbitTrailsToggle = createToggleRow({
+        label: 'Orbit trails',
+        description: 'Draw the inspiral orbital paths from the dataset.',
+        checked: share['showOrbitTrails'] !== false,
+        onChange: (checked) => {
+          host.setDestinationControl('black-hole-merger', { showOrbitTrails: checked });
+        }
+      });
+      const lensAccentsToggle = createToggleRow({
+        label: 'Illustrative lens accents',
+        description:
+          'Non-physical lensing accents. Turning this off leaves the dataset-driven view.',
+        checked: share['illustrativeLensing'] !== false,
+        onChange: (checked) => {
+          host.setDestinationControl('black-hole-merger', { illustrativeLensing: checked });
+        }
+      });
+      mergerSection.body.append(orbitTrailsToggle.root, lensAccentsToggle.root);
+      liveSyncs.push(() => {
+        const state = (host.state.destinations['black-hole-merger']?.state ?? {}) as Record<
+          string,
+          unknown
+        >;
+        orbitTrailsToggle.setChecked(state['showOrbitTrails'] !== false);
+        lensAccentsToggle.setChecked(state['illustrativeLensing'] !== false);
+      });
       const note = document.createElement('p');
       note.className = 'atlas-note';
       note.textContent =
@@ -1261,6 +1378,20 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       numericalGroup.root,
       referenceGroup.root
     );
+
+    // 6.3: replay the pre-rebuild open/closed states. The toggle's own click
+    // handler is the ONE code path that changes openness (setOpen), so the
+    // restore reuses it instead of re-implementing the attribute choreography.
+    for (const toggle of panelElement.querySelectorAll<HTMLButtonElement>(
+      '.atlas-section-toggle'
+    )) {
+      const title = toggle.querySelector('.atlas-section-title')?.textContent?.trim();
+      if (title === undefined) continue;
+      const wasOpen = sectionStatesBeforeBuild.get(title);
+      if (wasOpen === undefined) continue;
+      const isOpen = toggle.getAttribute('aria-expanded') === 'true';
+      if (isOpen !== wasOpen) toggle.click();
+    }
   }
 
   /** One-line trajectory-backend truth for the diagnostics readout. */
@@ -1338,11 +1469,21 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   // Share-link subset application (STATE_AND_ROUTES §9): the compact query
   // keys ride the SAME normalizer as runtime state. Applied once after init
   // so presentation surfaces exist; route identity stays authoritative via
-  // parseRoute (unknown keys here are ignored by the parser).
-  const share = parseFromUrl(window.location.search);
+  // parseRoute (unknown keys here are ignored by the parser). The route's
+  // destination keys any `dc=` payload when the query omits `d=` (U-06).
+  const share = parseFromUrl(window.location.search, {
+    defaultDestination: host.state.atlas.activeDestination
+  });
   if (share.rendering !== undefined) {
     host.setQualityMode(share.rendering.qualityMode);
     host.setTrajectoryBackend(share.rendering.trajectoryBackend);
+  }
+  // U-05 (design D5): experience mode is applied BEFORE sharedVisual, never
+  // after. Applying it last overwrote the encoded e/b/bs/t values with the
+  // mode's display defaults — `mode=` silently discarded the very fields it
+  // was encoded alongside. The more specific encoded values must win.
+  if (share.experience !== undefined && share.experience.mode !== host.experienceMode) {
+    host.setExperienceMode(share.experience.mode);
   }
   if (share.sharedVisual !== undefined) {
     host.setVisual({
@@ -1352,8 +1493,11 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       toneMapping: share.sharedVisual.toneMapping
     });
   }
-  if (share.experience !== undefined && share.experience.mode !== host.experienceMode) {
-    host.setExperienceMode(share.experience.mode);
+  // U-13: `?rm=` was parsed into canonical state and then dropped on the
+  // floor — setReducedMotion had zero external callers. Apply it so an
+  // explicit share/deep-link value wins over the media-query default.
+  if (share.accessibility !== undefined) {
+    host.setReducedMotion(share.accessibility.reducedMotion);
   }
 
   // Destination-control deep links (CA6 persistence generalization): dc=
@@ -1535,6 +1679,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
         // capture taken after either one has already seen focus fall to
         // <body>. Then rebuild both and restore focus to the equivalent control.
         const focusIdentity = captureFocus(root);
+        sectionStatesBeforeBuild = captureSectionStates();
         refreshNav();
         buildPanel();
         restoreFocus(root, focusIdentity);
@@ -1542,8 +1687,12 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       if (transport !== null) {
         transport.setPlaying(!host.time.snapshot().paused);
         transport.setPhase01(host.time.simulationPhase);
+        // U-08: reflect the CANONICAL playback-rate multiplier into the rate
+        // select (setRateLabel existed with zero callers, so the select
+        // permanently displayed its first option while the clock ran at 1x).
+        transport.setRateLabel(`${host.time.playbackRate}x`);
       }
-      if (observerSync !== null) observerSync();
+      for (const sync of liveSyncs) sync();
       if (waveformPanel !== null) {
         bindWaveformPanel();
         const physicalTime = host.time.snapshot().physicalTime;
@@ -1679,7 +1828,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     captureFrame
   };
   if (import.meta.env.DEV || __ATLAS_TEST_HOOKS_OPT_IN__) {
-    (window as unknown as Record<string, unknown>)['__ATLAS_APP__'] = hook;
+    // Object.assign writes the dynamic test-hook property without an
+    // unchecked cast (window has no index signature; the property name is
+    // data, not type-level surface).
+    Object.assign(window, { __ATLAS_APP__: hook });
   }
 
   return {
@@ -1701,7 +1853,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       // had it, and deleting an absent key would be a no-op anyway — but the
       // explicit guard keeps the two sites provably symmetric (U-04).
       if (import.meta.env.DEV || __ATLAS_TEST_HOOKS_OPT_IN__) {
-        delete (window as unknown as Record<string, unknown>)['__ATLAS_APP__'];
+        Reflect.deleteProperty(window, '__ATLAS_APP__');
       }
       waveformPanel?.dispose();
       waveformPanel = null;

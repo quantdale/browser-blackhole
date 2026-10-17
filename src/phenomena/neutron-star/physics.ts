@@ -19,10 +19,14 @@
  * - No interior solution is solved: the surface at R > 2 r_g is a boundary;
  *   nothing below it participates.
  * - Surface redshift uses the exact Schwarzschild static-emitter factor
- *   sqrt(1 - 2GM/(Rc^2)). Photon paths surface-to-observer are STRAIGHT
- *   lines here: no ray bending, no Doppler shift, no aberration, no
- *   light-travel-time effects. The lensing DIRECT path for this destination
- *   arrives later via the shared LensingService pass.
+ *   sqrt(1 - 2GM/(Rc^2)). Photon paths in this module's ANALYTIC pulse/beacon
+ *   geometry are STRAIGHT lines: no ray bending, no Doppler shift, no
+ *   aberration, no light-travel-time effects. The rendered image does NOT
+ *   come from this module: it is produced by the shipped DIRECT surface-ray
+ *   path in `surfaceLensingGpu.ts`, which integrates Schwarzschild null
+ *   geodesics per pixel (ray bending included) and resolves surface-hit vs
+ *   escaped-background against the material surface — not the shared
+ *   LensingService pass and not a mesh.
  * - The pulse/beacon light curve is an ANALYTIC GEOMETRY MODEL (smooth
  *   cosine-power cone with limb falloff) for readout and validation of pulse
  *   geometry — not an atmospheric radiative-transfer model.

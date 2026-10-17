@@ -119,6 +119,11 @@ export function createCollapsibleSection(
   const titleSpan = document.createElement('span');
   titleSpan.className = 'atlas-section-title';
   titleSpan.textContent = options.title;
+  // U-11: the region's accessible name comes from the TITLE text, so
+  // aria-labelledby must point at the title node — pointing at the region's
+  // own id made the region its own label (a self-reference).
+  const titleId = nextDomId('atlas-section-title');
+  titleSpan.id = titleId;
 
   const indicator = document.createElement('span');
   indicator.className = 'atlas-section-chevron';
@@ -129,9 +134,9 @@ export function createCollapsibleSection(
   body.id = bodyId;
   body.className = 'atlas-section-body';
   body.setAttribute('role', 'region');
-  body.setAttribute('aria-labelledby', bodyId);
-  // The button itself carries the accessible name; the region is labelled by
-  // it through the shared id below.
+  body.setAttribute('aria-labelledby', titleId);
+  // The button itself carries the accessible name (the title text); the
+  // region is labelled by that same title node through titleId above.
   toggle.setAttribute('aria-controls', bodyId);
 
   toggle.append(titleSpan, indicator);
@@ -260,6 +265,11 @@ export function createSliderRow(options: SliderRowOptions): SliderRowHandle {
 
   const readout = document.createElement('span');
   readout.className = 'atlas-slider-value';
+  // U-12: the value badge carries the current value AND the unit, so it is
+  // wired into aria-describedby — otherwise the formatted unit is visual-only
+  // and a screen-reader user hears a bare number.
+  const readoutId = nextDomId('atlas-slider-value');
+  readout.id = readoutId;
 
   head.append(label, readout);
   row.append(head);
@@ -272,15 +282,17 @@ export function createSliderRow(options: SliderRowOptions): SliderRowHandle {
   input.max = String(max);
   input.step = String(options.step > 0 ? options.step : 1);
 
+  const describedByIds = [readoutId];
   if (options.description !== undefined && options.description.length > 0) {
     const desc = document.createElement('p');
     desc.className = 'atlas-row-desc';
     const descId = nextDomId('atlas-slider-desc');
     desc.id = descId;
     desc.textContent = options.description;
-    input.setAttribute('aria-describedby', descId);
+    describedByIds.unshift(descId);
     row.append(desc);
   }
+  input.setAttribute('aria-describedby', describedByIds.join(' '));
 
   const render = (): void => {
     const value = input.valueAsNumber;
@@ -413,6 +425,9 @@ export function createToggleRow(options: ToggleRowOptions): ToggleRowHandle {
   const button = document.createElement('button');
   button.type = 'button';
   button.className = 'atlas-switch';
+  // The role is load-bearing: aria-checked on a plain button is read as a
+  // toggle button, while this row's contract is switch semantics (on/off).
+  button.setAttribute('role', 'switch');
 
   const text = document.createElement('span');
   text.textContent = options.label;
@@ -616,7 +631,11 @@ export function createTimelineTransport(
 
   const rateSelect = document.createElement('select');
   rateSelect.className = 'atlas-select atlas-timeline-rate';
-  rateSelect.setAttribute('aria-label', 'Playback speed');
+  // U-08: the select chooses a MULTIPLIER of the effective rate (the
+  // effective rate is the per-destination base rate x this multiplier), so
+  // the label says that instead of promising an absolute playback speed.
+  rateSelect.setAttribute('aria-label', 'Playback speed multiplier');
+  rateSelect.setAttribute('title', 'Playback speed multiplier');
   const ratesByLabel = new Map<string, number>();
   for (const option of RATE_OPTIONS) {
     const el = document.createElement('option');

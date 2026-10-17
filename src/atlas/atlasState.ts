@@ -509,8 +509,15 @@ function extractQueryComponent(raw: string): string {
  * Parsed destination/preset ids are structurally sanitized here but NOT
  * checked against the live registry — route/id validation against registered
  * descriptors is the navigation layer's job (STATE_AND_ROUTES §2).
+ *
+ * `defaultDestination` keys `dc=` payloads when the query carries no `d=`:
+ * a hand-written deep link (`/atlas/<dest>?dc=…`) names its destination in
+ * the ROUTE, so the caller passes the route-derived id here (U-06).
  */
-export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
+export function parseFromUrl(
+  serialized: string,
+  options?: { defaultDestination?: string }
+): Partial<CosmicAtlasStateV1> {
   const params = new URLSearchParams(extractQueryComponent(serialized));
   const read = (key: string): string | null => {
     const value = params.get(key);
@@ -524,7 +531,10 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
   const result: Partial<CosmicAtlasStateV1> = {};
 
   const destination = read('d');
-  const preset = read('p');
+  // `p` is the compact share key (serializeForUrl); `preset` is the route key
+  // (buildRoute/parseRoute) — both are accepted so either form of a
+  // preset-bearing URL parses (U-15, the serialise/parse key mismatch).
+  const preset = read('p') ?? read('preset');
   if (destination !== null || preset !== null) {
     result.atlas = {
       activeDestination:
@@ -621,8 +631,12 @@ export function parseFromUrl(serialized: string): Partial<CosmicAtlasStateV1> {
     try {
       const parsed: unknown = JSON.parse(dc);
       if (isPlainObject(parsed)) {
+        const fallbackDestination =
+          typeof options?.defaultDestination === 'string' && options.defaultDestination.length > 0
+            ? options.defaultDestination
+            : defaults.atlas.activeDestination;
         result.destinations = {
-          [destination ?? defaults.atlas.activeDestination]: {
+          [destination ?? fallbackDestination]: {
             schemaVersion: 1,
             state: parsed
           }

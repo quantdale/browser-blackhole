@@ -79,10 +79,15 @@ import {
   type NeutronStarSurfaceMaterial
 } from './surfaceLensingGpu.js';
 import { NEUTRON_STAR_DESCRIPTOR } from './descriptor.js';
+import {
+  interpolateTemperatureRamp,
+  type TemperatureRampAnchor
+} from '../shared/temperatureRamp.js';
 import type {
   EnterContext,
   ExitContext,
   FrameContext,
+  ICameraRig,
   PhenomenonModule,
   PrepareContext,
   PreparedPhenomenon,
@@ -307,10 +312,15 @@ export function normalizeNeutronStarState(raw: Record<string, unknown>): Neutron
 // Temperature -> linear RGB ramp (disclosed approximation)
 // ---------------------------------------------------------------------------
 
-const TEMPERATURE_RAMP_ANCHORS: ReadonlyArray<{
-  readonly logT: number;
-  readonly rgb: readonly [number, number, number];
-}> = [
+/**
+ * CALIBRATION (U-19): this destination's hand-picked Planckian-locus-inspired
+ * palette over log10(T). The interpolation ALGORITHM is shared with the
+ * stellar-explosion ramp (src/phenomena/shared/temperatureRamp.ts); only the
+ * anchors are destination-specific — this table is tuned for 1e5..1e7 K
+ * neutron-star surfaces and asymptotes earlier (logT 6.5) than the
+ * stellar-explosion shock-flash table.
+ */
+const TEMPERATURE_RAMP_ANCHORS: ReadonlyArray<TemperatureRampAnchor> = [
   { logT: 3.48, rgb: [1.0, 0.36, 0.09] }, // ~3000 K, dull red
   { logT: 3.78, rgb: [1.0, 0.87, 0.72] }, // ~6000 K, warm white
   { logT: 4.0, rgb: [0.86, 0.91, 1.0] }, // 1e4 K, white-blue
@@ -319,33 +329,15 @@ const TEMPERATURE_RAMP_ANCHORS: ReadonlyArray<{
 ];
 
 /**
- * HONEST APPROXIMATION: piecewise-linear interpolation of a hand-picked
- * Planckian-locus-inspired palette over log10(T), returned in linear-light
- * RGB. This is NOT Planck-law integration and carries no radiometric claim;
- * full blackbody integration is deferred. accretionDisk.blackbodyRgb was
- * deliberately not reused because its table is calibrated only up to 4e4 K
- * while neutron-star surfaces live at 1e5..1e7 K.
+ * HONEST APPROXIMATION: piecewise-linear interpolation of the disclosed
+ * palette over log10(T), returned in linear-light RGB. This is NOT Planck-law
+ * integration and carries no radiometric claim; full blackbody integration is
+ * deferred. accretionDisk.blackbodyRgb was deliberately not reused because its
+ * table is calibrated only up to 4e4 K while neutron-star surfaces live at
+ * 1e5..1e7 K. Algorithm: shared interpolateTemperatureRamp (U-19).
  */
 function temperatureKToLinearRgb(temperatureK: number): [number, number, number] {
-  const logT = Math.log10(Math.min(1e8, Math.max(1e3, temperatureK)));
-  const anchors = TEMPERATURE_RAMP_ANCHORS;
-  const first = anchors[0];
-  const last = anchors[anchors.length - 1];
-  if (first && logT <= first.logT) return [first.rgb[0], first.rgb[1], first.rgb[2]];
-  if (last && logT >= last.logT) return [last.rgb[0], last.rgb[1], last.rgb[2]];
-  for (let i = 0; i < anchors.length - 1; i++) {
-    const a = anchors[i];
-    const b = anchors[i + 1];
-    if (a && b && logT >= a.logT && logT <= b.logT) {
-      const t = (logT - a.logT) / (b.logT - a.logT);
-      return [
-        a.rgb[0] + (b.rgb[0] - a.rgb[0]) * t,
-        a.rgb[1] + (b.rgb[1] - a.rgb[1]) * t,
-        a.rgb[2] + (b.rgb[2] - a.rgb[2]) * t
-      ];
-    }
-  }
-  return [1, 1, 1]; // unreachable given the clamps above
+  return interpolateTemperatureRamp(TEMPERATURE_RAMP_ANCHORS, temperatureK);
 }
 
 // ---------------------------------------------------------------------------
@@ -468,6 +460,13 @@ export function createNeutronStarModule(): PhenomenonModule {
   let runtime: NeutronStarRuntimeState | null = null;
   let lastDebugSnapshot: Record<string, unknown> = {};
   let surfaceDebugOverride = false;
+  /**
+   * U-02: handle to the camera rig — the ONE live source for the observer
+   * direction. Captured at prepare/enter so the canonical control channel
+   * (applyControlState, which receives no context) can write the rig; cleared
+   * at dispose. See applyControlState for the full binding contract.
+   */
+  let cameraRig: ICameraRig | null = null;
   /** Governor tier observed on the last update frame (RenderContext has none). */
   let lastQualityTier: QualityTier = 'medium';
 
@@ -524,6 +523,7 @@ export function createNeutronStarModule(): PhenomenonModule {
   }
 
   async function prepare(ctx: PrepareContext): Promise<PreparedPhenomenon> {
+    cameraRig = ctx.services.cameraRig;
     assertNotDisposed();
     const abortGuard = (stage: string): void => {
       if (ctx.signal.aborted) throw new Error(`neutron-star: prepare aborted (${stage})`);
@@ -614,6 +614,7 @@ export function createNeutronStarModule(): PhenomenonModule {
 
   function enter(ctx: EnterContext): void {
     assertNotDisposed();
+    cameraRig = ctx.services.cameraRig;
     const state = normalizeNeutronStarState(ctx.preset.state);
     const basis = computeSpinFrameBasis(state);
     const fallbackDirection = new THREE.Vector3(0, 1, 0);
@@ -693,6 +694,18 @@ export function createNeutronStarModule(): PhenomenonModule {
 
     rt.spinPhaseRad = spinPhase(rt.activeSeconds, rt.spinHz);
     rt.revolutions = rt.activeSeconds * rt.spinHz;
+
+    // U-02 observer-inclination binding: the CAMERA RIG is the one live
+    // source for the observer direction. A control change writes the rig
+    // (applyControlState); every orbit change — user gesture, reset, an
+    // arrived preset seed — reads back here into runtime, which is what
+    // serializeShareState (canonical state) and the debug snapshot report.
+    // The read-back is held while an arrival ease is still interpolating so a
+    // transient pose never masquerades as a chosen inclination.
+    if (!ctx.services.cameraRig.isAnimating()) {
+      const polarDeg = ctx.services.cameraRig.getOrbit().polarDeg;
+      if (Number.isFinite(polarDeg)) rt.observerInclinationDeg = polarDeg;
+    }
 
     scratchAxis.set(rt.spinAxisWorld[0], rt.spinAxisWorld[1], rt.spinAxisWorld[2]);
     scratchQuaternion.setFromAxisAngle(scratchAxis, rt.spinPhaseRad);
@@ -855,6 +868,7 @@ export function createNeutronStarModule(): PhenomenonModule {
     fieldLines = null;
     surfacePass = null;
     runtime = null;
+    cameraRig = null;
     lastDebugSnapshot = {};
     // Pass/material/geometry GPU release is owned by the host ResourceScope
     // (tracked during prepare); this module holds no untracked GPU handles.
@@ -883,6 +897,36 @@ export function createNeutronStarModule(): PhenomenonModule {
     return { ...lastDebugSnapshot };
   }
 
+  /**
+   * Canonical live control channel (CA5) — the observer-inclination control
+   * (U-02). The partial merges over the live serialization and re-normalizes
+   * through the ONE normalizer; only `observerInclinationDeg` is a LIVE
+   * control (the documented control-scoping decision keeps the rest
+   * preset-bound and ignored here).
+   *
+   * Binding contract (design D2): the control writes the CAMERA RIG's polar
+   * angle — never a uniform — and `update()` reads the rig back into canonical
+   * state. The field is therefore not a second live source and not a passive
+   * readout. Writes are idempotent: a request already satisfied (or saturated
+   * at the rig's polar clamp) is a no-op, so a deep-link poll re-applying the
+   * same payload cannot pin the camera dirty.
+   */
+  function applyControlState(partial: Record<string, unknown>): void {
+    if (disposed) return;
+    const rt = runtime;
+    if (!rt || cameraRig === null) return;
+    const requested = normalizeNeutronStarState({
+      ...serializeShareState(),
+      ...partial
+    }).observerInclinationDeg;
+    const orbit = cameraRig.getOrbit();
+    if (requested === orbit.polarDeg && requested === rt.observerInclinationDeg) return;
+    // 'user': the viewer moved the camera (the rig's takeover/revision
+    // accounting counts viewer writes; NS presentation layers read it).
+    cameraRig.setOrbit(orbit.azimuthDeg, requested, orbit.distance, 'user');
+    rt.observerInclinationDeg = cameraRig.getOrbit().polarDeg;
+  }
+
   const moduleObject: PhenomenonModule = {
     descriptor: NEUTRON_STAR_DESCRIPTOR,
     prepare,
@@ -892,6 +936,7 @@ export function createNeutronStarModule(): PhenomenonModule {
     exit,
     dispose,
     serializeShareState,
+    applyControlState,
     getDebugSnapshot
   };
   return moduleObject;

@@ -79,6 +79,13 @@ Show derived normalized distance in physical mode.
 
 For convenience, camera inclination relative to disk normal. Free orbit controls may update it. Avoid singular UX at exact pole.
 
+IMPLEMENTED (U-02, Neutron Star): `observerInclinationDeg` is a LIVE control
+bound to the camera rig's polar angle — one source of truth. A control change
+sets the rig; an orbit change reads back into the control and canonical state;
+a preset seeds the rig on enter only. The displayed value always equals the
+rig's polar angle. Destinations whose inclination feeds a model computation
+(e.g. Tidal Disruption) keep their own documented semantics.
+
 ### Field of view
 
 Vertical FOV degrees. Suggested initial usable range about 15–110°, default around 50–60°. Extreme values may be advanced only.

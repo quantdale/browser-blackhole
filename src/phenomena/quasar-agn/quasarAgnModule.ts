@@ -238,12 +238,13 @@ function axialFade(heightUnits: number, startFrac: number, endFrac: number): Nod
 
 function trackMesh(ctx: PrepareContext, mesh: Mesh, bytesGeo: number, bytesMat: number): void {
   ctx.scope.track('geometry', mesh.geometry, () => mesh.geometry.dispose(), bytesGeo);
-  ctx.scope.track(
-    'material',
-    mesh.material,
-    () => (mesh.material as unknown as { dispose(): void }).dispose(),
-    bytesMat
-  );
+  // `Mesh`'s material generic widens to `Material | Material[]`; narrow with
+  // Array.isArray so disposal needs no unchecked cast. All call sites build
+  // single-material meshes, so the loop body runs exactly once in practice.
+  const materials = Array.isArray(mesh.material) ? mesh.material : [mesh.material];
+  for (const material of materials) {
+    ctx.scope.track('material', material, () => material.dispose(), bytesMat);
+  }
 }
 
 function trackVolume(ctx: PrepareContext, volume: VolumeHandle): void {
@@ -681,8 +682,14 @@ export class QuasarAgnModule implements PhenomenonModule {
     // --- animated time model ------------------------------------------------
     // Timeline days drive the disc shear pattern, the continuum surrogate and
     // the jet's delayed response. Everything is a pure function of this
-    // coordinate, so scrubbing and looping stay deterministic.
-    this.timeDays = ctx.time.physicalTime ?? ctx.time.phase * TIMELINE_SPAN_DAYS;
+    // coordinate, so scrubbing and looping stay deterministic. The finiteness
+    // guard matches the four sibling destinations (U-16): a non-finite
+    // physical time must never reach shader coordinates or the variability
+    // factor, so it falls back to the phase mapping.
+    const physicalDays = ctx.time.physicalTime ?? Number.NaN;
+    this.timeDays = Number.isFinite(physicalDays)
+      ? physicalDays
+      : ctx.time.phase * TIMELINE_SPAN_DAYS;
     this.uTimeDays.value = this.timeDays;
     this.continuumFactor = variabilityFactor(this.timeDays, this.variability);
     this.uContinuum.value = this.continuumFactor;

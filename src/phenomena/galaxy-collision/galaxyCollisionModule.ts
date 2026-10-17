@@ -211,6 +211,8 @@ class GalaxyCollisionModule implements PhenomenonModule {
   private secondaryPositions: Float32Array | null = null;
   private secondaryMesh: THREE.Mesh | null = null;
   private secondaryCount = 0;
+  /** U-17: secondary population deferred while the cloud is hidden. */
+  private secondaryPopulationStale = true;
   private nucleusPosAttr: THREE.InstancedBufferAttribute | null = null;
   private nucleusPositions: Float32Array = new Float32Array(6);
   private backdrop: CinematicBackdropHandle | null = null;
@@ -438,8 +440,41 @@ class GalaxyCollisionModule implements PhenomenonModule {
         this.secondaryCount;
       this.secondaryMesh.visible = this.secondaryCount > 0;
     }
+    // U-17: a detail change without a phase change still owes the cloud its
+    // positions — applyPhase skipped (or never ran) the population while the
+    // cloud was hidden, so pay the deferred rebuild now that it is visible.
+    if (this.secondaryCount > 0 && this.secondaryPopulationStale) this.populateSecondary();
     this.backdrop?.setDetail(secondaryDetail);
     this.backdrop?.setIntensity(ctx.experienceMode === 'cinematic' ? 0.48 : 0.18);
+  }
+
+  /**
+   * Rebuild and upload the secondary unresolved-emitter cloud (U-17).
+   * Called only while the cloud is actually drawn (secondaryCount > 0):
+   * populating a hidden 3,200-instance cloud every phase change is pure
+   * waste, so applyPhase defers it via {@link secondaryPopulationStale} and
+   * update() pays it the moment the cloud becomes visible again.
+   */
+  private populateSecondary(): void {
+    if (this.secondaryPositions === null || this.secondaryPosAttr === null) return;
+    const sourceCount = this.dataset?.tracerCount ?? 0;
+    for (let i = 0; i < SECONDARY_EMITTER_CAPACITY; i += 1) {
+      const source = sourceCount > 0 ? (i * 17 + 11) % sourceCount : 0;
+      const sourceOffset = source * 3;
+      const angle = hash01(i + 0x4f31) * Math.PI * 2;
+      const elevation = hash01(i + 0x8217) * 2 - 1;
+      const spread = 0.035 + hash01(i + 0xb19d) * 0.18;
+      const radial = Math.sqrt(Math.max(0, 1 - elevation * elevation));
+      const targetOffset = i * 3;
+      this.secondaryPositions[targetOffset] =
+        (this.tracerPositions?.[sourceOffset] ?? 0) + Math.cos(angle) * radial * spread;
+      this.secondaryPositions[targetOffset + 1] =
+        (this.tracerPositions?.[sourceOffset + 1] ?? 0) + elevation * spread * 0.42;
+      this.secondaryPositions[targetOffset + 2] =
+        (this.tracerPositions?.[sourceOffset + 2] ?? 0) + Math.sin(angle) * radial * spread;
+    }
+    this.secondaryPosAttr.needsUpdate = true;
+    this.secondaryPopulationStale = false;
   }
 
   private applyPhase(phase: number): void {
@@ -469,25 +504,11 @@ class GalaxyCollisionModule implements PhenomenonModule {
     );
     if (this.tracerPosAttr) this.tracerPosAttr.needsUpdate = true;
     if (this.nucleusPosAttr) this.nucleusPosAttr.needsUpdate = true;
-    if (this.secondaryPositions !== null && this.secondaryPosAttr !== null) {
-      const sourceCount = this.dataset.tracerCount;
-      for (let i = 0; i < SECONDARY_EMITTER_CAPACITY; i += 1) {
-        const source = sourceCount > 0 ? (i * 17 + 11) % sourceCount : 0;
-        const sourceOffset = source * 3;
-        const angle = hash01(i + 0x4f31) * Math.PI * 2;
-        const elevation = hash01(i + 0x8217) * 2 - 1;
-        const spread = 0.035 + hash01(i + 0xb19d) * 0.18;
-        const radial = Math.sqrt(Math.max(0, 1 - elevation * elevation));
-        const targetOffset = i * 3;
-        this.secondaryPositions[targetOffset] =
-          (this.tracerPositions?.[sourceOffset] ?? 0) + Math.cos(angle) * radial * spread;
-        this.secondaryPositions[targetOffset + 1] =
-          (this.tracerPositions?.[sourceOffset + 1] ?? 0) + elevation * spread * 0.42;
-        this.secondaryPositions[targetOffset + 2] =
-          (this.tracerPositions?.[sourceOffset + 2] ?? 0) + Math.sin(angle) * radial * spread;
-      }
-      this.secondaryPosAttr.needsUpdate = true;
-    }
+    // U-17: the secondary cloud is rebuilt ONLY while it is drawn. When its
+    // count is zero (non-cinematic), defer the 3,200-instance rebuild+upload
+    // and mark it stale; update() repopulates the moment it is visible again.
+    if (this.secondaryCount > 0) this.populateSecondary();
+    else this.secondaryPopulationStale = true;
 
     for (let i = 0; i < PROBE_INDICES.length; i += 1) {
       const idx = PROBE_INDICES[i]!;
@@ -521,6 +542,7 @@ class GalaxyCollisionModule implements PhenomenonModule {
     this.secondaryPositions = null;
     this.secondaryMesh = null;
     this.secondaryCount = 0;
+    this.secondaryPopulationStale = true;
     this.nucleusPosAttr = null;
     this.nucleusHaloA = null;
     this.nucleusHaloB = null;
