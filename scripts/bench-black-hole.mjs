@@ -447,4 +447,7 @@ if (qualityMismatch !== null) {
 if (backendMismatch !== null) console.error(backendMismatch);
 if (observerMismatch !== null) console.error(observerMismatch);
 if (forcedBackendMismatch !== null) console.error(forcedBackendMismatch);
-process.exit(0);
+// B-01: do NOT `process.exit(0)` here — it overwrote `process.exitCode = 1`
+// set by the zero-render refusal and made the refusal unobservable (the
+// harness always exited 0). Let the process exit naturally so the recorded
+// exit code survives.

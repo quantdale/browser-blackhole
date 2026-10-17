@@ -1,0 +1,72 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "browser-blackhole/benchmarks/schema.json",
+  "title": "Benchmark record (union of the shapes in use)",
+  "description": "Verification-gate-integrity's successor lane (benchmark-harness-integrity 5.1/B-07). Covers the union of the record shapes in use: schemaVersion 1 (legacy campaign records) and schemaVersion 2 (destination-bench records carrying renderTelemetry proof). Legacy records are VALID under this schema (5.2) — existing evidence is never invalidated by schema evolution.",
+  "oneOf": [
+    {
+      "title": "Legacy campaign record (schemaVersion 1)",
+      "type": "object",
+      "required": ["schemaVersion", "label", "commit"],
+      "properties": {
+        "schemaVersion": { "const": 1 },
+        "kind": { "type": "string" },
+        "label": { "type": "string" },
+        "commit": { "type": "string" },
+        "preset": { "type": "string" },
+        "timelinePhase": { "type": "number" },
+        "browser": { "type": "string" },
+        "adapter": { "type": "string" },
+        "backend": { "type": ["string", "object", "null"] },
+        "forcedBackend": { "type": ["string", "null"] },
+        "scene": { "type": "string" },
+        "viewport": { "type": "array", "items": { "type": "number" } },
+        "channel": { "type": "string" },
+        "internal": { "type": ["array", "object", "null"] },
+        "quality": { "type": ["string", "object", "null"] },
+        "requestedQuality": { "type": "string" },
+        "renderScale": { "type": "number" },
+        "medianMs": { "type": ["number", "null"] },
+        "p90Ms": { "type": ["number", "null"] },
+        "p95Ms": { "type": ["number", "null"] },
+        "p99Ms": { "type": ["number", "null"] },
+        "samples": { "type": "number" },
+        "frameCpuMs": { "type": ["object", "null"] },
+        "frameGpuMs": { "type": ["object", "null"] },
+        "gpuTimingNote": { "type": "string" },
+        "consoleErrors": { "type": ["array", "number"] },
+        "refusal": { "type": ["string", "null"] },
+        "refusals": { "type": "array", "items": { "type": "string" } }
+      },
+      "additionalProperties": true
+    },
+    {
+      "title": "Destination-bench record (schemaVersion 2)",
+      "type": "object",
+      "required": ["schemaVersion", "kind", "label", "commit", "renderTelemetry"],
+      "properties": {
+        "schemaVersion": { "const": 2 },
+        "kind": { "const": "destination-bench" },
+        "label": { "type": "string" },
+        "commit": { "type": "string" },
+        "viewport": { "type": "array", "items": { "type": "number" } },
+        "channel": { "type": "string" },
+        "viewportRect": { "type": ["object", "null"] },
+        "renderTelemetry": {
+          "type": ["object", "null"],
+          "required": ["framesObserved", "framesRendered", "framesSkipped"],
+          "properties": {
+            "framesObserved": { "type": "number" },
+            "framesRendered": { "type": "number" },
+            "framesSkipped": { "type": "number" },
+            "lastFrameWork": { "type": "object" }
+          },
+          "additionalProperties": true
+        },
+        "medianMs": { "type": ["number", "null"] },
+        "frameGpuMs": { "type": ["object", "null"] }
+      },
+      "additionalProperties": true
+    }
+  ]
+}

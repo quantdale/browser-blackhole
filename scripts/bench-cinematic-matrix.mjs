@@ -19,6 +19,7 @@
  */
 
 import { execFileSync } from 'node:child_process';
+import { normalizeRecord } from './lib/bench-records.mjs';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
 import { resolve } from 'node:path';
@@ -145,6 +146,46 @@ for (const backend of backends) {
           continue;
         }
         const normalized = normalizeRecord(record);
+        // B-01/2.3: the matrix asserts a child actually RENDERED. A harness
+        // that samples an idle loop must fail here, not emit a plausible
+        // millisecond number (the WS1 idle-skip made silent-zero-render
+        // records possible).
+        const framesRendered =
+          typeof record.renderTelemetry?.framesRendered === 'number'
+            ? record.renderTelemetry.framesRendered
+            : null;
+        if (framesRendered === null || framesRendered <= 0) {
+          failures.push({
+            backend,
+            tier,
+            workload: workload.id,
+            error: `framesRendered=${String(framesRendered)} — a zero-render child is a refusal, not a measurement`
+          });
+        }
+        // B-02/2.4: the child must REPORT the environment the matrix
+        // requested — a viewport or channel mismatch means the row measures
+        // something other than what it names.
+        const reportedViewport = Array.isArray(record.viewport) ? record.viewport : null;
+        if (
+          reportedViewport !== null &&
+          (reportedViewport[0] !== width || reportedViewport[1] !== height)
+        ) {
+          failures.push({
+            backend,
+            tier,
+            workload: workload.id,
+            error: `viewport mismatch: requested ${width}x${height}, reported ${String(reportedViewport[0])}x${String(reportedViewport[1])}`
+          });
+        }
+        const reportedChannel = typeof record.channel === 'string' ? record.channel : null;
+        if (reportedChannel !== null && reportedChannel !== channel) {
+          failures.push({
+            backend,
+            tier,
+            workload: workload.id,
+            error: `channel mismatch: requested ${channel}, reported ${reportedChannel}`
+          });
+        }
         const backendString = normalized.backend;
         const tierString = normalized.tier;
         if (backendString !== backend) {
@@ -248,38 +289,6 @@ function readCommit() {
 
 function usesWarmupMs(script) {
   return script === 'bench-stellar-explosion.mjs' || script === 'bench-galaxy-collision.mjs';
-}
-
-function normalizeRecord(record) {
-  const backend =
-    typeof record.backend === 'string'
-      ? record.backend
-      : typeof record.backendApi === 'string'
-        ? record.backendApi
-        : typeof record.backend?.api === 'string'
-          ? record.backend.api
-          : null;
-  const tier =
-    typeof record.quality === 'string'
-      ? record.quality
-      : typeof record.quality?.effectiveTier === 'string'
-        ? record.quality.effectiveTier
-        : typeof record.tier === 'string'
-          ? record.tier
-          : typeof record.requestedQuality === 'string'
-            ? record.requestedQuality
-            : null;
-  return {
-    backend,
-    tier,
-    internal: record.effectiveRenderSize ?? record.internal ?? null,
-    cpuMedian: record.frameCpuMs?.median ?? record.medianMs ?? null,
-    gpuMs: record.frameGpuMs?.lastResolvedFrame ?? null,
-    estimatedGpuBytes: record.memory?.estimatedGpuBytesTotal ?? null,
-    renderTelemetry: record.renderTelemetry ?? null,
-    rendererInfo: record.rendererInfo ?? null,
-    consoleErrors: Number(record.consoleErrors ?? 0)
-  };
 }
 
 /** Extract the last balanced JSON object containing a benchmark identity key. */

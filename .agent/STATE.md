@@ -1,3 +1,45 @@
+## 2026-10-17 session (4) — `benchmark-harness-integrity` COMPLETED (B-01…B-07)
+
+Status: **COMPLETE** — all task sections checked with evidence; B-01…B-07
+struck from `docs/MASTER_PLAN.md` §4; the §12 comparator REFUSES two real
+committed matrices naming their differing dimensions (the live acceptance
+run).
+
+**What was wrong:** a benchmark could refuse to measure and still exit 0
+(nine harnesses' trailing `process.exit(0)` clobbered `process.exitCode = 1`);
+two harnesses recorded a requested viewport/channel they never honoured; four
+baseline rows were commit-unattributable yet cited in certification; one
+harness defaulted its output INTO committed campaign evidence; the scenario
+harness's refusals overwrote each other; the schema and §12 comparison gate
+did not exist.
+
+**Fixed:** exit-code preservation in all nine (ACCEPTANCE: a neutered-render
+run of `bench-neutron-star` now exits 1 — was 0); `--channel/--width/--height`
+honoured + real `#viewport` rect + `currentCommit()` + schemaVersion-2
+records in the two twins (`normalizeRecord` extracted and unit-tested); the
+unattributable rows annotated in the baseline SUMMARY AND
+`docs/PERFORMANCE_CERTIFICATION.md` (the "WebGL2 faster" finding is now
+cited with its qualification; historical records NOT rewritten); run-scoped
+default output dir + `--allow-overwrite` refusal naming the record at risk;
+`accumulateRefusal` (two refusals report both — unit-tested);
+`benchmarks/schema.json` (legacy shape valid) + `npm run bench:compare`
+(refuses + names every differing dimension; `--override` records the
+override); matrix asserts `framesRendered > 0` and cross-checks
+backend/tier/viewport/channel; `bench:scenarios` script + README entry.
+
+Gates: `npm run check` 64 files / 748 unit green (after a tooling detour:
+the LSP and tsc disagree about `.mjs` declaration pairing — fixed by
+`allowJs`, with the tooling-proof local structural types recorded in the
+tests); all harness scripts syntax-checked; `openspec validate --strict`
+valid.
+
+**Next live lane:** Phase 5a `operations-and-deployment-readiness`
+(O-01…O-09 — including the npm/arborist install bug), Phase 5b
+`documentation-truthfulness-realignment` (D-06…D-15), then Phase 6 final
+certification. Unowned strays: A-07, Q-06, Q-08 (L-01/L-02 deferred by plan).
+
+---
+
 ## 2026-10-17 session (3) — `verification-gate-integrity` COMPLETED (V-01…V-17)
 
 Status: **COMPLETE** — all task sections of

@@ -332,4 +332,7 @@ if (forceBackend !== '' && info.backendApi !== forceBackend) {
     `[bench-kerr] WARNING: requested backend ${forceBackend}, effective ${info.backendApi}`
   );
 }
-process.exit(0);
+// B-01: do NOT `process.exit(0)` here — it overwrote `process.exitCode = 1`
+// set by the zero-render refusal and made the refusal unobservable (the
+// harness always exited 0). Let the process exit naturally so the recorded
+// exit code survives.

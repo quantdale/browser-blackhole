@@ -53,6 +53,7 @@ npm run bench:neutron-star      # direct Schwarzschild surface-ray harness (--pr
 npm run bench:compact-merger    # phase-aware merger harness (--phase=...)
 npm run bench:tidal-disruption  # phase-aware TDE harness (--phase=...)
 npm run bench:black-hole-merger # phase-aware NR-merger harness (--phase=...)
+npm run bench:scenarios       # the scenario matrix harness (stationary/idle/timeline/camera windows across destinations)
 npm run bench:galaxy-collision # data-driven merger harness (--preset=bridge-tail, --phase=0.5)
 ```
 

@@ -45,7 +45,9 @@
     "bench:cinematic-matrix": "node scripts/bench-cinematic-matrix.mjs",
     "mcp:preflight": "node scripts/mcp-preflight.mjs",
     "mcp:preflight:online": "node scripts/mcp-preflight.mjs --online",
-    "coverage:report": "node scripts/coverage-report.mjs"
+    "coverage:report": "node scripts/coverage-report.mjs",
+    "bench:scenarios": "node scripts/bench-scenarios.mjs",
+    "bench:compare": "node scripts/compare-benchmarks.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

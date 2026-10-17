@@ -32,6 +32,7 @@
  */
 
 import { preview } from 'vite';
+import { accumulateRefusal } from './lib/bench-records.mjs';
 import { chromium } from '@playwright/test';
 import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
 import os from 'node:os';
@@ -374,7 +375,10 @@ async function measureDestination(browser, destination, backend, port) {
     // A paused, settled scene must not issue orchestrated frames; this is the
     // WS1 product, not a failure.
     if (record.stationaryIdle.renderFrameCalls !== 0) {
-      record.refusal = `stationary idle issued ${record.stationaryIdle.renderFrameCalls} orchestrated frames`;
+      accumulateRefusal(
+        record,
+        `stationary idle issued ${record.stationaryIdle.renderFrameCalls} orchestrated frames`
+      );
     }
 
     // ---- stationary cost (forced continuous render) ------------------------
@@ -386,7 +390,7 @@ async function measureDestination(browser, destination, backend, port) {
       return result;
     }, frames);
     if (record.stationaryCost.renderTelemetry.framesRendered === 0) {
-      record.refusal = 'stationary cost window rendered 0 frames';
+      accumulateRefusal(record, 'stationary cost window rendered 0 frames');
     }
 
     // ---- active timeline ---------------------------------------------------
@@ -397,7 +401,7 @@ async function measureDestination(browser, destination, backend, port) {
       frames
     );
     if (record.activeTimeline.renderTelemetry.framesRendered === 0) {
-      record.refusal = 'active timeline window rendered 0 frames';
+      accumulateRefusal(record, 'active timeline window rendered 0 frames');
     }
 
     // ---- camera interaction + settling ------------------------------------
@@ -419,7 +423,7 @@ async function measureDestination(browser, destination, backend, port) {
       { frameCount: Math.min(frames, 90) }
     );
     if (record.cameraInteraction.renderTelemetry.framesRendered === 0) {
-      record.refusal = 'camera interaction window rendered 0 frames';
+      accumulateRefusal(record, 'camera interaction window rendered 0 frames');
     }
     // Settling is measured from a paused transport: a playing timeline keeps
     // TIME_ADVANCED dirty forever by design, so it can never be "settled".
@@ -476,13 +480,13 @@ async function measureDestination(browser, destination, backend, port) {
         Math.min(frames, 90)
       );
       if (record.tierLadder[tier].renderTelemetry.framesRendered === 0) {
-        record.refusal = `tier ${tier} window rendered 0 frames`;
+        accumulateRefusal(record, `tier ${tier} window rendered 0 frames`);
       }
     }
 
     record.backendInfo = await readBackend(page);
   } catch (error) {
-    record.refusal = record.refusal ?? (error instanceof Error ? error.message : String(error));
+    accumulateRefusal(record, error instanceof Error ? error.message : String(error));
   } finally {
     record.consoleErrors = consoleErrors.length;
     record.suppressedConsoleErrors = suppressedConsoleErrors.length;

@@ -5,6 +5,18 @@ Recorded: 2026-08-28
 Commit: `90b107ec63ebb988bb2145048383187c50ccef2f`
 Working tree: clean at capture (`git status --short` empty)
 
+> **Commit-attribution note (benchmark-harness-integrity 4.4/B-03, added
+> 2026-10-17).** Four of the eighteen rows in this baseline —
+> `stellar-explosion-{webgpu,webgl2}.json` and
+> `galaxy-collision-{webgpu,webgl2}.json` — record `"commit": "uncommitted"`
+> in their raw JSON: those two harnesses predated the `currentCommit()`
+> attribution helper and were captured before it was ported to them. The
+> numbers are machine-local observations, not certified evidence, and any
+> claim that leans on them (including the "WebGL2 faster than WebGPU on this
+> adapter" finding — see `docs/PERFORMANCE_CERTIFICATION.md`) must say so.
+> The historical records are deliberately NOT rewritten (4.6): an evidence
+> file is an artifact of its moment.
+
 ## Environment
 
 | Field | Value |

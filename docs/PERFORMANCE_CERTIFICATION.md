@@ -191,6 +191,15 @@ Observations:
 - CPU frame medians are all 16.7 ms — the compositor floor. GPU-reference
   per-frame values (forced continuous render, harness default tier) are
   0.59–5.31 ms on WebGPU and 8.29–12.05 ms on forced WebGL2 on this adapter.
+- **Attribution note (benchmark-harness-integrity 4.5/B-03):** the "WebGL2
+  faster than WebGPU on this adapter" finding (the heaviest full-screen
+  shaders measured roughly twice as fast on forced WebGL2 — see
+  `benchmarks/results/2026-08-28-ws0-baseline/SUMMARY.md` §11) draws partly
+  on commit-UNATTRIBUTABLE rows: four of the ws0 baseline records
+  (`stellar-explosion-*`, `galaxy-collision-*`) carry `"commit":
+  "uncommitted"` because those harnesses predated revision attribution. The
+  finding is machine-local observation, not certified evidence, and must be
+  cited with that qualification.
 - The one outlier is the first WebGPU→WebGL2 cold boot of black-hole
   (27.4 s): the first ANGLE/WebGL2 pipeline for the numerical Schwarzschild
   pass; warm revisits are ~2.4 s. It is a cold-compile cost, not steady state.

@@ -15,6 +15,7 @@
  * machine-specific runs are NOT committed by default.
  */
 
+import { execFileSync } from 'node:child_process';
 import { preview } from 'vite';
 import { chromium } from '@playwright/test';
 
@@ -31,6 +32,11 @@ const preset = String(arg('preset', 'bridge-tail'));
 const phase = Math.min(Math.max(Number(arg('phase', '0.5')), 0), 1);
 const quality = String(arg('quality', 'medium'));
 const forceBackend = String(arg('force-backend', ''));
+// B-02/3.1: the matrix pins a viewport and channel; these must be HONOURED,
+// not just recorded. Defaults preserve the historical 1280x800 msedge runs.
+const channelArg = String(arg('channel', 'msedge'));
+const viewportWidth = Number(arg('width', '1280'));
+const viewportHeight = Number(arg('height', '800'));
 
 const FORCE_BACKENDS = new Set(['', 'webgpu', 'webgl2']);
 if (!FORCE_BACKENDS.has(forceBackend)) {
@@ -39,8 +45,10 @@ if (!FORCE_BACKENDS.has(forceBackend)) {
 }
 
 const server = await preview({ preview: { port, host: '127.0.0.1' } });
-const browser = await chromium.launch({ channel: 'msedge' });
-const page = await browser.newPage({ viewport: { width: 1280, height: 800 } });
+const browser = await chromium.launch({ channel: channelArg });
+const page = await browser.newPage({
+  viewport: { width: viewportWidth, height: viewportHeight }
+});
 
 const consoleErrors = [];
 page.on('console', (m) => {
@@ -80,8 +88,14 @@ await page.evaluate(
     // `renderTelemetry` in the record prove it took effect.
     host.forceContinuousRenderForTest(true);
   },
-  { q: quality, width: 1280 - 320, height: 800 }
+  { q: quality }
 );
+// B-02/3.2: the render area is the application's REAL #viewport rect — the
+// old `1280 - 320` literal assumed a panel width that the layout owns.
+const viewportRect = await page.evaluate(() => {
+  const rect = document.getElementById('viewport')?.getBoundingClientRect();
+  return rect ? { width: rect.width, height: rect.height } : null;
+});
 await page.waitForTimeout(warmupMs / 2);
 await page.evaluate((p) => {
   window.__ATLAS_APP__.host.time.scrubTo(p);
@@ -187,9 +201,22 @@ const backendApi = await page.evaluate(
   () => window.__ATLAS_APP__.host.debugInventory().backend.api
 );
 
+// B-02/3.3: attribute the revision the harness itself runs at (an
+// unattributable record cannot support a certification claim — B-03).
+function currentCommit() {
+  try {
+    return String(execFileSync('git', ['rev-parse', 'HEAD'], { encoding: 'utf8' })).trim();
+  } catch {
+    return 'uncommitted';
+  }
+}
+
 const record = {
+  // B-07/3.4: schema identity on every record.
+  schemaVersion: 2,
+  kind: 'destination-bench',
   label,
-  commit: process.env.BENCH_COMMIT ?? 'uncommitted',
+  commit: process.env.BENCH_COMMIT ?? currentCommit(),
   preset,
   timelinePhase: phase,
   browser: `Edge ${info.browserVersion}`,
@@ -197,7 +224,9 @@ const record = {
   backend: backendApi,
   forcedBackend: forceBackend === '' ? null : forceBackend,
   scene: `GALAXY_COLLISION_${String(preset).toUpperCase().replace(/-/g, '_')}`,
-  viewport: [1280, 800],
+  viewport: [viewportWidth, viewportHeight],
+  channel: channelArg,
+  viewportRect,
   internal: info.internal,
   quality: info.tier,
   requestedQuality: quality,
@@ -242,4 +271,7 @@ await server.close();
 if (forceBackend !== '' && backendApi !== forceBackend) {
   console.error(`[bench] WARNING: requested backend ${forceBackend}, effective ${backendApi}`);
 }
-process.exit(0);
+// B-01: do NOT `process.exit(0)` here — it overwrote `process.exitCode = 1`
+// set by the zero-render refusal and made the refusal unobservable (the
+// harness always exited 0). Let the process exit naturally so the recorded
+// exit code survives.

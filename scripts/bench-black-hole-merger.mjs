@@ -26,7 +26,7 @@ import { preview } from 'vite';
 import { chromium } from '@playwright/test';
 import os from 'node:os';
 import { execSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 
 function arg(name, fallback) {
   const hit = process.argv.find((a) => a.startsWith(`--${name}=`));
@@ -92,9 +92,18 @@ function currentCommit() {
 }
 
 // Dataset version from the committed manifest (recorded in every row).
-const manifest = JSON.parse(
-  readFileSync(new URL('../public/data/black-hole-merger/manifest.json', import.meta.url), 'utf8')
-);
+// Parsed at the trust boundary with an explicit failure — a malformed
+// manifest must fail the harness loudly, not throw an unhandled parse error
+// mid-record.
+let manifest;
+try {
+  manifest = JSON.parse(
+    readFileSync(new URL('../public/data/black-hole-merger/manifest.json', import.meta.url), 'utf8')
+  );
+} catch (error) {
+  console.error(`[bench-bbm] cannot parse the committed BBH manifest: ${String(error)}`);
+  process.exit(2);
+}
 
 const server = await preview({ preview: { port, host: '127.0.0.1' } });
 const launchOptions = channel === 'chromium' ? {} : { channel };
@@ -349,13 +358,26 @@ const record = {
 
 console.log(JSON.stringify(record, null, 1));
 
-// Persist under benchmarks/results/<campaign>/ alongside prior campaigns.
-const outDir = new URL(
-  `../benchmarks/results/${arg('outdir', '2026-08-25-ca8')}/`,
-  import.meta.url
-);
-mkdirSync(outDir, { recursive: true });
+// B-04/4.1-4.2 (benchmark-harness-integrity): the default output directory
+// is RUN-SCOPED — the old default (`2026-08-25-ca8`) pointed at committed
+// campaign evidence and could silently overwrite certified records. Writing
+// into a directory that already holds records is refused unless
+// --allow-overwrite is passed, and the refusal NAMES the record at risk.
+const outDirName = String(arg('outdir', `local-${new Date().toISOString().slice(0, 10)}`));
+const outDir = new URL(`../benchmarks/results/${outDirName}/`, import.meta.url);
 const outFile = new URL(`${phase}-${quality}-${label}.json`.replace(/\+/g, 'p'), outDir);
+const allowOverwrite = process.argv.includes('--allow-overwrite');
+if (existsSync(outFile) && !allowOverwrite) {
+  console.error(
+    `[bench-bbm] REFUSING to overwrite certified/committed evidence: ${outFile.pathname}\n` +
+      'Pass --allow-overwrite to replace it explicitly (evidence files are artifacts of their moment).'
+  );
+  process.exitCode = 1;
+  await browser.close();
+  await server.close();
+  process.exit();
+}
+mkdirSync(outDir, { recursive: true });
 writeFileSync(outFile, JSON.stringify(record, null, 1) + '\n');
 console.log(`[bench-bbm] record written: ${outFile.pathname}`);
 
@@ -367,4 +389,7 @@ if (forceBackend !== '' && info.backendApi !== forceBackend) {
     `[bench-bbm] WARNING: requested backend ${forceBackend}, effective ${info.backendApi}`
   );
 }
-process.exit(0);
+// B-01: do NOT `process.exit(0)` here — it overwrote `process.exitCode = 1`
+// set by the zero-render refusal and made the refusal unobservable (the
+// harness always exited 0). Let the process exit naturally so the recorded
+// exit code survives.

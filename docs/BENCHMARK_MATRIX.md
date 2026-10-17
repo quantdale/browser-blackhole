@@ -203,6 +203,15 @@ The LUT backend is accepted only if it provides a meaningful performance/quality
 
 ## 11. Result storage
 
+**Implemented (benchmark-harness-integrity 5.1/5.2, 2026-10-17):**
+`benchmarks/schema.json` covers the UNION of the record shapes in use —
+schemaVersion 1 (legacy campaign records, explicitly marked `legacy`-shape
+and still valid: existing evidence is never invalidated) and schemaVersion 2
+(destination-bench records carrying `renderTelemetry` proof that the sampled
+window rendered). The default bench output directories are now RUN-SCOPED;
+writing into a directory that already holds records is refused unless
+`--allow-overwrite` names the record at risk.
+
 Suggested structure after harness exists:
 
 ```text
@@ -220,6 +229,15 @@ benchmarks/
 Large raw traces/screenshots should use an appropriate artifact mechanism rather than bloating Git history.
 
 ## 12. Regression comparison
+
+**Implemented (benchmark-harness-integrity 5.3-5.5/5.8):**
+`npm run bench:compare -- <baseline.json> <candidate.json> [--override]`.
+A comparison refuses mismatched metadata and names EVERY differing
+dimension (backend, quality, preset, unit of work, internal resolution,
+browser, adapter, sample count, schema version); only comparable runs
+produce a percentage. An explicit `--override` records that comparability
+was overridden and which dimensions differed. Unit tests in
+`tests/unit/compareBenchmarks.test.ts`.
 
 A comparison script should reject mismatched benchmark metadata unless explicitly overridden. It should surface changes in:
 

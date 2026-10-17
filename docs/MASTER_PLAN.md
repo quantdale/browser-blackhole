@@ -17,7 +17,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 1d+ | `atlas-terminal-state-visibility` | **complete and archived** (2026-10-09, `bbf66ea` + close-out) — unplanned follow-on to 1c/1d; closes the device-loss and slow-load presentation gap that `transition-error-user-visibility` did not cover. Its gated overlay probe (tasks.md §4) found the suspected occluding-overlay defect **does not reproduce**; overlay rendering intentionally unchanged and no golden re-baselined. |
 | 2 | `shared-renderer-service-lifecycle` | **complete** (2026-10-17 session) — R-01…R-12 struck |
 | 3 | `verification-gate-integrity` | **complete** (2026-10-17 session) — V-01…V-17 struck |
-| 4 | `benchmark-harness-integrity` | pending — B-01…B-07 in scope |
+| 4 | `benchmark-harness-integrity` | **complete** (2026-10-17 session) — B-01…B-07 struck |
 | 5a | `operations-and-deployment-readiness` | pending — O-01…O-09 in scope |
 | 5b | `documentation-truthfulness-realignment` | pending — D-06…D-15 in scope |
 | 6 | final certification | pending |
@@ -403,13 +403,13 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| B-01 | All 9 per-destination harnesses' zero-render refusal cannot fail the process: `process.exit(0)` overwrites `process.exitCode = 1` (9 of 11 `bench-*.mjs` scripts; the 2 orchestrators are correct) | P1 | confirmed | `bench-{black-hole,kerr,neutron-star,compact-merger,tidal-disruption,quasar-agn,stellar-explosion,galaxy-collision,black-hole-merger}.mjs` |
-| B-02 | Two harnesses ignore the matrix's pinned viewport and channel while the matrix records the requested values | P1 | confirmed | `bench-stellar-explosion.mjs:41-42`, `bench-galaxy-collision.mjs:41-42` vs `bench-cinematic-matrix.mjs:112-118,168-176` |
-| B-03 | 4 of 18 committed baseline rows record `commit: "uncommitted"` | P1 | confirmed | `benchmarks/results/2026-08-28-ws0-baseline/{stellar-explosion,galaxy-collision}-{webgpu,webgl2}.json` |
-| B-04 | `bench-black-hole-merger` defaults `--outdir` to a committed historical campaign directory and can overwrite it | P2 | confirmed | `bench-black-hole-merger.mjs:352-355` |
-| B-05 | `bench-scenarios.mjs` — the most-cited harness — has no `package.json` script and is absent from the README | P3 | confirmed | `package.json:26-49` |
-| B-06 | `bench-scenarios.mjs` overwrites `record.refusal`, losing the first failure reason | P3 | confirmed | `bench-scenarios.mjs:333,345,…` |
-| B-07 | `docs/BENCHMARK_MATRIX.md` §11/§12 schema and comparison script are specified but do not exist | P2 | confirmed | `BENCHMARK_MATRIX.md:196-238` vs `benchmarks/` and `scripts/` |
+| B-01 | All 9 per-destination harnesses' zero-render refusal cannot fail the process: `process.exit(0)` overwrites `process.exitCode = 1` (9 of 11 `bench-*.mjs` scripts; the 2 orchestrators are correct) | P1 | **RESOLVED 2026-10-17** session | `bench-{black-hole,kerr,neutron-star,compact-merger,tidal-disruption,quasar-agn,stellar-explosion,galaxy-collision,black-hole-merger}.mjs` |
+| B-02 | Two harnesses ignore the matrix's pinned viewport and channel while the matrix records the requested values | P1 | **RESOLVED 2026-10-17** session | `bench-stellar-explosion.mjs:41-42`, `bench-galaxy-collision.mjs:41-42` vs `bench-cinematic-matrix.mjs:112-118,168-176` |
+| B-03 | 4 of 18 committed baseline rows record `commit: "uncommitted"` | P1 | **RESOLVED 2026-10-17** session | `benchmarks/results/2026-08-28-ws0-baseline/{stellar-explosion,galaxy-collision}-{webgpu,webgl2}.json` |
+| B-04 | `bench-black-hole-merger` defaults `--outdir` to a committed historical campaign directory and can overwrite it | P2 | **RESOLVED 2026-10-17** session | `bench-black-hole-merger.mjs:352-355` |
+| B-05 | `bench-scenarios.mjs` — the most-cited harness — has no `package.json` script and is absent from the README | P3 | **RESOLVED 2026-10-17** session | `package.json:26-49` |
+| B-06 | `bench-scenarios.mjs` overwrites `record.refusal`, losing the first failure reason | P3 | **RESOLVED 2026-10-17** session | `bench-scenarios.mjs:333,345,…` |
+| B-07 | `docs/BENCHMARK_MATRIX.md` §11/§12 schema and comparison script are specified but do not exist | P2 | **RESOLVED 2026-10-17** session | `BENCHMARK_MATRIX.md:196-238` vs `benchmarks/` and `scripts/` |
 
 ### D — Specification and documentation truthfulness (changes: `specification-baseline-hygiene`, `documentation-truthfulness-realignment`)
 
