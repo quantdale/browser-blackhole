@@ -15,7 +15,6 @@
  * (tint/gain/radius behavior) evaluated from time since contact.
  */
 
-import { REMNANT_TEMPERATURE_K } from './types.js';
 import { kelvinToLinearRgb } from './emission.js';
 import type { ResolvedMergerScenario } from './types.js';
 import type { RemnantScenarioId } from './types.js';
@@ -38,7 +37,13 @@ export interface RemnantSample {
   readonly glowGain: number;
 }
 
-const HOT_TINT = kelvinToLinearRgb(REMNANT_TEMPERATURE_K);
+// Evaluated AT the locus law's ceiling (temperature-color-law-contract):
+// the remnant proxy REMNANT_TEMPERATURE_K (1.2e9 K) is far above the
+// 1e3..4e4 K valid domain of kelvinToLinearRgb, so the remnant tint IS the
+// clamped endpoint color — not a distinguishable hotter tint. Passing the
+// ceiling value explicitly makes that clamp visible at the call site (same
+// precedent as compactMergerModule's STAR_TINT).
+const HOT_TINT = kelvinToLinearRgb(4e4);
 
 /** Evaluate the remnant presentation at time t for the scenario. */
 export function remnantSampleAt(
