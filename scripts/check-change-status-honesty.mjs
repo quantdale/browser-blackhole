@@ -53,6 +53,12 @@ function countCheckboxes(tasksPath) {
  * The change's own status-claim line. Only lines that explicitly name
  * "implementation status" count as a claim (a stray prose sentence about
  * implementation does not); the FIRST 40 lines define the header block.
+ *
+ * A banner line is a line whose ONLY role is the banner — an optional
+ * blockquote marker and optional bold markers, then literally
+ * "implementation status:" … — so a checkbox evidence citation that merely
+ * quotes the banner text (`- [x] 1.1 … \`**implementation status: NOT
+ * STARTED**\` …`) is not parsed as a claim.
  */
 function readStatusClaim(changeDir) {
   const candidates = ['proposal.md', 'tasks.md'];
@@ -61,19 +67,25 @@ function readStatusClaim(changeDir) {
     try {
       const head = readFileSync(full, 'utf8').split('\n').slice(0, 40);
       for (const line of head) {
-        const match = /implementation\s+status\s*[:=]\s*(.+)$/i.exec(
-          line.replace(/^[\s>*-]+/, '')
-        );
-        if (match !== null) {
-          let value = match[1].trim();
-          value = value.replace(/\*\*/g, '').replace(/`/g, '').replace(/_/g, ' ');
-          value = value.replace(/^[^A-Za-z]+/, '').trim();
-          if (/not\s*[-\s]?started/i.test(value)) return { file, claim: 'not-started', line };
-          if (/in\s*[-\s]?progress/i.test(value)) return { file, claim: 'in-progress', line };
-          if (/complete|done|shipped/i.test(value))
-            return { file, claim: 'complete', line };
-          return { file, claim: 'unrecognized', line };
-        }
+        const stripped = line
+          .trim()
+          .replace(/^>\s*/, '') // blockquote banner
+          .replace(/^\*{2}/, '') // opening bold
+          .trim();
+        const match = /^implementation[\s-]+status\s*[:=]\s*(.+)$/i.exec(stripped);
+        if (match === null) continue;
+        let value = match[1]
+          .trim()
+          .replace(/\*{2}\s*$/, '') // closing bold
+          .replace(/`/g, '')
+          .replace(/[.;,]+$/, '')
+          .trim();
+        if (/^not[\s-]+started|\bnever\b/i.test(value))
+          return { file, claim: 'not-started', line };
+        if (/^in[\s-]?progress/i.test(value)) return { file, claim: 'in-progress', line };
+        if (/^complete|^done|^shipped/i.test(value))
+          return { file, claim: 'complete', line };
+        return { file, claim: 'unrecognized', line };
       }
     } catch {
       continue; // file missing (a change may legitimately lack proposal.md)

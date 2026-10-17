@@ -80,7 +80,7 @@ afterAll(() => {
 describe('check-change-status-honesty (task 2)', () => {
   it('FAILS when a zero-completed change claims implementation is complete (2.2)', () => {
     const s = scenario('claimed-complete-zero', {
-      banner: '## Status\n\n- **implementation status: COMPLETE (all 9 sections landed).**',
+      banner: '## Status\n\n**implementation status: COMPLETE** (all 9 sections landed).',
       tasks: '## Work\n\n- [ ] one\n- [ ] two\n- [ ] three\n'
     });
     const { out, code } = s.run();
