@@ -107,6 +107,18 @@ jobs:
           --reporter=json > smoke-results.json
       - name: Assert smoke coverage (a skip is not a pass)
         run: node scripts/check-smoke-coverage.mjs smoke-results.json 5
+      # staged-product-boot-coverage 2.4: the hosted browser job also executes
+      # the product-entry check — atlas shell on the product route WITHOUT
+      # legacy=1 (capability hosted-smoke-coverage). Broken out as its own
+      # step with its own expected count so neither spec can pass into the
+      # other's tally (design D3), with the same skip-honesty assertion.
+      - name: Playwright product-entry smoke (atlas shell, no legacy=1)
+        run: >-
+          npx playwright test --project=default --workers=1
+          tests/browser/product-entry.spec.ts
+          --reporter=json > product-entry-results.json
+      - name: Assert product-entry coverage (a skip is not a pass)
+        run: node scripts/check-smoke-coverage.mjs product-entry-results.json 1
       - name: GC1 offline self-check + artifact freshness gate (pure-stdlib, D7)
         run: |
           python tools/cosmic-data/restricted_three_body.py

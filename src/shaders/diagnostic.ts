@@ -27,7 +27,7 @@ import { attribute, float, normalize, uniform, varying, vec4 } from 'three/tsl';
 import type { Vec3 } from './cameraRayMath.js';
 import { createStarfieldSamplerNode } from './starfieldGpu.js';
 import { makeStarfieldParams } from './starfield.js';
-import type { DebugViewMode } from '../app/state.js';
+import type { DebugViewMode } from './debugViewMode.js';
 
 export interface DiagnosticUniformBlock {
   /** Observer position in r_g (plumbed per docs/SHADER_CONTRACTS.md section 2). */
@@ -172,7 +172,8 @@ export function applyBasisToDiagnosticUniforms(
  * Maps the canonical `debug.viewMode` (docs/STATE_SCHEMA.md section 8) onto
  * the shader-side selectors: 'diagnostic' -> direction gradient,
  * 'environment' -> straight-ray starfield, 'off' -> flat clear color.
- * Mirrors the CPU contract in src/app/state.ts.
+ * Mirrors the CPU contract in ./debugViewMode.ts (the neutral module the
+ * union actually lives in).
  */
 export function applyViewModeToDiagnosticUniforms(
   pass: DiagnosticPass,

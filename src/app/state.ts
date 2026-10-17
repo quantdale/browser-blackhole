@@ -10,6 +10,8 @@
  * unit-tested without a GPU or browser.
  */
 
+import type { DebugViewMode } from '../shaders/debugViewMode.js';
+
 export const SCHEMA_VERSION = 1;
 
 export type Vec3 = [number, number, number];
@@ -29,8 +31,13 @@ export type TargetFps = 30 | 60 | 90 | 120;
  * direction-gradient frame; 'off' renders the flat clear color until a real
  * background arrives. This is a debug-view selector, not a visual/artistic
  * mode, so it lives under `debug`, separate from `visual.mode`.
+ *
+ * Neutral home (hosted-product-boot-coverage 1.1): the union itself lives in
+ * `src/shaders/debugViewMode.ts` so shared shader modules never import this
+ * legacy-bound state module; re-exported here so the legacy shell's
+ * `BlackHoleRenderer.ts` / `RenderCoordinator.ts` keep compiling unchanged.
  */
-export type DebugViewMode = 'diagnostic' | 'environment' | 'off';
+export type { DebugViewMode };
 export type DebugRenderView =
   | 'final'
   | 'classification'
