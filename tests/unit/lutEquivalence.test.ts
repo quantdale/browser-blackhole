@@ -113,8 +113,27 @@ describe('M8-07 numerical-vs-LUT equivalence corpus', () => {
     const bc = B_CRITICAL_RG;
     const below = sampler.resolveRay(bc * 0.999999);
     const above = sampler.resolveRay(bc * 1.000001);
-    if (below.status !== 'fallback-numerical') expect(below.status).toBe('captured');
-    if (above.status !== 'fallback-numerical') expect(above.status).toBe('escaped');
+    // Compared-count floor (lut-boundary-assertion-floor D1): both class
+    // assertions sit behind the fallback filter, so a non-zero hybrid band
+    // (the one documented way resolveRay returns 'fallback-numerical'
+    // between these two offsets) would make this test green while comparing
+    // nothing. The exactness claim requires one compared sample per side;
+    // a fallback status counts as NOT compared and must fail the floor here
+    // rather than skip the expectations and exempt the test.
+    let compared = 0;
+    if (below.status !== 'fallback-numerical') compared += 1;
+    if (above.status !== 'fallback-numerical') compared += 1;
+    // Fixture note: the shipped manifest ships hybridBandHalfWidthX = 0, so
+    // both offsets compare today. The floor of 2 is what makes a future
+    // non-zero band covering these offsets FAIL this test (message names
+    // the minimum and the actual compared count) instead of letting the two
+    // filtered expectations go unmeasured.
+    expect(
+      compared,
+      `critical-boundary classification must compare at least 2 samples (compared=${compared}, below=${below.status}, above=${above.status})`
+    ).toBeGreaterThanOrEqual(2);
+    expect(below.status, 'just below b_c').toBe('captured');
+    expect(above.status, 'just above b_c').toBe('escaped');
   });
 
   // --- escape-direction angular error --------------------------------------
