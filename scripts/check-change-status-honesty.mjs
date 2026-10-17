@@ -80,11 +80,9 @@ function readStatusClaim(changeDir) {
           .replace(/`/g, '')
           .replace(/[.;,]+$/, '')
           .trim();
-        if (/^not[\s-]+started|\bnever\b/i.test(value))
-          return { file, claim: 'not-started', line };
+        if (/^not[\s-]+started|\bnever\b/i.test(value)) return { file, claim: 'not-started', line };
         if (/^in[\s-]?progress/i.test(value)) return { file, claim: 'in-progress', line };
-        if (/^complete|^done|^shipped/i.test(value))
-          return { file, claim: 'complete', line };
+        if (/^complete|^done|^shipped/i.test(value)) return { file, claim: 'complete', line };
         return { file, claim: 'unrecognized', line };
       }
     } catch {
@@ -122,7 +120,9 @@ for (const { name, dir } of active) {
   const { total, completed } = calculated;
   const claim = readStatusClaim(dir);
   if (claim === null) {
-    rows.push(`${name}  ${completed}/${total}  header=none  derived=${statusWord(completed, total)}  ok`);
+    rows.push(
+      `${name}  ${completed}/${total}  header=none  derived=${statusWord(completed, total)}  ok`
+    );
     continue;
   }
   const claimed = `${claim.file}: ${claim.claim} (${claim.line.trim()})`;

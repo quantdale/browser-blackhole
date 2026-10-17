@@ -38,14 +38,16 @@ interface FixtureOptions {
 }
 
 /** One self-contained scenario: a tmp root holding exactly one change. */
-function scenario(changeName: string, opts: FixtureOptions): { run: () => { out: string; code: number } } {
+function scenario(
+  changeName: string,
+  opts: FixtureOptions
+): { run: () => { out: string; code: number } } {
   const root = mkdtempSync(join(tmpdir(), 'change-status-honesty-'));
   const dir = join(root, changeName);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
     join(dir, 'proposal.md'),
-    (opts.banner === undefined ? '' : `${opts.banner}\n\n`) +
-      '# Proposal\n\n## Why\n\nBody.\n'
+    (opts.banner === undefined ? '' : `${opts.banner}\n\n`) + '# Proposal\n\n## Why\n\nBody.\n'
   );
   writeFileSync(join(dir, 'tasks.md'), `# Tasks\n\n${opts.tasks}\n`);
   const run = (): { out: string; code: number } => {
