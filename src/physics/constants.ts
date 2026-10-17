@@ -100,9 +100,22 @@ export function solarMassToGeometricMass(massSolar: number): number {
  * analytic form). Rays with b < b_c are captured, b > b_c escape; near b_c
  * deflection diverges logarithmically. Returns NaN for invalid input.
  */
+/**
+ * Q-08: single authority for the values that were previously duplicated
+ * across 4-5 modules. Every site below re-exports an alias of these so its
+ * public name keeps working while the VALUE has exactly one definition.
+ */
+export const CRITICAL_IMPACT_PARAMETER_RG = 3 * Math.sqrt(3);
+
+/** Canonical production spin clamp |a*| <= 0.998 (STATE_RANGES.absSpin). */
+export const DIMENSIONLESS_SPIN_ABS_MAX = 0.998;
+
+/** Default capture-band epsilon (r_g above the horizon) for the integrators. */
+export const CAPTURE_EPSILON_DEFAULT_RG = 1e-6;
+
 export function criticalImpactParameter(massRg = 1): number {
   if (!Number.isFinite(massRg) || massRg < 0) return NaN;
-  return 3 * Math.sqrt(3) * massRg;
+  return CRITICAL_IMPACT_PARAMETER_RG * massRg;
 }
 
 /**

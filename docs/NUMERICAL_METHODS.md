@@ -148,7 +148,16 @@ Do not simply test the Euclidean ray from the camera against the disk plane.
 
 ### 10.3 Escape
 
-Escape must be conservative. A candidate condition is `r > escapeRadius`, outward radial momentum, and estimated remaining weak-field deflection below the configured angular tolerance. Initial versions may choose a deliberately large `escapeRadius`. Performance optimization may tighten it only against reference comparisons.
+Escape must be conservative. The implemented criterion is `r > escapeRadius`
+AND outward radial momentum across the whole segment (both endpoints), with a
+deliberately large `escapeRadius` (Q-06: an earlier "remaining weak-field
+deflection" refinement existed as a dead proxy with no production caller and
+has been removed; the large-radius variant below is what every integration
+path — GPU Schwarzschild/Kerr and the binary64 oracle — implements).
+Performance optimization may tighten `escapeRadius` only against reference
+comparisons. A future remaining-deflection term may be reintroduced as a
+real criterion — with a caller — or not at all; documented-but-dead code is
+not a criterion.
 
 ### 10.4 Max steps / invalid values
 

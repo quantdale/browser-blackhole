@@ -92,7 +92,11 @@ export const DEFAULT_BLACK_HOLE_CONTROLS: Readonly<BlackHoleControlState> = {
 };
 
 /** Absolute clamp shared with canonical app state (docs/STATE_SCHEMA.md). */
-export const BLACK_HOLE_SPIN_LIMIT = 0.998;
+import { DIMENSIONLESS_SPIN_ABS_MAX } from '../../physics/constants.js';
+
+// Q-08: single authority (src/physics/constants.ts); local alias keeps the
+// public name and every internal use.
+export const BLACK_HOLE_SPIN_LIMIT = DIMENSIONLESS_SPIN_ABS_MAX;
 
 function clampSpin(raw: unknown): number {
   if (typeof raw !== 'number' || !Number.isFinite(raw)) {

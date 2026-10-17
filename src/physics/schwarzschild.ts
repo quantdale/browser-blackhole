@@ -457,24 +457,6 @@ export interface RadiusEventOptions {
   captureEpsilon: number;
   /** Conservative escape radius in r_g (section 10.3). */
   escapeRadiusRg: number;
-  /** Maximum accepted remaining-deflection proxy, radians (section 10.3). */
-  angularTolerance: number;
-}
-
-/**
- * Remaining-deflection proxy for escape testing (docs/NUMERICAL_METHODS.md
- * section 10.3). Weak-field deflection still ahead of a photon currently at
- * radius r with conserved impact parameter b is approximately
- * alpha_rem(b, r) = (4M/b) * (1 - sqrt(1 - (b/r)^2)), derived by integrating
- * the leading-order bending density 4M b / rho^3 along the straight chord
- * beyond the current radius. This bound is maximized over ALL b by grazing
- * trajectories (b -> r), where alpha_rem = 4M/r; smaller-b rays at the same r
- * have strictly less remaining bend. Using the b-independent supremum 4M/r
- * keeps the event test conservative without threading b through the event API.
- * Leading-order approximation by design; exact only far from the hole.
- */
-function remainingDeflectionProxy(r: number): number {
-  return 4 / r; // M = 1 in r_g-native units
 }
 
 /**
@@ -482,9 +464,16 @@ function remainingDeflectionProxy(r: number): number {
  * rules. Order matters and mirrors cpuReference: capture is checked BEFORE
  * escape (section 10.1 priority). Escape additionally requires outward radial
  * momentum across the WHOLE segment (prPrevious > 0 AND prNow > 0): a segment
- * straddling a radial turning point has its periapsis at or below r, realizes
- * exactly the grazing worst case, and must not escape yet. Non-finite state OR
- * non-finite options report RAY_NON_FINITE rather than silently ACTIVE.
+ * straddling a radial turning point has its periapsis at or below r and must
+ * not escape yet. Non-finite state OR non-finite options report RAY_NON_FINITE
+ * rather than silently ACTIVE.
+ *
+ * Q-06 (documentation-truthfulness lane): the earlier "remaining-deflection
+ * proxy" escape term was DEAD CODE — no production path called it (the GPU
+ * integrator and cpuReference both use the large-escape-radius variant that
+ * NUMERICAL_METHODS §10.3 sanctions). It is removed, and §10.3 now describes
+ * the criterion actually implemented: radius + outward-momentum with a
+ * deliberately conservative escape radius.
  *
  * Returns one of RAY_CAPTURED, RAY_ESCAPED, RAY_ACTIVE, RAY_NON_FINITE.
  */
@@ -494,27 +483,12 @@ export function classifyRadiusEvent(
   prNow: number,
   opts: RadiusEventOptions
 ): number {
-  if (
-    !allFinite([
-      r,
-      prPrevious,
-      prNow,
-      opts.captureEpsilon,
-      opts.escapeRadiusRg,
-      opts.angularTolerance
-    ])
-  ) {
+  if (!allFinite([r, prPrevious, prNow, opts.captureEpsilon, opts.escapeRadiusRg])) {
     return RAY_NON_FINITE;
   }
   if (r <= 2 + opts.captureEpsilon) return RAY_CAPTURED;
   const outwardThroughout = prPrevious > 0 && prNow > 0;
-  if (
-    r > opts.escapeRadiusRg &&
-    outwardThroughout &&
-    remainingDeflectionProxy(r) <= opts.angularTolerance
-  ) {
-    return RAY_ESCAPED;
-  }
+  if (r > opts.escapeRadiusRg && outwardThroughout) return RAY_ESCAPED;
   return RAY_ACTIVE;
 }
 

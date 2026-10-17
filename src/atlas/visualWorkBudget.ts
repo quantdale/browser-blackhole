@@ -6,10 +6,22 @@
 
 import type { GovernorActivityMode, QualityTier, VisualWorkBudget } from './types';
 
+/**
+ * Internal render scale per tier (docs/PERFORMANCE.md §3) — the SINGLE
+ * authority (A-07: the same table was duplicated in governor.ts, where a
+ * future edit could silently disagree with the budget's own renderScale).
+ */
+export const PER_TIER_RENDER_SCALE: Readonly<Record<QualityTier, number>> = {
+  low: 0.6,
+  medium: 0.8,
+  high: 1.0,
+  ultra: 1.0
+};
+
 const BASE_BY_TIER: Readonly<Record<QualityTier, Omit<VisualWorkBudget, 'tier' | 'activityMode'>>> =
   {
     low: {
-      renderScale: 0.6,
+      renderScale: PER_TIER_RENDER_SCALE.low,
       temporalEnabled: false,
       temporalHistoryFrames: 1,
       temporalJitterScale: 0,
@@ -26,7 +38,7 @@ const BASE_BY_TIER: Readonly<Record<QualityTier, Omit<VisualWorkBudget, 'tier' |
       lensingSupersampleQuality: 0
     },
     medium: {
-      renderScale: 0.8,
+      renderScale: PER_TIER_RENDER_SCALE.medium,
       temporalEnabled: false,
       temporalHistoryFrames: 2,
       temporalJitterScale: 0,
@@ -43,7 +55,7 @@ const BASE_BY_TIER: Readonly<Record<QualityTier, Omit<VisualWorkBudget, 'tier' |
       lensingSupersampleQuality: 0.25
     },
     high: {
-      renderScale: 1,
+      renderScale: PER_TIER_RENDER_SCALE.high,
       temporalEnabled: true,
       temporalHistoryFrames: 8,
       temporalJitterScale: 0.5,

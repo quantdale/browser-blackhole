@@ -54,7 +54,9 @@ export const ISCO_RG = 6;
  * (docs/NUMERICAL_METHODS.md §11). {@link criticalImpactParameter} locates
  * the same boundary numerically; the two are compared by validation vectors.
  */
-export const CRITICAL_IMPACT_PARAMETER_ANALYTIC_RG = 3 * Math.sqrt(3);
+// Q-08: single authority (src/physics/constants.ts).
+export { CRITICAL_IMPACT_PARAMETER_RG as CRITICAL_IMPACT_PARAMETER_ANALYTIC_RG } from '../../physics/constants.js';
+import { CAPTURE_EPSILON_DEFAULT_RG } from '../../physics/constants.js';
 
 /** Normalized null-constraint residual above which integration fails (§6). */
 const CONSTRAINT_FAILURE_THRESHOLD = 1e-4;
@@ -89,7 +91,7 @@ export const DEFAULT_PHOTON_INTEGRATION_OPTIONS: Readonly<PhotonIntegrationOptio
   minStep: 1e-9,
   maxStep: 250,
   escapeRadius: 1000,
-  captureEpsilon: 1e-6,
+  captureEpsilon: CAPTURE_EPSILON_DEFAULT_RG,
   pathStride: 0
 };
 

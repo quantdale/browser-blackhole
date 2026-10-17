@@ -37,7 +37,8 @@
 export const KERR_ABS_SPIN_EXTREMAL = 1;
 
 /** Production spin clamp (mirrors src/app/state.ts STATE_RANGES.absSpin). */
-export const KERR_ABS_SPIN_MAX = 0.998;
+// Q-08: single authority (src/physics/constants.ts).
+export { DIMENSIONLESS_SPIN_ABS_MAX as KERR_ABS_SPIN_MAX } from '../../../physics/constants.js';
 
 function requireFiniteSpin(aStar: number): number {
   if (!Number.isFinite(aStar)) {

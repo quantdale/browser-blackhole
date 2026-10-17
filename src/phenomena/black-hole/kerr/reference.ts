@@ -35,6 +35,7 @@
  */
 
 import { kerrErgosphereRadius, kerrHorizonRadii, kerrFragments } from './characteristics.js';
+import { CAPTURE_EPSILON_DEFAULT_RG } from '../../../physics/constants.js';
 
 /** 3-vector tuple in r_g units, relative to the black-hole center. */
 export type Vec3 = [number, number, number];
@@ -90,7 +91,7 @@ export const DEFAULT_KERR_PHOTON_OPTIONS: Readonly<KerrPhotonOptions> = {
   minStep: 1e-9,
   maxStep: 250,
   escapeRadiusRg: 1000,
-  captureEpsilon: 1e-6,
+  captureEpsilon: CAPTURE_EPSILON_DEFAULT_RG,
   stallBandDelta: 1e-3,
   constraintThreshold: 1e-4,
   carterThreshold: 1e-5,

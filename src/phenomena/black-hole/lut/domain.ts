@@ -25,7 +25,8 @@ import type { LutAxisMapping } from './types.js';
 // ---------------------------------------------------------------------------
 
 /** Critical impact parameter b_c = 3*sqrt(3)*M in r_g (NUMERICAL_METHODS §11). */
-export const B_CRITICAL_RG = 3 * Math.sqrt(3);
+// Q-08: derived from the single authority (src/physics/constants.ts).
+export { CRITICAL_IMPACT_PARAMETER_RG as B_CRITICAL_RG } from '../../../physics/constants.js';
 
 /**
  * Generator default: reference sphere where rows begin/end (ADR §4). */

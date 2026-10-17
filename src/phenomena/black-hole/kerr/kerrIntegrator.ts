@@ -157,7 +157,9 @@ const QUALITY_TIER_STEP_BUDGETS: Record<QualityTier, number> = {
 const MAX_COMPILE_LOOP_BOUND = QUALITY_TIER_STEP_BUDGETS.ultra * 3;
 
 /** Production spin clamp (mirrors canonical STATE_RANGES.absSpin). */
-const SPIN_CLAMP = 0.998;
+import { DIMENSIONLESS_SPIN_ABS_MAX } from '../../../physics/constants.js';
+// Q-08: single authority (src/physics/constants.ts).
+const SPIN_CLAMP = DIMENSIONLESS_SPIN_ABS_MAX;
 
 // ---------------------------------------------------------------------------
 // Public uniform-block documentation

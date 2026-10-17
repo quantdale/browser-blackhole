@@ -64,7 +64,7 @@ import type {
   QualityTier,
   VisualWorkBudget
 } from './types';
-import { resolveVisualWorkBudget } from './visualWorkBudget';
+import { PER_TIER_RENDER_SCALE, resolveVisualWorkBudget } from './visualWorkBudget';
 
 // ---------------------------------------------------------------------------
 // Tunables
@@ -73,13 +73,10 @@ import { resolveVisualWorkBudget } from './visualWorkBudget';
 /** Tier ladder, lowest first. Auto mode moves one step at a time. */
 const TIER_LADDER: readonly QualityTier[] = ['low', 'medium', 'high', 'ultra'];
 
-/** Internal render scale per tier (docs/PERFORMANCE.md §3). */
-export const PER_TIER_RENDER_SCALE: Readonly<Record<QualityTier, number>> = {
-  low: 0.6,
-  medium: 0.8,
-  high: 1.0,
-  ultra: 1.0
-};
+// A-07: the per-tier render-scale table is owned by visualWorkBudget.ts (the
+// single authority the resolved budget also reads); re-exported here for the
+// governor's existing consumers.
+export { PER_TIER_RENDER_SCALE } from './visualWorkBudget';
 
 /** Drop a tier when smoothed fps stays below target × this factor… */
 const DROP_THRESHOLD_FACTOR = 0.8;

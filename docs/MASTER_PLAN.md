@@ -22,9 +22,8 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 5b | `documentation-truthfulness-realignment` | **complete** (2026-10-17 session) — D-06…D-12, D-14, D-15 struck (D-13 struck at Phase 0) |
 | 6 | final certification | pending |
 
-Still open and unowned by any listed change: **A-07** (P3, render-scale table duplication),
-**Q-06** (P2, dead remaining-deflection proxy), **Q-08** (P3, duplicated physical constants),
-**L-01/L-02** (deferred legacy shell). `spatial-atlas-continuous-navigation` remains planning at
+Unowned strays A-07, Q-06, Q-08 were fixed in the 2026-10-17 session (struck in §4).
+**L-01/L-02** remain deferred (legacy shell; not completion criteria). `spatial-atlas-continuous-navigation` remains planning at
 0/123 tasks behind this lane; it is not part of this plan's phase order.
 
 Audit base: `main@dc0b3ba`. Planning revisions through `c0ee5f5` did not change product code, but
@@ -310,9 +309,9 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 | Q-03 | Kerr g-factor divides by `\|E\|` unconditionally, diverging from the gated Schwarzschild form | P1 | **RESOLVED 2026-10-03** `4a252b9` | `kerrIntegrator.ts` ~700 vs `schwarzschildIntegrator.ts:432-437` |
 | Q-04 | LUT capture sentinel is read through a linear filter, so classification is interpolated at `b_c` | P1 | **RESOLVED 2026-10-03** `4a252b9` | `lensingGpu.ts:399-405`, `textures.ts:66-69`, `generate.ts:455-461` |
 | Q-05 | LUT GPU hard-codes the `x→u` axis mapping; the manifest's `axisX` never reaches the shader | P2 | **RESOLVED 2026-10-03** `4a252b9` | `lensingGpu.ts:200-205` vs `lut/domain.ts:20-22` |
-| Q-06 | Escape criterion is radius+momentum only; the documented remaining-deflection proxy is dead code | P2 | confirmed | `docs/NUMERICAL_METHODS.md:151` vs `schwarzschild.ts:460-468` (no production caller) |
+| Q-06 | Escape criterion is radius+momentum only; the documented remaining-deflection proxy is dead code | P2 | **RESOLVED 2026-10-17** session | `docs/NUMERICAL_METHODS.md:151` vs `schwarzschild.ts:460-468` (no production caller) |
 | Q-07 | Kerr `massRg ≠ 1` mixes `a*` and `a = a*·M` (latent; `massRg` is pinned to 1 today) | P3 | **RESOLVED 2026-10-03** `4a252b9` | `kerrIntegrator.ts:458-464` vs `reference.ts:207-213` |
-| Q-08 | Physical constants duplicated 4–5× (spin clamp, capture ε, ISCO, `B_CRITICAL_RG`) | P3 | confirmed | `state.ts:152`, `controlState.ts:95`, `characteristics.ts:40`, `kerrIntegrator.ts:160` |
+| Q-08 | Physical constants duplicated 4–5× (spin clamp, capture ε, ISCO, `B_CRITICAL_RG`) | P3 | **RESOLVED 2026-10-17** session | `state.ts:152`, `controlState.ts:95`, `characteristics.ts:40`, `kerrIntegrator.ts:160` |
 
 ### E — Reliability / error surfacing (change: `transition-error-user-visibility`)
 
@@ -334,7 +333,7 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 | A-04 | `renderScale` applied twice: the HDR/post target is sized at `css·dpr·scale²` | P1 | **RESOLVED 2026-10-03** `274c591` | `SharedRendererKernel.ts:542,555,561` + `SharedPost.ts:173-174` — kernel owns the formula once and passes already-scaled dims with post scale 1; pinned by `tests/unit/renderScaleApplication.test.ts` |
 | A-05 | Governor FPS EMA measures the CPU submit window, not frame cadence; its own test harness models a different measurement | P1 | **RESOLVED 2026-10-03** `274c591` | `governor.ts:238-260` called only from `SharedRendererKernel.renderFrame`; `tests/unit/governor.test.ts:6-8,28-32` — new `advanceFrame(deltaMs, presented)` consumes only presented-frame intervals; `lastCpuSubmitMs` retained separately |
 | A-06 | Governor activity clock advances only on rendered frames, so `activityMode` latches at `interaction` while idle | P2 | **RESOLVED 2026-10-03** `274c591` | `host.ts:725-730`, `governor.ts:238-262` — `advanceFrame` calls `advanceActivityClock(deltaMs)` on every tick, before the presented gate |
-| A-07 | Render-scale table duplicated in `governor.ts` and `visualWorkBudget.ts` | P3 | confirmed — **open** | `governor.ts:81-86` vs `visualWorkBudget.ts:11-77` |
+| A-07 | Render-scale table duplicated in `governor.ts` and `visualWorkBudget.ts` | P3 | **RESOLVED 2026-10-17** session | `governor.ts:81-86` vs `visualWorkBudget.ts:11-77` |
 
 ### U — Product correctness / control truthfulness (change: `destination-control-truthfulness`)
 
