@@ -20,7 +20,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 4 | `benchmark-harness-integrity` | **complete** (2026-10-17 session) — B-01…B-07 struck |
 | 5a | `operations-and-deployment-readiness` | **complete** (2026-10-17 session) — O-01…O-09 struck |
 | 5b | `documentation-truthfulness-realignment` | **complete** (2026-10-17 session) — D-06…D-12, D-14, D-15 struck (D-13 struck at Phase 0) |
-| 6 | final certification | pending |
+| 6 | final certification | **complete** (2026-10-17 session) — re-certified at the close-out; see `docs/RELEASE_CERTIFICATION.md` 2026-10-17 authoritative table |
 
 Unowned strays A-07, Q-06, Q-08 were fixed in the 2026-10-17 session (struck in §4).
 **L-01/L-02** remain deferred (legacy shell; not completion criteria). `spatial-atlas-continuous-navigation` remains planning at

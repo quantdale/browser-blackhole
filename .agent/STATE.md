@@ -1,3 +1,43 @@
+## 2026-10-17 session (7) — Phase 6 FINAL CERTIFICATION — the hardening campaign is COMPLETE
+
+Status: **RE-CERTIFIED.** The `docs/MASTER_PLAN.md` hardening campaign —
+the "everything wrong" register derived from the 2026-10 audit — is fully
+resolved: every Q-, E-, A-, U-, R-, V-, B-, O- and D-lane finding is struck
+from §4 with a resolution commit, including the three unowned strays
+(A-07, Q-06, Q-08). L-01/L-02 remain deferred by plan (legacy shell; the
+plan explicitly holds them out of completion criteria).
+
+**Authoritative certification:** `docs/RELEASE_CERTIFICATION.md`
+"2026-10-17 hardening re-certification" — the single authoritative gate
+table (the 2026-09-12 and 2026-08-27 runs are dated superseded evidence).
+
+| Gate | Result |
+| --- | --- |
+| `npm run check` | PASS — 66 files / 756 unit; build + hook gate ok |
+| Full Playwright suite | PASS — 309/309 + 1 documented skip (visual 43/43 + cinematic 8/8 in-suite) |
+| Firefox matrix | PASS — 4/4 |
+| `npm audit --audit-level=high` | PASS — 0 vulnerabilities (re-checked; re-check rule recorded) |
+| `openspec validate --all --strict` | PASS — 18/18 |
+| Command-surface + deployment-contract gates | PASS |
+
+Completed OpenSpec changes are ARCHIVED into `openspec/specs/` (12
+capability baselines); `spatial-atlas-continuous-navigation` remains an
+unarchived 0/123 planning change by design (never to be implemented as part
+of hardening).
+
+**Strays closed in the final stretch:** Q-06 (dead remaining-deflection
+proxy removed; NUMERICAL_METHODS §10.3 now documents the criterion actually
+implemented), Q-08 (4-5x duplicated physics constants consolidated into
+src/physics/constants.ts with alias-preserving re-exports), A-07 (the
+per-tier render-scale table now has one owner: visualWorkBudget.ts).
+
+**Standing env note for future runners:** browser gates on this host must
+NOT use `CI=1` (it silently switches to the GPU-less bundled Chromium —
+three phantom failures were traced to exactly that earlier in this
+session); run without CI or with `PLAYWRIGHT_BROWSER_CHANNEL=msedge`.
+
+---
+
 ## 2026-10-17 session (6) — `documentation-truthfulness-realignment` COMPLETED (D-06…D-15)
 
 Status: **COMPLETE** — documentation-only (plus the permitted command-surface

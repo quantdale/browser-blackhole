@@ -6,11 +6,43 @@ Certified: 2026-08-27 (commit `7d55423`); **re-certified 2026-09-12 at `bbd71ef`
 This report records the evidence for the final production-readiness campaign. It
 supersedes any earlier "campaign complete" claim that predated a green hosted CI.
 
-**Authoritative gate table (3.1):** the §0 re-certification tables below
-(commit `bbd71ef`, dated 2026-09-12) are the single authoritative gate record.
-The 2026-08-27 run's table is preserved below as **superseded evidence** — it
-is a dated artifact of its run, not a second authority (3.2). The `npm audit`
-claim carries its own date and re-check rule (3.3/3.5).
+**Authoritative gate table (3.1):** the 2026-10-17 hardening re-certification
+below is the single authoritative gate record. The 2026-09-12 (§0) and
+2026-08-27 runs are preserved as **superseded evidence** — dated artifacts of
+their runs, not second authorities (3.2). The `npm audit` claim carries its
+own date and re-check rule (3.3/3.5).
+
+## 2026-10-17 hardening re-certification (AUTHORITATIVE)
+
+Certified: 2026-10-17, at the `documentation-truthfulness-realignment`
+close-out on `main`. This completes the `docs/MASTER_PLAN.md` hardening
+campaign: every P0/P1/P2/P3 finding in the §4 register is struck (Q, E, A,
+U, R, V, B, O, D lanes; A-07/Q-06/Q-08 included; L-01/L-02 remain deferred
+by plan as non-completion criteria).
+
+| Gate | Result |
+| --- | --- |
+| `npm run format:check` | PASS |
+| `npm run lint` (eslint) | PASS |
+| `npm run typecheck` (tsc) | PASS |
+| `npm run test` (vitest) | PASS — **756/756 across 66 files** (incl. the golden-inventory, service-lifecycle contract, command-surface-adjacent and deployment-contract gates) |
+| `npm run build` | PASS — no source maps, no machine-local paths, hook-free (check-no-test-hook) |
+| Full Playwright suite (`--project=default`) | PASS — **309/309 + 1 documented skip** (incl. visual-goldens 43/43 and cinematic-goldens 8/8 in-suite) |
+| Firefox matrix (`--project=firefox`) | PASS — 4/4 |
+| `npm audit --audit-level=high` | PASS — **0 vulnerabilities**, re-checked 2026-10-17 (3.5: re-check at every certification) |
+| `openspec validate --all --strict` | PASS — 18/18 |
+| Command-surface check | PASS — every documented `npm run` exists |
+| Deployment contract test | PASS — deep links + asset 404 semantics against a plain static server |
+
+Host: Windows 11 local capable runner; Playwright `channel: msedge`
+(hardware WebGPU, `nvidia lovelace`); `E2E_PORT=4219`; `--workers=1`.
+Note for future runners: browser gates must NOT run under `CI=1` on this
+host (that silently switches to the GPU-less bundled Chromium — see
+`.agent/STATE.md` 2026-10-17 session (1)).
+
+Completed OpenSpec changes are archived into `openspec/specs/` (12 capability
+baselines); `spatial-atlas-continuous-navigation` remains an unarchived
+0/123 planning change by design.
 
 ## §0 — Re-certification at HEAD (`bbd71ef`, 2026-09-12)
 
