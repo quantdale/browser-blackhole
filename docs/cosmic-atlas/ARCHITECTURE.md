@@ -29,74 +29,49 @@ particles   volumes     lensing ...
         HDR/post/canvas
 ```
 
-## 2. Proposed repository layout
+## 2. Repository layout (shipped)
+
+The ACTUAL shipped tree (verified against the filesystem, 2026-10-17):
 
 ```text
 src/
-  atlas/
-    CosmicAtlasHost.ts
-    DestinationRegistry.ts
-    NavigationController.ts
-    TransitionDirector.ts
-    ResourceManager.ts
-    TimeController.ts
-    atlasState.ts
-    routes.ts
-
-  renderer/
-    # existing black-hole renderer code remains
-    shared/
-      CameraRig.ts
-      PerformanceGovernor.ts
-      ParticleService.ts
-      VolumeService.ts
-      RibbonService.ts
-      TrajectoryService.ts
-      FieldLineService.ts
-      LensingService.ts
-      SharedPost.ts
-      ResourceScope.ts
-
-  phenomena/
-    black-hole/
-    neutron-star/
-    stellar-explosion/
-    compact-merger/
+  app/                 # atlas shell (atlasApp.ts) + legacy M0 shell
+  atlas/               # host, registry, navigation, transition, state,
+                       # routes, governor, launchCatalog, destinations/
+  camera/              # camera helpers
+  phenomena/           # the eight destinations + shared/
+    black-hole/        #   Schwarzschild LUT + kerr/ + lut/ + observer
     black-hole-merger/
-    tidal-disruption/
-    quasar/
+    compact-merger/
     galaxy-collision/
-    stellar-merger/
-    solar-activity/
-    lensing-lab/
-
-  data/
-    manifests/
-    binary/
-
-  ui/
-    atlas/
-      DestinationSelector.ts
-      DestinationPanel.ts
-      TimelineControl.ts
-      FidelityBadge.ts
-      LoadingStatus.ts
+    neutron-star/
+    quasar-agn/
+    stellar-explosion/
+    tidal-disruption/
+    shared/            # assetTransfer, temperatureRamp
+  physics/             # constants, schwarzschild, worldFrame
+  renderer/
+    SharedRendererKernel.ts
+    shared/            # CameraRig, TemporalService, SharedPost, StrandService,
+                       # RibbonService, ParticleService, VolumeService,
+                       # LensingService, TrajectoryService, FieldLineService,
+                       # ResourceScope, AutoFramer, CinematicPrimitives,
+                       # visualLayers
+  shaders/             # TSL/CPU shader references (cameraRayMath, starfield, …)
+  ui/                  # atlas DOM component factories + legacy panels
 
 public/
-  cosmic-data/
-  cosmic-assets/
+  data/                # committed datasets (black-hole-merger/, galaxy-collision/)
+  luts/                # shipped LUT families (index.json + families)
+  404.html, _redirects # publish-directory host configuration
 
 tools/
-  cosmic-data/
-    fetch/
-    normalize/
-    validate/
-    reduce/
-    compress/
-    manifests/
+  cosmic-data/         # offline Python pipeline (fetch/reduce/self-check)
 ```
 
-Create only files needed by current milestone; this is the target topology.
+Every path above exists in the repository today (task 5.3). The original
+aspirational layout is preserved in the appendix below as a TARGET topology —
+it is historical planning, not the shipped tree.
 
 ## 3. Destination descriptor
 
@@ -467,3 +442,55 @@ Keep bounded shared caches for:
 - recently used destination CPU-side compressed data if memory budget allows.
 
 Cache size must be observable and evictable.
+
+
+---
+
+## Appendix — original target topology (aspirational; superseded by §2)
+
+The layout below was the 2026 planning-era target. Several names landed
+differently (`quasar` -> `quasar-agn`; no `stellar-merger`, `solar-activity`
+or `lensing-lab` destinations were ever implemented — see
+`PHENOMENA_IMPLEMENTATION.md` §9-§11, marked unimplemented). Kept as the
+design record.
+
+```text
+src/
+  phenomena/
+    black-hole/
+    neutron-star/
+    stellar-explosion/
+    compact-merger/
+    black-hole-merger/
+    tidal-disruption/
+    quasar/
+    galaxy-collision/
+    stellar-merger/
+    solar-activity/
+    lensing-lab/
+
+  data/
+    manifests/
+    binary/
+
+  ui/
+    atlas/
+      DestinationSelector.ts
+      DestinationPanel.ts
+      TimelineControl.ts
+      FidelityBadge.ts
+      LoadingStatus.ts
+
+public/
+  cosmic-data/
+  cosmic-assets/
+
+tools/
+  cosmic-data/
+    fetch/
+    normalize/
+    validate/
+    reduce/
+    compress/
+    manifests/
+```

@@ -43,6 +43,8 @@ jobs:
       - run: npm run test
       - name: Unit-test import-coverage report (report-only, D8/V-10)
         run: npm run coverage:report
+      - name: Command-surface check (documented commands must exist)
+        run: node scripts/check-command-surface.mjs
       - run: npm run build
 
   browser-smoke:

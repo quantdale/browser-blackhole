@@ -1,5 +1,10 @@
 # Detailed milestone work packets
 
+> **SUPERSEDED (2026-10-17, `documentation-truthfulness-realignment`).**
+> The live work queue is `docs/MASTER_PLAN.md` executed through
+> `openspec/changes/`. These work packets are HISTORICAL (M0-M12 complete)
+> and are retained for their history, not as a work queue.
+
 This document expands `ROADMAP.md` into executable work packets. IDs are stable planning identifiers. An autonomous agent should mark completion/evidence in `.agent/STATE.md` rather than deleting packets.
 
 ## M0 — Repository and rendering foundation

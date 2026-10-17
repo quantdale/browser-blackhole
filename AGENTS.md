@@ -12,18 +12,28 @@ The numbered list below still contains historical planning documents. Read `docs
 
 Read, in this order:
 
-1. `.agent/STATE.md`
-2. `docs/PRODUCT_SPEC.md`
-3. `docs/ARCHITECTURE.md`
-4. `docs/PHYSICS.md`
-5. `docs/RENDERING_PIPELINE.md`
-6. `docs/PERFORMANCE.md`
-7. `docs/TESTING.md`
-8. `docs/ROADMAP.md`
-9. `docs/BACKLOG.md`
-10. `docs/RESEARCH_REFERENCES.md`
+1. `.agent/STATE.md` — current state, blockers, evidence
+2. `docs/MASTER_PLAN.md` — the live work queue (audit-derived hardening
+   campaign) executed through `openspec/changes/`
+3. `docs/ARCHITECTURE.md` and `docs/cosmic-atlas/ARCHITECTURE.md` — the
+   shipped system
+4. `docs/PHYSICS.md` and `docs/NUMERICAL_METHODS.md` — physics conventions
+   that remain in force
+5. `docs/RENDERING_PIPELINE.md` — rendering conventions that remain in force
+6. `docs/TESTING.md` and `docs/PERFORMANCE.md` — verification and
+   measurement conventions
+7. `docs/RELEASE_CERTIFICATION.md` — the current certification
 
 If an implementation decision conflicts with these documents, stop and either update the decision documentation with a defensible reason or choose the documented design. Do not silently drift.
+
+### Historical planning documents (NOT the work queue)
+
+`docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, `docs/BACKLOG.md` and
+`docs/MILESTONE_WORK_PACKETS.md` are the completed M0-M12 planning record.
+Each carries a SUPERSEDED header naming its replacement. Keep them for their
+physics and history value; do not treat them as the live work queue. The
+same applies to `docs/KERR_RESEARCH_PLAN.md` (M9 complete) and
+`docs/RESEARCH_REFERENCES.md` (reference bibliography).
 
 ## Autonomous execution loop
 

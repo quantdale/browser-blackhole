@@ -1,5 +1,11 @@
 # Implementation roadmap
 
+> **SUPERSEDED (2026-10-17, `documentation-truthfulness-realignment`).**
+> The live work queue is `docs/MASTER_PLAN.md` (the audit-derived hardening
+> campaign) executed through `openspec/changes/`. This M0-M12 roadmap is
+> HISTORICAL: every milestone below is complete. Retained for its history
+> and physics record, not as a work queue.
+
 Milestones are sequential at the integration level even when individual work packets can run in parallel. Every milestone must leave a runnable checkpoint.
 
 ## M0 — Repository and rendering foundation

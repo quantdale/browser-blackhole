@@ -10,10 +10,13 @@ The 2026-08-25 survey recorded the paper as effectively closed-access for exact
 parameter extraction. A 2026-08-26 source scan found the paper is now publicly
 reachable as a scanned PDF:
 
-- NASA GISS publication page: `https://pubs.giss.nasa.gov/abs/to01000a.html`
-- NASA NTRS reprint record: `https://ntrs.nasa.gov/citations/19720056411`
-- DOI: `10.1086/151825` (note: the canonical DOI is `10.1086/151823`; cite the
-  published version precisely when transcribing).
+- NASA GISS publication page: `https://www.giss.nasa.gov/pubs/abs/to03000u.html`
+- NASA GISS scanned PDF: `https://www.giss.nasa.gov/pubs/docs/1972/1972_Toomre_to03000u.pdf`
+- NASA NTRS reprint record: `https://ntrs.nasa.gov/citations/19730032576`
+- DOI: `10.1086/151823` (the canonical DOI — an earlier revision of this
+  document carried `10.1086/151825`, `to01000a` and NTRS `19720056411`, all
+  corrected here to match `DATA_SOURCES_GALAXY_COLLISION_SOURCE_LOCK.md` and
+  the runtime manifest; see the 2026-10-17 identifier correction below).
 
 This moves CA9 from "source inaccessible" to "source must be transcribed and
 validated" (audit F-04). It does **not** by itself grant redistribution rights
@@ -130,3 +133,31 @@ About/presets/snapshot: "Galaxy trajectories follow the classic restricted
 three-body experiments of Toomre & Toomre (1972), regenerated from their
 published parameters. Gas, dust, and starburst visuals are illustrative
 proxies; no self-gravity or hydrodynamics is simulated."
+
+
+---
+
+## 2026-10-17 identifier correction (`documentation-truthfulness-realignment` 6.1-6.3)
+
+**Identifiers.** This document previously carried `DOI 10.1086/151825`, GISS
+page `to01000a` and NTRS `19720056411` — contradicting
+`DATA_SOURCES_GALAXY_COLLISION_SOURCE_LOCK.md` (and the runtime manifest,
+whose `source.doi` is `10.1086/151823`). Resolved IN FAVOUR OF the source-lock
+record: the identifiers above now match it exactly. The source-lock document
+is the single authority for this source's identifiers.
+
+**Parameter provenance (6.3).** The earlier wording implied the scenario
+parameters came from the paper. They do not: the paper establishes the METHOD
+(restricted three-body, parabolic, test-particle disks); the numeric scenario
+(equal-mass 1:1, q=4, 60 deg inclination, the window and sampling constants)
+is a **repository-derived default within that source-locked framework** — the
+classification `source-locked-framework-repository-scenario` in the runtime
+manifest says exactly this. This correction STRENGTHENS the claim: the
+manifest now tells the truth about which parts are source facts and which are
+repository choices, instead of overstating the paper's role.
+
+**Cross-check (6.5).** Every remaining identifier in both data-source
+documents was checked against `public/data/galaxy-collision/gc1.manifest.json`:
+`source.doi = 10.1086/151823` matches; `parametersStatus =
+source-locked-framework-repository-scenario` matches the provenance statement
+above; `decisionAdr = CA-ADR-022` matches both documents.

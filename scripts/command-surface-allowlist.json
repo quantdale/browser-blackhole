@@ -1,0 +1,4 @@
+{
+  "//": "Reviewed allowlist for scripts/check-command-surface.mjs (tasks 4.3). Commands that appear in documentation but are intentionally NOT package.json scripts — each entry carries its reason. This is reviewed data, not a silent escape.",
+  "physics:fixtures": "REMOVED from docs — the physics fixture generators are the offline Python pipeline (tools/cosmic-data/README.md 'Reproduction gate'); they need the pinned interpreter (CPython 3.9-3.11) and pinned network records, so they cannot be a portable npm script. Kept here so any future reference is caught and re-decided, never silently allowed."
+}

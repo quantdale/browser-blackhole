@@ -1,3 +1,49 @@
+## 2026-10-17 session (6) — `documentation-truthfulness-realignment` COMPLETED (D-06…D-15)
+
+Status: **COMPLETE** — documentation-only (plus the permitted command-surface
+check); D-06…D-12, D-14, D-15 struck (D-13 was struck at Phase 0);
+`openspec validate --strict` valid; `git diff --stat -- src tests public`
+EMPTY.
+
+**What was wrong:** documents governed as "required reading" pointed at
+finished campaigns as if live; one certification carried TWO contradictory
+gate tables and a frozen audit claim; a documented npm command did not exist;
+an architecture section described a tree that matches no shipped path; three
+phenomena sections described destinations that do not exist; the Kerr plan
+still said "deferred" a completed backend; two data-source documents carried
+conflincting identifiers for the same paper; two control catalogues each
+claimed authority over the other.
+
+**Fixed:** AGENTS.md's required reading rebuilt around the CURRENT documents
+(MASTER_PLAN as the live queue; the completed M0-M12 planning docs moved to a
+labelled historical section, each with a SUPERSEDED header naming its
+replacement); RELEASE_CERTIFICATION consolidated to ONE authoritative table
+(the dated 2026-09-12 re-certification) with the older run as a dated
+superseded-evidence appendix and every `npm audit` claim carrying its date,
+dev-only scope and the 3.5 re-check rule; the phantom `physics:fixtures`
+reference replaced by the documented manual procedure, with a permanent
+command-surface check (`scripts/check-command-surface.mjs` + reviewed
+allowlist, wired into CI) that extracts every `npm run <name>` from docs and
+fails on any missing script; ARCHITECTURE §2 rewritten against the real
+shipped tree (aspirational layout kept as a target-topology appendix);
+PHENOMENA_IMPLEMENTATION §9-§11 marked unimplemented expansions; the galaxy
+collision identifiers resolved in favour of the source-lock record (now
+identical to the runtime manifest) with the parameter-provenance claim
+corrected (the paper establishes the method; the scenario is repository-
+derived — the correction strengthens the claim); the atlas control catalogue
+governs and the root one keeps its implementation contracts without the
+authority claim.
+
+Gates: `npm run check` 66 files / 756 unit green; command-surface check ok
+(187 files, 39 scripts, 2 reviewed allowlist entries); product-code diff
+EMPTY; `openspec validate --strict` valid.
+
+**Next live lane:** Phase 6 final certification (the §8 gate matrix on a
+capable runner + archive completed OpenSpec changes into `openspec/specs/`).
+Unowned strays: A-07, Q-06, Q-08 (L-01/L-02 deferred by plan).
+
+---
+
 ## 2026-10-17 session (5) — `operations-and-deployment-readiness` COMPLETED (O-01…O-09)
 
 Status: **COMPLETE** — all task sections checked with evidence; O-01…O-09

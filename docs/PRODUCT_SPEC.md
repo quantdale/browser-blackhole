@@ -1,5 +1,14 @@
 # Product specification
 
+> **SUPERSEDED (2026-10-17, `documentation-truthfulness-realignment`).**
+> This document is the historical single-destination product spec. The live
+> product statement is `docs/MASTER_PLAN.md` §1 (Cosmic Atlas: eight
+> production destinations behind one WebGPURenderer) with
+> `docs/cosmic-atlas/ARCHITECTURE.md`, `docs/UI_UX.md`,
+> `docs/UI_CONTROL_CATALOG.md`, and the current certification in
+> `docs/RELEASE_CERTIFICATION.md`. This file keeps its physics and history
+> value; it is no longer authoritative as the product statement.
+
 ## 1. Product statement
 
 Build a browser-based interactive black-hole visualizer that lets a user orbit and move the observer, manipulate physically meaningful black-hole/accretion-disk parameters, inspect relativistic effects, and trade rendering quality for performance in real time.

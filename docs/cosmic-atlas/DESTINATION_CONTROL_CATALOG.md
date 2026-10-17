@@ -1,6 +1,6 @@
 # Destination control catalog
 
-This catalog defines intended user controls and prevents agents from inventing misleading sliders.
+This catalog defines intended user controls and prevents agents from inventing misleading sliders. It is the GOVERNING destination-control inventory; [`docs/UI_CONTROL_CATALOG.md`](../UI_CONTROL_CATALOG.md) records implementation-level semantics (ranges, physical-vs-cinematic separation) and cross-references this catalog rather than claiming independent authority.
 
 Controls marked **physical** require model units/conventions. Controls marked **scenario** select validated/model presets. Controls marked **visual** affect presentation only.
 

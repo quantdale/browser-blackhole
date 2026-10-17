@@ -1,6 +1,13 @@
 # UI control catalog and semantics
 
-This is the authoritative inventory of user-facing controls. Exact ranges may be tuned by implementation/benchmark evidence, but semantic meaning and physical-vs-cinematic separation must remain clear.
+This document records implementation-level control SEMANTICS (ranges, physical-vs-cinematic
+separation, contracts). The GOVERNING inventory of destination controls is
+[`docs/cosmic-atlas/DESTINATION_CONTROL_CATALOG.md`](cosmic-atlas/DESTINATION_CONTROL_CATALOG.md) —
+where the two disagree, the atlas catalogue governs (it is the one maintained against the shipped
+destinations). This file keeps its implementation contracts and cross-references the atlas
+catalogue instead of claiming independent authority.
+
+Exact ranges may be tuned by implementation/benchmark evidence, but semantic meaning and physical-vs-cinematic separation must remain clear.
 
 ## 1. Global mode
 

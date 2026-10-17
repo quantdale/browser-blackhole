@@ -1,6 +1,6 @@
 # Cosmic Atlas implementation roadmap
 
-Cosmic Atlas milestones are additional to the existing black-hole M0-M11 roadmap. Do not use this document to skip unfinished black-hole correctness work.
+Cosmic Atlas milestones are additional to the existing black-hole M0-M11 roadmap. (Historical note: that roadmap is complete — the black-hole correctness work it warned about landed through M11/M12 and the 2026-10 hardening campaign; the live work queue is `docs/MASTER_PLAN.md` executed through `openspec/changes/`.)
 
 ## Entry condition
 

@@ -635,6 +635,10 @@ determinism, WebGL2 fallback, leave/re-enter) plus `GC_ENCOUNTER`/`GC_BRIDGE_TAI
 
 ## 9. Stellar Merger — expansion
 
+> **UNIMPLEMENTED EXPANSION (marked 2026-10-17, `documentation-truthfulness-realignment`).**
+> No `stellar-merger` destination exists in the repository. This section is a
+> design sketch for a future destination, not a description of shipped code.
+
 ### Includes
 
 - stellar collision/contact;
@@ -669,6 +673,10 @@ Do not assert one specific observed transient's cause without event-specific sou
 
 ## 10. Solar Activity — expansion
 
+> **UNIMPLEMENTED EXPANSION (marked 2026-10-17, `documentation-truthfulness-realignment`).**
+> No `solar-activity` destination exists in the repository. This section is a
+> design sketch for a future destination, not a description of shipped code.
+
 ### Includes
 
 - solar flare;
@@ -693,6 +701,10 @@ Do not call it live MHD unless actual MHD data is used.
 ---
 
 ## 11. Gravitational Lensing Lab
+
+> **UNIMPLEMENTED EXPANSION (marked 2026-10-17, `documentation-truthfulness-realignment`).**
+> No `lensing-lab` destination exists in the repository. This section is a
+> design sketch for a future destination, not a description of shipped code.
 
 ### Fidelity
 

@@ -1,5 +1,10 @@
 # Implementation backlog / work packets
 
+> **SUPERSEDED (2026-10-17, `documentation-truthfulness-realignment`).**
+> The live work queue is `docs/MASTER_PLAN.md` executed through
+> `openspec/changes/`. This backlog is HISTORICAL (all packets complete)
+> and is retained for its history, not as a work queue.
+
 This backlog converts the roadmap into agent-sized tasks. IDs are stable references for commits/state updates.
 
 ## Foundation

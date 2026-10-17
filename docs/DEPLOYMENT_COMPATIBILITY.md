@@ -1,5 +1,12 @@
 # Deployment, compatibility, and runtime policy
 
+> **SUPERSEDED (2026-10-17, `documentation-truthfulness-realignment`).**
+> The operative artifacts are `docs/DEPLOYMENT.md` (the deployment contract,
+> now including committed reference host configurations) and
+> `docs/COMPATIBILITY_MATRIX.md` (the evidence table). This document remains
+> the policy statement beneath them; where wording conflicts, DEPLOYMENT.md
+> and `docs/MASTER_PLAN.md`'s current state win.
+
 > M11 note: the operative release artifacts are [`docs/DEPLOYMENT.md`](DEPLOYMENT.md)
 > (provider-neutral deployment contract) and
 > [`docs/COMPATIBILITY_MATRIX.md`](COMPATIBILITY_MATRIX.md) (evidence table).

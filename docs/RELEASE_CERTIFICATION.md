@@ -6,6 +6,12 @@ Certified: 2026-08-27 (commit `7d55423`); **re-certified 2026-09-12 at `bbd71ef`
 This report records the evidence for the final production-readiness campaign. It
 supersedes any earlier "campaign complete" claim that predated a green hosted CI.
 
+**Authoritative gate table (3.1):** the §0 re-certification tables below
+(commit `bbd71ef`, dated 2026-09-12) are the single authoritative gate record.
+The 2026-08-27 run's table is preserved below as **superseded evidence** — it
+is a dated artifact of its run, not a second authority (3.2). The `npm audit`
+claim carries its own date and re-check rule (3.3/3.5).
+
 ## §0 — Re-certification at HEAD (`bbd71ef`, 2026-09-12)
 
 The 2026-08-27 certification covered commit `7d55423`. Since then the repository
@@ -40,8 +46,14 @@ the current HEAD rather than re-asserted from the August baseline.
 - `npm run build` (`tsc --noEmit` + `vite build`) — PASS; built in 9.23s;
   largest chunk `three.webgpu` 1,033 kB (283.61 kB gzip); no source maps; no
   machine-local paths or secrets in `dist/`.
-- `npm audit` — **0 vulnerabilities** (196 dependencies: 2 prod, 195 dev,
-  55 optional).
+- `npm audit` — **0 vulnerabilities** AS OF 2026-09-12 (196 dependencies:
+  2 prod, 195 dev, 55 optional). **Dated claim (3.3):** at the 2026-10-17
+  hardening audit this had drifted to 2 HIGH (brace-expansion, source-map-js)
+  — both dev-only toolchain, both with fixes available; `npm audit fix`
+  remediated them via the lockfile and the high+ audit gate now runs in the
+  hosted quality job (`operations-and-deployment-readiness` O-02). **This
+  result must be RE-CHECKED at every certification, never carried forward
+  (3.5).**
 - No `TODO`/`FIXME`/`HACK` markers in `src/`.
 
 ### Gate D — visual correctness (PASS)
@@ -129,7 +141,7 @@ the current HEAD rather than re-asserted from the August baseline.
 - Certification/doc-closure commit: `7d55423` and the docs follow-up on `main`
 - Working tree: clean at certification
 - Runtime: Node 22 (CI) / v24.3.0 (local dev); npm 11.4.2
-- Dependencies: exact-pinned in `package.json` + `package-lock.json`; `npm ci` reproduces the lockfile; `npm audit` 0 vulnerabilities (dev + prod)
+- Dependencies: exact-pinned in `package.json` + `package-lock.json`; `npm ci` reproduces the lockfile; `npm audit` 0 vulnerabilities as of 2026-08-27 (dated — re-check at every certification, 3.5)
 
 ## Defects (ledger: `openspec/changes/archive/2026-10-03-final-production-readiness/ledger.md`)
 
@@ -140,6 +152,14 @@ the current HEAD rather than re-asserted from the August baseline.
 - Accepted limitations: hosted CI cannot run the GPU-heavy browser suite (see Compatibility); it is a local capable-runner gate with recorded evidence.
 
 Hard requirement met: **P0 = 0, P1 = 0.**
+
+## Superseded evidence — 2026-08-27 certification run (dated appendix)
+
+The table below is the ORIGINAL 2026-08-27 run (commit `7d55423`, msedge +
+AMD RDNA-2). It is preserved verbatim as a dated artifact — it is NOT an
+authoritative table (see the header). Its counts (515/515 across 35 files)
+describe that run only; the authoritative counts are the §0
+re-certification's.
 
 ## Quality gates (local, capable WebGPU runner — msedge + AMD RDNA-2, Windows 11)
 
@@ -153,7 +173,7 @@ Hard requirement met: **P0 = 0, P1 = 0.**
 | Full non-golden Playwright suite | PASS — 131/131 |
 | Visual goldens (`visual-goldens.spec.ts`) | PASS — 43/43, twice-stable (pass 1 + pass 2, both exit 0) |
 | Firefox second-engine matrix (`--project=firefox`) | PASS — 4/4 (local capable machine) |
-| `npm audit` | PASS — 0 vulnerabilities |
+| `npm audit` | PASS — 0 vulnerabilities (as of 2026-08-27; re-check at every certification) |
 
 ## CI (hosted GitHub Actions)
 
@@ -224,6 +244,6 @@ The full behavioral suite (navigation, presets, timeline, observer modes, resize
 
 - Hosted CI: `quality` + `browser-smoke` green on 3 consecutive runs of commit `79b2da9` (run `33079109595`, run and 2 re-runs).
 - Defects: P0 = 0, P1 = 0 (ledger: `openspec/changes/archive/2026-10-03-final-production-readiness/ledger.md`).
-- Local capable-runner evidence: 515/515 unit, 131/131 non-golden browser, 43/43 goldens twice-stable, 4/4 Firefox, `npm audit` 0 vulnerabilities.
+- Local capable-runner evidence: 515/515 unit, 131/131 non-golden browser, 43/43 goldens twice-stable, 4/4 Firefox, `npm audit` 0 vulnerabilities (2026-08-27 figure — superseded evidence; re-check at every certification).
 - Every environment-limited gate (full GPU suite, goldens, Firefox, WebKit, real mobile devices) is recorded as local-capable-runner evidence or DEFERRED_ENVIRONMENT — never claimed as hosted-CI PASS.
 - Repository/OpenSpec/README/`.agent` state agree with this report as of commit `7d55423` and the docs follow-up on `main`.

@@ -172,9 +172,17 @@ Do not auto-update goldens in CI.
 
 ## 8. Physics fixture generation
 
-Fixture generation is a separate explicit command, never part of normal tests. Suggested:
+Fixture generation is a separate explicit command, never part of normal tests. It is a MANUAL
+procedure driven by the offline Python pipeline (there is no `npm run physics:fixtures` — the
+generators need the pinned interpreter and the pinned network records, so they cannot be a portable
+npm script). The documented procedure is `tools/cosmic-data/README.md` "Reproduction gate":
 
-`npm run physics:fixtures -- --case <id>`
+```bash
+python -m pip install -r tools/cosmic-data/requirements.txt
+python tools/cosmic-data/fetch_sxs_record.py      # pinned Zenodo record, MD5-checked
+python tools/cosmic-data/reduce_bbh_merger.py     # deterministic reduction (writes tests/unit/fixtures/bbm-parity.json)
+python tools/cosmic-data/restricted_three_body.py  # GC self-check report (CI freshness-gated)
+```
 
 Generation must:
 

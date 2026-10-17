@@ -1,5 +1,13 @@
 # Kerr backend research and implementation plan
 
+> **SUPERSEDED (2026-10-17, `documentation-truthfulness-realignment`).**
+> M9 (the Kerr backend) is COMPLETE: the numerical Kerr backend ships in
+> `src/phenomena/black-hole/kerr/`, its conventions are codified in
+> `docs/KERR_BACKEND_ADR.md`, and the Q-01..Q-05/Q-07 initializer defects
+> were resolved (`4a252b9`). The sentence "Kerr is intentionally deferred"
+> below is HISTORICAL. This file is retained as the research record that
+> produced the ADR.
+
 Kerr is intentionally deferred until Schwarzschild is validated. This file prevents a future agent from implementing a plausible-looking rotating black hole from incomplete formulas.
 
 ## 1. Scope
