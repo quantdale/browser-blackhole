@@ -35,6 +35,17 @@ jobs:
           cache: npm
       - name: Install from lockfile
         run: npm ci
+      # archive-validation-gate 3.1: the hosted gate also runs both OpenSpec
+      # validators — every active change and every archived change must pass
+      # strict validation; a bare unchecked archived task fails the job.
+      # Pin the CLI (installed as a global tool locally at this exact version);
+      # a missing/failing invocation fails the job, it is never a silent pass.
+      - name: Install OpenSpec CLI (pinned, used by the two gates below)
+        run: npm install --global @fission-ai/openspec@1.9.0
+      - name: Specification validation (strict, all active changes)
+        run: openspec validate --all --strict
+      - name: Specification validation (strict, all archived changes)
+        run: openspec validate --archived --strict
       - name: Dependency audit gate (high+; see docs/DEPENDENCIES.md)
         run: npm audit --audit-level=high
       - run: npm run format:check

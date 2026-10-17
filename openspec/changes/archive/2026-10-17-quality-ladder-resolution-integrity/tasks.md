@@ -183,6 +183,6 @@
 
 ## 9. Close-out
 
-- [ ] 9.1 Strike findings A-01, A-02, A-03, A-04, A-05, A-06 from `docs/MASTER_PLAN.md` with their resolution commit.
-- [ ] 9.2 Append evidence to `.agent/STATE.md`.
-- [ ] 9.3 Commit this change as one coherent checkpoint.
+- [x] 9.1 Strike findings A-01, A-02, A-03, A-04, A-05, A-06 from `docs/MASTER_PLAN.md` with their resolution commit. — Evidence re-verified 2026-10-17 before checking (archive-validation-gate 1.1–1.3): `docs/MASTER_PLAN.md` §4 register rows for A-01…A-06 each read "RESOLVED 2026-10-03 `274c591`" and the execution-progress table's Phase 1b row states "**complete** (`274c591`, close-out `e364437`) — A-01…A-06 struck". Checkbox correction only.
+- [x] 9.2 Append evidence to `.agent/STATE.md`. — State verified 2026-10-17: the `.agent/STATE.md` "2026-10-03 session" section opens "Phase 1 change 2: quality-ladder-resolution-integrity implemented, validated and CLOSED — Status: **COMPLETE (committed `274c591`)**" and records the per-row A-01…A-06 evidence. Checkbox correction only; no other line edited.
+- [x] 9.3 Commit this change as one coherent checkpoint. — Commit verified 2026-10-17: implementation `274c591`, close-out commit `e364437`, and the archive lives at `openspec/changes/archive/2026-10-17-quality-ladder-resolution-integrity/`. Checkbox correction only.
