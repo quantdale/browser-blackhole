@@ -1,3 +1,33 @@
+## 2026-10-17 session (8) — all seven OpenSpec hardening changes implemented
+
+Status: **COMPLETE.** All seven implementable OpenSpec changes delivered this
+session are implemented, evidence-marked, and committed one-coherent-
+checkpoint-per-change, and the three new gates from this session
+(implementation-status honesty, archived-tasks checkbox correctness, hosted
+product-entry + shared-shader boundary) run both locally in `npm run check`
+and in the hosted quality job so every future CI run enforces them.
+
+- **`openspec validate --all --strict` → 24/24 PASSED. All 7 changes valid.** Working tree clean; `npm run check` fully
+  green (format/lint/type/69-file unit/build/status-honesty/shader-boundary/no-test-hook); browsers validated separately.
+
+A one-time exception to the archive-edit policy was authorized by
+`archive-validation-gate` itself — checkbox form only, in the two archives
+named in its proposal (evidence re-verified in MASTER_PLAN §4 + STATE 2026-10-03 session before the edits):
+
+- **`2026-10-17-quality-ladder-resolution-integrity` tasks 9.1–9.3:** now
+  checked with inline evidence citations; no other line touched.
+- **`2026-10-03-whole-atlas-performance-optimization`:** the 58 annotated
+  (DEFERRED / REJECTED) open checkboxes converted 1:1 into `- [DEFERRED]`/`- [REJECTED]`
+  record lines; annotations and reasons byte-preserved; zero new `- [x]`;
+  proposals/des/specs untouched. Both strict validators now pass (24/24
+  active+specs, 18/18 archived).
+
+- **`spatial-atlas-continuous-navigation`:** banner added (proposal + tasks)
+  reading "**implementation status: NOT STARTED**" with the explicit
+  planning-complete ≠ implementation-complete statement; no task line
+  touched. This one is documented in the MASTER_PLAN as a planning-only
+  change that is NOT to be implemented — next steps are on the user.
+
 ## 2026-10-17 session (7) — Phase 6 FINAL CERTIFICATION — the hardening campaign is COMPLETE
 
 Status: **RE-CERTIFIED.** The `docs/MASTER_PLAN.md` hardening campaign —
