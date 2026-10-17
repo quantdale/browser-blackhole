@@ -1,7 +1,7 @@
 /**
  * Canonical Schwarzschild physics core: stable ray classification,
  * static-observer tetrad mapping, geodesic-plane reduction, radius-event
- * classification, and reference-ray diagnostics.
+ * classification, and the per-ray diagnostics shape.
  *
  * Spec sources (implemented exactly; do not drift without updating docs):
  * - docs/NUMERICAL_METHODS.md
@@ -17,9 +17,13 @@
  *   0..6 shared with GPU debug render targets; codes must not be renumbered.
  *
  * Integration policy: the Hamiltonian ODE loop itself is OWNED by
- * src/phenomena/black-hole/cpuReference.ts and is imported here, never
- * duplicated. This module layers the classification enum, the plane-basis
- * construction, and the diagnostic result shape around it.
+ * src/phenomena/black-hole/cpuReference.ts. This module does not import or
+ * duplicate the integrator; it layers the classification enum, the plane-basis
+ * construction, and the diagnostic result shape around the integrator's
+ * result. (The previous retired wrapper here was reference-ray-oracle-
+ * honesty D1: it left disk-hit unset, could be mistaken for the reference
+ * disk-hit oracle, and had zero callers — unexported and removed. Disk-hit
+ * classification stays on the production integrators' own paths.)
  *
  * All radii and positions in this module are r_g-native: lengths measured in
  * r_g = GM/c^2 of the traced hole, hence the Schwarzschild mass parameter is
@@ -28,25 +32,23 @@
  *
  * Honest limitations (detailed on each symbol):
  * - cpuReference aliases numerical failure (non-finite state,
- *   constraint-residual blowup) to 'max-steps', so code RAY_MAX_STEPS may
- *   mean any of MAX_STEPS/NON_FINITE unless its result distinguishes them;
- *   only its degenerate-input branch (steps === 0) is separable and maps to
- *   RAY_INVALID_INITIAL_STATE. RAY_NON_FINITE is therefore never emitted by
- *   traceReferenceRay, only by classifyRadiusEvent for its own inputs.
- * - minRadius/windingRadians are reconstructed from strided pathSamples:
- *   estimates, not continuous extrema. maxConstraintResidual is unavailable
- *   from cpuReference's public result and is NaN.
- * - DISK_HIT is never produced by this module until crossing refinement
- *   (docs/NUMERICAL_METHODS.md section 10.2) lands in the owned integrator.
+ *   constraint-residual blowup) to 'max-steps' for its own callers, so a
+ *   consumer mapping cpuReference statuses must treat a max-steps alias as
+ *   ambiguous; only the degenerate-input branch (steps === 0) is separable
+ *   and maps to RAY_INVALID_INITIAL_STATE. RAY_NON_FINITE (5) is produced
+ *   only by classifyRadiusEvent for its own inputs.
+ * - RayTraceResult's minRadius/windingRadians fields are documented as
+ *   reconstructed from strided pathSamples: estimates, not continuous
+ *   extrema. maxConstraintResidual is unavailable from cpuReference's
+ *   public result and stays NaN (never silently zero).
+ * - DISK_HIT is never produced by this module: the production integrators
+ *   (schwarzschildIntegrator.ts, kerrIntegrator.ts) classify disk crossings
+ *   on their own paths with their own segment-segment refinement.
  *
  * Pure TypeScript: no three.js imports.
  */
 
-import {
-  DEFAULT_PHOTON_INTEGRATION_OPTIONS,
-  integratePhoton
-} from '../phenomena/black-hole/cpuReference.js';
-import type { PhotonIntegrationOptions, Vec3 } from '../phenomena/black-hole/cpuReference.js';
+import type { Vec3 } from '../phenomena/black-hole/cpuReference.js';
 import { schwarzschildF } from './constants.js';
 
 // ---------------------------------------------------------------------------
@@ -490,116 +492,4 @@ export function classifyRadiusEvent(
   const outwardThroughout = prPrevious > 0 && prNow > 0;
   if (r > opts.escapeRadiusRg && outwardThroughout) return RAY_ESCAPED;
   return RAY_ACTIVE;
-}
-
-// ---------------------------------------------------------------------------
-// Reference ray tracing wrapper over cpuReference.integratePhoton
-// ---------------------------------------------------------------------------
-
-/** Pass-through integrator controls (defaults from cpuReference). */
-export type TraceReferenceRayOptions = Partial<PhotonIntegrationOptions>;
-
-/** Wrap angle into (-pi, pi]. */
-function wrapToPi(angle: number): number {
-  const twoPi = 2 * Math.PI;
-  let wrapped = (angle + Math.PI) % twoPi;
-  if (wrapped < 0) wrapped += twoPi;
-  return wrapped - Math.PI;
-}
-
-/**
- * Trace one reference ray with the owned double-precision integrator and
- * package the result as {@link RayTraceResult}
- * (docs/NUMERICAL_METHODS.md section 19, docs/SHADER_CONTRACTS.md section 7).
- *
- * Status mapping (documented honestly):
- * - 'captured'  -> RAY_CAPTURED
- * - 'escaped'   -> RAY_ESCAPED
- * - 'max-steps' -> RAY_INVALID_INITIAL_STATE when steps === 0 (cpuReference's
- *   degenerate-input branch: zero origin/direction, non-finite input, or
- *   observer at/inside the horizon), else RAY_MAX_STEPS. NOTE: cpuReference
- *   ALIASES numerical failure to 'max-steps' (non-finite state and
- *   constraint-residual blowup included, because its mandated status union
- *   has no distinct member), so RAY_MAX_STEPS may mean exhausted budget OR
- *   mid-flight numerical failure; RAY_NON_FINITE (5) is never produced here.
- *   Corner case: explicitly requesting maxSteps <= 0 also lands in
- *   RAY_MAX_STEPS rather than INVALID_INITIAL_STATE.
- *
- * Diagnostics provenance: steps/finalPosition/finalDirection/pathSamples come
- * straight from integratePhoton. minRadius and windingRadians are
- * reconstructed from the strided path samples (estimates; see field docs).
- * maxConstraintResidual is NaN (not exposed by cpuReference). diskHit is left
- * undefined: crossing refinement (section 10.2) is not implemented in the
- * owned integrator, so RAY_DISK_HIT never occurs from this wrapper yet.
- */
-export function traceReferenceRay(
-  originWorld: Vec3,
-  dirWorld: Vec3,
-  options: TraceReferenceRayOptions = {}
-): RayTraceResult {
-  const integration = integratePhoton(originWorld, dirWorld, options);
-  const requestedMaxSteps = options.maxSteps ?? DEFAULT_PHOTON_INTEGRATION_OPTIONS.maxSteps;
-
-  let classification: number;
-  switch (integration.status) {
-    case 'captured':
-      classification = RAY_CAPTURED;
-      break;
-    case 'escaped':
-      classification = RAY_ESCAPED;
-      break;
-    default:
-      classification =
-        integration.steps === 0 && requestedMaxSteps > 0
-          ? RAY_INVALID_INITIAL_STATE
-          : RAY_MAX_STEPS;
-  }
-
-  // Plane basis reused for winding reconstruction; invalid/degenerate rays
-  // yield NaN-filled vectors and the guards below keep diagnostics NaN.
-  const plane = rayInitialStateFromWorld(originWorld, dirWorld);
-  const planeUsable =
-    !plane.invalid && Number.isFinite(plane.e0[0]) && Number.isFinite(plane.e1[0]);
-
-  let minRadius = NaN;
-  let windingRadians = NaN;
-  if (integration.pathSamples.length > 0) {
-    for (const sample of integration.pathSamples) {
-      const rr = Math.hypot(sample[0], sample[1], sample[2]);
-      minRadius = Number.isFinite(minRadius) ? Math.min(minRadius, rr) : rr;
-    }
-    if (planeUsable) {
-      windingRadians = 0;
-      let hasPrevious = false;
-      let previousAngle = 0;
-      for (const sample of integration.pathSamples) {
-        const angle = Math.atan2(dot3(sample, plane.e1), dot3(sample, plane.e0));
-        if (hasPrevious) windingRadians += Math.abs(wrapToPi(angle - previousAngle));
-        previousAngle = angle;
-        hasPrevious = true;
-      }
-    }
-  }
-
-  const finalRadius = Math.hypot(
-    integration.finalPosition[0],
-    integration.finalPosition[1],
-    integration.finalPosition[2]
-  );
-
-  const result: RayTraceResult = {
-    classification,
-    steps: integration.steps,
-    minRadius,
-    finalRadius,
-    windingRadians,
-    maxConstraintResidual: NaN
-  };
-
-  if (classification === RAY_ESCAPED) {
-    const fd = integration.finalDirection;
-    result.escapeDirection = [fd[0], fd[1], fd[2]];
-  }
-
-  return result;
 }
