@@ -1,5 +1,12 @@
 # Tasks — Spatial Atlas Continuous Navigation
 
+> **implementation status: NOT STARTED**
+> OpenSpec planning-complete is not implementation-complete: `status --json`
+> reports `isComplete: true` solely because the planning artifacts exist.
+> 0 completed tasks means not started. Boxes are implementation-owned and
+> may not be checked, reordered or implemented by any status/honesty or
+> documentation change; see `openspec/changes/spatial-atlas-status-honesty`.
+
 This is the executable checklist. `MASTER_PLAN.md` supplies rationale and acceptance detail.
 
 ## Prerequisite

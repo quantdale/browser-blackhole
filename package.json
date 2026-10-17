@@ -32,7 +32,7 @@
     "bench:black-hole:numerical": "node scripts/bench-black-hole.mjs --backend=numerical --label=numerical",
     "bench:black-hole:lut": "node scripts/bench-black-hole.mjs --backend=lut --label=lut",
     "check:no-test-hook": "node scripts/check-no-test-hook.mjs",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run check:no-test-hook",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build && npm run check:status-honesty && npm run check:no-test-hook",
     "bench:compact-merger": "node scripts/bench-compact-merger.mjs",
     "bench:tidal-disruption": "node scripts/bench-tidal-disruption.mjs",
     "bench:quasar-agn": "node scripts/bench-quasar-agn.mjs",
@@ -47,7 +47,8 @@
     "mcp:preflight:online": "node scripts/mcp-preflight.mjs --online",
     "coverage:report": "node scripts/coverage-report.mjs",
     "bench:scenarios": "node scripts/bench-scenarios.mjs",
-    "bench:compare": "node scripts/compare-benchmarks.mjs"
+    "bench:compare": "node scripts/compare-benchmarks.mjs",
+    "check:status-honesty": "node scripts/check-change-status-honesty.mjs"
   },
   "dependencies": {
     "three": "0.185.1"
