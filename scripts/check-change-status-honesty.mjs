@@ -14,9 +14,12 @@
  *   unrecognized status value  -> FAIL (the grammar only accepts what it
  *                                  understands; silent no-claims are lies)
  *
- * A change with no status header is REPORTED with the derived status but
- * does not fail: no claim, no contradiction (spec scenario "Planning
- * artifacts exist and no task is complete" is satisfied by the report).
+ * A change with no status header keeps the old lenient behavior ONLY where no
+ * SHALL binds it: header-less IN PROGRESS and COMPLETE changes are reported
+ * with the derived status and pass with no claim to contradict. But a
+ * header-less ZERO-COMPLETED change FAILS: the spec requires that change's
+ * own status header to state that implementation has not started
+ * ('Planning-complete SHALL NOT be reported as implementation-complete').
  * The check must not implement, check, reorder or summarize any task body.
  *
  * Usage: node scripts/check-change-status-honesty.mjs [changesRoot]
@@ -119,6 +122,21 @@ for (const { name, dir } of active) {
   }
   const { total, completed } = calculated;
   const claim = readStatusClaim(dir);
+  if (claim === null) {
+    const word = statusWord(completed, total);
+    if (total > 0 && completed === 0) {
+      failures.push(
+        `${name}: zero completed tasks (${completed}/${total}) but the change carries NO ` +
+          'implementation-status header — the spec requires that change\u2019s own status ' +
+          'header to state that implementation has not started ' +
+          '(e.g. a line reading exactly **implementation status: NOT STARTED**)'
+      );
+      rows.push(`${name}  ${completed}/${total}  header=none  derived=not-started  FAIL`);
+      continue;
+    }
+    rows.push(`${name}  ${completed}/${total}  header=none  derived=${word}  ok`);
+    continue;
+  }
   if (claim === null) {
     rows.push(
       `${name}  ${completed}/${total}  header=none  derived=${statusWord(completed, total)}  ok`

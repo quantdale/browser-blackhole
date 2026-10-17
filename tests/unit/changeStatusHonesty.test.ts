@@ -147,8 +147,34 @@ describe('check-change-status-honesty (task 2)', () => {
     expect(out).toMatch(/unrecognized implementation-status value/);
   });
 
+  it('FAILS a header-less ZERO-COMPLETED change — the spec requires the header (review re-check)', () => {
+    const s = scenario('zero-completed-no-banner', {
+      tasks: '## Work\n\n- [ ] one\n- [ ] two\n- [ ] three\n'
+    });
+    const { out, code } = s.run();
+    expect(code, out).toBe(1);
+    expect(out).toMatch(/NO implementation-status header/);
+    expect(out).toMatch(/0\/3/);
+  });
+
+  it('passes header-less IN PROGRESS and COMPLETE changes', () => {
+    const partial = scenario('headerless-partial', {
+      tasks: '## Work\n\n- [x] one\n- [ ] two\n'
+    });
+    const { out, code } = partial.run();
+    expect(code, out).toBe(0);
+    expect(out).toContain('headerless-partial  1/2  header=none  derived=in-progress  ok');
+    const done = scenario('headerless-complete', {
+      tasks: '## Work\n\n- [x] one\n- [x] two\n'
+    });
+    const doneOut = done.run();
+    expect(doneOut.code, doneOut.out).toBe(0);
+    expect(doneOut.out).toContain('headerless-complete  2/2  header=none  derived=complete  ok');
+  });
+
   it('checks fenced code blocks out of the checkbox count', () => {
     const s = scenario('fenced-template', {
+      banner: 'implementation status: NOT STARTED',
       tasks: '## Work\n\n- [ ] real one\n\n```\n- [x] not a task (template example)\n```\n'
     });
     const { out, code } = s.run();
