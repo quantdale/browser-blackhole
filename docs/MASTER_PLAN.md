@@ -317,11 +317,11 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| E-01 | Destination preparation failure is console-only; no public error channel exists | P1 | confirmed | `types.ts:942-948` (`TransitionPublicState` has no `error`), `host.ts:499-509`, `atlasApp.ts` never reads it |
-| E-02 | The atlas shell's own remediation builder has no callers; the product terminal state is a code + raw message | P1 | confirmed | `hostStatus.ts:497` vs `atlasApp.ts:1227-1235` |
-| E-03 | A failed lazy-chunk load (bad deploy / offline) silently reverts with no user explanation | P1 | confirmed | `TransitionDirector.ts:578-581` + `host.ts:499-509` |
+| E-01 | Destination preparation failure is console-only; no public error channel exists | P1 | **RESOLVED 2026-10-09** change 3 | `types.ts:942-948` (`TransitionPublicState` has no `error`), `host.ts:499-509`, `atlasApp.ts` never reads it |
+| E-02 | The atlas shell's own remediation builder has no callers; the product terminal state is a code + raw message | P1 | **RESOLVED 2026-10-09** change 3 | `hostStatus.ts:497` vs `atlasApp.ts:1227-1235` |
+| E-03 | A failed lazy-chunk load (bad deploy / offline) silently reverts with no user explanation | P1 | **RESOLVED 2026-10-09** change 3 | `TransitionDirector.ts:578-581` + `host.ts:499-509` |
 | E-04 | Overlay can be left frozen opaque if device loss occurs during `outgoing` | P2 | suspected | `TransitionDirector.renderOverlay` early-returns on null renderer — **probed and NOT reproduced 2026-10-09 at `bbf66ea`**; see the resolution entry for E-04 above |
-| E-05 | A stalled destination preparation never terminates: no prepare timeout exists, so a hung data request leaves the app in `preparing` forever | P1 | confirmed | `TransitionDirector.ts:277` sets only `slowLoadThresholdMs` (900 ms), which merely emits a status event (`:602-610`); the only `abort()` calls are retarget (`:416`), cancel (`:471`) and dispose (`:986`); the loaders pass the signal to `fetch` (`galaxy-collision/loader.ts:74,90`, `black-hole-merger/loader.ts:70,86`) but nothing times it out |
+| E-05 | A stalled destination preparation never terminates: no prepare timeout exists, so a hung data request leaves the app in `preparing` forever | P1 | **RESOLVED 2026-10-09** change 3 | `TransitionDirector.ts:277` sets only `slowLoadThresholdMs` (900 ms), which merely emits a status event (`:602-610`); the only `abort()` calls are retarget (`:416`), cancel (`:471`) and dispose (`:986`); the loaders pass the signal to `fetch` (`galaxy-collision/loader.ts:74,90`, `black-hole-merger/loader.ts:70,86`) but nothing times it out |
 
 ### A — Adaptive quality / rendering authority (change: `quality-ladder-resolution-integrity`)
 
@@ -414,11 +414,11 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| D-01 | Four pre-existing OpenSpec changes fail `openspec validate --changes --strict` | P1 | confirmed | At `dc0b3ba`: 3 passed, 4 failed. At `c0ee5f5`: 13 passed, 4 failed. The same four fail: cinematic, whole-atlas performance, neutron-star surface, spatial atlas — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
-| D-02 | Change status headers say "PLAN ONLY — NO IMPLEMENTATION" while the same folder's `tasks.md` says COMPLETE | P1 | confirmed | `whole-atlas-performance-optimization/proposal.md:4` + `MASTER_PLAN.md:4` vs `tasks.md:1019`; same in `cinematic-visual-fidelity-overhaul` — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
-| D-03 | OpenSpec execution instructions still need a complete current inventory and archive policy | P1 | confirmed | The completed M12/CA9 order was an active misdirection; an interim correction now forbids re-executing it. Hygiene must still enumerate all 17 changes and write the archive policy — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
-| D-04 | No `openspec/config.yaml`; `openspec doctor` reports the root unhealthy | P1 | confirmed | `openspec doctor` — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
-| D-05 | No `openspec/specs/` — five completed changes were never archived, so no capability baseline exists | P1 | confirmed | `openspec list --specs` → "No specs found" — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-01 | Four pre-existing OpenSpec changes fail `openspec validate --changes --strict` | P1 | **RESOLVED 2026-10-03** specification-baseline-hygiene | At `dc0b3ba`: 3 passed, 4 failed. At `c0ee5f5`: 13 passed, 4 failed. The same four fail: cinematic, whole-atlas performance, neutron-star surface, spatial atlas — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-02 | Change status headers say "PLAN ONLY — NO IMPLEMENTATION" while the same folder's `tasks.md` says COMPLETE | P1 | **RESOLVED 2026-10-03** specification-baseline-hygiene | `whole-atlas-performance-optimization/proposal.md:4` + `MASTER_PLAN.md:4` vs `tasks.md:1019`; same in `cinematic-visual-fidelity-overhaul` — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-03 | OpenSpec execution instructions still need a complete current inventory and archive policy | P1 | **RESOLVED 2026-10-03** specification-baseline-hygiene | The completed M12/CA9 order was an active misdirection; an interim correction now forbids re-executing it. Hygiene must still enumerate all 17 changes and write the archive policy — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-04 | No `openspec/config.yaml`; `openspec doctor` reports the root unhealthy | P1 | **RESOLVED 2026-10-03** specification-baseline-hygiene | `openspec doctor` — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-05 | No `openspec/specs/` — five completed changes were never archived, so no capability baseline exists | P1 | **RESOLVED 2026-10-03** specification-baseline-hygiene | `openspec list --specs` → "No specs found" — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
 | D-06 | Root `AGENTS.md` required-reading list points at superseded single-destination docs | P1 | **RESOLVED 2026-10-17** session | `AGENTS.md:5-15` → `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, `docs/BACKLOG.md` |
 | D-07 | `docs/RELEASE_CERTIFICATION.md` self-contradicts: 631/46 vs 515/35 for the same gate | P1 | **RESOLVED 2026-10-17** session | lines 39 vs 151 |
 | D-08 | `docs/RELEASE_CERTIFICATION.md` claims `npm audit` = 0 vulnerabilities; it now reports 1 high | P1 | **RESOLVED 2026-10-17** session | lines 43/132/156/227 vs `npm audit` |
@@ -426,7 +426,7 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 | D-10 | `docs/cosmic-atlas/ARCHITECTURE.md` §2 lists a repository layout matching no shipped path | P2 | **RESOLVED 2026-10-17** session | `ARCHITECTURE.md:33-101` |
 | D-11 | `docs/PHENOMENA_IMPLEMENTATION.md` §9–§11 describe three expansion destinations that do not exist | P2 | **RESOLVED 2026-10-17** session | `README.md:124` presents the file as current |
 | D-12 | `docs/KERR_RESEARCH_PLAN.md` still frames Kerr as deferred | P2 | **RESOLVED 2026-10-17** session | line 3; M9 is complete |
-| D-13 | `openspec/project.md` names two different "sources of truth" audit documents | P3 | confirmed | lines 34 vs 79 — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
+| D-13 | `openspec/project.md` names two different "sources of truth" audit documents | P3 | **RESOLVED 2026-10-03** specification-baseline-hygiene | lines 34 vs 79 — RESOLVED 2026-10-03 in the specification-baseline-hygiene checkpoint |
 | D-14 | Two galaxy-collision data-source documents carry different identifiers for the same source | P2 | **RESOLVED 2026-10-17** session | `DATA_SOURCES_GALAXY_COLLISION.md:13-16` vs `..._SOURCE_LOCK.md:15-18` |
 | D-15 | Two competing control inventories, neither cross-referencing the other | P3 | **RESOLVED 2026-10-17** session | `UI_CONTROL_CATALOG.md:3` vs `cosmic-atlas/DESTINATION_CONTROL_CATALOG.md` |
 
@@ -448,8 +448,8 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| L-01 | ~1,900 LOC of M0 legacy shell (two app shells, two state schemas, two renderer lifecycles) retained behind `?legacy=1` | P3 | confirmed | `App.ts`, `state.ts`, `BlackHoleRenderer.ts`, `RenderCoordinator.ts`, `renderSize.ts`, `ResizeController.ts`, `controlPanel.ts`, `statusPanel.ts` |
-| L-02 | The shared `src/shaders/diagnostic.ts` imports `DebugViewMode` from the legacy app state — a shared module depends on a legacy module | P3 | confirmed | `shaders/diagnostic.ts:30` |
+| L-01 | ~1,900 LOC of M0 legacy shell (two app shells, two state schemas, two renderer lifecycles) retained behind `?legacy=1` | P3 | **DEFERRED by plan** — not completion criteria | `App.ts`, `state.ts`, `BlackHoleRenderer.ts`, `RenderCoordinator.ts`, `renderSize.ts`, `ResizeController.ts`, `controlPanel.ts`, `statusPanel.ts` |
+| L-02 | The shared `src/shaders/diagnostic.ts` imports `DebugViewMode` from the legacy app state — a shared module depends on a legacy module | P3 | **DEFERRED by plan** — not completion criteria | `shaders/diagnostic.ts:30` |
 
 L-01 and L-02 are **not completion criteria** of `shared-renderer-service-lifecycle` or
 `destination-control-truthfulness`. Neither change may remove the legacy shell or retarget
