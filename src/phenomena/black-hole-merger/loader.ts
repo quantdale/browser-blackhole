@@ -17,6 +17,7 @@
 
 import { BbmLoadError, cacheDataset, decodeBbm1, type BbmDataset } from './dataset.js';
 import { readBodyWithProgress } from '../shared/assetTransfer.js';
+import { isUnsafeAssetPath } from '../black-hole/lut/discovery.js';
 
 export interface BbmManifestRuntime {
   readonly encoding: string;
@@ -46,6 +47,9 @@ function isBbmManifest(value: unknown): value is BbmManifestShape {
     r['encoding'] === 'bbm1' &&
     r['schemaVersion'] === 1 &&
     typeof r['filename'] === 'string' &&
+    // V-16/5.8: manifest-controlled asset names must never escape the asset
+    // directory — the same rule the LUT validator enforces.
+    !isUnsafeAssetPath(r['filename']) &&
     typeof r['samples'] === 'number' &&
     typeof r['bytes'] === 'number' &&
     typeof r['checksumSha256'] === 'string' &&

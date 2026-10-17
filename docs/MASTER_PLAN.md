@@ -16,7 +16,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 1d | `destination-control-truthfulness` | **complete** (`87deee3` scoped slice + `1812601` completion, 2026-10-17) — U-01…U-19 struck |
 | 1d+ | `atlas-terminal-state-visibility` | **complete and archived** (2026-10-09, `bbf66ea` + close-out) — unplanned follow-on to 1c/1d; closes the device-loss and slow-load presentation gap that `transition-error-user-visibility` did not cover. Its gated overlay probe (tasks.md §4) found the suspected occluding-overlay defect **does not reproduce**; overlay rendering intentionally unchanged and no golden re-baselined. |
 | 2 | `shared-renderer-service-lifecycle` | **complete** (2026-10-17 session) — R-01…R-12 struck |
-| 3 | `verification-gate-integrity` | pending — V-01…V-17 in scope |
+| 3 | `verification-gate-integrity` | **complete** (2026-10-17 session) — V-01…V-17 struck |
 | 4 | `benchmark-harness-integrity` | pending — B-01…B-07 in scope |
 | 5a | `operations-and-deployment-readiness` | pending — O-01…O-09 in scope |
 | 5b | `documentation-truthfulness-realignment` | pending — D-06…D-15 in scope |
@@ -381,23 +381,23 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| V-01 | `lutEquivalence.test.ts` declares a 5e-3 rad tolerance, computes the error, prints it, and asserts nothing (`void angErr`) | P1 | confirmed | `lutEquivalence.test.ts:12` (header) vs `:178-186` |
-| V-02 | Scientific golden suite asserts only a relative delta; no absolute content floor. The harness itself documents two measured false passes | P1 | confirmed | `visual-goldens.spec.ts:18-27` vs `cinematic-goldens.spec.ts:65-78`; `goldenHarness.ts:401-407` |
-| V-03 | Several tests can skip every subject and still report passed | P1 | confirmed | `lutEquivalence.test.ts:106,115-116,176`; `kerrReference.test.ts:170,201,205`; `kerrConvergence.test.ts:58` |
-| V-04 | The production LUT discovery path (`public/luts/index.json`) is read by no test; every failure returns `null` with no log | P1 | confirmed | `blackHoleDestination.ts:779-785` vs `lutRuntime.test.ts:24-33` |
-| V-05 | 44 of 45 browser specs, both golden suites and the Firefox project never run in any CI job | P1 | confirmed | `.github/workflows/ci.yml:52` |
-| V-06 | CI smoke can skip 2 of its 5 tests and still exit 0 | P1 | confirmed | `smoke.spec.ts:58,94` |
-| V-07 | Offline-tool verdicts are asserted from a committed JSON report; the generator never runs in CI | P1 | confirmed | `ca9Integrator.test.ts:25-31,83`; absent from `ci.yml` |
-| V-08 | `tests/unit/__probe.test.ts` is zero-assertion debug scaffolding in the CI gate | P2 | confirmed | whole file |
-| V-09 | 8 committed `_WEBGL2` cinematic baselines are unreachable by any documented command | P2 | confirmed | `cinematic-goldens.spec.ts:20-23`; no script sets `CINEMATIC_GOLDEN_BACKEND` |
-| V-10 | No code-coverage tooling anywhere | P2 | confirmed | `vite.config.ts:17-20`; `.gitignore:22-23` |
-| V-11 | `launchCatalog` completeness guard is a floor over a scan that swallows import errors | P2 | confirmed | `launchCatalog.test.ts:63,84-86,119` |
-| V-12 | Capability tests cover 3 of the 6 injection cases `docs/CI_CD.md` §10 requires | P2 | confirmed | `capability.test.ts:4-16` |
-| V-13 | `void x;` statements mark computed-and-discarded values in two tests | P3 | confirmed | `lutRuntime.test.ts:255,272` |
-| V-14 | `findShippedFamilyDir()` is `readdirSync`-order dependent | P3 | confirmed | `lutRuntime.test.ts:24-33`, `lutEquivalence.test.ts:34-45` |
-| V-15 | `lutEquivalence.test.ts` shares mutable state across `it()` blocks via a setup test | P3 | confirmed | `lutEquivalence.test.ts:93-99` |
-| V-16 | The two data loaders accept a manifest asset filename that could escape the asset directory; the LUT loader already rejects it | P2 | confirmed | `black-hole-merger/loader.ts:47,85` and `galaxy-collision/loader.ts:43,89` (validate as `typeof string`, interpolate into a fetch URL) vs `lut/validate.ts:170` which rejects `..`, `\` and a leading `/` |
-| V-17 | The unit gate is not reliably reproducible: `launchCatalog.test.ts` times out under load (2 of 3 full-suite runs failed during this audit) | **P1** | confirmed | `launchCatalog.test.ts:56-92` sequentially `await import()`s every phenomenon presets/module and destination file, transitively loading the 1 MB `three/webgpu`, in one test against Vitest's default 5000 ms timeout; measured 2.38 s / 5.03 s / 2.41 s standalone and 2 of 3 full-suite failures |
+| V-01 | `lutEquivalence.test.ts` declares a 5e-3 rad tolerance, computes the error, prints it, and asserts nothing (`void angErr`) | P1 | **RESOLVED 2026-10-17** session | `lutEquivalence.test.ts:12` (header) vs `:178-186` |
+| V-02 | Scientific golden suite asserts only a relative delta; no absolute content floor. The harness itself documents two measured false passes | P1 | **RESOLVED 2026-10-17** session | `visual-goldens.spec.ts:18-27` vs `cinematic-goldens.spec.ts:65-78`; `goldenHarness.ts:401-407` |
+| V-03 | Several tests can skip every subject and still report passed | P1 | **RESOLVED 2026-10-17** session | `lutEquivalence.test.ts:106,115-116,176`; `kerrReference.test.ts:170,201,205`; `kerrConvergence.test.ts:58` |
+| V-04 | The production LUT discovery path (`public/luts/index.json`) is read by no test; every failure returns `null` with no log | P1 | **RESOLVED 2026-10-17** session | `blackHoleDestination.ts:779-785` vs `lutRuntime.test.ts:24-33` |
+| V-05 | 44 of 45 browser specs, both golden suites and the Firefox project never run in any CI job | P1 | **RESOLVED 2026-10-17** session | `.github/workflows/ci.yml:52` |
+| V-06 | CI smoke can skip 2 of its 5 tests and still exit 0 | P1 | **RESOLVED 2026-10-17** session | `smoke.spec.ts:58,94` |
+| V-07 | Offline-tool verdicts are asserted from a committed JSON report; the generator never runs in CI | P1 | **RESOLVED 2026-10-17** session | `ca9Integrator.test.ts:25-31,83`; absent from `ci.yml` |
+| V-08 | `tests/unit/__probe.test.ts` is zero-assertion debug scaffolding in the CI gate | P2 | **RESOLVED 2026-10-17** session | whole file |
+| V-09 | 8 committed `_WEBGL2` cinematic baselines are unreachable by any documented command | P2 | **RESOLVED 2026-10-17** session | `cinematic-goldens.spec.ts:20-23`; no script sets `CINEMATIC_GOLDEN_BACKEND` |
+| V-10 | No code-coverage tooling anywhere | P2 | **RESOLVED 2026-10-17** session | `vite.config.ts:17-20`; `.gitignore:22-23` |
+| V-11 | `launchCatalog` completeness guard is a floor over a scan that swallows import errors | P2 | **RESOLVED 2026-10-17** session | `launchCatalog.test.ts:63,84-86,119` |
+| V-12 | Capability tests cover 3 of the 6 injection cases `docs/CI_CD.md` §10 requires | P2 | **RESOLVED 2026-10-17** session | `capability.test.ts:4-16` |
+| V-13 | `void x;` statements mark computed-and-discarded values in two tests | P3 | **RESOLVED 2026-10-17** session | `lutRuntime.test.ts:255,272` |
+| V-14 | `findShippedFamilyDir()` is `readdirSync`-order dependent | P3 | **RESOLVED 2026-10-17** session | `lutRuntime.test.ts:24-33`, `lutEquivalence.test.ts:34-45` |
+| V-15 | `lutEquivalence.test.ts` shares mutable state across `it()` blocks via a setup test | P3 | **RESOLVED 2026-10-17** session | `lutEquivalence.test.ts:93-99` |
+| V-16 | The two data loaders accept a manifest asset filename that could escape the asset directory; the LUT loader already rejects it | P2 | **RESOLVED 2026-10-17** session | `black-hole-merger/loader.ts:47,85` and `galaxy-collision/loader.ts:43,89` (validate as `typeof string`, interpolate into a fetch URL) vs `lut/validate.ts:170` which rejects `..`, `\` and a leading `/` |
+| V-17 | The unit gate is not reliably reproducible: `launchCatalog.test.ts` times out under load (2 of 3 full-suite runs failed during this audit) | **P1** | **RESOLVED 2026-10-17** session | `launchCatalog.test.ts:56-92` sequentially `await import()`s every phenomenon presets/module and destination file, transitively loading the 1 MB `three/webgpu`, in one test against Vitest's default 5000 ms timeout; measured 2.38 s / 5.03 s / 2.41 s standalone and 2 of 3 full-suite failures |
 
 ### B — Benchmark harness integrity (change: `benchmark-harness-integrity`)
 

@@ -12,7 +12,7 @@
  * of catalog ids and the beta-visibility filter.
  */
 
-import { readdirSync } from 'node:fs';
+import { existsSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -46,15 +46,33 @@ function findDescriptor(mod: DescriptorModule): PhenomenonDescriptor | null {
   return null;
 }
 
-async function collectDescriptorIds(): Promise<Map<string, string>> {
+async function collectDescriptorIds(): Promise<{
+  ids: Map<string, string>;
+  failures: string[];
+}> {
   const ids = new Map<string, string>();
+  const failures: string[] = [];
   const phenomenonDir = join(REPO_ROOT, 'src', 'phenomena');
   const destinationsDir = join(REPO_ROOT, 'src', 'atlas', 'destinations');
 
   const modules: string[] = [];
   for (const entry of readdirSync(phenomenonDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) continue;
-    modules.push(`../../src/phenomena/${entry.name}/presets.js`);
+    // V-11: existence-gated discovery — a package without a presets file
+    // (e.g. black-hole, whose descriptor lives in destinations/, or shared)
+    // is simply not a descriptor package. Only files that EXIST are imported,
+    // so an import failure of an existing file is a real failure and cannot
+    // hide in the same catch as a missing file.
+    const presetsPath = join(phenomenonDir, entry.name, 'presets.ts');
+    if (existsSync(presetsPath)) {
+      modules.push(`../../src/phenomena/${entry.name}/presets.js`);
+    }
+    // WS3 split destinations keep the descriptor in descriptor.ts (e.g.
+    // neutron-star) with the heavy module importing it back.
+    const descriptorPath = join(phenomenonDir, entry.name, 'descriptor.ts');
+    if (existsSync(descriptorPath)) {
+      modules.push(`../../src/phenomena/${entry.name}/descriptor.js`);
+    }
     // Some destinations keep the descriptor in the module file itself
     // (e.g. neutron-star). Probe <Name>Module.js when present.
     try {
@@ -65,7 +83,8 @@ async function collectDescriptorIds(): Promise<Map<string, string>> {
         }
       }
     } catch {
-      // unreadable package dir: skip
+      // unreadable package dir: the scan reports the directory itself below
+      failures.push(`${entry.name}: package directory unreadable`);
     }
   }
   // The black-hole destination keeps its descriptor in destinations/.
@@ -75,15 +94,17 @@ async function collectDescriptorIds(): Promise<Map<string, string>> {
   }
 
   for (const specifier of modules) {
+    // V-11: import failures are COLLECTED, never swallowed — a partial
+    // import must fail the gate, not quietly shrink the discovered set.
     try {
       const imported = (await import(specifier)) as DescriptorModule;
       const descriptor = findDescriptor(imported);
       if (descriptor !== null) ids.set(descriptor.id, specifier);
-    } catch {
-      // A module without a loadable presets file is not a destination.
+    } catch (error) {
+      failures.push(`${specifier}: ${String(error).slice(0, 160)}`);
     }
   }
-  return ids;
+  return { ids, failures };
 }
 
 describe('launch catalog completeness', () => {
@@ -123,15 +144,26 @@ describe('launch catalog completeness', () => {
   // or threshold is weakened. `verification-gate-integrity` (V-17) owns the
   // structural fix (splitting the heavy graph out of this row).
   it('every registered destination descriptor appears in the catalog', async () => {
-    const descriptorIds = await collectDescriptorIds();
-    expect(descriptorIds.size).toBeGreaterThanOrEqual(8); // 7 production + diagnostic
+    const { ids: descriptorIds, failures } = await collectDescriptorIds();
+    // V-11: a swallowed import must not pass silently.
+    expect(failures, 'every discovered module file must import cleanly').toEqual([]);
 
+    // 7.6: completeness is derived from the AUTHORITATIVE registry in both
+    // directions — no floor that a partial import could still satisfy.
     const catalogIds = new Set(LAUNCH_CATALOG.map((e) => e.id));
     catalogIds.add(DEBUG_DESTINATION_ID);
     const missing: string[] = [];
     for (const [id, file] of descriptorIds) {
       if (!catalogIds.has(id)) missing.push(`${id} (${file})`);
     }
-    expect(missing).toEqual([]);
+    expect(missing, 'every discovered descriptor must be in the catalog').toEqual([]);
+    const undiscovered = [...catalogIds].filter((id) => !descriptorIds.has(id));
+    expect(
+      undiscovered,
+      'every catalog entry must be discoverable (incomplete discovery must fail)'
+    ).toEqual([]);
+    expect(descriptorIds.size, 'the discovered set must cover the catalog').toBeGreaterThanOrEqual(
+      catalogIds.size
+    );
   }, 30_000);
 });

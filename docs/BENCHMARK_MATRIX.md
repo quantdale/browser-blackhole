@@ -2,6 +2,16 @@
 
 This document defines reproducible performance experiments. It prevents vague claims such as “60 FPS on my PC” from becoming design evidence.
 
+**Offline-artifact evidence model (verification-gate-integrity 8.4/D7).**
+Artifacts that benchmarks and parity corpora consume are freshness-gated
+where the generator can run hosted: the GC1 self-check report is regenerated
+in CI with `git diff --exit-code` (ci.yml), so a stale committed report is a
+red gate, not silent evidence. The BBH reducer artifacts cannot regenerate on
+Python >= 3.12 (the `sxs` pin) and are therefore annotated as STORED VERDICTS
+in `tests/unit/ca9Integrator.test.ts` — a record of a past run, refreshed
+only on a supported interpreter. A stored verdict is weaker evidence than a
+fresh one and is labelled as such wherever it is cited.
+
 ## 1. Benchmark record
 
 Every stored result must include:

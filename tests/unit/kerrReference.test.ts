@@ -141,6 +141,7 @@ describe('conservation invariants along traces', () => {
 
   for (const a of [0, 0.5, -0.5, 0.9, -0.9]) {
     it(`keeps null residual + Carter drift tiny along every corpus ray (a*=${a})`, () => {
+      let compared = 0;
       for (const ray of corpus) {
         const result = integrateKerrPhoton(ray.pos, ray.dir, { aStar: a, maxSteps: 120_000 });
         if (
@@ -149,9 +150,16 @@ describe('conservation invariants along traces', () => {
         ) {
           continue; // camera-domain guard, not a conservation subject
         }
+        compared += 1;
         expect(result.conserved.nullResidualMax, `${ray.label} residual`).toBeLessThan(1e-5);
         expect(result.conserved.carterDrift, `${ray.label} carter`).toBeLessThan(1e-5);
       }
+      // Non-vacuity (verification-gate-integrity D2): the corpus declares 4
+      // rays; a silently narrowed corpus must fail, not pass quietly.
+      expect(
+        compared,
+        'conservation must compare at least 3 of 4 corpus rays'
+      ).toBeGreaterThanOrEqual(3);
     }, 60_000);
   }
 
@@ -196,20 +204,26 @@ describe('Schwarzschild limit agreement against cpuReference (a* = 0)', () => {
   for (const { pos, dir } of rays) {
     it(`matches classification/min-radius/final-direction for ${dir.map((d) => d.toFixed(2)).join(',')}`, () => {
       const schw = integratePhoton(pos, dir, { escapeRadius: 200, captureEpsilon: 1e-6 });
-      if (schw.status === 'max-steps') {
-        // cpuReference stalls at the horizon (no stall-capture resolution);
-        // such rows carry no classification information to compare.
-        return;
-      }
+      // Non-vacuity (verification-gate-integrity D2): this row must actually
+      // compare. cpuReference stalls at the horizon (no stall-capture
+      // resolution), but the documented corpus never produces a max-steps
+      // outcome — if one appears, the row FAILS loudly instead of silently
+      // passing without a subject.
+      expect(schw.status, 'corpus ray must produce a comparable cpuReference outcome').not.toBe(
+        'max-steps'
+      );
       const kerr = integrateKerrPhoton(pos, dir, {
         aStar: 0,
         escapeRadiusRg: 200,
         captureEpsilon: 1e-6,
         maxSteps: 250_000
       });
-      if (kerr.classification === 'numerical-failure') {
-        return; // budget artifacts are excluded from comparison by design
-      }
+      // Budget artifacts were excluded from comparison by design — and that
+      // made the row vacuous whenever one fired. The documented corpus
+      // completes within budget; assert it rather than skipping.
+      expect(kerr.classification, 'corpus ray must complete within the Kerr step budget').not.toBe(
+        'numerical-failure'
+      );
       expect(kerr.classification).toBe(schw.status === 'captured' ? 'captured' : 'escaped');
       if (kerr.classification === 'captured') {
         // Both solvers must terminate just above the same horizon.
@@ -234,6 +248,7 @@ describe('spin-sign symmetry and frame dragging (ADR §1.5)', () => {
       { pos: [26, -2, 5], dir: [-0.95, 0.05, -0.28] }
     ];
     for (const a of [0.6, 0.9]) {
+      let comparedPairs = 0;
       for (const { pos, dir } of rays) {
         const plus = integrateKerrPhoton(pos, dir, { aStar: a, maxSteps: 120_000 });
         const mirrorPos: Vec3 = [pos[0], pos[1], -pos[2]];
@@ -244,10 +259,14 @@ describe('spin-sign symmetry and frame dragging (ADR §1.5)', () => {
         });
         expect(minus.classification).toBe(plus.classification);
         if (!plus.finalPosition || !minus.finalPosition) continue;
+        comparedPairs += 1;
         expect(minus.finalPosition[2]).toBeCloseTo(-plus.finalPosition[2], 6);
         expect(minus.finalPosition[0]).toBeCloseTo(plus.finalPosition[0], 6);
         expect(minus.minRadiusRg).toBeCloseTo(plus.minRadiusRg, 8);
       }
+      // Non-vacuity (verification-gate-integrity D2): the mirror corpus must
+      // actually reach the position comparison.
+      expect(comparedPairs, 'symmetry must compare at least 2 ray pairs').toBeGreaterThanOrEqual(2);
     }
   }, 90_000);
 

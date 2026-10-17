@@ -6,11 +6,10 @@
   "type": "module",
   "license": "MIT",
   "engines": {
-    "node": "\u003e=22.12.0"
+    "node": ">=22.12.0"
   },
   "scripts": {
     "dev": "vite",
-    "build": "tsc --noEmit && vite build",
     "build": "tsc --noEmit && vite build",
     "build:e2e": "tsc --noEmit && node scripts/build-e2e.mjs",
     "preview:e2e": "npm run build:e2e && vite preview",
@@ -45,7 +44,8 @@
     "capture:stellar-gate": "node scripts/capture-stellar-gate.mjs",
     "bench:cinematic-matrix": "node scripts/bench-cinematic-matrix.mjs",
     "mcp:preflight": "node scripts/mcp-preflight.mjs",
-    "mcp:preflight:online": "node scripts/mcp-preflight.mjs --online"
+    "mcp:preflight:online": "node scripts/mcp-preflight.mjs --online",
+    "coverage:report": "node scripts/coverage-report.mjs"
   },
   "dependencies": {
     "three": "0.185.1"

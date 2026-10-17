@@ -5,8 +5,9 @@
  * public/luts (artifact provenance is part of the test).
  */
 
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { shippedFamilyDir } from './support/shippedLutFamily.js';
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -21,27 +22,10 @@ import { B_CRITICAL_RG } from '../../src/phenomena/black-hole/lut/domain.js';
 // Fixture: the shipped family directory under public/luts/
 // ---------------------------------------------------------------------------
 
-function findShippedFamilyDir(): string {
-  const root = join(process.cwd(), 'public', 'luts');
-  for (const name of readdirSync(root)) {
-    const p = join(root, name);
-    if (statSync(p).isDirectory() && existsSync(join(p, 'manifest.json'))) return p;
-  }
-  throw new Error('no shipped LUT family found under public/luts — run npm run lut:generate');
-}
-
-function existsSync(p: string): boolean {
-  try {
-    statSync(p);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 let cachedFamilyDir: string | null = null;
 function familyDir(): string {
-  if (cachedFamilyDir === null) cachedFamilyDir = findShippedFamilyDir();
+  // 5.7: the SHARED index-based resolver (no readdir-order dependence).
+  if (cachedFamilyDir === null) cachedFamilyDir = shippedFamilyDir();
   return cachedFamilyDir;
 }
 

@@ -32,7 +32,7 @@
   "checks": [
     {
       "id": "barker-finite-difference",
-      "threshold": 1e-8,
+      "threshold": 1e-08,
       "measured": 3.4734198162905244e-10,
       "pass": true
     },
@@ -44,15 +44,18 @@
     },
     {
       "id": "time-reversal",
-      "threshold": 1e-9,
+      "threshold": 1e-09,
       "measured": 0.0,
       "comparedParticles": 1097,
-      "quarantineCountsForwardBackward": [1, 74],
+      "quarantineCountsForwardBackward": [
+        1,
+        74
+      ],
       "pass": true
     },
     {
       "id": "reflection-symmetry",
-      "threshold": 1e-9,
+      "threshold": 1e-09,
       "measured": 0.0,
       "comparedParticles": 1931,
       "pass": true
@@ -64,14 +67,14 @@
         "freqRelErr": 0.0001
       },
       "measured": {
-        "radiusAmplitude": 2.958237371974981e-5,
-        "freqRelErr": 1.406573099831577e-5
+        "radiusAmplitude": 2.958237371974981e-05,
+        "freqRelErr": 1.406573099831577e-05
       },
       "pass": true
     },
     {
       "id": "frozen-potential-energy-drift",
-      "threshold": 5e-6,
+      "threshold": 5e-06,
       "measured": 0.0,
       "quarantineCount": 341,
       "pass": true
@@ -89,7 +92,10 @@
     }
   ],
   "exerciseMetrics": {
-    "windowT": [-50.0, 70.0],
+    "windowT": [
+      -50.0,
+      70.0
+    ],
     "keyframeCount": 481,
     "unboundBothFractionAtEnd": 0.03125,
     "quarantineCount": 0

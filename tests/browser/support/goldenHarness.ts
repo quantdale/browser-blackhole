@@ -71,6 +71,15 @@ export interface GoldenSpec {
   settleMs?: number;
   special?: 'hyperspace-mid';
   tolerance: GoldenTolerance;
+  /**
+   * V-02/D3: per-scene ABSOLUTE content floor (mean luma, 0-255) of the
+   * captured frame. The relative comparison alone cannot see a destroyed
+   * subject when the baseline carries the same destruction (two measured
+   * false passes are recorded in the harness history). Floors are set at
+   * roughly half the measured content of each scene; genuinely sparse scenes
+   * carry a lower, explicitly documented floor.
+   */
+  minMeanLuma: number;
   notes: string;
 }
 
@@ -78,6 +87,9 @@ export interface GoldenMetrics {
   meanAbsDelta: number;
   pctPixelsBeyond: number;
   maxChannelDelta: number;
+  /** V-02/D3: absolute content statistics of the CURRENT capture (0-255). */
+  meanLuma: number;
+  spatialStdLuma: number;
 }
 
 export interface GoldenResult {
@@ -123,6 +135,8 @@ async function compareInPage(
         meanAbsDelta: Number.POSITIVE_INFINITY,
         pctPixelsBeyond: 100,
         maxChannelDelta: 255,
+        meanLuma: 0,
+        spatialStdLuma: 0,
         widthMismatch: true
       };
     }
@@ -130,6 +144,8 @@ async function compareInPage(
     let sumDelta = 0;
     let beyond = 0;
     let maxChannelDelta = 0;
+    let lumaSum = 0;
+    let lumaSqSum = 0;
     const pixels = current.width * current.height;
     for (let i = 0; i < pixels; i++) {
       const o = i * 4;
@@ -142,11 +158,20 @@ async function compareInPage(
         if (d > maxChannelDelta) maxChannelDelta = d;
       }
       if (pixelMax > perChannelThreshold) beyond++;
+      const luma =
+        0.2126 * (current.data[o] ?? 0) +
+        0.7152 * (current.data[o + 1] ?? 0) +
+        0.0722 * (current.data[o + 2] ?? 0);
+      lumaSum += luma;
+      lumaSqSum += luma * luma;
     }
+    const meanLuma = lumaSum / pixels;
     return {
       meanAbsDelta: sumDelta / (pixels * 3),
       pctPixelsBeyond: (beyond / pixels) * 100,
       maxChannelDelta,
+      meanLuma,
+      spatialStdLuma: Math.sqrt(Math.max(0, lumaSqSum / pixels - meanLuma * meanLuma)),
       widthMismatch: false
     };
   }, payload);
@@ -374,14 +399,26 @@ export async function compareAgainstGolden(
   const within =
     metrics.meanAbsDelta <= spec.tolerance.meanAbsDelta &&
     metrics.pctPixelsBeyond <= spec.tolerance.pctPixelsBeyond;
+  // V-02/D3: the ABSOLUTE content floor runs regardless of the relative
+  // comparison — a destroyed subject must fail even when the baseline
+  // carries the same destruction.
+  const floorOk = metrics.meanLuma >= spec.minMeanLuma;
   return {
-    status: within ? 'pass' : 'fail',
+    status: within && floorOk ? 'pass' : 'fail',
     metrics: {
       meanAbsDelta: +metrics.meanAbsDelta.toFixed(3),
       pctPixelsBeyond: +metrics.pctPixelsBeyond.toFixed(4),
-      maxChannelDelta: metrics.maxChannelDelta
+      maxChannelDelta: metrics.maxChannelDelta,
+      meanLuma: +metrics.meanLuma.toFixed(3),
+      spatialStdLuma: +metrics.spatialStdLuma.toFixed(3)
     },
-    ...(within ? {} : { message: `tolerance exceeded for ${spec.name}` })
+    ...(within && floorOk
+      ? {}
+      : {
+          message: !floorOk
+            ? `content floor violated for ${spec.name}: meanLuma ${metrics.meanLuma.toFixed(2)} < floor ${spec.minMeanLuma}`
+            : `tolerance exceeded for ${spec.name}`
+        })
   };
 }
 
@@ -405,6 +442,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 87.94, // 50% of measured baseline content (175.873)
     notes:
       'Deterministic camera-ray gradient pattern; catches boot/compositing regressions of the atlas shell itself. Tight tolerance: fully static scene.'
   },
@@ -412,6 +450,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     name: 'BH_CLASSIC',
     url: '/atlas/black-hole',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 19.28, // 50% of measured baseline content (38.561)
     notes:
       'Default Schwarzschild lensing + accretion disk view; catches gross lensing/disk/post regressions (shadow loss, disk disappearance, inverted beaming).'
   },
@@ -419,6 +458,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     name: 'NS_SURFACE',
     url: '/atlas/neutron-star',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 21.71, // 50% of measured baseline content (43.426)
     notes:
       'Neutron-star default preset (surface + hot spot + dipole lines); catches surface-emission and field-line regressions.'
   },
@@ -426,6 +466,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     name: 'NS_PULSAR',
     url: '/atlas/neutron-star?preset=pulsar',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 11.05, // 50% of measured baseline content (22.104)
     notes:
       'Pulsar preset at phase-0 rotation; catches hot-spot/beam geometry regressions (lighthouse pattern at t=0).'
   },
@@ -433,6 +474,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     name: 'NS_MAGNETAR',
     url: '/atlas/neutron-star?preset=magnetar',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 12.36, // 50% of measured baseline content (24.715)
     notes:
       'Magnetar preset with flare envelope active at fixed flarePhase; catches flare-envelope and tint regressions.'
   },
@@ -442,6 +484,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     special: 'hyperspace-mid',
     pauseTimeline: false,
     tolerance: { meanAbsDelta: 25, pctPixelsBeyond: 48, perChannelThreshold: 35 },
+    minMeanLuma: 48.85, // 50% of measured baseline content (97.697)
     notes:
       'Mid-transition hyperspace field between Black Hole and Neutron Star. Generous tolerance: the exact frame captured depends on transition timing jitter; asserts the transition system renders AT ALL (streak field present, scene handoff not black).'
   },
@@ -454,6 +497,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.03,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 4, pctPixelsBeyond: 1.5, perChannelThreshold: 32 },
+    minMeanLuma: 6.75, // 50% of measured baseline content (13.51)
     notes:
       'Red-supergiant progenitor before collapse; catches missing progenitor surface, tint/gain regressions, camera/preset breakage.'
   },
@@ -463,6 +507,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.24,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2.5, perChannelThreshold: 40 },
+    minMeanLuma: 20.88, // 50% of measured baseline content (41.755)
     notes:
       'Shock-flash window (hot blue-white peak luminosity proxy); catches emissivity-evolution and volume-ignition regressions.'
   },
@@ -472,6 +517,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.55,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 8.09, // 50% of measured baseline content (16.186)
     notes:
       'Expanding-ejecta phase (shell + clumping + particles); catches lost volume, broken particle population, gross morphology drift.'
   },
@@ -481,6 +527,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.55,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 9.28, // 50% of measured baseline content (18.56)
     notes:
       'Hypernova at matched phase — structurally distinct model state (higher velocity scale, stronger anisotropy), NOT a brightness scalar.'
   },
@@ -490,6 +537,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.42,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 1.1, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (5.493) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Long-GRB bipolar jet viewed on-axis (beamed response saturated); catches lost-jet and viewing-response regressions.'
   },
@@ -499,6 +547,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.42,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 1.63, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (8.171) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Same GRB engine viewed off-axis — must differ from SN_GRB_ON geometrically; catches flat-multiplier regressions of viewing response.'
   },
@@ -518,6 +567,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 1.39, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (6.967) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Binary inspiral mid-window: two compact surfaces + closed-form orbit trails on dark sky. Catches star/trail loss, orbit-phase regressions, sky breakage.'
   },
@@ -533,6 +583,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 1.9, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (9.524) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Merger flash + early ejecta ignition. Catches flash-envelope and volume-ignition regressions; bloom-carrying frame needs moderate tolerance.'
   },
@@ -548,6 +599,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 0.87, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (4.331) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Kilonova light-curve peak: warm expanding shell + remnant. Catches emission/temperature-trend and shell-radius regressions.'
   },
@@ -563,6 +615,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 0.85, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (4.228) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Short-GRB bipolar jet viewed on-axis (response saturated). Catches lost-jet and viewing-response regressions on-axis.'
   },
@@ -578,6 +631,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 1.59, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (7.932) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Identical engine viewed 68 deg off-axis — bipolar diamond geometry must differ from CM_GRB_ON; catches flat-multiplier response regressions.'
   },
@@ -593,6 +647,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 0.75, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (2.834) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Afterglow with prompt-BH remnant scenario (faint accretion glow, fading ejecta). Catches remnant-scenario and late-timeline resource regressions.'
   },
@@ -614,6 +669,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 1.08, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (5.389) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Boot frame: tidally deformed star close-up on inbound corridor, BH marker near frame edge. Catches star-loss, deformation-graph, and arrival-framing regressions.'
   },
@@ -629,6 +685,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 1.25, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (6.25) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Strong pre-disruption elongation (stretch well above 1). Catches deformation ordering/cap regressions and axis-orientation breaks.'
   },
@@ -644,6 +701,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 0.86, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (4.303) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Young debris: star faded, compact bound (warm) + unbound (cool) stream arcs near periapsis + accent particles. Catches stream-loss, handoff-fade and spine-crop regressions.'
   },
@@ -653,6 +711,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.77,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 0.88, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (4.413) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Deep-penetration first wraps: differential Kepler winding of the most-bound family around the BH (beta 2.5 morphology, early shock segment). Catches winding-phase and energy-spread regressions.'
   },
@@ -662,6 +721,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.78,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 1.79, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (8.964) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Shock stage: equatorial emissivity volume active at the circularization radius. Catches volume-ignition and phase-gating regressions.'
   },
@@ -671,6 +731,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.97,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 5, perChannelThreshold: 48 },
+    minMeanLuma: 1.7, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (8.48) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Nascent-disk stage: procedural annulus gain ramp, streams retired, volume off. Catches late-phase resource-retirement and disk-gain regressions.'
   },
@@ -684,6 +745,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole?preset=kerr-zero-spin',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 23.45, // 50% of measured baseline content (46.903)
     notes:
       'Numerical Kerr backend at a*=0 — the spin->0 convergence reference view. Must remain visually indistinguishable from the Schwarzschild path within documented tolerances; catches silent backend/fallback flips.'
   },
@@ -692,6 +754,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole?preset=kerr-high-prograde',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 14.54, // 50% of measured baseline content (29.084)
     notes:
       'a*=+0.9 prograde thin disk down to the BPT ISCO; frame-dragged asymmetric photon ring. Catches lost spin dependence, ISCO-edge and dragging-direction regressions.'
   },
@@ -700,6 +763,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole?preset=kerr-retrograde',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 14.05, // 50% of measured baseline content (28.092)
     notes:
       'a*=-0.7 with the disk still +Y-corotating (retrograde relative to spin): ISCO pushed to ~8 r_g, counter-dragging. Must differ geometrically from KERR_HIGH_PROGRADE.'
   },
@@ -712,6 +776,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/quasar-agn?preset=inner-engine',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 16.9, // 50% of measured baseline content (33.808)
     notes:
       'INNER zone: DIRECT lensing pass + corona proxy. Catches silent backend loss or corona disappearance in the close-range zone.'
   },
@@ -720,6 +785,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/quasar-agn?preset=quasar-reference',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 5.01, // 50% of measured baseline content (10.02)
     notes:
       'NUCLEAR zone: outer disk + dusty torus + bipolar jet base at 45 deg from the axis; GR pass culled. Catches torus/jet loss and zone-boot regressions.'
   },
@@ -728,6 +794,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/quasar-agn?preset=radio-galaxy',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 0.81, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (4.041) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'GALACTIC zone: kpc-scale extended jets with knots over the procedural host. Catches host/jet-extension and cull-guard regressions.'
   },
@@ -736,6 +803,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/quasar-agn?preset=blazar-view',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 1.67, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (8.357) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Blazar orientation (~3 deg from the jet axis): approaching lobe dominates via the disclosed constant-sum beaming gains. Catches lobe-asymmetry regressions.'
   },
@@ -753,6 +821,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 0.98, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (4.893) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Late NR inspiral (~4 orbits before the h22 peak): two horizon-scaled markers with illustrative ring/glow accents on reduced coordinate paths + trails. Catches marker/trail loss and orbit-phase regressions.'
   },
@@ -768,6 +837,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 1.32, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (6.606) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Final approach just before the merger anchor: converged separation from the source trajectories. Catches late-inspiral sampling and convergence regressions.'
   },
@@ -783,6 +853,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // clean, and another let two fully-formed galaxies match an almost empty
     // baseline. Tolerance has to be comparable to the content fraction.
     tolerance: { meanAbsDelta: 3, pctPixelsBeyond: 1.5, perChannelThreshold: 40 },
+    minMeanLuma: 5.79, // 50% of measured baseline content (11.58)
     notes:
       'Merger anchor window: CINEMATIC flash envelope over the DATA_DRIVEN timing (t=0 at the h22 amplitude peak). Catches flash-envelope and anchor-alignment regressions.'
   },
@@ -798,6 +869,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.72,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 6.75, // 50% of measured baseline content (13.506)
     notes:
       'Ringdown: exclusive swap to the validated Kerr backend with SOURCE-DERIVED remnant spin/mass and illustrative glow proxy. Catches Kerr-parameter wiring and system-handoff regressions.'
   },
@@ -809,6 +881,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.9,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 6.34, // 50% of measured baseline content (12.686)
     notes:
       'Final Kerr remnant view (mass 0.9516 M, |chi| = 0.6865). Must differ geometrically from KERR presets only through the source-derived parameters; catches silent parameter drift. KNOWN LIMITATION visible in this baseline: a thin NUMERICAL_FAILURE band along the spin axis, where escaped rays that grazed within sin(theta) < 0.04 of the axis are reclassified as failures by the Kerr integrator pole policy. It is a Kerr-backend limitation shared with the black-hole Kerr presets, not a regression of this destination; the baseline shows what the app actually renders rather than hiding it.'
   },
@@ -823,6 +896,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole?preset=observer-circular',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 8.09, // 50% of measured baseline content (16.172)
     notes:
       'Physical circular observer at r = 12 r_g frozen at tau = 0: aberrated/Doppler-shifted disk from the comoving tetrad. Catches loss of observer-frame aberration/frequency physics and silent reversion to camera-mode rendering.'
   },
@@ -831,6 +905,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole?preset=observer-flyby',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 11.02, // 50% of measured baseline content (22.038)
     notes:
       'Flyby observer (beta_inf = 0.6, b = 8 r_g) at its integrated epoch-tau state: scattering-encounter optics from conserved E/L_z worldline. Catches flyby-worldline/tetrad regressions and scripted-motion impostors.'
   },
@@ -839,6 +914,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     url: '/atlas/black-hole?preset=observer-freefall',
     pinTier: 'low',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 3, perChannelThreshold: 40 },
+    minMeanLuma: 10.25, // 50% of measured baseline content (20.496)
     notes:
       'Freefall observer at release epoch (tau = 0, r0 = 14 r_g, at rest relative to static observers): infalling-frame view of disk/sky. Catches freefall initial-condition and stop-band truthfulness regressions.'
   },
@@ -850,6 +926,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     // baseline a known budget-limited failure band instead of the scene.
     pinTier: 'ultra',
     tolerance: { meanAbsDelta: 8, pctPixelsBeyond: 4, perChannelThreshold: 48 },
+    minMeanLuma: 9.55, // 50% of measured baseline content (19.109)
     notes:
       'Kerr a* = +0.6 prograde circular observer at r = 8 r_g, epoch-frozen: frame dragging composed with comoving aberration through the full Kerr tetrad chain. Catches Kerr/moving-observer composition and double-counting regressions.'
   },
@@ -861,6 +938,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     scrubPhase: 0.0,
     pinTier: 'low',
     tolerance: { meanAbsDelta: 6, pctPixelsBeyond: 2, perChannelThreshold: 32 },
+    minMeanLuma: 0.78, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (3.89) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Galaxy collision encounter setup (t ~ -50): two pre-pericenter disks approaching. Catches missing disks, trajectory-load and preset-boot regressions.'
   },
@@ -871,6 +949,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     pinTier: 'low',
     // Sparse-content tolerance; see GC_ENCOUNTER.
     tolerance: { meanAbsDelta: 2, pctPixelsBeyond: 1, perChannelThreshold: 40 },
+    minMeanLuma: 0.79, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (3.958) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Bridge/tail formation near pericenter (t ~ 10): tidal bridge and counter-tail from the restricted three-body model. Catches lost tidal features and interpolation regressions.'
   },
@@ -881,6 +960,7 @@ export const GOLDEN_SPECS: GoldenSpec[] = [
     pinTier: 'low',
     // Sparse-content tolerance; see GC_ENCOUNTER.
     tolerance: { meanAbsDelta: 2, pctPixelsBeyond: 1, perChannelThreshold: 40 },
+    minMeanLuma: 0.76, // SPARSE-CONTENT EXEMPTION TIER: 20% of measured (3.785) — the floor catches a DESTROYED subject (near-zero content); brightness legitimately varies for these dim scenes
     notes:
       'Post-encounter extended tails (t ~ 50): long tidal tails after nuclei have separated. Catches late-phase morphology and resource-retirement regressions.'
   }

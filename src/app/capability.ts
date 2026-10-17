@@ -32,14 +32,24 @@ export interface RuntimeCapabilities {
 export interface BackendDecisionInput {
   webgpuAvailable: boolean;
   webgl2Available: boolean;
+  /**
+   * D9 (verification-gate-integrity): "WebGPU present but missing a required
+   * feature" is NOT expressible as `{webgpuAvailable: true}` — without this
+   * field the capability table could not cover the documented failure-mode
+   * list. A WebGPU adapter missing a required feature downgrades to the
+   * WebGL2 fallback instead of selecting a backend that cannot run the
+   * product.
+   */
+  webgpuMissingRequiredFeature?: boolean;
 }
 
 /**
- * Pure backend decision. WebGPU is preferred whenever the API exists;
- * WebGL2 is the documented fallback; anything else is unsupported.
+ * Pure backend decision. WebGPU is preferred whenever the API exists AND the
+ * adapter carries the required features; WebGL2 is the documented fallback;
+ * anything else is unsupported.
  */
 export function decideBackend(input: BackendDecisionInput): RenderBackend {
-  if (input.webgpuAvailable) return 'webgpu';
+  if (input.webgpuAvailable && input.webgpuMissingRequiredFeature !== true) return 'webgpu';
   if (input.webgl2Available) return 'webgl2';
   return 'unsupported';
 }

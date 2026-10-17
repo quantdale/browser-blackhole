@@ -10,6 +10,17 @@
  * - the exercise configuration can never silently masquerade as published
  *   Toomre & Toomre parameters ("placeholder-exercise-config" guard);
  * - locked unit conventions and the pinned provenance are declared.
+ *
+ * STORED-VERDICT DISCLOSURE (verification-gate-integrity 6.4/V-07): these
+ * rows assert from the COMMITTED report
+ * `tools/cosmic-data/reports/ca9-integrator-selfcheck.json` — they verify a
+ * STORED VERDICT, not a live regeneration. The GC1 pipeline is pure-stdlib
+ * and its freshness is CI-gated (`git diff --exit-code` on the reports dir,
+ * ci.yml); the BBH reducer (reduce_bbh_merger.py) cannot run on Python
+ * >= 3.12 (the `sxs` pin) and is annotated here until
+ * `operations-and-deployment-readiness` fixes the toolchain. If this test
+ * fails, first regenerate the report on a supported interpreter before
+ * suspecting the engine.
  */
 
 import { readFileSync } from 'node:fs';

@@ -38,6 +38,25 @@ interface FetchCounter {
   bin: number;
 }
 
+function stubFetchManifest(count: FetchCounter, manifest: Record<string, unknown>): void {
+  const manifestJson = JSON.stringify(manifest);
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input);
+      if (url.includes('gc1.manifest.json')) {
+        count.manifest += 1;
+        return new Response(manifestJson, {
+          status: 200,
+          headers: { 'content-type': 'application/json' }
+        });
+      }
+      count.bin += 1;
+      return new Response(new Uint8Array(0), { status: 200 });
+    })
+  );
+}
+
 function stubFetch(count: FetchCounter, binBytes: Buffer = BIN_BYTES): void {
   vi.stubGlobal(
     'fetch',
@@ -116,5 +135,25 @@ describe('GC1 loader dataset cache (R-12)', () => {
     expect(createHash('sha256').update(BIN_BYTES).digest('hex')).toBe(
       MANIFEST.runtime['checksumSha256']
     );
+  });
+});
+
+// 5.9 (verification-gate-integrity): a manifest whose asset filename could
+// escape the asset directory must be rejected with an explicit reason BEFORE
+// any request is issued — the same unsafe-path rule the LUT validator
+// enforces (V-16).
+describe('GC1 manifest asset-path rule (5.9)', () => {
+  it('rejects a traversing asset filename with no request issued', async () => {
+    const base = JSON.parse(MANIFEST_JSON) as Record<string, unknown>;
+    const runtime = base['runtime'] as Record<string, unknown>;
+    for (const bad of ['../secrets.bin', 'a' + String.fromCharCode(92) + 'b.bin', '/etc/passwd']) {
+      const count: FetchCounter = { manifest: 0, bin: 0 };
+      stubFetchManifest(count, {
+        ...base,
+        runtime: { ...runtime, filename: bad }
+      });
+      await expect(loadGc1Dataset(ASSET_ID), `must reject '${bad}'`).rejects.toThrow();
+      expect(count.bin, 'no asset request may be issued for a rejected path').toBe(0);
+    }
   });
 });

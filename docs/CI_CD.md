@@ -209,6 +209,28 @@ Where real hardware conditions are unavailable, unit-test decision logic with sy
 
 Do not mock GPU numerical correctness through these tests; they validate product decision logic only.
 
+**Implemented (verification-gate-integrity 7.4/V-12):** the decision table in
+`tests/unit/capability.test.ts` covers all six documented failure modes. The
+`BackendDecisionInput` carries `webgpuMissingRequiredFeature` so "WebGPU
+present but missing a required feature" is expressible; the three cases that
+are decided OUTSIDE the backend decision (timestamp-query absence, LUT
+failure, reduced texture limits) are marked explicitly in the table with the
+reason and the owning module — never silently omitted.
+
+**New hosted checks added by the same change (8.2/V-05 compensations):**
+
+- `scripts/check-smoke-coverage.mjs` — the smoke job fails when any test
+  skips or fewer than the expected count executes (a skip is not a pass);
+- the GC1 offline self-check runs in CI with a `git diff --exit-code`
+  freshness gate on `tools/cosmic-data/reports/` (the BBH reducer artifacts
+  are annotated as stored-verdict evidence until the Python toolchain is
+  fixed);
+- `npm run coverage:report` — static unit-test import-coverage report
+  (report-only), naming modules with no unit-test importer;
+- `tests/unit/goldenInventory.test.ts` — GPU-less golden baseline inventory
+  (set equality in both directions) that runs inside `npm run test` and
+  therefore in the hosted quality job.
+
 ## 11. Device-loss/error tests
 
 Implement injectable renderer lifecycle faults so browser tests can verify:

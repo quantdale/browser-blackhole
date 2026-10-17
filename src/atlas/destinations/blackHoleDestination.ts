@@ -38,6 +38,7 @@ import {
   type LutGpuResources
 } from '../../phenomena/black-hole/lut/textures.js';
 import { loadLutFamily, formatWebGL2Status } from '../../phenomena/black-hole/lut/runtime.js';
+import { resolveLutFamilyFromIndex } from '../../phenomena/black-hole/lut/discovery.js';
 import { readBodyWithProgress } from '../../phenomena/shared/assetTransfer.js';
 import {
   LUT_AUTO_DEFAULT,
@@ -789,11 +790,13 @@ function readTrajectoryUrlOverride(): TrajectoryBackendPreference | null {
 /**
  * Best-effort discovery + load of the shipped Schwarzschild LUT family.
  *
- * Any failure returns `null` — the numerical paths remain the source of truth.
- * The abort signal is honoured so a destination retarget (or a director stall
- * abort) cancels the in-flight requests instead of leaving them pending, and
- * `report` publishes genuine network events so the atlas stall gate can tell a
- * slow transfer from a hung one.
+ * Any failure returns `null` — the numerical paths remain the source of truth
+ * — but EVERY failure reports its reason (verification-gate-integrity 5.4): a
+ * silent numerical-backend downgrade is a scientific-outcome change and must
+ * leave a diagnostic. The abort signal is honoured so a destination retarget
+ * (or a director stall abort) cancels the in-flight requests instead of
+ * leaving them pending, and `report` publishes genuine network events so the
+ * atlas stall gate can tell a slow transfer from a hung one.
  */
 async function loadShippedLutFamily(options: {
   signal: AbortSignal;
@@ -808,16 +811,25 @@ async function loadShippedLutFamily(options: {
 } | null> {
   const { signal } = options;
   const report = options.report ?? ((): void => undefined);
+  const fail = (reason: string): null => {
+    console.warn(
+      `[loadShippedLutFamily] LUT family unavailable: ${reason} (numerical paths remain active)`
+    );
+    return null;
+  };
 
   const indexResponse = await fetch('/luts/index.json', { signal });
-  if (!indexResponse.ok) return null;
+  if (!indexResponse.ok) return fail(`index fetch failed: ${indexResponse.status}`);
   // Response headers arrived: a progress event on its own.
   report(0.25, 'Reading LUT index');
-  const index = (await indexResponse.json()) as Record<string, string>;
-  const familyDir = index['schwarzschild-v1'];
-  if (familyDir === undefined) return null;
+  const index: unknown = await indexResponse.json();
+  // D5: the SAME pure resolver the tests exercise (the family selection can
+  // no longer pass its tests while the shipped index is broken).
+  const resolution = resolveLutFamilyFromIndex(index);
+  if (!resolution.ok) return fail(resolution.reason);
+  const familyDir = resolution.familyDir;
   const manifestResponse = await fetch(`/luts/${familyDir}/manifest.json`, { signal });
-  if (!manifestResponse.ok) return null;
+  if (!manifestResponse.ok) return fail(`manifest fetch failed: ${manifestResponse.status}`);
   report(0.3, 'Reading LUT manifest');
   const manifestJson = await manifestResponse.json();
   const manifest = manifestJson as {
@@ -828,7 +840,9 @@ async function loadShippedLutFamily(options: {
   };
   const trajEntry = manifest.textures.find((t) => t.id === 'trajectory');
   const auxEntry = manifest.textures.find((t) => t.id === 'aux');
-  if (trajEntry === undefined || auxEntry === undefined) return null;
+  if (trajEntry === undefined || auxEntry === undefined) {
+    return fail('manifest is missing the trajectory/aux texture entries');
+  }
   const assets = new Map<string, Uint8Array>();
   // Two textures, each a real network event: report between and inside them so
   // Two textures, each a real network event: report between and inside them so
@@ -839,7 +853,7 @@ async function loadShippedLutFamily(options: {
   let loaded = 0;
   for (const entry of [trajEntry, auxEntry]) {
     const assetResponse = await fetch(`/luts/${familyDir}/${entry.file}`, { signal });
-    if (!assetResponse.ok) return null;
+    if (!assetResponse.ok) return fail(`${entry.id} table fetch failed: ${assetResponse.status}`);
     const base = 0.3 + loaded * textureSpan;
     loaded += 1;
     report(base, `Downloading ${entry.id} table`);
@@ -851,13 +865,13 @@ async function loadShippedLutFamily(options: {
   }
   report(0.55, 'Validating LUT family');
   const result = await loadLutFamily(manifestJson, assets);
-  if (!result.ok) return null;
+  if (!result.ok) return fail(`family validation failed: ${result.reason}`);
   const domainSpan = (
     result.family.manifest.textures.find((t) => t.id === 'trajectory')?.domain as {
       storedSpanRg?: number;
     }
   )?.storedSpanRg;
-  if (domainSpan === undefined) return null;
+  if (domainSpan === undefined) return fail('trajectory texture domain is missing storedSpanRg');
   const filterable =
     formatWebGL2Status(trajEntry.format as Parameters<typeof formatWebGL2Status>[0]).filterable &&
     formatWebGL2Status(auxEntry.format as Parameters<typeof formatWebGL2Status>[0]).filterable;

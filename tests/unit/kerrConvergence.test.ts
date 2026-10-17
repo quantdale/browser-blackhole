@@ -55,7 +55,12 @@ describe('a* = 0 exact limit against the validated Schwarzschild reference', () 
         // Match the Kerr solver's disk annulus for hit comparability.
         maxSteps: COMMON.maxSteps
       });
-      if (schw.status === 'max-steps') return; // stall rows carry no signal
+      // Non-vacuity (verification-gate-integrity D2): a stall row would make
+      // this agreement row vacuous. The documented corpus never stalls; assert
+      // it instead of silently returning without a subject.
+      expect(schw.status, `${ray.label}: cpuReference must produce a comparable outcome`).not.toBe(
+        'max-steps'
+      );
       const kerr = integrateKerrPhoton(ray.pos, ray.dir, {
         ...COMMON,
         aStar: 0,
@@ -91,11 +96,27 @@ describe('a* = 0 exact limit against the validated Schwarzschild reference', () 
     }, 120_000);
   }
 
-  /** Coarse existence probe: any annulus sample near the plane. */
+  /**
+   * Coarse existence probe on the stride-sampled cpuReference path: an
+   * equatorial-plane CROSSING under the ADR §1.14 sign-change convention
+   * (the same event the Kerr reference's diskHits record), with the estimated
+   * crossing radius in the annulus. The earlier near-plane-sample probe
+   * measured a DIFFERENT event — a ray flying along the plane without ever
+   * crossing it scored as a hit on this side and a miss on the Kerr side —
+   * which the comparison could only survive while it was vacuous. Existence
+   * only; the stride cannot resolve the refined crossing radius (Kerr-side
+   * radius convergence is asserted in kerrReference.test.ts).
+   */
   function schwDiskHitExists(samples: Vec3[]): boolean {
-    for (const p of samples) {
-      const rho = Math.hypot(p[0], p[2]);
-      if (Math.abs(p[1]) < 0.75 && rho >= DISK_INNER && rho <= DISK_OUTER) return true;
+    for (let i = 1; i < samples.length; i += 1) {
+      const a = samples[i - 1]!;
+      const b = samples[i]!;
+      if (a[1] * b[1] >= 0) continue; // strict sign change only
+      const t = a[1] / (a[1] - b[1]);
+      const x = a[0] + (b[0] - a[0]) * t;
+      const z = a[2] + (b[2] - a[2]) * t;
+      const rho = Math.hypot(x, z);
+      if (rho >= DISK_INNER && rho <= DISK_OUTER) return true;
     }
     return false;
   }

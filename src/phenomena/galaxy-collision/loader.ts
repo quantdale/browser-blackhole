@@ -12,6 +12,7 @@
 
 import { decodeGc1, Gc1LoadError, type Gc1Dataset } from './dataset.js';
 import { readBodyWithProgress } from '../shared/assetTransfer.js';
+import { isUnsafeAssetPath } from '../black-hole/lut/discovery.js';
 
 export interface Gc1ManifestRuntime {
   readonly encoding: string;
@@ -42,6 +43,9 @@ function isGc1Manifest(value: unknown): value is Gc1ManifestShape {
     r['encoding'] === 'gc1' &&
     r['schemaVersion'] === 1 &&
     typeof r['filename'] === 'string' &&
+    // V-16/5.8: manifest-controlled asset names must never escape the asset
+    // directory — the same rule the LUT validator enforces.
+    !isUnsafeAssetPath(r['filename']) &&
     typeof r['tracerCount'] === 'number' &&
     typeof r['keyframeCount'] === 'number' &&
     typeof r['bytes'] === 'number' &&

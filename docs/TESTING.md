@@ -24,6 +24,27 @@ Cover:
 - deterministic random/star seeds;
 - LUT metadata/checksum validation later.
 
+### Coverage model (verification-gate-integrity 7.2/V-10)
+
+`npm run coverage:report` prints a STATIC unit-test import-coverage report
+(report-only: no threshold, never a build failure). The following families
+are **deliberately browser-only covered** and listed as such by the report —
+their absence from unit coverage is intentional, not accidental:
+
+- `src/shaders/*` — TSL GPU graphs cannot run in a Node unit environment;
+  their CPU reference (`cameraRayMath.ts`, `starfield.ts`) IS unit-tested and
+  the browser parity corpora validate the GPU paths;
+- `src/ui/*` — pure DOM factories covered by the browser accessibility/
+  interaction suites;
+- `src/app/*` (the two app shells) — covered end-to-end by the browser
+  suites; only their pure helpers (`capability.ts` decision logic, state
+  normalizers) are unit-tested by design.
+
+The preferred tooling (vitest statement coverage via
+`@vitest/coverage-v8`) is recorded as wanted but currently blocked by a
+deterministic npm/arborist failure on the development machine — see
+`openspec/changes/verification-gate-integrity/tasks.md` §7.1.
+
 ## 3. Schwarzschild physics tests
 
 Required fixtures:
@@ -102,6 +123,23 @@ Golden scenes should eventually include:
 - Kerr spin=0 comparison later.
 
 Use perceptual/pixel thresholds carefully; post-processing and browser/GPU differences can require backend-specific baselines. Physics-value tests remain authoritative where visual baselines are flaky.
+
+### Backend-specific cinematic baselines (V-09/6.6)
+
+The cinematic suite captures per-backend baselines with a `_<BACKEND>` suffix.
+This is the documented command that reaches the eight committed `_WEBGL2`
+rows (they are not orphans — the golden-inventory gate
+`tests/unit/goldenInventory.test.ts` accepts exactly these suffix variants):
+
+```sh
+CINEMATIC_GOLDEN_BACKEND=webgl2 E2E_PORT=4219 npx playwright test cinematic-goldens --project=default --workers=1
+```
+
+Only `webgpu` and `webgl2` are accepted values (the spec throws on anything
+else). The default run (no env var) captures the backend-natural baselines.
+Every scientific golden row also carries a per-scene ABSOLUTE content floor
+(`minMeanLuma`) asserted alongside the relative comparison — a destroyed
+subject must fail even when the baseline carries the same destruction.
 
 ## 7. Browser E2E
 

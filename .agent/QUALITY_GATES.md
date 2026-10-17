@@ -2,6 +2,13 @@
 
 These gates are cumulative. Later milestones inherit earlier gates. A gate that cannot run because of the execution environment is `DEFERRED_ENVIRONMENT`, never `PASS`.
 
+**A skip is not a pass (verification-gate-integrity 8.3).** A test run that
+skipped subjects is honest reporting, not green evidence: a row that skips
+its subjects must fail or be explicitly re-scoped to a deterministic input,
+never pass vacuously. Hosted smoke runs assert zero skips and a full executed
+count (`scripts/check-smoke-coverage.mjs`), and unit rows that can skip
+subjects carry compared-count assertions.
+
 ## Gate A — repository health
 
 Blocking requirements:

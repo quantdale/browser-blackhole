@@ -222,10 +222,15 @@ function copyVec3(v: Vec3): Vec3 {
  * rays take the dedicated stable radial path (§13) instead of building a
  * tangent basis from a near-zero vector.
  *
- * Event policy (docs §10): capture at r <= 2M + captureEpsilon*massRg;
- * escape only when r > escapeRadius AND radial momentum is outward;
- * non-finite state, constraint-residual failure, or step-budget exhaustion
- * report 'max-steps'.
+ * Event policy (docs §10): capture at r <= 2M + captureEpsilon*massRg, or by
+ * the STALL-CAPTURE guard below (the Schwarzschild form of the validated Kerr
+ * horizon-stall policy in kerrHorizonStepGuardPolicy: an infalling ray whose
+ * redshift factor has collapsed cannot climb back out, so it is captured —
+ * without this guard the step size collapses near the horizon and the
+ * integrator crawls out of budget, reporting 'max-steps' for a ray the Kerr
+ * reference resolves as 'captured'); escape only when r > escapeRadius AND
+ * radial momentum is outward; non-finite state, constraint-residual failure,
+ * or step-budget exhaustion report 'max-steps'.
  */
 export function integratePhoton(
   pos: Vec3,
@@ -347,6 +352,17 @@ export function integratePhoton(
 
     // Horizon capture (docs §10.1), checked before escape.
     if (r <= captureRadius) {
+      status = 'captured';
+      break;
+    }
+    // Stall capture (docs §10.2): mirror of the Kerr reference's
+    // 'captured-stall' guard at a* = 0 — the Kerr form is
+    // pr < 0 && Delta/(r^2+a^2 cos^2) < 1e-3, which at a* = 0 reduces to
+    // pr < 0 && (1 - 2m/r) < 1e-3 (i.e. r < ~2.002 m). An infalling ray this
+    // close to the horizon is captured; without this the radial step size
+    // collapses and the integrator exhausts its budget reporting 'max-steps'
+    // for a ray the Kerr side resolves deterministically.
+    if (pr < 0 && 1 - (2 * m) / r < 1e-3) {
       status = 'captured';
       break;
     }

@@ -53,9 +53,16 @@ test.describe('M0 smoke', () => {
 
   test('camera interaction does not throw and keeps rendering', async ({ page }) => {
     const { consoleErrors, pageErrors } = collectErrors(page);
-    await gotoApp(page);
+    // 6.2 (verification-gate-integrity): force the KNOWN backend instead of
+    // skipping on an unknown one — a skip is not a pass. A runner without
+    // even forced WebGL2 must FAIL the job (the intended signal).
+    await gotoApp(page, '?backend=webgl2');
     const status = await waitForTerminalPhase(page);
-    if (status.phase !== 'ready') test.skip(true, 'no usable backend in this environment');
+    if (status.phase !== 'ready') {
+      throw new Error(
+        `forced-WebGL2 boot did not reach ready (phase=${status.phase}) — this runner cannot host the smoke gate`
+      );
+    }
 
     const canvas = page.locator('#scene');
     const box = await canvas.boundingBox();
@@ -89,9 +96,16 @@ test.describe('M0 smoke', () => {
 
   test('resize portrait/landscape keeps rendering without errors', async ({ page }) => {
     const { consoleErrors, pageErrors } = collectErrors(page);
-    await gotoApp(page);
+    // 6.2 (verification-gate-integrity): force the KNOWN backend instead of
+    // skipping on an unknown one — a skip is not a pass. A runner without
+    // even forced WebGL2 must FAIL the job (the intended signal).
+    await gotoApp(page, '?backend=webgl2');
     const status = await waitForTerminalPhase(page);
-    if (status.phase !== 'ready') test.skip(true, 'no usable backend in this environment');
+    if (status.phase !== 'ready') {
+      throw new Error(
+        `forced-WebGL2 boot did not reach ready (phase=${status.phase}) — this runner cannot host the smoke gate`
+      );
+    }
 
     for (const viewport of [
       { width: 480, height: 800 }, // portrait

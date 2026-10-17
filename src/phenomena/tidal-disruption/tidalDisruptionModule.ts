@@ -976,8 +976,23 @@ export function createTidalDisruptionModule(): PhenomenonModule {
     // contract), so re-asserting an identical focus every frame kept a paused
     // scene rendering forever (the §0 scenario matrix's TDE idle finding).
     if (autoFramer.enabled && !ctx.services.cameraRig.isAnimating()) {
-      if (streamVisible) focusTargetScratch.copy(streamFocusScratch);
-      else focusTargetScratch.set(enc.x, enc.y, enc.z);
+      if (streamVisible) {
+        focusTargetScratch.copy(streamFocusScratch);
+      } else if (starGain > 0.001) {
+        // Boot shot: the incoming star's live position.
+        focusTargetScratch.set(enc.x, enc.y, enc.z);
+      } else {
+        // Post-disruption media is centered on the black-hole/debris origin
+        // — the documented intent of this focus cue. Chasing the star's
+        // analytic parabolic coordinate here DIVERGES: at the nascent-disk
+        // stage it parked the camera >200,000 scene units from the only
+        // visible subject (the annulus at the origin), and the frame
+        // rendered pure black while the debug snapshot claimed
+        // `diskVisible: true, diskGain: 1` — the TDE_NASCENT_DISK golden
+        // pinned exactly that destroyed subject (verification-gate-integrity
+        // 4.8 raised it).
+        focusTargetScratch.set(0, 0, 0);
+      }
       if (
         !Number.isFinite(lastFocusTargetX) ||
         Math.abs(focusTargetScratch.x - lastFocusTargetX) > FOCUS_TARGET_EPSILON ||

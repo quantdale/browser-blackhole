@@ -23,6 +23,8 @@ jobs:
       - run: npm run lint
       - run: npm run typecheck
       - run: npm run test
+      - name: Unit-test import-coverage report (report-only, D8/V-10)
+        run: npm run coverage:report
       - run: npm run build
 
   browser-smoke:
@@ -32,17 +34,21 @@ jobs:
     # GitHub runners have no GPU, so every scene renders through software WebGL2
     # (SwiftShader) on 2 vCPUs. The heavy TSL lensing/Kerr shaders and the
     # full-screen hyperspace transition compile/render at seconds-per-frame, and
-    # runner speed varies wildly run-to-run (a black-hole arrival measured 18s in
+    # runner speed varies wildly run-to-run (a black-hole arrival measured
+    # 18s in
     # one hosted run and >180s in another). No fixed timeout survives that
     # variance, so the full GPU suite CANNOT be a stable hosted gate — it is a
     # LOCAL capable-runner gate (docs/CI_CD.md sections 2, 7, 16; run it with
     # `npm run e2e` on a WebGPU-capable machine, plus `--project=firefox`).
     #
-    # smoke.spec.ts boots the ROOT experience, which renders the CHEAP diagnostic
-    # gradient (no lensing/Kerr compile), plus the forced-WebGL2 gradient and the
+    # smoke.spec.ts boots the ROOT experience, which renders the CHEAP
+    # diagnostic
+    # gradient (no lensing/Kerr compile), plus the forced-WebGL2 gradient and
+    # the
     # forced-unsupported terminal UX. It is backend-agnostic and cheap, so it is
     # stable on software WebGL2 while still proving: the app boots to a truthful
-    # ready/fallback/unsupported terminal state, the WebGL2 fallback path renders,
+    # ready/fallback/unsupported terminal state, the WebGL2 fallback path
+    # renders,
     # the canvas is non-zero, interaction/resize are safe, and the console/page
     # error channels stay clean (docs/CI_CD.md section 5). It is NOT a WebGPU or
     # full-scene validation.
@@ -60,7 +66,20 @@ jobs:
         run: npx playwright install --with-deps chromium
       - run: npm run build
       - name: Playwright M0 smoke (backend-agnostic)
-        run: npx playwright test --project=default --workers=1 tests/browser/smoke.spec.ts
+        run: >-
+          npx playwright test --project=default --workers=1
+          tests/browser/smoke.spec.ts
+          --reporter=json > smoke-results.json
+      - name: Assert smoke coverage (a skip is not a pass)
+        run: node scripts/check-smoke-coverage.mjs smoke-results.json 5
+      - name: GC1 offline self-check + artifact freshness gate (pure-stdlib, D7)
+        run: |
+          python tools/cosmic-data/restricted_three_body.py
+          git diff --exit-code tools/cosmic-data/reports/ || {
+            echo '::error::CA9 self-check report is stale';
+            echo 'Regenerate and commit it (tools/cosmic-data).';
+            exit 1;
+          }
       - name: Upload failure artifacts
         if: failure()
         uses: actions/upload-artifact@v4

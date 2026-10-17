@@ -368,3 +368,32 @@ describe('cinematic environment layer', () => {
     expect(first[2]).toBeGreaterThanOrEqual(sampleStarfieldRadiance(direction, p)[2]);
   });
 });
+
+describe('star cell round-trip (folded from __probe.test.ts, task 6.5)', () => {
+  it('a star direction maps back to its own cube cell and samples non-zero radiance', () => {
+    // The zero-assertion probe established this informally; it is now a real
+    // gate: seeded placement -> face coordinates -> direction -> cell identity
+    // -> radiance at the star direction.
+    const p = makeStarfieldParams({ starDensity: 0.3, cellsPerFaceSide: 32 });
+    let found = 0;
+    outer: for (let f = 0; f < 6; f += 1) {
+      for (let i = 0; i < 32; i += 1) {
+        for (let j = 0; j < 32; j += 1) {
+          if (!cellHasStar(f, i, j, p)) continue;
+          const { fu, fv } = starFaceCoords(f, i, j, p);
+          const sd = faceCoordsToDirection(f, fu, fv);
+          const cell = directionToCubeCell(sd, 32);
+          expect(cell, 'round-trip must resolve a cell').not.toBeNull();
+          expect(cell!.face, 'round-trip face').toBe(f);
+          expect(cell!.i, 'round-trip i').toBe(i);
+          expect(cell!.j, 'round-trip j').toBe(j);
+          const r = sampleStarfieldRadiance(sd, p);
+          expect(r[0] + r[1] + r[2], 'a star must light its own direction').toBeGreaterThan(0);
+          found += 1;
+          if (found >= 3) break outer;
+        }
+      }
+    }
+    expect(found, 'the seeded field must contain stars').toBe(3);
+  });
+});

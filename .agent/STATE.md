@@ -1,3 +1,70 @@
+## 2026-10-17 session (3) — `verification-gate-integrity` COMPLETED (V-01…V-17)
+
+Status: **COMPLETE** — all task sections of
+`openspec/changes/verification-gate-integrity/tasks.md` checked with a
+negative-test before/after table as the durable proof; `--strict` valid;
+every V-finding struck from `docs/MASTER_PLAN.md` §4.
+
+**"Make green mean measured."** The acceptance suite is NEGATIVE — for each
+gate, deliberately break the protected property and watch it go red:
+
+| Mutation | BEFORE (blind) | AFTER |
+| --- | --- | --- |
+| broken LUT index | 81/81 PASS | 13 rows FAIL |
+| deleted golden PNG | nothing notices | inventory FAILS |
+| skip whole LUT corpus | 9/9 PASS | compared-count FAILS |
+| destroyed sparse subject | black==black passes | content floor FAILS |
+| full unit gate | flaked 2-of-3 (audit) | 5/5 identical (738/738) |
+
+**Triage highlights (designed-to-be-red rows):**
+
+1. **The a*=0 Kerr agreement corpus was 100% vacuous** — every row silently
+   skipped because the binary64 oracle returned `max-steps` for all its rays
+   (no stall-capture). Real defect: the Schwarzschild form of the validated
+   Kerr `captured-stall` guard added to `cpuReference.ts` (documented event
+   policy). The agreement now compares for real. A second mismatch surfaced:
+   the disk-hit probe measured near-plane samples while Kerr counts
+   sign-change crossings (ADR §1.14) — aligned to the canonical convention.
+2. **TDE_NASCENT_DISK's baseline was PURE BLACK** while its notes claimed to
+   catch disk-gain regressions — and the product really rendered black:
+   the auto-framer chased the star's DIVERGING analytic parabolic coordinate
+   (camera at x=−211,411) while the annulus at the origin was the only
+   visible subject. Product fix (framer targets the origin post-disruption,
+   matching its own comment) + justified re-capture (3.6 KB black → 46.9 KB).
+3. The LUT terminal-direction tolerance 5e-3 rad is now ENFORCED (16×
+   margin); the metrics block's signed comparison was measuring the nT sign
+   convention (~0.95 rad), not angular error.
+4. The stricter launchCatalog row found a real discovery gap (WS3's
+   `descriptor.ts` was never probed) and import failures are no longer
+   swallowed.
+5. The GC freshness gate found the committed self-check report genuinely
+   stale (old serialization); regeneration verified SEMANTICALLY IDENTICAL.
+
+**Structural additions:** golden inventory (GPU-less, runs in hosted CI via
+`npm run test`), smoke coverage gate (a skip is not a pass — 5/5 executed, 0
+skipped), GC self-check freshness gate, static unit-test import-coverage
+report (report-only; the `@vitest/coverage-v8` provider is BLOCKED by a
+deterministic npm/arborist failure on this machine — recorded with the exact
+error; the dependency-free report answers the design's stated question),
+capability decision table over all six documented failure modes
+(`webgpuMissingRequiredFeature` widened the decision input), asset-path rule
+unified across all three loaders with no-request-issued rejection rows, and
+proportionate timeouts + 5× determinism proof for the heavy module-graph
+rows.
+
+**Gates:** `npm run check` 62 files / 738 unit; visual-goldens 43/43 (only
+TDE_NASCENT_DISK changed, justified); cinematic 8/8; full suite 309/309 + 1
+documented skip; firefox 4/4; hosted-equivalent checks green; `openspec
+validate --strict` valid.
+
+**Next live lane:** Phase 4 `benchmark-harness-integrity` (B-01…B-07), then
+Phase 5a `operations-and-deployment-readiness` (O-01…O-09 — including the
+npm/arborist install bug that blocked the coverage provider), Phase 5b
+`documentation-truthfulness-realignment` (D-06…D-15), Phase 6 certification.
+Unowned strays: A-07, Q-06, Q-08 (L-01/L-02 deferred by plan).
+
+---
+
 ## 2026-10-17 session (2) — `shared-renderer-service-lifecycle` COMPLETED (R-01…R-12)
 
 Status: **COMPLETE** — all 11/11 task sections of
