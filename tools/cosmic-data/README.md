@@ -8,7 +8,20 @@ Provenance and scientific contracts live in
 
 ## Reproduction gate (DATA_PIPELINE §14)
 
-A clean environment can reproduce the committed runtime artifact exactly:
+**Supported interpreter: CPython 3.9-3.11** (`.python-version` pins 3.11).
+`requirements.txt` restricts `sxs` to `python_version < "3.12"`; on any
+other interpreter `reduce_bbh_merger.py` fails fast with a message naming
+the missing package and this range instead of a bare import error.
+
+A clean environment can reproduce the committed runtime artifact exactly,
+under these conditions (4.6 — "exact" means exactly this):
+
+- the pinned interpreter range above (`sxs` cannot install outside it);
+- the pinned source files fetched by `fetch_sxs_record.py` (Zenodo record,
+  MD5-checked — the same source bytes every time);
+- the committed `PROD_*` scenario constants (the reducer's source-lock
+  self-check refuses to emit if they ever disagree with the manifest's
+  source-lock block).
 
 ```bash
 python -m pip install -r tools/cosmic-data/requirements.txt

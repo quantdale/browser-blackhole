@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Not found — Cosmic Atlas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+      body {
+        margin: 0;
+        min-height: 100vh;
+        display: grid;
+        place-items: center;
+        background: #0b0d12;
+        color: #d7dce6;
+        font:
+          15px/1.6 system-ui,
+          sans-serif;
+      }
+      main {
+        max-width: 34rem;
+        padding: 2rem;
+        text-align: center;
+      }
+      a {
+        color: #8fb8ff;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Not found</h1>
+      <p id="not-found-text">
+        This address does not exist on this server.
+        <a href="/">Return to Cosmic Atlas</a>.
+      </p>
+    </main>
+    <script>
+      // SPA fallback scoped to NAVIGATION requests (verification-gate-
+      // integrity's successor lane, operations-and-deployment-readiness 1.2):
+      // a missing ASSET must keep its not-found status, while a deep link
+      // (a path with no file extension in its final segment) is a client-side
+      // route and gets the application shell.
+      //
+      // Hosts with URL-preserving rewrites (Netlify _redirects, Vercel
+      // vercel.json) serve the shell at the ORIGINAL deep link and do not
+      // need this file. This fallback is for 404-catch hosts (e.g. GitHub
+      // Pages), which cannot re-serve the shell under the failed URL, so the
+      // navigation case redirects to the shell entry; it assumes ROOT
+      // hosting (the default `base` build — see docs/DEPLOYMENT.md for the
+      // sub-path position).
+      (function () {
+        var path = location.pathname;
+        var lastSegment = path.slice(path.lastIndexOf('/') + 1);
+        var looksLikeAsset = /\.[A-Za-z0-9]+$/.test(lastSegment);
+        if (!looksLikeAsset) {
+          location.replace('/' + location.search + location.hash);
+          return;
+        }
+        // Asset request: keep the honest not-found page (status stays 404).
+        document.getElementById('not-found-text').textContent =
+          'This file does not exist on this server. ' +
+          'If you followed a link, the deployment may be missing an asset — try reloading the application.';
+      })();
+    </script>
+  </body>
+</html>

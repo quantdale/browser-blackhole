@@ -33,6 +33,43 @@ not a dev-server claim.
    private URLs (`docs/ASSET_PROVENANCE.md` §15; the M11 bundle scan is part
    of the release audit).
 
+## Reference host configurations (committed)
+
+The repository ships reference fallback configurations — the deployment
+contract is validated by `tests/unit/deploymentContract.test.ts`, which
+serves `dist/` from a plain static server and asserts that deep links return
+the shell while missing assets keep their not-found status (no graphics
+device required):
+
+- **Netlify (URL-preserving):** `netlify.toml` (repo root — Vite must not
+  copy it into the site) + `public/_redirects` (copied into `dist/`). The
+  `_redirects` rules route missing ASSET classes to the honest 404 page and
+  everything else to `index.html` with the original URL preserved.
+- **Vercel (URL-preserving):** `vercel.json` (repo root) rewrites every
+  non-asset, extension-free path to `/index.html`.
+- **404-catch hosts (e.g. GitHub Pages):** `public/404.html` serves the
+  fallback scoped to NAVIGATION requests (final path segment without a file
+  extension); a missing asset keeps its not-found status and page. These
+  hosts cannot re-serve the shell under the failed URL, so the navigation
+  case redirects to the shell entry — the deep link is only fully preserved
+  on hosts with URL-preserving rewrites. **The 404 fallback assumes ROOT
+  hosting** (the default build).
+
+## Sub-path position (O-07)
+
+`npm run build` produces a ROOT build (`base: '/'`), which the reference
+configs and `public/404.html` document. For sub-path hosting, build with an
+explicit base:
+
+```bash
+BASE_PATH=/my-subpath/ npm run build
+```
+
+The build's `index.html` then references every asset under that base. The
+Netlify/Vercel rewrite rules must be adjusted to the same prefix, and the
+404-catch fallback is NOT supported under a sub-path (its redirect is
+root-anchored) — use a URL-preserving host for sub-path deployments.
+
 ## Runtime behavior the host must not break
 
 - **Asset integrity:** LUT/data manifests carry schema version + checksums

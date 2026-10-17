@@ -19,7 +19,17 @@ import { defineConfig } from 'vite';
  */
 const atlasTestHooksOptIn = process.env['VITE_ATLAS_TEST_HOOKS'] === '1';
 
+/**
+ * O-07/1.3 (operations-and-deployment-readiness): the deployment base path
+ * is configurable at build time — `BASE_PATH=/sub-path/ npm run build`
+ * produces a sub-path build. Empty/unset keeps the root assumption (`/`)
+ * that `public/404.html`'s navigation fallback and the reference host
+ * configs document. Both are stated in docs/DEPLOYMENT.md.
+ */
+const basePath = process.env['BASE_PATH'] ?? '/';
+
 export default defineConfig({
+  base: basePath,
   define: {
     __ATLAS_TEST_HOOKS_OPT_IN__: JSON.stringify(atlasTestHooksOptIn)
   },

@@ -1,0 +1,9 @@
+# O-03/2.5 (operations-and-deployment-readiness): pinning actions to
+# immutable SHAs without maintenance converts a supply-chain risk into a
+# staleness risk — Dependabot keeps the pins current. Do not skip this.
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

@@ -1,0 +1,6 @@
+# Netlify reference configuration (operations-and-deployment-readiness 1.1).
+# Publish-directory files live in public/ (_redirects, 404.html) because Vite
+# copies public/ into dist/; this file stays at the repo root (Netlify reads
+# it from the repository, and it must NOT be copied into the published site).
+[build]
+  publish = "dist"

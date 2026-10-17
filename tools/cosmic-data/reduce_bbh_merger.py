@@ -40,6 +40,36 @@ import math
 import sys
 from pathlib import Path
 
+# --- Dependency preflight (operations-and-deployment-readiness 4.3) ---------
+# A bare ImportError from these imports is unactionable on a modern
+# interpreter (the `sxs` pin is python_version < "3.12"). Terminate with a
+# message that NAMES the missing package and the supported range instead.
+SUPPORTED_PYTHON = "CPython 3.9-3.11 (requirements.txt pins sxs for <3.12)"
+
+
+def _require(module_name: str, requirement: str) -> None:
+    try:
+        __import__(module_name)
+    except ImportError:
+        print(f"reduce_bbh_merger: missing dependency '{module_name}'.")
+        print(f"  supported interpreter: {SUPPORTED_PYTHON}")
+        print(f"  install: python -m pip install -r tools/cosmic-data/requirements.txt")
+        print(f"  requirement: {requirement}")
+        sys.exit(2)
+
+
+if sys.version_info >= (3, 12):
+    print("reduce_bbh_merger: unsupported Python " + sys.version.split()[0] + ".")
+    print(f"  supported interpreter: {SUPPORTED_PYTHON}")
+    print("  the sxs package pin cannot install on this interpreter; "
+          "use a supported version (see .python-version).")
+    sys.exit(2)
+
+_require("numpy", "numpy>=2.0,<3")
+_require("h5py", "h5py>=3.10,<4")
+_require("sxs", "sxs>=2025.0.27,<2026")
+# ---------------------------------------------------------------------------
+
 import h5py
 import numpy as np
 
@@ -47,7 +77,14 @@ TOOL_ROOT = Path(__file__).resolve().parent
 REPO_ROOT = TOOL_ROOT.parent.parent
 sys.path.insert(0, str(TOOL_ROOT))
 
-from fetch_sxs_record import DOI, LICENSE, RECORD_ID, RECORD_URL, local_path  # noqa: E402
+from fetch_sxs_record import (  # noqa: E402
+    DOI,
+    LICENSE,
+    RECORD_ID,
+    RECORD_URL,
+    RETRIEVED_AT,
+    local_path,
+)
 
 # ---------------------------------------------------------------------------
 # Output contract (versioned; bump RUNTIME_SCHEMA together with the decoder)
@@ -152,7 +189,25 @@ def load_horizons() -> dict[str, dict[str, np.ndarray]]:
 
 
 def load_metadata() -> dict:
-    return json.loads(local_path("Lev5:metadata.json").read_bytes())
+    """Parse the pinned SXS metadata at the trust boundary; a missing or
+    malformed file fails with an explicit message, not a bare traceback."""
+    path = local_path("Lev5:metadata.json")
+    try:
+        raw = path.read_bytes()
+    except OSError as exc:
+        raise RuntimeError(
+            f"reduce_bbh_merger: cannot read the pinned metadata {path}: {exc}. "
+            "Run tools/cosmic-data/fetch_sxs_record.py first."
+        ) from exc
+    try:
+        parsed = json.loads(raw)
+    except ValueError as exc:
+        raise RuntimeError(
+            f"reduce_bbh_merger: pinned metadata {path} is not valid JSON: {exc}"
+        ) from exc
+    if not isinstance(parsed, dict):
+        raise RuntimeError(f"reduce_bbh_merger: pinned metadata {path} is not a JSON object")
+    return parsed
 
 
 # ---------------------------------------------------------------------------
@@ -198,7 +253,6 @@ def build_reduced_times(
         raise SystemExit("[reduce] insufficient inspiral phase span before the peak")
     earliest_by_cap = np.searchsorted(times, peak_time - INSPIRAL_WINDOW_CAP_M)
     start_index = max(earliest_by_orbits, int(earliest_by_cap))
-    t_start = float(times[start_index])
     achieved_orbits = abs(phi[start_index]) / (4.0 * math.pi)
 
     n_total = SAMPLE_COUNT
@@ -550,7 +604,7 @@ def main() -> int:
             "doi": DOI,
             "license": LICENSE,
             "licenseUrl": "https://creativecommons.org/licenses/by/4.0/legalcode",
-            "retrievedAt": "2026-08-25",
+            "retrievedAt": RETRIEVED_AT,  # O-09: provenance-owned, not hardcoded
             "publications": ["Mroue:2013xna", "Boyle:2019kee", "SXSCatalogWebsite"],
             "attribution": (
                 "Waveform and trajectory data from the SXS Collaboration "

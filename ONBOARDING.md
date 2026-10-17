@@ -24,7 +24,10 @@ Credentials, API keys, signing material, account logins, licensed models/assets,
 - Node.js >= 22.12.0 + npm
 - Chromium/Chrome or Edge with WebGPU for hardware validation
 - Playwright browser dependencies
-- Python when running the repository's scientific data-reduction tools
+- Python when running the repository's scientific data-reduction tools —
+  **CPython 3.9-3.11** (`.python-version` pins 3.11; `requirements.txt`
+  restricts `sxs` to `<3.12`, and `reduce_bbh_merger.py` fails fast with a
+  message naming the missing package and this range on any other interpreter)
 
 **Task-dependent / optional tools**
 - Firefox for cross-engine fallback matrix

@@ -18,7 +18,7 @@ read-only audit of product code at `main@dc0b3ba`, then corrected against curren
 | 2 | `shared-renderer-service-lifecycle` | **complete** (2026-10-17 session) — R-01…R-12 struck |
 | 3 | `verification-gate-integrity` | **complete** (2026-10-17 session) — V-01…V-17 struck |
 | 4 | `benchmark-harness-integrity` | **complete** (2026-10-17 session) — B-01…B-07 struck |
-| 5a | `operations-and-deployment-readiness` | pending — O-01…O-09 in scope |
+| 5a | `operations-and-deployment-readiness` | **complete** (2026-10-17 session) — O-01…O-09 struck |
 | 5b | `documentation-truthfulness-realignment` | pending — D-06…D-15 in scope |
 | 6 | final certification | pending |
 
@@ -435,15 +435,15 @@ code evidence needing a runtime check; `suspected` = plausible, needs investigat
 
 | ID | Title | Pri | Conf | Evidence |
 | --- | --- | --- | --- | --- |
-| O-01 | No committed host configuration satisfies the documented mandatory SPA-fallback contract | P1 | confirmed | `docs/DEPLOYMENT.md:23-27`; no `_redirects`/`vercel.json`/`404.html` in repo |
-| O-02 | `npm audit` reports 1 high-severity advisory (`brace-expansion` 5.0.9, dev-only) with `fixAvailable` | P2 | confirmed | `npm audit --json` |
-| O-03 | CI has no `permissions`, `concurrency`, `timeout-minutes`, SHA pinning, dependency review or audit gate | P2 | confirmed | `.github/workflows/ci.yml` |
-| O-04 | The BBH reproduction gate cannot run on Python ≥ 3.12 and fails with a bare `ImportError` | P2 | confirmed | `requirements.txt:3`, `reduce_bbh_merger.py:88` |
-| O-05 | `restricted_three_body.py` silently ignores `r_in`/`r_out` in the production sampler branch | P2 | confirmed | `restricted_three_body.py:279-283` vs `:812-816` |
-| O-06 | No Python version pin for the offline pipeline | P3 | confirmed | no `pyproject.toml`/`.python-version` |
-| O-07 | `vite.config.ts` sets no `base`; sub-path hosting breaks silently | P3 | confirmed | `vite.config.ts:4-11` |
-| O-08 | `mcp-preflight.mjs` uses `execFileSync(..., {shell: true})` and an over-broad `'~'` path rule | P3 | confirmed | `mcp-preflight.mjs:34-43,136-149` |
-| O-09 | Reducer hardcodes `retrievedAt: "2026-08-25"` into a regenerated manifest | P3 | confirmed | `reduce_bbh_merger.py:495` |
+| O-01 | No committed host configuration satisfies the documented mandatory SPA-fallback contract | P1 | **RESOLVED 2026-10-17** session | `docs/DEPLOYMENT.md:23-27`; no `_redirects`/`vercel.json`/`404.html` in repo |
+| O-02 | `npm audit` reports 1 high-severity advisory (`brace-expansion` 5.0.9, dev-only) with `fixAvailable` | P2 | **RESOLVED 2026-10-17** session | `npm audit --json` |
+| O-03 | CI has no `permissions`, `concurrency`, `timeout-minutes`, SHA pinning, dependency review or audit gate | P2 | **RESOLVED 2026-10-17** session | `.github/workflows/ci.yml` |
+| O-04 | The BBH reproduction gate cannot run on Python ≥ 3.12 and fails with a bare `ImportError` | P2 | **RESOLVED 2026-10-17** session | `requirements.txt:3`, `reduce_bbh_merger.py:88` |
+| O-05 | `restricted_three_body.py` silently ignores `r_in`/`r_out` in the production sampler branch | P2 | **RESOLVED 2026-10-17** session | `restricted_three_body.py:279-283` vs `:812-816` |
+| O-06 | No Python version pin for the offline pipeline | P3 | **RESOLVED 2026-10-17** session | no `pyproject.toml`/`.python-version` |
+| O-07 | `vite.config.ts` sets no `base`; sub-path hosting breaks silently | P3 | **RESOLVED 2026-10-17** session | `vite.config.ts:4-11` |
+| O-08 | `mcp-preflight.mjs` uses `execFileSync(..., {shell: true})` and an over-broad `'~'` path rule | P3 | **RESOLVED 2026-10-17** session | `mcp-preflight.mjs:34-43,136-149` |
+| O-09 | Reducer hardcodes `retrievedAt: "2026-08-25"` into a regenerated manifest | P3 | **RESOLVED 2026-10-17** session | `reduce_bbh_merger.py:495` |
 
 ### L — Legacy surface (deferred; no current change owns this lane)
 

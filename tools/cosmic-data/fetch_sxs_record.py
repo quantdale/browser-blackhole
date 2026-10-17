@@ -37,6 +37,10 @@ USER_AGENT = "browser-blackhole-cosmic-data/1.0 (offline scientific fetch)"
 # ---------------------------------------------------------------------------
 
 RECORD_ID = "13166927"
+# Provenance: the date the pinned record was actually retrieved (the
+# original pin). Regenerated manifests derive this constant instead of
+# hardcoding a date the reducer cannot know (O-09).
+RETRIEVED_AT = "2026-08-25"
 RECORD_URL = f"https://zenodo.org/records/{RECORD_ID}"
 DOI = "10.5281/zenodo.13166927"
 LICENSE = "CC-BY-4.0"

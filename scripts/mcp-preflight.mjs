@@ -39,8 +39,9 @@ const ALLOWED_LAUNCHERS = new Set([
 ]);
 
 // Global / home-directory path fragments that must never appear (repo-local only).
+// A bare '~' substring would flag legitimate tilde VERSION ranges (pkg@~1.2.3);
+// the tilde rule is PATH-ANCHORED below instead (task 6.4).
 const GLOBAL_FRAGMENTS = [
-  '~',
   '/Users/',
   '\\Users\\',
   'C:\\Users\\',
@@ -69,8 +70,39 @@ const notes = [];
 const seenIds = new Map(); // id -> config file
 
 function stripJsonc(text) {
-  // Remove /* */ block comments and // line comments (best-effort, no strings awareness).
-  return text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  // Strings-aware scanner (6.3): comment markers INSIDE string values must
+  // survive — the old blind regex truncated any value containing ` // `.
+  let out = '';
+  let inString = false;
+  let escaped = false;
+  for (let i = 0; i < text.length; i += 1) {
+    const c = text[i];
+    if (inString) {
+      out += c;
+      if (escaped) escaped = false;
+      else if (c === '\\') escaped = true;
+      else if (c === '"') inString = false;
+      continue;
+    }
+    if (c === '"') {
+      inString = true;
+      out += c;
+      continue;
+    }
+    if (c === '/' && text[i + 1] === '/') {
+      while (i < text.length && text[i] !== '\n') i += 1;
+      out += '\n';
+      continue;
+    }
+    if (c === '/' && text[i + 1] === '*') {
+      i += 2;
+      while (i < text.length && !(text[i] === '*' && text[i + 1] === '/')) i += 1;
+      i += 1;
+      continue;
+    }
+    out += c;
+  }
+  return out;
 }
 
 function loadServers(file) {
@@ -97,6 +129,10 @@ function loadServers(file) {
 function checkGlobalRefs(name, file, value) {
   if (typeof value !== 'string') return;
   const lower = value.toLowerCase();
+  // Path-anchored tilde: `~` alone or `~/...` / `~\...` — NOT a version range.
+  if (lower === '~' || /^~[\\/]/.test(lower)) {
+    problems.push(`${file} [${name}]: references home directory "~" (must be repository-local)`);
+  }
   for (const frag of GLOBAL_FRAGMENTS) {
     if (lower.includes(frag.toLowerCase())) {
       problems.push(
@@ -142,8 +178,9 @@ function checkPinned(launcher, args, name, file) {
       problems.push(`${file} [${name}]: unpinned "${spec}" — pin an explicit version per plan`);
       return;
     }
-    // must carry an explicit semver-ish version: pkg@x.y.z
-    if (!/^(@?[\w./-]+)@[\w.+-]+$/.test(spec)) {
+    // must carry a pinned semver-ish version or range: pkg@x.y.z / pkg@~1.2 /
+    // pkg@^1.2.3 (a tilde VERSION range is not a home-path reference — 6.4).
+    if (!/^(@?[\w./-]+)@[\w.+-~^]+$/.test(spec)) {
       problems.push(
         `${file} [${name}]: package spec "${spec}" is not pinned to an explicit version`
       );
@@ -151,9 +188,11 @@ function checkPinned(launcher, args, name, file) {
     }
     if (ONLINE) {
       try {
-        execFileSync('npm', ['view', spec, 'version'], {
+        // O-08/6.1: no `shell: true` — the spec reaches the registry as a
+        // single argv entry, never shell-interpreted. The platform-specific
+        // npm executable is resolved directly (npm.cmd on win32).
+        execFileSync(process.platform === 'win32' ? 'npm.cmd' : 'npm', ['view', spec, 'version'], {
           stdio: 'pipe',
-          shell: true,
           timeout: 60000
         });
         notes.push(`${file} [${name}]: registry resolved ${spec}`);

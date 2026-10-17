@@ -116,6 +116,36 @@ PROD_SAMPLE_SEED = 1972
 
 SOURCE_LOCK_STATUS = "source-locked-framework-repository-scenario"
 
+
+def _assert_source_lock_consistency() -> None:
+    """Refuse to emit when PROD_* parameters disagree with SOURCE_LOCK_SCENARIO
+    (operations-and-deployment-readiness 5.3/5.5). The manifest publishes the
+    SOURCE_LOCK_SCENARIO block; the binary is generated from the PROD_*
+    constants; they must be the same values or the manifest lies."""
+    expected = {
+        "massRatio": PROD_MASS_RATIO,
+        "pericenterQ": PROD_PERICENTER_Q,
+        "inclinationDeg": PROD_INCLINATION_DEG,
+        "argumentPericenterDeg": PROD_OMEGA_DEG,
+        "longitudeNodeDeg": PROD_NODE_DEG,
+        "diskRin": PROD_DISK_R_IN,
+        "diskRout": PROD_DISK_R_OUT,
+        "tracersPerGalaxy": PROD_TRACERS_PER_GALAXY,
+        "tSpan": list(PROD_T_SPAN),
+        "dt": PROD_DT,
+        "keyframeEvery": PROD_KEYFRAME_EVERY,
+    }
+    mismatches = []
+    for key, value in expected.items():
+        locked = SOURCE_LOCK_SCENARIO.get(key, {}).get("value")
+        if locked != value:
+            mismatches.append(f"{key}: PROD_*={value!r} vs source-lock={locked!r}")
+    if mismatches:
+        raise RuntimeError(
+            "refusing to emit production artifact: source-lock mismatch\n  "
+            + "\n  ".join(mismatches)
+        )
+
 SOURCE_LOCK_SCENARIO = {
     "massRatio": {"value": 1.0, "classification": "source-consistent-default",
                   "note": "equal-mass symmetric two-tailed case (Antennae-like)"},
@@ -274,18 +304,15 @@ def sample_disk_tracers(
     """Sample thin-disk tracers with circular host-frame velocities.
 
     Radius law: surface density Sigma ~ r^-alpha sampled exactly by inverse
-    CDF over [R_IN, R_OUT] (alpha != 1 branch uses the power-law form).
+    CDF over [r_in, r_out] (alpha != 1 branch uses the power-law form).
     """
-    alpha = alpha
     u = rng.random(count)
     if abs(alpha - 1.0) < 1e-12:
         # Sigma ~ 1/r  =>  p(r) ~ const  =>  uniform in r
-        radii = DISK_R_IN + (DISK_R_OUT - DISK_R_IN) * u
+        radii = r_in + (r_out - r_in) * u
     else:
         beta = 2.0 - alpha
-        radii = (
-            DISK_R_IN**beta + (DISK_R_OUT**beta - DISK_R_IN**beta) * u
-        ) ** (1.0 / beta)
+        radii = (r_in**beta + (r_out**beta - r_in**beta) * u) ** (1.0 / beta)
     theta = 2.0 * np.pi * rng.random(count)
     positions = np.stack([radii * np.cos(theta), radii * np.sin(theta)], axis=1)
     speed = np.sqrt(G * host_mass / radii)
@@ -376,7 +403,7 @@ def integrate(
     t_span: tuple[float, float],
     dt: float,
     keyframe_every: int,
-) -> dict[str, np.ndarray | list[float]]:
+) -> dict[str, np.ndarray | list[float] | int]:
     """Fixed-step velocity Verlet; primaries evaluated analytically at step
     endpoints (velocity-Verlet-compatible force timing). Negative spans
     integrate backwards (time-reversibility support). Particles violating
@@ -546,10 +573,10 @@ def check_time_reversal() -> dict[str, object]:
     q_fwd = half["quarantined"]  # type: ignore[index]
     q_back = back["quarantined"]  # type: ignore[index]
 
-    def at_risk(run: dict[str, np.ndarray | list[float]]) -> np.ndarray:
+    def at_risk(run: dict[str, np.ndarray | list[float] | int]) -> np.ndarray:
         return run["minNucleusDistance"] < AT_RISK_MARGIN_RADIUS  # type: ignore[operator,index]
 
-    keep = ~(q_fwd | q_back | at_risk(half) | at_risk(back))
+    keep = ~(q_fwd | q_back | at_risk(half) | at_risk(back))  # type: ignore[operator]
     err = float(
         np.max(np.abs(back["finalX"][keep] - x[keep]))  # type: ignore[arg-type,index]
         / max(1.0, float(np.max(np.abs(x))))
@@ -588,10 +615,10 @@ def check_reflection_symmetry() -> dict[str, object]:
     qa = run_a["quarantined"]  # type: ignore[index]
     qm = run_m["quarantined"]  # type: ignore[index]
 
-    def at_risk_m(run: dict[str, np.ndarray | list[float]]) -> np.ndarray:
+    def at_risk_m(run: dict[str, np.ndarray | list[float] | int]) -> np.ndarray:
         return run["minNucleusDistance"] < AT_RISK_MARGIN_RADIUS  # type: ignore[operator,index]
 
-    keep = ~(qa | qm | at_risk_m(run_a) | at_risk_m(run_m))
+    keep = ~(qa | qm | at_risk_m(run_a) | at_risk_m(run_m))  # type: ignore[operator]
     err = float(
         np.max(np.abs(mirrored_back[keep] - run_a["finalX"][keep]))  # type: ignore[arg-type,index]
     )
@@ -616,11 +643,11 @@ def check_circular_orbit_single_mass() -> dict[str, object]:
     vc = np.array([[0.0, omega_kepler * r0, 0.0]])
     out = integrate(solo_enc, xc, vc, (0.0, 30.0), EXERCISE_DT, EXERCISE_KEYFRAME_EVERY)
     traj = out["positions"]  # type: ignore[misc]
-    radii = np.linalg.norm(traj[:, 0, :], axis=1)
+    radii = np.linalg.norm(traj[:, 0, :], axis=1)  # type: ignore[index]
     amplitude = float(radii.max() - radii.min())
     # Measured frequency via unwrapped polar angle — immune to the sampling
     # grid (a crossing-time estimator quantizes to the keyframe interval).
-    angles = np.unwrap(np.arctan2(traj[:, 0, 1], traj[:, 0, 0]))
+    angles = np.unwrap(np.arctan2(traj[:, 0, 1], traj[:, 0, 0]))  # type: ignore[index]
     times = out["times"]  # type: ignore[misc]
     omega_meas = float((angles[-1] - angles[0]) / (times[-1] - times[0]))
     freq_err = abs(omega_meas - omega_kepler) / omega_kepler
@@ -760,6 +787,12 @@ def emit_artifact(out_dir: Path, scratch_npz: Path | None = None) -> dict[str, o
     if SOURCE_LOCK_STATUS != "source-locked-framework-repository-scenario":
         raise RuntimeError("refusing to emit production artifact: not source-locked")
 
+    # 5.3 (operations-and-deployment-readiness): the parameters passed to
+    # emission MUST equal the values written into the manifest's source-lock
+    # block — the artifact is refused on any mismatch, so the manifest can
+    # never claim a scenario the binary was not generated from.
+    _assert_source_lock_consistency()
+
     enc = Encounter(
         PROD_MASS_RATIO, PROD_PERICENTER_Q, PROD_OMEGA_DEG,
         PROD_INCLINATION_DEG, PROD_NODE_DEG,
@@ -848,7 +881,7 @@ def emit_artifact(out_dir: Path, scratch_npz: Path | None = None) -> dict[str, o
 
 
 def main(argv: list[str] | None = None) -> int:
-    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    parser = argparse.ArgumentParser(description=(__doc__ or "").splitlines()[0])
     parser.add_argument(
         "--scratch-npz",
         type=Path,

@@ -1,0 +1,20 @@
+# Netlify SPA fallback (operations-and-deployment-readiness 1.1/1.2).
+#
+# Semantics: existing static files are served first; MISSING files fall
+# through these rules in order. Asset classes are routed to the honest 404
+# page with a 404 status (a missing asset must never masquerade as the app
+# shell); everything else is a client-side route and receives index.html
+# WITH THE ORIGINAL URL PRESERVED (the SPA router reads location.pathname).
+#
+# Sub-path hosting: use a `base`-configured build and rewrite with the
+# sub-path prefix (docs/DEPLOYMENT.md §sub-path).
+/*.js    /404.html  404
+/*.css   /404.html  404
+/*.map   /404.html  404
+/*.json  /404.html  404
+/*.wasm  /404.html  404
+/*.png   /404.html  404
+/*.jpg   /404.html  404
+/*.svg   /404.html  404
+/*.bin   /404.html  404
+/*       /index.html  200

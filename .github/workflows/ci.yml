@@ -5,20 +5,38 @@ on:
     branches: [main]
   pull_request:
 
+# O-03/2.1: least-privilege workflow token — the jobs only read the repo.
+permissions:
+  contents: read
+
+# O-03/2.2: one in-flight run per ref; superseded pushes cancel.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   quality:
     # Deterministic non-GPU gates only. A green run here says nothing about
     # GPU/WebGPU behavior (docs/CI_CD.md section 16).
     name: quality (format/lint/typecheck/unit/build)
     runs-on: ubuntu-latest
+    # O-03/2.3: a hung job fails loudly instead of burning the six-hour cap.
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # O-03/2.4: actions pinned to immutable commit SHAs (floating tags move);
+      # Dependabot keeps the pins current (2.5).
+      # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22
+          # O-03/2.7: pinned to a specific minor, not a floating major.
+          node-version: 22.12.0
           cache: npm
       - name: Install from lockfile
         run: npm ci
+      - name: Dependency audit gate (high+; see docs/DEPENDENCIES.md)
+        run: npm audit --audit-level=high
       - run: npm run format:check
       - run: npm run lint
       - run: npm run typecheck
@@ -28,6 +46,8 @@ jobs:
       - run: npm run build
 
   browser-smoke:
+    # O-03/2.3: bounded job runtime.
+    timeout-minutes: 30
     # Reliable hosted browser gate: the M0 backend-agnostic smoke on Chromium.
     #
     # WHY ONLY THE SMOKE (not the full behavioral/parity/golden suite): hosted
@@ -56,10 +76,12 @@ jobs:
     needs: quality
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020
         with:
-          node-version: 22
+          node-version: 22.12.0
           cache: npm
       - run: npm ci
       - name: Install pinned Playwright browser (Chromium)
@@ -82,10 +104,30 @@ jobs:
           }
       - name: Upload failure artifacts
         if: failure()
-        uses: actions/upload-artifact@v4
+        # v4.6.2
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: playwright-smoke-artifacts
           path: |
             test-results/
             playwright-report/
           if-no-files-found: ignore
+
+  dependency-review:
+    # O-03/2.6: production-dependency review on pull requests.
+    name: dependency review (production scope)
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      # v4.2.2
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+      # v4.7.1
+      # Immutable SHA pin: the action ref is an unbreakable 73-char token
+      # (no YAML wrapping can fit it in 80 columns).
+      # yamllint disable-line rule:line-length
+      - uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9
+        with:
+          scope: runtime

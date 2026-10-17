@@ -1,3 +1,62 @@
+## 2026-10-17 session (5) — `operations-and-deployment-readiness` COMPLETED (O-01…O-09)
+
+Status: **COMPLETE** — all task sections checked with evidence; O-01…O-09
+struck from `docs/MASTER_PLAN.md` §4; `openspec validate --strict` valid.
+
+**Deployment contract (O-01/O-07):** committed reference SPA-fallback
+configurations — `public/_redirects` (missing asset classes keep their 404
+status via the honest 404 page; everything else receives index.html with the
+ORIGINAL URL preserved), `public/404.html` (navigation-scoped fallback for
+404-catch hosts), `vercel.json` + `netlify.toml` at the repo root. The
+deployment-contract test serves dist/ from a plain static server and proves:
+deep link 404s WITHOUT the config (the recorded before-evidence), returns
+the shell WITH it at the original URL, missing assets never masquerade as
+the shell, existing assets serve as themselves. `BASE_PATH=/x/ npm run build`
+makes the base configurable; DEPLOYMENT.md documents the shapes and the
+sub-path position (404 fallback is root-only).
+
+**CI hardening (O-03):** least-privilege `permissions`, `concurrency` with
+cancel-in-progress, `timeout-minutes` on all jobs, ALL actions pinned to
+immutable SHAs (7 pins, 0 floating tags), Dependabot for the actions
+ecosystem, dependency-review scoped to runtime deps, Node pinned 22.12.0.
+
+**Dependency gate (O-02):** `npm audit` baseline recorded (2 high, dev-only);
+`npm audit fix` remediated via the lockfile — **0 vulnerabilities**; the
+high+ audit gate joined the quality job in the same change. (The
+`@vitest/coverage-v8` provider remains blocked by the npm/arborist
+`edgesOut` failure; the static coverage report substitutes.)
+
+**Python toolchain (O-04/O-06):** `.python-version` (3.11), supported range
+(3.9-3.11 — `sxs` pin `<3.12`) documented in ONBOARDING + the tool README;
+the reducer's preflight terminates with a message naming the missing package
+and range (verified live on 3.13 — the clear message replaces a bare
+ImportError); the README's reproducibility claim now states its exact
+conditions.
+
+**Generator correctness (O-05/O-09):** the disk sampler uses its
+`r_in`/`r_out` in both branches (silently ignored before) and the
+self-assignment is gone; the source-lock self-check refuses to emit when
+PROD_* constants disagree with the manifest SOURCE_LOCK_SCENARIO block
+(verified both ways — a mutated PROD_DISK_R_IN refuses naming the mismatch);
+the committed GC1 artifact validates unchanged (NOT regenerated).
+`retrievedAt` now derives from the provenance module's RETRIEVED_AT constant
+instead of a hardcoded literal.
+
+**Preflight script (O-08):** `shell: true` removed (platform npm resolved
+directly); the bare `~` rule is path-anchored (tilde version ranges pass,
+home refs fail); the JSONC stripper is strings-aware (comment markers inside
+values survive). Black-box tests run the real script against fixtures.
+
+Gates: `npm run check` **66 files / 756 unit tests** green; Python
+preflight + source-lock self-check verified live in both directions;
+`openspec validate --strict` valid.
+
+**Next live lane:** Phase 5b `documentation-truthfulness-realignment`
+(D-06…D-15), then Phase 6 final certification. Unowned strays: A-07, Q-06,
+Q-08 (L-01/L-02 deferred by plan).
+
+---
+
 ## 2026-10-17 session (4) — `benchmark-harness-integrity` COMPLETED (B-01…B-07)
 
 Status: **COMPLETE** — all task sections checked with evidence; B-01…B-07
