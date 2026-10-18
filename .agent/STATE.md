@@ -1,3 +1,54 @@
+## 2026-10-18 — Kerr magenta band — DIAGNOSED (solver limitation), no code change
+
+Status: **DIAGNOSED — CASE B (genuine numerical limitation).** Branch
+`visual-fidelity/kerr-magenta-band-diagnostics` off verified base `1b01b7e`.
+**No production rendering code was modified**; no golden was regenerated.
+Evidence: `docs/VISUAL_FIDELITY_KERR_MAGENTA_BAND.md`,
+`artifacts/visual-fidelity-kerr-band/`.
+
+- **Root cause, proven at pixel level:** the band is the pole-passage honesty
+gate (ADR §1.19, `minSinTheta < 0.04` ⇒ `RAY_NON_FINITE` ⇒
+  `NUMERICAL_FAILURE_RGB` linear (0.08,0,0.08)). Physical magenta is exactly
+  `80,0,80` for 7,926/7,967 px; the `?kerrstatus` view emits pole yellow
+  `255,243,124` at those same coordinates. **IoU 0.9969; 99.69% of magenta is
+  pole-passage class; 100% of failures are shown magenta.**
+- **Classifier trap recorded:** pole yellow is linear (1.0, 0.9, 0.2), which the
+  shipped tonemap+sRGB chain delivers as b≈124, not <90. An early `b < 90` test
+  filed the whole pole population under "unclassified" and would have produced
+  a false "the band is not failures" headline. Classification now transforms
+  the shader's LINEAR constants through the display chain.
+- **Phase-5 experiments:** tier-stable (Medium 1.17% / High 1.13% magenta);
+  constant 0.998% pole across phases 0.0–0.85; backend-identical (WebGPU
+  1.1709% vs forced WebGL2 1.1707%, IoU 1.0); presentation amplification
+  **1.004×** (bloom+ACES+exposure contribute 0.4%) ⇒ bloom/filtering hypothesis
+  REFUTED. LUT not in this path (failure colour emitted from the terminal-status
+  select).
+- **Why the gate is right (and was nearly misjudged):** the gated rays are
+  strong-field axis passages (min|sinθ| at r≈1.6–9.6 r_g, turns ≥1/1). In
+  binary64 they are excellently conditioned (16× step refinement ⇒ 0.000°
+  direction drift; null residual ≲1e-12; input-perturbation sensitivity
+  ≤0.084°). An input-only perturbation test therefore LOOKED like proof the gate
+  was over-conservative. Faithful **f32 step-rounding emulation reversed that**:
+  inside-gate rays give terminal-direction errors of **3.75°–55.41°** (and two
+  rays go non-finite / r→−∞). The 0.04 threshold is the only reason the frame is
+  not presenting wrong sky directions as physics. **Threshold left at 0.04.**
+- **Deliverables:** diagnostic harnesses (`scripts/diag-kerr-band.mjs`,
+  `probe-kerr-band-pixels.mjs`, `probe-kerr-presentation.mjs`,
+  `probe-kerr-cpu-rays.ts`) and `tests/unit/kerrPolarBandDiagnosis.test.ts`
+  (7 tests locking gate symmetry, capture preservation, missing-terminal-direction
+  honesty, binary64 convergence, clean invariants, and the f32 unresolvability
+  claim plus its outside-gate control).
+- **Gates:** `npm run check` PASS (74 files / 820 unit); Kerr browser pack
+  `kerr-backend-census` + `kerr-parity` (webgpu+webgl2) + `kerr-integration`
+  PASS 12/12; goldens untouched. Performance gate vacuous by construction (no
+  production change ⇒ bit-identical GPU cost); no benchmark claim made.
+- **Remaining limitation:** ~1.0–1.13% of frame in this framing cannot be
+  resolved in f32 BL near the axis and is disclosed as explicit failure.
+  Follow-up campaign scoped: `kerr-near-axis-solver` (coordinate-regular /
+  rotated-frame near-axis branch / selective higher precision), §11 of the doc.
+
+---
+
 ## 2026-10-18 — AGN nuclear outer-disk photosphere POC — RESOLVED (validated)
 
 Status: **RESOLVED.** Branch `visual-fidelity/agn-nuclear-disk-photosphere`

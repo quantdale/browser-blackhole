@@ -114,7 +114,15 @@ Tier ladder is governed by `VisualWorkBudget`: `volumeActiveSteps`/`detailOctave
 
 - WebKit / real mobile hardware / headed end-user acceptance are `DEFERRED_ENVIRONMENT` (no device farm).
 - Absolute GPU timings are local-adapter evidence only; governed tiers + bounded resources are the product guarantee.
-- Kerr polar band (`sin(theta)<0.04`) remains a thin magenta failure band — bounded (<20% census) and documented, not hidden.
+- Kerr polar band (`sin(theta)<0.04`) remains a magenta failure band. Measured
+  2026-10-18 on `kerr-high-prograde` (High and Medium, WebGPU and forced WebGL2,
+  972×727): **1.13% of frame at High / 1.17% at Medium**, of which **99.7% is the
+  pole-passage class** (IoU 0.997 against the `?kerrstatus` view; theta-wrap
+  0.001%, max-steps 0%). It is thin in AREA but visually prominent because it
+  sits on the two symmetry-axis columns. Diagnosis: genuine f32 Boyer-Lindquist
+  near-axis limitation, not a presentation defect (bloom/tone-map amplification
+  measured at 1.004×). Documented, not hidden — see
+  `docs/VISUAL_FIDELITY_KERR_MAGENTA_BAND.md`.
 - AGN galactic host is static over the short `TIMELINE_PLAYBACK_SECONDS` (Myr physical evolution vs 400-day timeline) — no fake motion.
 - Fallback SwiftShader is **functionally correct but 30× slower** (BH 76s arrival) — harness timeouts raised to 90s/300s; hardware WebGPU is the reference for performance.
 - All new halos/granulation/tracer profiles/grade remain illustrative presentation, not full radiative transfer/MHD/dynamical spacetime.
