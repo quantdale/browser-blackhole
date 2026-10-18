@@ -9,22 +9,24 @@
  * `src/renderer/RenderCoordinator.ts`) MAY keep that import, so the check
  * must not fail *for those files*.
  *
- * Implementation: this is a CLOSURE scan, not a directory scan. Every module
- * under `src/shaders/` is a seed; each seed's relative-import graph is
- * walked. A violation is ANY import of the legacy application state module
- * (`src/app/state.ts`) made by a non-exempt module reachable from the seed
- * set. Walking stops at the exempt legacy-shell files: their own `app/state`
- * imports are the sanctioned legacy behavior and their graphs stay outside
- * the product shader boundary. A spec string that references `app/state` but
- * does not resolve is also a violation (an unresolved import is broken code,
- * never harmless).
+ * Implementation: a CLOSURE scan. A "shader module" is (a) every module
+ * under `src/shaders/` plus (b) every module under `src/` that imports TSL
+ * from `three/webgpu` — the semantic marker of GPU shader construction, so a
+ * GPU module outside `src/shaders/` (e.g. `phenomena/black-hole/lut/lensingGpu.ts`)
+ * is covered too. Each seed's relative-import graph is walked. A violation is
+ * ANY import of the legacy application state module (`src/app/state.ts`) made
+ * by a non-exempt module reachable from the seed set. Walking stops at the
+ * exempt legacy-shell files: their own `app/state` imports are the sanctioned
+ * legacy behavior and their graphs stay outside the product shader boundary.
+ * A spec string that references `app/state` but does not resolve is also a
+ * violation (an unresolved import is broken code, never harmless).
  *
  * Usage: node scripts/check-shared-shader-boundary.mjs [<srcRoot>]
  * (default: `src`; `<srcRoot>` must contain `shaders/`)
  */
 
 import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, normalize, relative } from 'node:path';
+import { dirname, join, normalize, relative, sep } from 'node:path';
 
 const srcRoot = normalize(process.argv[2] === undefined ? 'src' : process.argv[2]);
 
@@ -48,7 +50,6 @@ if (statTry === null || !statTry.isDirectory()) {
   console.error(`check-shared-shader-boundary: cannot read shader seed directory ${shadersDir}`);
   process.exit(2);
 }
-const seeds = listTypeScript(shadersDir, []);
 
 /** Legacy-shell files are exempt: they ARE the sanctioned legacy diagnostic app. */
 const EXEMPT = new Set(
@@ -56,6 +57,15 @@ const EXEMPT = new Set(
     normalize(join(srcRoot, p))
   )
 );
+
+const seeds = listTypeScript(srcRoot, []).filter((file) => {
+  if (EXEMPT.has(file)) return false;
+  // (a) the shader directory is always a seed set;
+  if (file.startsWith(`${shadersDir}${sep}`)) return true;
+  // (b) any module constructing TSL shaders is a shader module regardless of
+  // directory, so GPU modules outside src/shaders/ are covered too.
+  return /from\s+['"]three\/webgpu['"]/.test(readFileSync(file, 'utf8'));
+});
 
 /** The legacy application state module, in every text file form it may take. */
 const STATE_FILES = new Set(
@@ -123,9 +133,9 @@ while (queue.length > 0) {
 }
 
 console.log(
-  `check-shared-shader-boundary: scanned ${walked.size} module(s) in the ${shadersDir} import ` +
-    `closure (${seeds.length} seed(s)) for legacy-app/state imports ` +
-    `(${EXEMPT.size} legacy-shell file(s) exempt)`
+  `check-shared-shader-boundary: scanned ${walked.size} module(s) in the shader import closure ` +
+    `(${seeds.length} seed(s): ${shadersDir} + three/webgpu importers) ` +
+    `for legacy-app/state imports (${EXEMPT.size} legacy-shell file(s) exempt)`
 );
 
 if (violations.length > 0) {

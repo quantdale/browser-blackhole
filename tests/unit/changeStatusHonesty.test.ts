@@ -21,13 +21,14 @@
  * Each assertion gets its own fixture root so scenarios never share state.
  */
 
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'vitest';
+
+import { createTempRootTracker, runScript } from './support/scriptFixtures.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SCRIPT = join(REPO_ROOT, 'scripts', 'check-change-status-honesty.mjs');
@@ -37,12 +38,16 @@ interface FixtureOptions {
   readonly tasks: string;
 }
 
+const tempRoots = createTempRootTracker();
+afterAll(() => tempRoots.cleanup());
+
 /** One self-contained scenario: a tmp root holding exactly one change. */
 function scenario(
   changeName: string,
   opts: FixtureOptions
 ): { run: () => { out: string; code: number } } {
   const root = mkdtempSync(join(tmpdir(), 'change-status-honesty-'));
+  tempRoots.track(root);
   const dir = join(root, changeName);
   mkdirSync(dir, { recursive: true });
   writeFileSync(
@@ -50,34 +55,8 @@ function scenario(
     (opts.banner === undefined ? '' : `${opts.banner}\n\n`) + '# Proposal\n\n## Why\n\nBody.\n'
   );
   writeFileSync(join(dir, 'tasks.md'), `# Tasks\n\n${opts.tasks}\n`);
-  const run = (): { out: string; code: number } => {
-    try {
-      const out = execFileSync(process.execPath, [SCRIPT, root], {
-        encoding: 'utf8',
-        stdio: 'pipe'
-      });
-      return { out, code: 0 };
-    } catch (error) {
-      const e = error as { stdout?: string; stderr?: string; status?: number };
-      return {
-        out: `${e.stdout ?? ''}\n${e.stderr ?? ''}`,
-        code: e.status ?? 1
-      };
-    }
-  };
-  const tracked = root;
-  rmAfterAll(tracked);
-  return { run };
+  return { run: () => runScript(SCRIPT, [root]) };
 }
-
-/** Collect roots so vitest's afterAll (hoisted at module level) can sweep. */
-const pending: string[] = [];
-function rmAfterAll(root: string): void {
-  pending.push(root);
-}
-afterAll(() => {
-  for (const root of pending) rmSync(root, { recursive: true, force: true });
-});
 
 describe('check-change-status-honesty (task 2)', () => {
   it('FAILS when a zero-completed change claims implementation is complete (2.2)', () => {

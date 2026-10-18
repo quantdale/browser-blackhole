@@ -32,6 +32,17 @@ import { join } from 'node:path';
 const DEFAULT_ROOT = 'openspec/changes';
 const root = process.argv[2] === undefined ? DEFAULT_ROOT : process.argv[2];
 
+let rootStat = null;
+try {
+  rootStat = statSync(root);
+} catch {
+  rootStat = null;
+}
+if (rootStat === null || !rootStat.isDirectory()) {
+  console.error(`check-change-status-honesty: changes root '${root}' is not a directory`);
+  process.exit(2);
+}
+
 /** Checkbox counts from tasks.md, deliberately skipping fenced code blocks. */
 function countCheckboxes(tasksPath) {
   let total = 0;
@@ -135,12 +146,6 @@ for (const { name, dir } of active) {
       continue;
     }
     rows.push(`${name}  ${completed}/${total}  header=none  derived=${word}  ok`);
-    continue;
-  }
-  if (claim === null) {
-    rows.push(
-      `${name}  ${completed}/${total}  header=none  derived=${statusWord(completed, total)}  ok`
-    );
     continue;
   }
   const claimed = `${claim.file}: ${claim.claim} (${claim.line.trim()})`;

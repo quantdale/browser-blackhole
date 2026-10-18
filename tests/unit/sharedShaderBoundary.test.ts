@@ -15,13 +15,14 @@
  *  - the real repository tree is clean (5 shader seeds, no app/state import).
  */
 
-import { execFileSync } from 'node:child_process';
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, describe, expect, it } from 'vitest';
+
+import { createTempRootTracker, runScript } from './support/scriptFixtures.js';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
 const SCRIPT = join(REPO_ROOT, 'scripts', 'check-shared-shader-boundary.mjs');
@@ -32,8 +33,12 @@ interface TreeSpec {
   readonly app?: Record<string, string>;
 }
 
+const tempRoots = createTempRootTracker();
+afterAll(() => tempRoots.cleanup());
+
 function buildTree(spec: TreeSpec): string {
   const root = mkdtempSync(join(tmpdir(), 'shader-boundary-'));
+  tempRoots.track(root);
   const src = join(root, 'src');
   for (const [rel, body] of Object.entries(spec.shaders)) {
     mkdirSync(join(src, 'shaders', rel, '..'), { recursive: true });
@@ -47,30 +52,11 @@ function buildTree(spec: TreeSpec): string {
     mkdirSync(join(src, 'app', rel, '..'), { recursive: true });
     writeFileSync(join(src, 'app', rel), body);
   }
-  const pending = root;
-  rmAfterAll(pending);
   return join(src);
 }
 
-const pending: string[] = [];
-function rmAfterAll(root: string): void {
-  pending.push(root);
-}
-afterAll(() => {
-  for (const root of pending) rmSync(root, { recursive: true, force: true });
-});
-
 function run(srcRoot: string): { out: string; code: number } {
-  try {
-    const out = execFileSync(process.execPath, [SCRIPT, srcRoot], {
-      encoding: 'utf8',
-      stdio: 'pipe'
-    });
-    return { out, code: 0 };
-  } catch (error) {
-    const e = error as { stdout?: string; stderr?: string; status?: number };
-    return { out: `${e.stdout ?? ''}\n${e.stderr ?? ''}`, code: e.status ?? 1 };
-  }
+  return runScript(SCRIPT, [srcRoot]);
 }
 
 describe('check-shared-shader-boundary (task 1.3 + review re-check)', () => {
@@ -123,10 +109,36 @@ describe('check-shared-shader-boundary (task 1.3 + review re-check)', () => {
     expect(out).toMatch(/ok \(no module in the shader import graph imports app\/state\)/);
   });
 
-  it('passes on the real repository tree', () => {
+  it('FAILS for a GPU module OUTSIDE src/shaders that imports legacy state (review re-check)', () => {
+    const src = buildTree({
+      shaders: {
+        'pass.ts': 'export const x = 1;\n'
+      },
+      renderer: {
+        'shared/lensingGpu.ts':
+          "import { ShaderNode } from 'three/webgpu';\n" +
+          "import type { DebugViewMode } from '../../app/state.js';\n" +
+          'export type L = DebugViewMode | ShaderNode;\n'
+      },
+      app: { 'state.ts': "export type DebugViewMode = 'off';\n" }
+    });
+    const { out, code } = run(src);
+    expect(code, out).toBe(1);
+    expect(out).toMatch(/lensingGpu\.ts:2/);
+    expect(out).toMatch(/legacy application state module/);
+  });
+
+  it('passes on the real repository tree with a non-vacuous seed floor', () => {
     const { out, code } = run(join(REPO_ROOT, 'src'));
     expect(code, out).toBe(0);
-    expect(out).toMatch(/scanned \d+ module\(s\)/);
+    const scanned = /scanned (\d+) module\(s\)/.exec(out);
+    const seeds = /\((\d+) seed\(s\)/.exec(out);
+    expect(scanned, out).not.toBeNull();
+    expect(seeds, out).not.toBeNull();
+    // Non-vacuity: the suite must keep covering the 5 shader-dir modules plus
+    // the three/webgpu (TSL) modules outside it; an emptied seed set must fail.
+    expect(Number(seeds![1]), out).toBeGreaterThanOrEqual(5);
+    expect(Number(scanned![1]), out).toBeGreaterThanOrEqual(Number(seeds![1]));
     expect(out).toMatch(/2 legacy-shell file\(s\) exempt/);
   });
 });
