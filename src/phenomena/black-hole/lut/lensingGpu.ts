@@ -311,7 +311,10 @@ export function createLutLensingMaterial(
     seed: 0x9e3779b9
   };
   validateDiskModelParams(diskModel);
-  const diskEmission = makeDiskEmissionNode(diskModel);
+  const uDiskAtmosphere = uniform(0);
+  const diskEmission = makeDiskEmissionNode(diskModel, {
+    atmosphereScale: uDiskAtmosphere
+  });
 
   const trajSampler = texture(params.trajectoryTexture);
   const auxSampler = texture(params.auxTexture);
@@ -660,10 +663,16 @@ export function createLutLensingMaterial(
               float(1).div(ut.mul(dopplerDenomSafe)),
               float(0)
             ).mul(energyMultiplier);
+            // Planar-ray tilt: |n · orbital plane| is the LUT presentation
+            // proxy for how vertically the tabulated ray crosses the disk.
+            // The LUT does not store a local 3D chord. Scientific scale 0
+            // ignores this factor.
+            const planeTilt = sqrt(e0.y.mul(e0.y).add(e1.y.mul(e1.y)));
             const emitted = diskEmission.emit({
               r: bestR,
               gFactor,
-              phi: bestPhi
+              phi: bestPhi,
+              verticalCosine: clamp(planeTilt, 0, 1)
             }) as Vec3Node;
             lutRadiance.addAssign(emitted);
             prevBest.assign(bestS);
@@ -797,10 +806,13 @@ export function createLutLensingMaterial(
                             float(1).div(ut.mul(dopplerDenomSafe)),
                             float(0)
                           ).mul(energyMultiplier);
+                          const chord = segEnd.sub(segStart);
+                          const absNy = chord.y.abs().div(max(length(chord), float(1e-4)));
                           const emitted = diskEmission.emit({
                             r: rHit,
                             gFactor,
-                            phi: phiHit
+                            phi: phiHit,
+                            verticalCosine: absNy
                           }) as Vec3Node;
                           numRadiance.addAssign(emitted);
                         }
@@ -990,6 +1002,8 @@ export function createLutLensingMaterial(
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const atmosphere = readFiniteNumber(state['diskAtmosphereScale']);
+      if (atmosphere !== null) uDiskAtmosphere.value = Math.min(1, Math.max(0, atmosphere));
       const environmentDetail = readFiniteNumber(state['environmentDetail']);
       if (environmentDetail !== null && environmentDetail >= 0) {
         uEnvironmentDetail.value = Math.min(1, environmentDetail);

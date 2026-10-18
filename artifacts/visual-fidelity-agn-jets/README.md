@@ -7,6 +7,7 @@ Same host for the before/after preset frames: Edge, WebGPU `nvidia lovelace`,
 
 - `before-galactic-cinematic.png` / `after-galactic-cinematic.png` — radio-galaxy preset. The cylinder spike becomes a bipolar glow. Filaments do not read at this framing.
 - `before-nuclear-cinematic.png` / `after-nuclear-cinematic.png` — nuclear preset. Difference is sub-pixel; the jet base is unresolved inside the funnel.
-- `closeup-side-140.png`, `closeup-orbit.png`, `closeup-closer-70.png` — galactic zone, user orbit, distances 140 and 70. Soft sheath, kinked receding lobe, faint tendrils. Not a cylinder and not the rejected DNA helix.
+- `closeup-side-140.png`, `closeup-orbit.png`, `closeup-closer-70.png` — galactic zone, user orbit, distances 140 and 70. Soft sheath, kinked receding lobe. Jets are not selective-bloom sources. Not a cylinder and not the rejected DNA helix.
+- `before-bh-classic-cinematic.png` / `after-bh-classic-cinematic.png` — cinematic disk atmosphere candidate. Scientific goldens were not regenerated.
 
 Narrative and timings: `docs/VISUAL_FIDELITY_AGN_JETS.md`.

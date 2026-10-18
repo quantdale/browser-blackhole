@@ -117,8 +117,8 @@ export const JET_KINK_SECOND_AMPLITUDE = 0.055;
 /** Second filament weight relative to the primary spine Gaussian. */
 export const JET_FILAMENT_WEIGHT = 0.4;
 
-export const JET_SPINE_RADIANCE = 1.7;
-export const JET_SHEATH_RADIANCE = 0.75;
+export const JET_SPINE_RADIANCE = 0.85;
+export const JET_SHEATH_RADIANCE = 0.55;
 
 const JET_MARCH_STEPS: Readonly<
   Record<QualityTier, Readonly<Record<'base' | 'extended', number>>>

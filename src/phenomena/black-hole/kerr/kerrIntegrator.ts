@@ -403,8 +403,10 @@ export function createKerrLensingMaterial(
   // Bind the emission graph's inner edge to the LIVE uniform holder so both
   // the annulus gate and the Shakura-Sunyaev profile follow ISCO(spin)
   // every frame without recompiles (docs/KERR_BACKEND_ADR.md §1.16).
+  const uDiskAtmosphere = uniform(0);
   const diskEmission = makeDiskEmissionNode(diskModel, {
-    innerRadiusRgLive: uniforms.diskInnerRg
+    innerRadiusRgLive: uniforms.diskInnerRg,
+    atmosphereScale: uDiskAtmosphere
   });
 
   // --- Fullscreen-triangle vertex stage ---
@@ -921,10 +923,14 @@ export function createKerrLensingMaterial(
                 ).mul(gObserverMultiplier);
                 // emit() applies the g^3 Liouville transform INTERNALLY (its
                 // contract) — pass RAW g, never re-multiply (NM §17).
+                const segStart = embedWorldFn(prevR, prevTh, prevPh);
+                const chord = segEnd.sub(segStart);
+                const absNy = chord.y.abs().div(max(length(chord), float(1e-4)));
                 const emitted = diskEmission.emit({
                   r: rHit,
                   gFactor,
-                  phi: phHit
+                  phi: phHit,
+                  verticalCosine: absNy
                 }) as Vec3Node;
                 radiance.addAssign(emitted);
               }
@@ -1168,6 +1174,8 @@ export function createKerrLensingMaterial(
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const atmosphere = readFiniteNumber(state['diskAtmosphereScale']);
+      if (atmosphere !== null) uDiskAtmosphere.value = Math.min(1, Math.max(0, atmosphere));
       const environmentDetail = readFiniteNumber(state['environmentDetail']);
       if (environmentDetail !== null && environmentDetail >= 0) {
         uEnvironmentDetail.value = Math.min(1, environmentDetail);

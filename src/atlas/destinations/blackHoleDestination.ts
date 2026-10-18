@@ -62,9 +62,11 @@ import type { TimelikeWorldline } from '../../phenomena/black-hole/observer/worl
 import { kerrIscoRadius } from '../../phenomena/black-hole/kerr/characteristics.js';
 import { blackHoleDescriptor } from './blackHoleDescriptor.js';
 import type { ILensingService, KerrLensingParams } from '../types.js';
+import { DISK_ATMOSPHERE_DISCLOSURE } from '../../phenomena/black-hole/accretionDisk.js';
 import type {
   EnterContext,
   ExitContext,
+  ExperienceMode,
   FrameContext,
   PhenomenonModule,
   PrepareContext,
@@ -148,6 +150,8 @@ export class BlackHoleModule implements PhenomenonModule {
   /** Canonical control record (the ONLY authority is the normalizer). */
   private controls: BlackHoleControlState = { ...DEFAULT_BLACK_HOLE_CONTROLS };
   private lastQualityTier: FrameContext['quality'] = 'medium';
+  /** Presentation only. Scientific keeps the disk atmosphere scale at 0. */
+  private experienceMode: ExperienceMode = 'scientific';
   private disposed = false;
   private activePassKind: PassKind | null = null;
 
@@ -518,6 +522,7 @@ export class BlackHoleModule implements PhenomenonModule {
    */
   update(ctx: FrameContext): void {
     this.lastQualityTier = ctx.quality;
+    this.experienceMode = ctx.experienceMode ?? 'scientific';
     // M8-09: canonical Schwarzschild trajectory preference rides FrameContext.
     this.frameTrajectoryBackend = ctx.trajectoryBackend;
     if (!this.disposed && !ctx.services.time.snapshot().paused) {
@@ -619,6 +624,7 @@ export class BlackHoleModule implements PhenomenonModule {
           ...observerPayload.stateKeys
         };
         lensingState['temporalJitterNdc'] = ctx.temporalJitterNdc ?? [0, 0];
+        lensingState['diskAtmosphereScale'] = this.experienceMode === 'cinematic' ? 1 : 0;
         const obsMode = this.controls.observer.mode;
         const movingMode = obsMode === 'circular' || obsMode === 'flyby' || obsMode === 'freefall';
         if (
@@ -712,6 +718,8 @@ export class BlackHoleModule implements PhenomenonModule {
     const spin = effectiveSpin(this.controls);
     return {
       pattern,
+      diskAtmosphereScale: this.experienceMode === 'cinematic' ? 1 : 0,
+      diskAtmosphere: DISK_ATMOSPHERE_DISCLOSURE,
       lensingWired: wired,
       // Metric/control truth (M9):
       metric: this.controls.metric,

@@ -954,6 +954,19 @@ export class QuasarAgnModule implements PhenomenonModule {
       const proxy = volume.object3d();
       proxy.name = `agn-jet-${kind}-${side}-volume`;
       proxy.renderOrder = 14;
+      // The march is already HDR in the scene. Selective bloom on this
+      // material clips the spine to white and hides the sheath. Corona and
+      // torus keep their emissive tags; the jet does not borrow bloom as
+      // structure.
+      if ('material' in proxy) {
+        const material = proxy.material;
+        const jetMaterials = Array.isArray(material) ? material : [material];
+        for (const entry of jetMaterials) {
+          if (entry !== null && typeof entry === 'object' && 'userData' in entry) {
+            entry.userData['cinematicEmissive'] = false;
+          }
+        }
+      }
       group.add(proxy);
       trackVolume(this.prepareCtx, volume);
       this.jetVolumes.push({ zone, kind, side, handle: volume });

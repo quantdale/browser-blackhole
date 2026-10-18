@@ -45,6 +45,9 @@
  *   tradition of Bartlett/Helland-style log-temperature fits). It is NOT a
  *   Planck spectrum solver and not colorimetry; plausible ~1000..40000 K.
  * - Turbulence is seeded procedural value noise modulating radiance only.
+ * - Optional cinematic finite-thickness is a path-length factor on the
+ *   already g^3-scaled radiance. It does not recompute g and is off unless
+ *   the caller supplies a live atmosphere-scale node.
  */
 
 import {
@@ -488,6 +491,31 @@ type UintNode = Node<'uint'>;
  * the dimensionless g of {@link diskRedshiftFactor}. Returns a linear-HDR
  * vec3 node.
  */
+/** Floor on |n·chord| so a grazing ray cannot make the atmosphere unbounded. */
+export const DISK_ATMOSPHERE_MU_FLOOR = 0.12;
+/** How strongly a longer vertical path brightens the existing disk radiance. */
+export const DISK_ATMOSPHERE_PATH_GAIN = 0.28;
+/** Cap on the added path factor, so the limb cannot become a second light source. */
+export const DISK_ATMOSPHERE_EXTRA_MAX = 1.6;
+
+export const DISK_ATMOSPHERE_DISCLOSURE =
+  'Cinematic-only finite-thickness factor on the existing g^3 disk radiance. ' +
+  'The path-length proxy is 1/max(|n·chord|, 0.12), capped. It does not ' +
+  'recompute redshift, does not move the geodesic hit, and is off in Scientific mode.';
+
+/**
+ * Presentation path-length factor. Scale 0 (Scientific) returns exactly 1.
+ * Face-on crossings (|n·dir| ~ 1) add nothing. Grazing crossings brighten
+ * the already-computed disk color, which is what a thin atmosphere does
+ * without a second redshift.
+ */
+export function diskAtmosphereFactor(absVerticalCosine: number, scale: number): number {
+  if (!(scale > 0)) return 1;
+  const mu = Math.min(1, Math.max(DISK_ATMOSPHERE_MU_FLOOR, absVerticalCosine));
+  const extra = Math.min(DISK_ATMOSPHERE_EXTRA_MAX, (1 / mu - 1) * DISK_ATMOSPHERE_PATH_GAIN);
+  return 1 + scale * extra;
+}
+
 export function makeDiskEmissionNode(
   p: DiskModelParams,
   opts?: {
@@ -496,9 +524,19 @@ export function makeDiskEmissionNode(
      * frame. Must stay > 1 r_g; callers clamp before writing.
      */
     innerRadiusRgLive?: { value: number };
+    /**
+     * Live cinematic scale. Omit it and the graph is the pre-atmosphere
+     * emission node, so callers that do not opt in cannot drift.
+     */
+    atmosphereScale?: Node<'float'>;
   }
 ): {
-  emit: (inputs: { r: unknown; gFactor: unknown; phi: unknown }) => unknown;
+  emit: (inputs: {
+    r: unknown;
+    gFactor: unknown;
+    phi: unknown;
+    verticalCosine?: unknown;
+  }) => unknown;
 } {
   validateDiskModelParams(p);
 
@@ -511,6 +549,8 @@ export function makeDiskEmissionNode(
   const turbAmp = p.turbulence;
   const seed = p.seed >>> 0;
   const rInLive = opts?.innerRadiusRgLive;
+  // SAFETY: uniform() returns a UniformNode that the graph uses as a float
+  // node. The holder is the documented { value: number } live-edge contract.
   const rEdgeNode: FloatNode =
     rInLive !== undefined ? (uniform(rInLive.value) as unknown as FloatNode) : float(rIn);
   const rOutNode = float(rOut);
@@ -628,65 +668,78 @@ export function makeDiskEmissionNode(
     return vec3(mul(r, invLum), mul(g, invLum), mul(b, invLum));
   };
 
-  const emitFn = Fn(([rInNode, gInNode, phiInNode]: [unknown, unknown, unknown]): Vec3Node => {
-    // Boundary cast: the integrator supplies float-valued nodes; Node<'float'>
-    // satisfies the TSL float() conversion's ScalarNode parameter.
-    const r = float(rInNode as Node<'float'>);
-    const g = float(gInNode as Node<'float'>);
-    const phi = float(phiInNode as Node<'float'>);
+  const emitFn = Fn(
+    ([rInNode, gInNode, phiInNode, muInNode]: [unknown, unknown, unknown, unknown]): Vec3Node => {
+      // Boundary cast: the integrator supplies float-valued nodes; Node<'float'>
+      // satisfies the TSL float() conversion's ScalarNode parameter.
+      const r = float(rInNode as Node<'float'>);
+      const g = float(gInNode as Node<'float'>);
+      const phi = float(phiInNode as Node<'float'>);
 
-    // --- Edge windows (mirror diskEmissivity) -----------------------------
-    const fade = spanNode.mul(0.05);
-    const innerWindow = smoothstep(rEdgeNode, rEdgeNode.add(fade), r);
-    const outerWindow = oneMinus(smoothstep(rOutNode.sub(fade), rOutNode, r));
+      // --- Edge windows (mirror diskEmissivity) -----------------------------
+      const fade = spanNode.mul(0.05);
+      const innerWindow = smoothstep(rEdgeNode, rEdgeNode.add(fade), r);
+      const outerWindow = oneMinus(smoothstep(rOutNode.sub(fade), rOutNode, r));
 
-    // --- Emissivity core: (r/rIn)^(-emIdx), domain-clamped ----------------
-    const x = div(max(r, rEdgeNode), rEdgeNode);
-    const core = pow(x, float(-emIdx));
-    const eps = mul(mul(core, innerWindow), outerWindow);
+      // --- Emissivity core: (r/rIn)^(-emIdx), domain-clamped ----------------
+      const x = div(max(r, rEdgeNode), rEdgeNode);
+      const core = pow(x, float(-emIdx));
+      const eps = mul(mul(core, innerWindow), outerWindow);
 
-    // --- Shakura-Sunyaev temperature (mirror diskTemperature) -------------
-    const active = select(r.greaterThan(rEdgeNode), float(1), float(0));
-    const boundaryTerm = pow(max(oneMinus(pow(x, float(-0.5))), float(0)), float(0.25));
-    const temperature = mul(active, mul(pow(x, float(-0.75)), boundaryTerm).mul(tScale));
+      // --- Shakura-Sunyaev temperature (mirror diskTemperature) -------------
+      const active = select(r.greaterThan(rEdgeNode), float(1), float(0));
+      const boundaryTerm = pow(max(oneMinus(pow(x, float(-0.5))), float(0)), float(0.25));
+      const temperature = mul(active, mul(pow(x, float(-0.75)), boundaryTerm).mul(tScale));
 
-    // --- Beaming: specific-intensity transform g^3 (docs §17) -------------
-    const beamable = select(g.greaterThan(0), float(1), float(0));
-    const beaming = mul(pow(max(g, float(0)), float(3)), beamable);
+      // --- Beaming: specific-intensity transform g^3 (docs §17) -------------
+      const beamable = select(g.greaterThan(0), float(1), float(0));
+      const beaming = mul(pow(max(g, float(0)), float(3)), beamable);
 
-    // --- Observed-color ramp at T_obs = g * T(r) --------------------------
-    const tObs = mul(g, temperature);
-    const tClamped = clampNode(tObs, 1000, 40000);
-    const chroma = blackbodyChromaNode(tClamped);
-    // Relative bolometric energy (T/6500)^4 with an overflow-guarded
-    // exponent (mirrors the +/-50 clamp in blackbodyRgb).
-    const energyExponent = clampNode(
-      mul(
-        float(4),
-        sub(log(max(div(tClamped, BLACKBODY_T_REF), float(1e-30))), log(float(BLACKBODY_T_REF)))
-      ),
-      -BLACKBODY_MAX_EXPONENT,
-      BLACKBODY_MAX_EXPONENT
-    );
-    const energy = exp(energyExponent);
+      // --- Observed-color ramp at T_obs = g * T(r) --------------------------
+      const tObs = mul(g, temperature);
+      const tClamped = clampNode(tObs, 1000, 40000);
+      const chroma = blackbodyChromaNode(tClamped);
+      // Relative bolometric energy (T/6500)^4 with an overflow-guarded
+      // exponent (mirrors the +/-50 clamp in blackbodyRgb).
+      const energyExponent = clampNode(
+        mul(
+          float(4),
+          sub(log(max(div(tClamped, BLACKBODY_T_REF), float(1e-30))), log(float(BLACKBODY_T_REF)))
+        ),
+        -BLACKBODY_MAX_EXPONENT,
+        BLACKBODY_MAX_EXPONENT
+      );
+      const energy = exp(energyExponent);
 
-    // --- Assemble: chroma * eps * beaming * energy ------------------------
-    const shaded = mul(chroma, mul(mul(eps, beaming), energy));
+      // --- Assemble: chroma * eps * beaming * energy ------------------------
+      const shaded = mul(chroma, mul(mul(eps, beaming), energy));
 
-    // --- Seeded turbulence: centered noise added pre-gain -----------------
-    const noise = turbulenceNoise(phi, r);
-    const fluctuation = mul(noise, 2).sub(1); // center to [-1, 1]
-    const turbulent = shaded.add(fluctuation.mul(float(turbAmp)));
+      // --- Seeded turbulence: centered noise added pre-gain -----------------
+      const noise = turbulenceNoise(phi, r);
+      const fluctuation = mul(noise, 2).sub(1); // center to [-1, 1]
+      const turbulent = shaded.add(fluctuation.mul(float(turbAmp)));
 
-    // --- Overall gain, then non-finite guard ------------------------------
-    const gained = mul(turbulent, float(dScale));
-    // NaN != NaN under IEEE semantics: equal() is false exactly for NaN.
-    return gained.equal(gained).select(max(gained, vec3(0)), vec3(0));
-  });
+      // --- Overall gain, then non-finite guard ------------------------------
+      const gained = mul(turbulent, float(dScale));
+      // NaN != NaN under IEEE semantics: equal() is false exactly for NaN.
+      const base = gained.equal(gained).select(max(gained, vec3(0)), vec3(0));
+      const atmosphere = opts?.atmosphereScale;
+      if (atmosphere === undefined) return base;
+      // Path-length factor on the already g^3-scaled color. Scale <= 0 selects
+      // `base` so Scientific mode does not apply a second redshift or a new hit.
+      const mu = clampNode(float(muInNode as Node<'float'>).abs(), DISK_ATMOSPHERE_MU_FLOOR, 1);
+      const extra = min(
+        div(float(1), mu).sub(1).mul(DISK_ATMOSPHERE_PATH_GAIN),
+        float(DISK_ATMOSPHERE_EXTRA_MAX)
+      );
+      const thickened = base.mul(float(1).add(atmosphere.mul(extra)));
+      return select(atmosphere.greaterThan(0.001), thickened, base);
+    }
+  );
 
   return {
-    emit: (inputs: { r: unknown; gFactor: unknown; phi: unknown }) =>
-      emitFn(inputs.r, inputs.gFactor, inputs.phi)
+    emit: (inputs: { r: unknown; gFactor: unknown; phi: unknown; verticalCosine?: unknown }) =>
+      emitFn(inputs.r, inputs.gFactor, inputs.phi, inputs.verticalCosine ?? float(1))
   };
 }
 

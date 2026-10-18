@@ -445,7 +445,10 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
     seed: 0x9e3779b9
   };
   validateDiskModelParams(diskModel);
-  const diskEmission = makeDiskEmissionNode(diskModel);
+  const uDiskAtmosphere = uniform(0);
+  const diskEmission = makeDiskEmissionNode(diskModel, {
+    atmosphereScale: uDiskAtmosphere
+  });
 
   // --- Fullscreen-triangle vertex stage (pattern of src/shaders/diagnostic.ts).
   const positionAttr = attribute<'vec3'>('position', 'vec3');
@@ -775,10 +778,13 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
                 ).mul(energyMultiplier);
                 // emit() applies the g^3 Liouville transform INTERNALLY (its
                 // contract) — pass raw g, never re-multiply (NM §17).
+                const chord = segEnd.sub(segStart);
+                const absNy = chord.y.abs().div(max(length(chord), float(1e-4)));
                 const emitted = diskEmission.emit({
                   r: rHit,
                   gFactor,
-                  phi: phiHit
+                  phi: phiHit,
+                  verticalCosine: absNy
                 }) as Vec3Node;
                 // Additive accumulation: higher-order images emerge naturally
                 // because integration continues after every crossing.
@@ -954,6 +960,8 @@ export function createLensingMaterial(params: LensingPassParams): SchwarzschildL
       if (eps !== null && eps >= 0) uCaptureEpsilon.value = eps;
       const bgInt = readFiniteNumber(state['backgroundIntensity']);
       if (bgInt !== null && bgInt >= 0) uBackgroundIntensity.value = bgInt;
+      const atmosphere = readFiniteNumber(state['diskAtmosphereScale']);
+      if (atmosphere !== null) uDiskAtmosphere.value = Math.min(1, Math.max(0, atmosphere));
       const environmentDetail = readFiniteNumber(state['environmentDetail']);
       if (environmentDetail !== null && environmentDetail >= 0) {
         uEnvironmentDetail.value = Math.min(1, environmentDetail);

@@ -16,8 +16,12 @@ Evidence: `docs/VISUAL_FIDELITY_AGN_JETS.md`. Host WebGPU `nvidia lovelace`,
 (scientific 10.25 → 10.41 ms). Resolved galactic close-up 7–12 ms, 2 visible
 volumes. Goldens not regenerated. Full Playwright suite DEFERRED.
 
-Next: keep the approaching spine below bloom clip; then a separately gated
-cinematic-only disk atmosphere that does not touch geodesics or `g^3`.
+Follow-up on the same branch: jet materials are not selective-bloom sources
+(bloom was clipping the spine). Cinematic disk atmosphere is a capped
+path-length factor on the existing `g^3` color (`diskAtmosphereScale` 0 in
+Scientific, 1 in Cinematic). Scientific goldens `BH_CLASSIC`,
+`KERR_ZERO_SPIN`, `KERR_HIGH_PROGRADE`, and `AGN_INNER_ENGINE` passed.
+Cinematic goldens were not regenerated. Full Playwright suite DEFERRED.
 
 ---
 

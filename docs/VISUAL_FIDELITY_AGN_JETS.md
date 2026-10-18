@@ -92,9 +92,27 @@ presentation scale chosen so the march has a resolved transverse extent.
 Spine broadening is a march-resolution floor, disclosed in
 `JET_VOLUME_DISCLOSURE`.
 
-## 7. Next, in order
+## 7. Follow-up landed in the same branch
 
-1. Jet tuning, still on VolumeService: keep the approaching spine below the bloom clip so the sheath tendrils read at the close-up without raising global bloom. Do not put the regular helix back.
-2. Nuclear outer disk is still `RingGeometry`. A later slice can give that annulus a thin vertical emissivity in the same module, without touching the INNER direct pass.
-3. Flagship disk atmosphere, separately gated and cinematic-only. The geodesic hit, redshift, and `g^3` stay authoritative. After the existing hit, a short vertical Gaussian of the already-computed temperature is the safe image-formation change. Scientific mode keeps the uniform at 0. Do not add a second redshift, do not retune physics tolerances, and do not replace the ray tracer with a volume march — the AGN result says VolumeService is for extended optically thin plasma, not for a surface the integrator already finds.
-4. Kerr magenta band stays a numerical item, not a lookdev item.
+Jet materials no longer feed selective bloom. Bloom was clipping the spine
+to white. The scene HDR march remains. Spine radiance was lowered so the
+approaching lobe is not a solid lamp. The receding lobe still shows the kink
+and the soft sheath. Fine filaments on the bright lobe are still smoothed by
+half-resolution reconstruction. That limit is recorded, not hidden by raising
+bloom.
+
+Cinematic disk atmosphere is a path-length factor on the existing `g^3`
+radiance (`diskAtmosphereFactor`). It does not recompute redshift and does
+not move the geodesic hit. `diskAtmosphereScale` is 1 in Cinematic and 0 in
+Scientific. Measured on this host: Scientific BH classic mean abs delta 0.21
+versus the pre-change capture (golden tolerance is 6 / 2%). Playwright
+scientific goldens `BH_CLASSIC`, `KERR_ZERO_SPIN`, `KERR_HIGH_PROGRADE`, and
+`AGN_INNER_ENGINE` passed. Cinematic BH classic differs from the previous
+cinematic capture (mean abs ~8, 4% of pixels beyond 32). Those cinematic
+goldens were not regenerated.
+
+## 8. Still next
+
+1. Nuclear outer disk is still `RingGeometry`.
+2. Kerr magenta band stays a numerical item, not a lookdev item.
+3. Full Playwright suite and cinematic golden review remain DEFERRED.
