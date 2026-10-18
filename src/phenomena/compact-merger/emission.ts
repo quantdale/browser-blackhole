@@ -71,8 +71,10 @@ export function kilonovaTemperatureK(tauSeconds: number): number {
  * 4e4 K ceiling below — call sites must not pass hotter temperatures
  * expecting a distinguishable result (see compactMergerModule STAR_TINT).
  */
+export const KELVIN_LOCUS_MAX_K = 40000;
+
 export function kelvinToLinearRgb(kelvin: number): [number, number, number] {
-  const t = Number.isFinite(kelvin) ? Math.min(40000, Math.max(1000, kelvin)) : 6000;
+  const t = Number.isFinite(kelvin) ? Math.min(KELVIN_LOCUS_MAX_K, Math.max(1000, kelvin)) : 6000;
   const ref = 6600;
   const ratio = ref / t;
   const r = t >= ref ? Math.pow(ratio, 0.28) : 1;

@@ -23,6 +23,7 @@ import { describe, expect, it } from 'vitest';
 
 import { blackbodyRgb } from '../../src/phenomena/black-hole/accretionDisk.js';
 import {
+  KELVIN_LOCUS_MAX_K,
   KILONOVA_T0_K,
   kelvinToLinearRgb as mergerLocusRgb
 } from '../../src/phenomena/compact-merger/emission.js';
@@ -34,8 +35,8 @@ import {
 
 /** Interior sample inside ALL three stated domains. */
 const INTERIOR_K = 6000;
-/** The shared cap of the disk law and the merger-locus law. */
-const DISK_MERGER_CEILING_K = 4e4;
+/** The accretion-disk law's own ceiling (blackbodyRgb's clamp). */
+const ACCRETION_CEILING_K = 4e4;
 
 describe('three temperature color laws (temperature-color-laws)', () => {
   it('names the accretion-disk law and keeps it finite HDR output', () => {
@@ -84,16 +85,16 @@ describe('three temperature color laws (temperature-color-laws)', () => {
 
 describe('capped laws clamp to the domain endpoint color', () => {
   it('accretion-disk law: above 40000 K returns the 40000 K endpoint exactly', () => {
-    const atCeiling = blackbodyRgb(DISK_MERGER_CEILING_K);
-    expect(blackbodyRgb(DISK_MERGER_CEILING_K + 1)).toEqual(atCeiling);
+    const atCeiling = blackbodyRgb(ACCRETION_CEILING_K);
+    expect(blackbodyRgb(ACCRETION_CEILING_K + 1)).toEqual(atCeiling);
     expect(blackbodyRgb(REMNANT_TEMPERATURE_K)).toEqual(atCeiling);
     // Below the floor: same clamp rule, coldest endpoint.
     expect(blackbodyRgb(999)).toEqual(blackbodyRgb(1000));
   });
 
   it('compact-merger locus: above 40000 K returns the 40000 K endpoint exactly', () => {
-    const atCeiling = mergerLocusRgb(DISK_MERGER_CEILING_K);
-    expect(mergerLocusRgb(DISK_MERGER_CEILING_K + 1)).toEqual(atCeiling);
+    const atCeiling = mergerLocusRgb(KELVIN_LOCUS_MAX_K);
+    expect(mergerLocusRgb(KELVIN_LOCUS_MAX_K + 1)).toEqual(atCeiling);
     expect(mergerLocusRgb(REMNANT_TEMPERATURE_K)).toEqual(atCeiling);
     expect(mergerLocusRgb(999)).toEqual(mergerLocusRgb(1000));
   });
@@ -117,7 +118,7 @@ describe('capped laws clamp to the domain endpoint color', () => {
     // else. The kilonova film peaks at KILONOVA_T0_K (in-domain) and the
     // star tint sits AT the ceiling by design — both covered by the
     // endpoint-equality rows above.
-    expect(mergerLocusRgb(REMNANT_TEMPERATURE_K)).toEqual(mergerLocusRgb(DISK_MERGER_CEILING_K));
+    expect(mergerLocusRgb(REMNANT_TEMPERATURE_K)).toEqual(mergerLocusRgb(KELVIN_LOCUS_MAX_K));
     const filmPeak = mergerLocusRgb(KILONOVA_T0_K);
     for (const channel of filmPeak) expect(Number.isFinite(channel)).toBe(true);
   });

@@ -14,3 +14,8 @@
 
 - [x] 3.1 Run the new unit test. — `npx vitest run tests/unit/temperatureColorLaws.test.ts`: **8/8 passed** (0.43s); `tsc --noEmit` clean (one test-file tuple-indexing fix along the way).
 - [x] 3.2 Run `openspec validate --change temperature-color-law-contract --strict`. — `openspec validate temperature-color-law-contract --type change --strict`: **valid**.
+
+## 4. Review follow-up (standards re-check)
+
+- [x] 4.1 The ceiling was expressed three times (4e4 literal at the call site, the clamp literal in the law, and a test-local constant) — a Primitive Obsession / duplicated-magic-number smell the review flagged. Export the law's ceiling as `KELVIN_LOCUS_MAX_K` from `compact-merger/emission.ts` and use it at the clamp, the `HOT_TINT` call site, and the test. — done; output values unchanged (same 40000 endpoint), `STAR_TINT` untouched, the accretion-disk law keeps its own `ACCRETION_CEILING_K` test constant because it is a different function's clamp.
+- [x] 4.2 Re-run the law tests and the gate. — `npx vitest run tests/unit/temperatureColorLaws.test.ts`: **8/8 passed**; `npx tsc --noEmit`: clean; `openspec validate temperature-color-law-contract --type change --strict`: **valid**.
