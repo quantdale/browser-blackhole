@@ -23,12 +23,15 @@
  * - Camera DISTANCE follows zoom01 through agnCameraDistance ONLY when the
  *   zoom input or zone changes; azimuth/polar stay user-owned.
  *
- * Jet note (disclosed): jets are dedicated additive cone meshes with
- * PER-LOBE live gain uniforms because the blazar approximation needs a
- * CONTINUOUS approaching/receding brightness ratio tied to observer angle.
- * Shared services where they fit: corona/torus volumes (VolumeService),
- * host stars + jet knots (ParticleService; knot population scale IS the
- * catalog's jet-tracer-density control).
+ * Jet note (disclosed): jets are VolumeService V2 emission-absorption
+ * marches (spine + illustrative cocoon), one volume per lobe, parented to
+ * the owning zone group so a hidden zone does not march. PER-LOBE live gain
+ * uniforms still carry the blazar approaching/receding ratio. Nuclear
+ * emission is multiplied by the continuum surrogate at
+ * t - outward/c; the galactic extension is not given a fake delay pattern.
+ * Shared services: corona/torus/jet volumes (VolumeService), host stars +
+ * jet knots (ParticleService; knot population scale IS the catalog's
+ * jet-tracer-density control).
  *
  * Normalized geometry: all content dimensions are constants IN r_g, so the
  * scene layout is mass-independent; `blackHoleMassSolar` drives physical
@@ -44,7 +47,7 @@ import {
   Scene,
   SphereGeometry
 } from 'three/webgpu';
-import { CylinderGeometry, RingGeometry } from 'three/webgpu';
+import { RingGeometry } from 'three/webgpu';
 import {
   atan,
   clamp,
@@ -68,8 +71,6 @@ import {
   CORONA_RADIUS_RG,
   DEFAULT_QUASAR_AGN_STATE,
   HOST_DISK_RADIUS_RG,
-  JET_BASE_HALF_WIDTH_RG,
-  JET_BASE_LENGTH_RG,
   JET_EXTENDED_HALF_WIDTH_RG,
   JET_EXTENDED_LENGTH_RG,
   OUTER_DISK_INNER_RG,
@@ -105,6 +106,12 @@ import {
   variabilityFactor,
   type VariabilityComponent
 } from './variability.js';
+import {
+  JET_VOLUME_DISCLOSURE,
+  agnJetVolumeLayout,
+  createAgnJetVolumeCallbacks,
+  type AgnJetVolumeLayout
+} from './jetVolumeField.js';
 import { lensingCameraUniformState } from '../../renderer/shared/LensingService.js';
 import {
   CINEMATIC_DETAIL_BY_TIER,
@@ -212,30 +219,6 @@ function continuumNode(
   return max(float(1).add(sum), float(0.05));
 }
 
-/** Additive unlit material bound to a LIVE per-lobe gain uniform. */
-function jetMaterial(
-  color: [number, number, number],
-  alphaNode: Node<'float'>,
-  gainUniform: Node<'float'>,
-  patternNode: Node<'float'> | null
-): MeshBasicNodeMaterial {
-  const material = new MeshBasicNodeMaterial();
-  material.transparent = true;
-  material.blending = AdditiveBlending;
-  material.depthWrite = false;
-  material.side = DoubleSide;
-  const c = vec3(color[0], color[1], color[2]);
-  const gain = patternNode === null ? gainUniform : gainUniform.mul(patternNode);
-  material.colorNode = vec4(c.mul(gain), max(alphaNode.mul(gain), float(0)));
-  return material;
-}
-
-/** Axial fade along a jet of the given scene-unit height. */
-function axialFade(heightUnits: number, startFrac: number, endFrac: number): Node<'float'> {
-  const t = positionLocal.y.div(float(heightUnits)).clamp(0, 1);
-  return smoothstep(float(startFrac), float(endFrac), t).oneMinus().max(float(0.05));
-}
-
 function trackMesh(ctx: PrepareContext, mesh: Mesh, bytesGeo: number, bytesMat: number): void {
   ctx.scope.track('geometry', mesh.geometry, () => mesh.geometry.dispose(), bytesGeo);
   // `Mesh`'s material generic widens to `Material | Material[]`; narrow with
@@ -279,6 +262,12 @@ export class QuasarAgnModule implements PhenomenonModule {
 
   private coronaVolume: VolumeHandle | null = null;
   private torusVolume: VolumeHandle | null = null;
+  private jetVolumes: Array<{
+    zone: AgnZoneId;
+    kind: AgnJetVolumeLayout['kind'];
+    side: AgnJetVolumeLayout['side'];
+    handle: VolumeHandle;
+  }> = [];
   private hostParticles: ParticleSystemHandle | null = null;
   private knotParticles: ParticleSystemHandle | null = null;
   private backdrop: CinematicBackdropHandle | null = null;
@@ -786,6 +775,7 @@ export class QuasarAgnModule implements PhenomenonModule {
     this.lensing = null;
     this.coronaVolume = null;
     this.torusVolume = null;
+    this.jetVolumes = [];
     this.hostParticles = null;
     this.knotParticles = null;
     this.backdrop = null;
@@ -849,17 +839,26 @@ export class QuasarAgnModule implements PhenomenonModule {
         largeScale: 'PROCEDURAL_SCIENTIFIC illustrative morphologies',
         blazar: 'orientation-driven beaming-ratio approximation (fixed Gamma)',
         variability: VARIABILITY_DISCLOSURE,
-        torus: 'PROCEDURAL_SCIENTIFIC clumpy dust distribution (Nenkova et al. 2008 picture)'
+        torus: 'PROCEDURAL_SCIENTIFIC clumpy dust distribution (Nenkova et al. 2008 picture)',
+        jet: JET_VOLUME_DISCLOSURE
       },
       representation:
-        'seeded deep-space backdrop + direct inner pass + layered torus/corona/jet/host representations',
+        'seeded deep-space backdrop + direct inner pass + layered torus/corona/jet-volume/host representations',
       particleWork: {
         host: this.hostParticles?.getDebugSnapshot() ?? null,
         knots: this.knotParticles?.getDebugSnapshot() ?? null
       },
       volumeWork: {
         corona: this.coronaVolume?.getDebugSnapshot?.() ?? null,
-        torus: this.torusVolume?.getDebugSnapshot?.() ?? null
+        torus: this.torusVolume?.getDebugSnapshot?.() ?? null,
+        jets: this.jetVolumes.map((jet) => ({
+          ...(jet.handle.getDebugSnapshot?.() ?? {}),
+          zone: jet.zone,
+          kind: jet.kind,
+          side: jet.side,
+          zoneVisible: jet.zone === this.activeZone,
+          selfShadow: false
+        }))
       },
       disposed: this.disposed
     };
@@ -885,6 +884,9 @@ export class QuasarAgnModule implements PhenomenonModule {
 
   /** Push toggles/population scales into live resources (state -> scene). */
   private applyStateToResources(): void {
+    if (this.coronaVolume !== null) {
+      this.coronaVolume.setVisible(this.activeZone === 'inner');
+    }
     if (this.torusVolume !== null) {
       this.torusVolume.setVisible(this.state.torusVisible && this.activeZone === 'nuclear');
     }
@@ -894,66 +896,67 @@ export class QuasarAgnModule implements PhenomenonModule {
     if (this.knotParticles !== null) {
       this.knotParticles.setPopulationScale(this.state.jetTracerDensity);
     }
+    for (const jet of this.jetVolumes) {
+      // Group gating already hides the other diorama. setVisible also stops
+      // the half-resolution march, so a hidden zone does not pay jet work.
+      jet.handle.setVisible(jet.zone === this.activeZone);
+    }
   }
 
   /**
    * Bipolar jets for one zone (base pair in NUCLEAR or extended pair in
-   * GALACTIC). Each side gets a narrow bright core + wide faint sheath, both
-   * bound to that side's live gain uniform.
+   * GALACTIC). One VolumeService march per lobe: a narrow spine plus a wider
+   * illustrative cocoon. The lobe gain uniform is the blazar ratio. The
+   * nuclear base multiplies emission by the light-delayed continuum; the
+   * galactic extension does not, because its light-crossing time erases a
+   * 200-day variation.
+   *
+   * VolumeService detail octaves are intentionally omitted. That helper
+   * scales noise by the longest box axis, which cannot put filaments across
+   * a narrow jet. Transverse turbulence lives in the jet field, at the cocoon
+   * scale. The global step scale, half-resolution target, early termination,
+   * and temporal jitter still come from VolumeService and the work budget.
    */
   private buildJets(group: Group, kind: 'base' | 'extended'): void {
-    const lengthRg = kind === 'base' ? JET_BASE_LENGTH_RG : JET_EXTENDED_LENGTH_RG;
-    const widthRg = kind === 'base' ? JET_BASE_HALF_WIDTH_RG : JET_EXTENDED_HALF_WIDTH_RG;
     const zone: AgnZoneId = kind === 'base' ? 'nuclear' : 'galactic';
-    const height = rgToUnits(lengthRg, zone);
-    const width = rgToUnits(widthRg, zone);
-
-    // The BASE jet responds to the nuclear light curve with a light-travel
-    // delay: material at height y sees the continuum as it was y/c ago, so a
-    // brightness pattern travels outward at c. The NUCLEAR-zone jet base is
-    // ~17 light-days long, comparable to the shortest modelled variability
-    // period, so that propagation is directly visible. The kpc-scale EXTENDED
-    // jet gets no pattern: its light-crossing time is ~10^4 yr, which smooths
-    // a 200-day variation away entirely, and faking motion there would be a
-    // fidelity claim this destination does not make.
-    const pattern =
-      kind === 'base'
-        ? continuumNode(
-            this.variability,
-            this.uTimeDays.sub(positionLocal.y.mul(this.uNuclearDelayPerUnit))
-          )
-        : null;
-
     for (const side of ['plus', 'minus'] as const) {
+      const layout = agnJetVolumeLayout(
+        kind,
+        side,
+        this.prepareCtx.preset.seed,
+        this.prepareCtx.quality
+      );
       const gain = side === 'plus' ? this.gainPlus : this.gainMinus;
-
-      const coreGeo = new CylinderGeometry(width * 0.35, width * 0.9, height, 20, 1, true);
-      coreGeo.translate(0, height / 2, 0);
-      const coreMat = jetMaterial([0.62, 0.8, 1.0], axialFade(height, 0.12, 1), gain, pattern);
-      const core = new Mesh(coreGeo, coreMat);
-      core.name = `agn-jet-${kind}-${side}-core`;
-      if (side === 'minus') core.rotation.x = Math.PI;
-      group.add(core);
-      trackMesh(
-        this.prepareCtxFor(group),
-        core,
-        (coreGeo.attributes.position?.count ?? 0) * 9,
-        4096
-      );
-
-      const sheathGeo = new CylinderGeometry(width * 1.4, width * 2.6, height, 24, 1, true);
-      sheathGeo.translate(0, height / 2, 0);
-      const sheathMat = jetMaterial([0.4, 0.55, 0.95], axialFade(height, 0.05, 0.5), gain, pattern);
-      const sheath = new Mesh(sheathGeo, sheathMat);
-      sheath.name = `agn-jet-${kind}-${side}-sheath`;
-      if (side === 'minus') sheath.rotation.x = Math.PI;
-      group.add(sheath);
-      trackMesh(
-        this.prepareCtxFor(group),
-        sheath,
-        (sheathGeo.attributes.position?.count ?? 0) * 9,
-        4096
-      );
+      const callbacks = createAgnJetVolumeCallbacks({
+        layout,
+        gain,
+        timeDays: this.uTimeDays,
+        delayPerUnit: this.uNuclearDelayPerUnit,
+        continuumAt: kind === 'base' ? (tDays) => continuumNode(this.variability, tDays) : null
+      });
+      const volume = this.prepareCtx.services.volumes.createVolume({
+        bounds: {
+          kind: 'box',
+          center: layout.bounds.center,
+          halfExtents: layout.bounds.halfExtents
+        },
+        density: callbacks.density,
+        emission: callbacks.emission,
+        baseMaxSteps: layout.baseMaxSteps,
+        depthAwareUpsample: true,
+        approximateSelfShadow: false,
+        gradientShading: false,
+        halfResolution: true,
+        earlyAlphaTermination: true,
+        temporalJitter: true
+      });
+      volume.setStepScale(TIER_STEP_SCALE[this.prepareCtx.quality]);
+      const proxy = volume.object3d();
+      proxy.name = `agn-jet-${kind}-${side}-volume`;
+      proxy.renderOrder = 14;
+      group.add(proxy);
+      trackVolume(this.prepareCtx, volume);
+      this.jetVolumes.push({ zone, kind, side, handle: volume });
     }
   }
 

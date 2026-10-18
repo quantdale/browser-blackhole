@@ -79,8 +79,10 @@ const FIDELITY_BASE =
   'are DIRECT (the validated black-hole lensing backend, reused); corona, ' +
   'outer disk, dusty torus, jets and host galaxy are PROCEDURAL_SCIENTIFIC ' +
   'illustrative morphologies dimensioned by order-of-magnitude AGN model ' +
-  'values (r_g-native geometry; zone scales in types.ts). NOT GRMHD, not ' +
-  'radiative transfer, not a unified-model simulation. Blazar mode is an ' +
+  'values (r_g-native geometry; zone scales in types.ts). Jets are optically ' +
+  'thin emission-absorption volumes: a collimated spine plus a wider ' +
+  'illustrative cocoon, not a cylinder mesh and not synchrotron transfer. ' +
+  'NOT GRMHD, not radiative transfer, not a unified-model simulation. Blazar mode is an ' +
   'observer ORIENTATION toward the jet axis with a disclosed fixed-Gamma ' +
   'beaming-ratio brightness approximation — not a separate object class.';
 

@@ -517,7 +517,7 @@ Transition between zones based on camera distance with hysteresis to prevent fli
 - luminous accretion disk;
 - corona glow/volume;
 - dusty torus;
-- relativistic bipolar jet;
+- relativistic bipolar jet (illustrative VolumeService spine + cocoon, not a cylinder mesh);
 - host-galaxy context;
 - smooth zoom from compact to galactic scale.
 

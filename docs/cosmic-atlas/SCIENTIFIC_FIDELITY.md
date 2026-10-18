@@ -197,6 +197,8 @@ Central GR can be direct. Large-scale jet, corona, torus and host structure are 
 
 Blazar mode changes observer orientation toward the jet; it is not a separate physical object class.
 
+Jet cores and sheaths are optically thin VolumeService emission-absorption marches, not cylinder meshes and not synchrotron radiative transfer. The spine targets the documented collimated half-width and is broadened only when that width is below the constant-step sample. The wider Gaussian is an illustrative entrained cocoon. Approaching/receding brightness remains the fixed-Gamma beaming ratio. Nuclear emission still follows the continuum surrogate with a light-travel delay; the galactic extension stays static on the 400-day timeline.
+
 ## 13. Source uncertainty
 
 For phenomena with active scientific uncertainty, documentation must separate:

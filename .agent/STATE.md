@@ -1,3 +1,26 @@
+## 2026-10-18 — AGN jet volume proof of concept (visual fidelity, new initiative)
+
+Status: **IMPLEMENTED, not a full-atlas claim.** Branch
+`visual-fidelity/agn-jet-volume` off `a00ab5d`. Does not reopen hardening
+and does not implement `spatial-atlas-continuous-navigation`.
+
+Cylinder core/sheath jets in `quasarAgnModule.ts` are now one VolumeService
+V2 march per lobe (`src/phenomena/quasar-agn/jetVolumeField.ts`). Spine
+targets the documented half-width; the wider Gaussian is a disclosed
+illustrative cocoon. Beaming-ratio gains, nuclear light-travel delay, zone
+exclusivity, and the inner DIRECT pass are unchanged. A single large helix
+was rejected after a close-up showed a DNA braid.
+
+Evidence: `docs/VISUAL_FIDELITY_AGN_JETS.md`. Host WebGPU `nvidia lovelace`,
+1280×800, High, internal 972×727. Inner AGN control GPU time matched
+(scientific 10.25 → 10.41 ms). Resolved galactic close-up 7–12 ms, 2 visible
+volumes. Goldens not regenerated. Full Playwright suite DEFERRED.
+
+Next: keep the approaching spine below bloom clip; then a separately gated
+cinematic-only disk atmosphere that does not touch geodesics or `g^3`.
+
+---
+
 ## 2026-10-18 — seven OpenSpec changes archived and pushed
 
 Status: **ARCHIVED.** The seven implemented changes are synced into
