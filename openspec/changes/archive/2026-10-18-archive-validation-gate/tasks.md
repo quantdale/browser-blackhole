@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Evidence for the three closeout boxes
 
 - [x] 1.1 Re-read archived tasks 9.1–9.3 in `openspec/changes/archive/2026-10-17-quality-ladder-resolution-integrity/tasks.md`. — all three read as bare `- [ ]` closeout items (strike register findings / append STATE evidence / coherent commit).

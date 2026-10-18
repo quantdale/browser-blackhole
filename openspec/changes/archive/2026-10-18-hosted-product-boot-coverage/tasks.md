@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Shared type boundary
 
 - [x] 1.1 Move `DebugViewMode` to a neutral module that is not `src/app/state.ts`. — new `src/shaders/debugViewMode.ts` carries the exact union `'diagnostic' | 'environment' | 'off'` (no behavioral change; set of view modes unchanged) with the M1-05 doc comment moved from `src/app/state.ts`.

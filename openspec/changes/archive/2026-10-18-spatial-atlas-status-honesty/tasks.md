@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Header
 
 - [x] 1.1 Add an implementation-not-started banner to `openspec/changes/spatial-atlas-continuous-navigation/proposal.md` and `tasks.md`. — both files now open with `**implementation status: NOT STARTED**` (checked with the new check; see 2.1). No task line was touched.

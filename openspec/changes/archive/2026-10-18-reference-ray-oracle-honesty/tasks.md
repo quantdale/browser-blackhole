@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Confirm there is no caller
 
 - [x] 1.1 Search `src/` and `tests/` for `traceReferenceRay`. Record every hit. Stop if a production or parity caller exists and report it instead of unexporting. — definition only: `src/physics/schwarzschild.ts:535` (plus a header-comment mention at :35). AFT search found similarly-named functions (`traceSurfaceRay`, `traceSchwarzschildPlane`) but ZERO callers of `traceReferenceRay` in `src/` and zero hits in `tests/`. Clear to retire.

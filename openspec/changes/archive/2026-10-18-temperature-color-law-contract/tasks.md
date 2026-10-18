@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Lock the three laws
 
 - [x] 1.1 Add a unit test that names the accretion-disk law, the stellar-explosion ramp, and the compact-merger locus. — `tests/unit/temperatureColorLaws.test.ts`: one row per law naming it and asserting its output contract (disk: finite HDR unit-luminance × SB energy; ramp: finite, inside anchor range; merger locus: finite, in [0,1]).

@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 Temperature-to-linear-RGB is three different functions. The accretion-disk law clamps to 1000–40000 K. The stellar-explosion ramp clamps to 1000–1e7 K. The compact-merger law is a separate closed form that also clamps at 40000 K, and its star tint is passed at exactly that ceiling. Nothing in the tree makes that split a tested contract, so a later edit can mix the laws or treat a clamped result as a distinguishable hotter color.

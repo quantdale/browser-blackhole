@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 `traceReferenceRay` in `src/physics/schwarzschild.ts` leaves disk-hit classification unset and states that crossing refinement is not implemented. A search of `src/` and `tests/` finds no caller. The GPU Schwarzschild pass does detect disk crossings. The exported wrapper can be mistaken for the reference oracle while omitting the event the production pass classifies.

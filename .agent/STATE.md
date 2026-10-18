@@ -1,3 +1,18 @@
+## 2026-10-18 — seven OpenSpec changes archived and pushed
+
+Status: **ARCHIVED.** The seven implemented changes are synced into
+`openspec/specs/` and moved to `openspec/changes/archive/2026-10-18-*`.
+`spatial-atlas-continuous-navigation` remains the only active change,
+0/123, implementation status NOT STARTED. Do not implement it as part of
+this close-out.
+
+Synced capabilities: `verification-gate-integrity`, `kerr-photon-initialization`,
+`ci-release-readiness`, `specification-hygiene`, plus new baselines
+`reference-ray-oracle`, `temperature-color-laws`, and
+`shared-module-legacy-boundary`.
+
+---
+
 ## 2026-10-17 session (8) — all seven OpenSpec hardening changes implemented
 
 Status: **COMPLETE (review-reconciled).** All seven implementable OpenSpec

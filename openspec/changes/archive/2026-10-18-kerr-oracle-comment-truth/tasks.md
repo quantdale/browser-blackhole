@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Lock the executable term
 
 - [x] 1.1 Add a unit test that evaluates the static frame-dragging term at a lapse below 1 and asserts it equals `g_tφ / √f_s` and does not equal `g_tφ / f_s`. — `tests/unit/kerrReference.test.ts` new describe `static frame-dragging normalisation (kerr-oracle-comment-truth D2)`: equatorial tangential probe (pos [8,0,0], dir [0,0,1], a*=0.5, M=1) gives closed-form `f_s = 0.75` (lapse below 1), `g_tφ = −0.125`, `Δ = 48.25`, `nPh = 1`; asserts `initKerrRay().lZ` matches the `g_tφ/√f_s` composition to 1e-11 and is NOT the `g_tφ/f_s` composition (the two candidate terms separate by 0.0223 — 12 orders above binary64 noise).

@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 `openspec validate --archived --strict` fails two archived changes, and the hosted quality job never runs an OpenSpec validator. `2026-10-17-quality-ladder-resolution-integrity` has three bare unchecked closeout boxes (9.1–9.3) whose described work is already in later commits. `2026-10-03-whole-atlas-performance-optimization` has 58 unchecked boxes; each is annotated `DEFERRED` or `REJECTED`, and the CLI still counts them incomplete.

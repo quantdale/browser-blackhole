@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** All tasks checked with evidence. Do not re-apply.
+
 ## 1. Failing floor
 
 - [x] 1.1 In `tests/unit/lutEquivalence.test.ts`, add a compared-count assertion of 2 to the critical-boundary test before the class expectations, counting only samples whose status is not `fallback-numerical`.

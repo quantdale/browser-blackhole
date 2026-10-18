@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 The unit test named "classification boundary is exact at b_c within fp precision" can pass without asserting anything. Both expectations sit inside `if (status !== 'fallback-numerical')`, and there is no compared-count floor. `resolveRay` returns `fallback-numerical` inside a non-zero hybrid band around `b_c`. The shipped manifest currently has that band at 0, so the test asserts today. A later non-zero band makes the test green while measuring nothing.

@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 `openspec list` reports `spatial-atlas-continuous-navigation` as in progress with 0 of 123 tasks complete. `openspec status` on the same change reports `isComplete: true` because the planning artifacts exist. A search of `src/` finds no explorer implementation. An agent that treats planning-complete as shipped will either skip the work or apply a 123-task change that was written against an older host.

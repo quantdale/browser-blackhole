@@ -127,3 +127,47 @@ capability specification, and the completed change SHALL be archived.
 
 - **WHEN** a change is archived
 - **THEN** its design rationale, task record and evidence remain retrievable
+
+### Requirement: Planning-complete SHALL NOT be reported as implementation-complete
+
+A change whose planning artifacts exist and whose implementation checklist has no completed task SHALL be reported as implementation-not-started. A tooling flag that means only that planning artifacts exist SHALL NOT be the repository's implementation-status authority. The change's own status header SHALL state that implementation has not started, and an automated check SHALL fail if that header claims implementation is complete while the checklist is untouched.
+
+#### Scenario: Planning artifacts exist and no task is complete
+
+- **WHEN** an active change has every planning artifact and zero completed implementation tasks
+- **THEN** repository status reports implementation as not started
+- **AND** it does not report the change as implementation-complete
+
+#### Scenario: A header claims implementation is complete
+
+- **WHEN** that change's own status header says implementation is complete
+- **THEN** the automated check fails
+
+#### Scenario: Implementation later starts
+
+- **WHEN** at least one implementation task is completed with evidence
+- **THEN** repository status may report the change as in progress
+- **AND** it still does not report the change as implementation-complete until the checklist says so
+
+### Requirement: Archived changes SHALL pass strict validation in the automated gate
+
+The automated quality gate SHALL run strict validation of active changes and of archived changes. A bare unchecked task in an archived change SHALL fail that gate. A task annotated as deferred or rejected SHALL remain recorded and SHALL NOT be marked complete. It SHALL NOT remain an unchecked checkbox, because an unchecked checkbox means work is still required.
+
+#### Scenario: An archived change has a bare unchecked task
+
+- **WHEN** strict archived validation runs
+- **AND** an archived change contains an unchecked task with no deferral or rejection annotation
+- **THEN** the gate fails
+- **AND** the failure names the change
+
+#### Scenario: Deferred work is recorded without an open checkbox
+
+- **WHEN** an archived change records work as deferred or rejected
+- **THEN** the record remains readable
+- **AND** that item is not an unchecked checkbox
+- **AND** it is not marked as completed work
+
+#### Scenario: The quality gate omits archive validation
+
+- **WHEN** the automated quality gate does not run strict archived validation
+- **THEN** the gate does not satisfy this requirement

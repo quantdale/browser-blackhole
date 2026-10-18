@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 In `src/phenomena/black-hole/kerr/reference.ts` the comments next to the static `L_z` extraction and the terminal `n_ph` reconstruction say `g_tφ / f_s`. The executable lines use `g_tφ / √f_s`. The GPU pass matches the executable lines, not the comments. A later edit that "fixes" the code to match the comment would introduce a CPU/GPU split the current tree does not have.

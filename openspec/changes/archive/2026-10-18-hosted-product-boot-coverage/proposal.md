@@ -1,3 +1,5 @@
+> **COMPLETE — archived 2026-10-18.** Specs synced into `openspec/specs/`. Do not re-apply.
+
 ## Why
 
 The product entry in `src/main.ts` sends `/` to `/atlas/black-hole` unless `?legacy=1` is set, or unless `history.replaceState` throws, in which case the legacy app mounts. The hosted browser job runs only `tests/browser/smoke.spec.ts`, and that harness forces `legacy=1`. The only hosted browser gate therefore never mounts the atlas shell. Separately, `src/shaders/diagnostic.ts` imports `DebugViewMode` from `src/app/state.ts`, so a shared shader module depends on the legacy application state module.
