@@ -112,15 +112,42 @@ state rounded to float32 after every stage) gives, versus the binary64 oracle:
 | 0.0381 | captured | non-finite / r → −∞ | not presentable |
 | 0.0325 | captured | non-finite / r → −∞ | not presentable |
 
-An earlier input-perturbation-only test showed sub-0.1° sensitivity and briefly
-suggested the gate might be over-conservative. That test was inadequate: it does
-not accumulate rounding over thousands of RK4 stages. The step-rounding
-emulation is the honest measurement, and it reverses the conclusion. This
-reversal is recorded deliberately — it is the difference between "the gate looks
-too strict" and "the gate is the only reason the image is not lying".
+An early screen-direction sweep (camera-ray perturbations through a
+reconstructed basis) gave 3.75°–55.41° for four gated rays. The reproducible
+committed evidence is `scripts/probe-kerr-f32-divergence.ts`, which uses an
+explicit axis-offset ray family so the result does not depend on how a camera
+basis happened to be rebuilt:
+
+| offset (r_g) | f64 | min\|sin θ\| (f64) | gated | f32 emulation | direction error |
+| --- | --- | --- | --- | --- | --- |
+| 1–4 | captured | 0.035–0.732 | no | captured | — (classification matches) |
+| 5 | numerical-failure | 0.0289 | **yes** | escaped | **29.56°** |
+| 6 | numerical-failure | 0.0247 | **yes** | escaped | **53.33°** |
+| 8 | numerical-failure | 0.0196 | **yes** | escaped | **136.65°** |
+| 12 | numerical-failure | 0.0149 | **yes** | escaped | **159.47°** |
+
+Every gated ray carries a null-residual of 1e-13–1e-14 in f64 (the geodesic is
+fine) yet the f32 emulation reports a **29°–159° wrong sky direction** — and in
+the screen-direction sweep several inside-gate rays did not survive f32 at all
+(non-finite, r → −∞). The divergence grows monotonically as the axis approach
+deepens, which is the expected `1/sin²θ` behaviour and is not a coincidence of
+one sample.
+
+The earlier emulation run also showed captured rays going non-finite. That was
+a **harness** defect (missing the production near-horizon half-step guard), not
+a solver finding; the committed probe mirrors the guard and the captured rays now
+track f64 exactly. Recording it matters: an unguarded emulation overstates the
+problem and would have been the wrong basis for a threshold argument.
+
+An input-perturbation-only test showed sub-0.1° sensitivity and briefly suggested
+the gate might be over-conservative. That test was inadequate: it does not
+accumulate rounding over thousands of RK4 stages. The step-rounding emulation is
+the honest measurement, and it reverses the conclusion. This reversal is
+recorded deliberately — it is the difference between "the gate looks too strict"
+and "the gate is the only reason the image is not lying".
 
 **Verdict: the 0.04 threshold is scientifically correct and must not be lowered.**
-Lowering it would render 4°–55° wrong sky directions as if they were physical.
+Lowering it would render 29°–159° wrong sky directions as if they were physical.
 
 ## 7. Controlled experiments (Phase 5)
 
@@ -170,6 +197,9 @@ are out of scope by charter and are scoped as a follow-up in §11.
   sweep (core vs tinted spread).
 - `scripts/probe-kerr-cpu-rays.ts` — live-camera ray sampling through the
   binary64 oracle with a `poleFailureSin` sweep and full diagnostics.
+- `scripts/probe-kerr-f32-divergence.ts` — production-faithful f32 step-rounding
+  emulation against the ungated binary64 oracle, over an explicit axis-offset ray
+  family. This is the committed evidence for the §6 table.
 - `tests/unit/kerrPolarBandDiagnosis.test.ts` — 7 tests locking: gate fires only
   on sub-threshold escaped rays; captured rays keep capture even below the
   threshold; failures never carry a terminal direction; binary64 convergence to
