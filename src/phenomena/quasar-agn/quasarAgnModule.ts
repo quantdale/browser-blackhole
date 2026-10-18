@@ -420,6 +420,13 @@ export class QuasarAgnModule implements PhenomenonModule {
     const engineHalo = new Mesh(engineHaloGeometry, engineHaloVisual.material);
     engineHalo.name = 'agn-nuclear-engine-halo';
     engineHalo.renderOrder = 12;
+    // Presentation glow, not a solid body: the halo is the illustrative
+    // engine-light proxy (a cinematicEmissive bloom source) and must bleed
+    // over foreground geometry as it did before the outer-disk shell wrote
+    // depth. Keeping its depth test ON shrank the visible core to the
+    // hemisphere above the disk plane and made the engine read as missing at
+    // unsettled frames. The shell's own self-occlusion is unaffected.
+    engineHaloVisual.material.depthTest = false;
     nuclearGroup.add(engineHalo);
     this.nuclearEngineVisual = engineHaloVisual;
     trackMesh(this.prepareCtxFor(engineHalo), engineHalo, 4096, 4096);
