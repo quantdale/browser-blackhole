@@ -38,16 +38,7 @@
  * readouts only (AU/pc conversions) — normalized-mode philosophy.
  */
 
-import {
-  AdditiveBlending,
-  DoubleSide,
-  Group,
-  Mesh,
-  MeshBasicNodeMaterial,
-  Scene,
-  SphereGeometry
-} from 'three/webgpu';
-import { RingGeometry } from 'three/webgpu';
+import { Group, Mesh, Scene, SphereGeometry } from 'three/webgpu';
 import {
   atan,
   clamp,
@@ -57,13 +48,11 @@ import {
   min,
   mix,
   mx_fractal_noise_float,
-  positionLocal,
   sin,
   smoothstep,
   uniform,
   vec2,
-  vec3,
-  vec4
+  vec3
 } from 'three/tsl';
 import type { Node } from 'three/webgpu';
 
@@ -112,6 +101,13 @@ import {
   createAgnJetVolumeCallbacks,
   type AgnJetVolumeLayout
 } from './jetVolumeField.js';
+import {
+  OUTER_DISK_PHOTOSPHERE_DISCLOSURE,
+  buildOuterDiskPhotosphereGeometry,
+  createOuterDiskPhotosphereMaterial,
+  outerDiskLayout,
+  type OuterDiskLayout
+} from './outerDiskPhotosphere.js';
 import { lensingCameraUniformState } from '../../renderer/shared/LensingService.js';
 import {
   CINEMATIC_DETAIL_BY_TIER,
@@ -176,7 +172,6 @@ const SECONDS_PER_DAY = 86_400;
 const C_M_PER_S = 2.99792458e8;
 
 /** Spiral-arm count of the disc brightness pattern (illustrative azimuthal m). */
-const DISK_PATTERN_ARMS = 2;
 
 /**
  * Target total optical depth through the dusty torus. The dust IS optically
@@ -287,6 +282,9 @@ export class QuasarAgnModule implements PhenomenonModule {
    * Mass-dependent, so it follows the `blackHoleMassSolar` control.
    */
   private readonly uOmegaScale = uniform(0);
+
+  /** Layout metadata of the NUCLEAR outer-disk photosphere (debug/telemetry). */
+  private outerDiskLayoutInfo: OuterDiskLayout | null = null;
   /**
    * Light-travel delay per NUCLEAR scene unit, in days (mass-dependent). Used
    * by every nuclear component that responds to the continuum with a lag: the
@@ -840,13 +838,27 @@ export class QuasarAgnModule implements PhenomenonModule {
         blazar: 'orientation-driven beaming-ratio approximation (fixed Gamma)',
         variability: VARIABILITY_DISCLOSURE,
         torus: 'PROCEDURAL_SCIENTIFIC clumpy dust distribution (Nenkova et al. 2008 picture)',
-        jet: JET_VOLUME_DISCLOSURE
+        jet: JET_VOLUME_DISCLOSURE,
+        outerDisk: OUTER_DISK_PHOTOSPHERE_DISCLOSURE
       },
       representation:
         'seeded deep-space backdrop + direct inner pass + layered torus/corona/jet-volume/host representations',
       particleWork: {
         host: this.hostParticles?.getDebugSnapshot() ?? null,
         knots: this.knotParticles?.getDebugSnapshot() ?? null
+      },
+      diskWork: {
+        representation: 'photospheric-shell',
+        innerRg: OUTER_DISK_INNER_RG,
+        outerRg: OUTER_DISK_OUTER_RG,
+        thicknessAtOuterUnits: this.outerDiskLayoutInfo?.thicknessAtOuterUnits ?? null,
+        thicknessAtInnerUnits: this.outerDiskLayoutInfo?.thicknessAtInnerUnits ?? null,
+        azimuthSegments: this.outerDiskLayoutInfo?.azimuthSegments ?? null,
+        radialSegments: this.outerDiskLayoutInfo?.radialSegments ?? null,
+        vertexCount: this.outerDiskLayoutInfo?.vertexCount ?? null,
+        triangleCount: this.outerDiskLayoutInfo?.triangleCount ?? null,
+        zoneVisible: this.activeZone === 'nuclear',
+        disposed: this.disposed
       },
       volumeWork: {
         corona: this.coronaVolume?.getDebugSnapshot?.() ?? null,
@@ -982,57 +994,24 @@ export class QuasarAgnModule implements PhenomenonModule {
     return this.prepareCtx;
   }
 
-  /** NUCLEAR outer accretion disk: emissive annulus, soft radial edges. */
+  /**
+   * NUCLEAR outer accretion disk: finite-thickness photospheric shell
+   * (top + bottom + rims), replacing the zero-thickness additive annulus.
+   * See outerDiskPhotosphere.ts for the preserved laws and disclosures.
+   */
   private buildOuterDisk(): Mesh {
-    const rIn = rgToUnits(OUTER_DISK_INNER_RG, 'nuclear');
-    const rOut = rgToUnits(OUTER_DISK_OUTER_RG, 'nuclear');
-    const geometry = new RingGeometry(rIn, rOut, 128, 1);
-    geometry.rotateX(-Math.PI / 2);
-    const material = new MeshBasicNodeMaterial();
-    material.transparent = true;
-    material.blending = AdditiveBlending;
-    material.depthWrite = false;
-    material.side = DoubleSide;
-    const radiusUnits = length(positionLocal.xz);
-    const t = radiusUnits.sub(float(rIn)).div(max(float(rOut - rIn), float(1e-4)));
-    const edges = smoothstep(float(0), float(0.07), t).mul(smoothstep(float(1), float(0.85), t));
-    const body = mix(
-      vec3(1.0, 0.87, 0.63),
-      vec3(0.72, 0.56, 0.96),
-      smoothstep(float(0.25), float(0.92), t)
-    );
-
-    // Differential (Keplerian) rotation: the azimuthal brightness pattern is
-    // carried at Omega(r) = uOmegaScale * (r/r_g)^(-3/2), so the inner disc laps
-    // the outer disc instead of the whole annulus turning as a rigid body. This
-    // is the destination's primary motion cue in the NUCLEAR zone.
-    const rRg = max(radiusUnits.mul(float(ZONE_UNIT_RG.nuclear)), float(1e-3));
-    const omega = this.uOmegaScale.mul(rRg.pow(float(-1.5)));
-    const phi = atan(positionLocal.z, positionLocal.x);
-    const wave = sin(phi.mul(float(DISK_PATTERN_ARMS)).sub(omega.mul(this.uTimeDays)));
-    // Sheared clumping: a second, faster-varying azimuthal harmonic keeps the
-    // pattern from reading as a clean sine wave.
-    const fine = sin(phi.mul(float(DISK_PATTERN_ARMS * 5)).sub(omega.mul(this.uTimeDays).mul(1.6)));
-    const pattern = float(0.62)
-      .add(wave.mul(float(0.32)))
-      .add(fine.mul(float(0.14)));
-    // The variability factor remains the model's resolved continuum; this
-    // display gain only gives the differential pattern enough contrast to
-    // read as orbiting gas at the destination's deliberately wide framing.
-    const brightness = pattern.mul(this.uContinuum).mul(float(1.08));
-
-    material.colorNode = vec4(
-      body.mul(edges).mul(brightness).mul(float(1.5)),
-      edges.mul(brightness).mul(float(0.85))
-    );
+    const layout = outerDiskLayout(this.prepareCtx.preset.seed);
+    const geometry = buildOuterDiskPhotosphereGeometry(layout);
+    const material = createOuterDiskPhotosphereMaterial({
+      layout,
+      timeDays: this.uTimeDays,
+      continuum: this.uContinuum,
+      omegaScale: this.uOmegaScale
+    });
     const mesh = new Mesh(geometry, material);
     mesh.name = 'agn-outer-disk';
-    trackMesh(
-      this.prepareCtxFor(mesh),
-      mesh,
-      (geometry.attributes.position?.count ?? 0) * 12,
-      6144
-    );
+    this.outerDiskLayoutInfo = layout;
+    trackMesh(this.prepareCtxFor(mesh), mesh, layout.vertexCount * 12, 6144);
     return mesh;
   }
 }

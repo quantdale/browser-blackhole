@@ -14,6 +14,8 @@ artifacts/cinematic-visual-fidelity/*
 !artifacts/cinematic-visual-fidelity/final-17c4644/**
 !artifacts/visual-fidelity-agn-jets
 !artifacts/visual-fidelity-agn-jets/**
+!artifacts/visual-fidelity-agn-disk
+!artifacts/visual-fidelity-agn-disk/**
 test-results/
 playwright-report/
 blob-report/
