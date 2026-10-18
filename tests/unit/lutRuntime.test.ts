@@ -146,14 +146,30 @@ describe('ray resolution', () => {
     if (!result.ok) return;
     const s = new LutSampler(result.family);
     const bc = result.family.manifest.physics.bCriticalRg;
+    // Compared-count floor (lut-boundary-assertion-floor): a status filter
+    // (explicit numerical fallback) reduces the compared count, so a corpus
+    // that silently narrows must fail rather than pass quietly. This test
+    // claims BOTH sides of b_c, so each side needs at least one subject.
+    let comparedBelow = 0;
+    let comparedAbove = 0;
     for (const scaleOfBc of [0.5, 0.9, 0.999, 1.001, 1.05, 1.4]) {
       const b = bc * scaleOfBc;
       const r = s.resolveRay(b);
       expect(r.status === 'captured' || r.status === 'escaped').toBe(true);
       if (r.status !== 'fallback-numerical') {
+        if (b < bc) comparedBelow += 1;
+        else comparedAbove += 1;
         expect(r.status === 'captured').toBe(b < bc);
       }
     }
+    expect(
+      comparedBelow,
+      'critical-boundary test must compare a subject BELOW b_c'
+    ).toBeGreaterThanOrEqual(1);
+    expect(
+      comparedAbove,
+      'critical-boundary test must compare a subject ABOVE b_c'
+    ).toBeGreaterThanOrEqual(1);
   });
 
   it('routes out-of-domain rays to explicit numerical fallback', async () => {
