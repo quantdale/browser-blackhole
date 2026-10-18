@@ -1,3 +1,39 @@
+## 2026-10-18 — visual-fidelity close-out: every deferred gate now has evidence
+
+Status: **RESOLVED (validated this session).** The two DEFERRED gates of the
+AGN jet volume proof of concept are closed on GPU-capable hardware; no code
+changed in this close-out, only evidence and state.
+
+- Pre-gates re-run: `npm ci` PASS (one transient Windows EPERM on the
+  rolldown binding, cleared and re-run clean; 196 packages, 0
+  vulnerabilities) and `npm run check` PASS — 72 files / 796 unit, build +
+  status-honesty + shader-boundary + no-test-hook all green.
+- **Full Playwright suite — RESOLVED (was DEFERRED): PASS, 316 passed / 1
+  skipped / 0 failed** (default project, ~9.3 min, host WebGPU
+  `nvidia lovelace`, viewport 1280×800, High tier, internal 972×727).
+  Includes scientific visual goldens 43/43 (goldens NOT regenerated),
+  cinematic goldens 8/8, integrator/kerr/lut/ray parity, temporal
+  stability, resource-leak/device-loss/lifecycle rows, and the Firefox
+  compatibility matrix 4/4 in the same run. Forced-WebGL2 jet-volume row
+  passed standalone before the suite (webgpu + webgl2, 2/2).
+- **Cinematic golden review — RESOLVED at declared tolerance, no
+  regeneration.** `CIN_BH_CLASSIC` (the intentional disk-atmosphere
+  difference) compares 7.95 mean abs / 4.08% beyond / SSIM 0.955 against
+  the unregenerated golden; harness threshold 10 / 12 / 0.88. Candidate
+  images remain review artifacts, not goldens.
+- Before/after PNGs visually inspected (not just test status): galactic
+  preset loses the cylinder spike for a bipolar glow; close-ups show
+  spine-in-sheath with soft edges and a kinked dimmer receding lobe; BH
+  classic shows the bounded cinematic-only brightening. Claims in
+  `docs/VISUAL_FIDELITY_AGN_JETS.md` §3 are consistent with the images.
+
+Next work (unchanged priority): nuclear outer disk `RingGeometry`, then
+disk-atmosphere fine structure; Kerr magenta band stays a numerical item.
+Cinematic goldens may only be regenerated as an explicit reviewed
+acceptance of the intentional cinematic difference.
+
+---
+
 ## 2026-10-18 — AGN jet volume proof of concept (visual fidelity, new initiative)
 
 Status: **IMPLEMENTED, not a full-atlas claim.** Branch

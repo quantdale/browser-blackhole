@@ -79,10 +79,12 @@ used as GPU time.
 | Gate | Result |
 | --- | --- |
 | `npm run check` before edits | PASS — 70 files / 787 unit |
+| `npm run check` after both slices (2026-10-18 close-out) | PASS — 72 files / 796 unit, build + hook gates ok |
 | Jet field unit tests | PASS — see the final check |
 | `quasar-agn-jet-volume` WebGPU + WebGL2 | PASS on the volume contract (zone exclusivity, half-resolution, blazar ratio, no console errors) |
-| Full Playwright / goldens | DEFERRED — goldens must not be regenerated to hide this intentional difference |
-| Firefox | DEFERRED |
+| Full Playwright suite (2026-10-18 close-out, this host, GPU-capable) | PASS — 316 passed / 1 skipped / 0 failed, default project, incl. scientific visual goldens 43/43 and cinematic goldens 8/8, parity/lifecycle/temporal specs. Goldens were not regenerated. |
+| Cinematic golden review | PASS at the declared cinematic tolerance without regeneration. `CIN_BH_CLASSIC` (the intentional disk-atmosphere difference) compares 7.95 mean abs / 4.08% pixels beyond / SSIM 0.955 against the unregenerated golden; the harness threshold is 10 / 12% / 0.88. Candidate images for human review are in `artifacts/visual-fidelity-agn-jets/`. |
+| Firefox matrix | PASS — 4/4 in the same full-suite run (engine-agnostic fallback rows) |
 
 ## 6. Approximations
 
@@ -109,10 +111,15 @@ versus the pre-change capture (golden tolerance is 6 / 2%). Playwright
 scientific goldens `BH_CLASSIC`, `KERR_ZERO_SPIN`, `KERR_HIGH_PROGRADE`, and
 `AGN_INNER_ENGINE` passed. Cinematic BH classic differs from the previous
 cinematic capture (mean abs ~8, 4% of pixels beyond 32). Those cinematic
-goldens were not regenerated.
+goldens were not regenerated; the unregenerated `CIN_BH_CLASSIC` golden
+passes the declared cinematic harness tolerance (10 / 12% / 0.88) at
+7.95 / 4.08 / 0.955, so the difference is intentional and bounded. The
+candidate images for review are in `artifacts/visual-fidelity-agn-jets/`.
 
 ## 8. Still next
 
 1. Nuclear outer disk is still `RingGeometry`.
 2. Kerr magenta band stays a numerical item, not a lookdev item.
-3. Full Playwright suite and cinematic golden review remain DEFERRED.
+3. Cinematic golden baselines stay unregenerated pending human review of
+   `artifacts/visual-fidelity-agn-jets/`; regenerate only as an explicit,
+   reviewed acceptance of the intentional cinematic difference.
