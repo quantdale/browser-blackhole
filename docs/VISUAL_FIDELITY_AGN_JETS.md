@@ -118,7 +118,9 @@ candidate images for review are in `artifacts/visual-fidelity-agn-jets/`.
 
 ## 8. Still next
 
-1. Nuclear outer disk is still `RingGeometry`.
+1. ~~Nuclear outer disk is still `RingGeometry`.~~ **RESOLVED 2026-10-18** on
+   branch `visual-fidelity/agn-nuclear-disk-photosphere` — see
+   `docs/VISUAL_FIDELITY_AGN_DISK.md`.
 2. Kerr magenta band stays a numerical item, not a lookdev item.
 3. Cinematic golden baselines stay unregenerated pending human review of
    `artifacts/visual-fidelity-agn-jets/`; regenerate only as an explicit,

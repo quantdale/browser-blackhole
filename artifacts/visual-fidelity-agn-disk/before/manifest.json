@@ -1,0 +1,77 @@
+{
+  "commit": "54d071faf854256f956f82bb0d8c235482865c67",
+  "backend": {
+    "api": "webgpu",
+    "adapterName": "intel gen-12lp",
+    "maxTextureSize": 8192,
+    "floatRenderTargets": true,
+    "timestampQuery": true,
+    "storageBuffers": true,
+    "devicePixelRatio": 1
+  },
+  "viewportCss": [
+    1280,
+    800
+  ],
+  "quality": "high (forced)",
+  "phase": 0.35,
+  "exposure": "destination default (scientific 1.0 / cinematic 1.1)",
+  "views": [
+    {
+      "name": "01-nuclear-default-cinematic",
+      "mode": "cinematic",
+      "orbit": null
+    },
+    {
+      "name": "02-nuclear-inclined-cinematic",
+      "mode": "cinematic",
+      "orbit": [
+        35,
+        60,
+        196
+      ]
+    },
+    {
+      "name": "03-nuclear-edge-on-cinematic",
+      "mode": "cinematic",
+      "orbit": [
+        35,
+        87,
+        196
+      ]
+    },
+    {
+      "name": "03b-nuclear-edge-on-closeup-cinematic",
+      "mode": "cinematic",
+      "orbit": [
+        35,
+        88,
+        25
+      ]
+    },
+    {
+      "name": "04-nuclear-closeup-cinematic",
+      "mode": "cinematic",
+      "orbit": [
+        35,
+        75,
+        25
+      ]
+    },
+    {
+      "name": "05-nuclear-default-scientific",
+      "mode": "scientific",
+      "orbit": null
+    },
+    {
+      "name": "06-nuclear-inclined-scientific",
+      "mode": "scientific",
+      "orbit": [
+        35,
+        60,
+        196
+      ]
+    }
+  ],
+  "consoleErrors": []
+}

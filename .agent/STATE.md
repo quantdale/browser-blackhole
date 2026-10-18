@@ -1,3 +1,46 @@
+## 2026-10-18 — AGN nuclear outer-disk photosphere POC — RESOLVED (validated)
+
+Status: **RESOLVED.** Branch `visual-fidelity/agn-nuclear-disk-photosphere`
+off verified base `54d071f` (ancestor-checked). The NUCLEAR outer disk is
+now a finite-thickness photospheric shell instead of the flat additive
+`RingGeometry` annulus. Evidence: `docs/VISUAL_FIDELITY_AGN_DISK.md`,
+review set `artifacts/visual-fidelity-agn-disk/`.
+
+- Implementation: `src/phenomena/quasar-agn/outerDiskPhotosphere.ts` +
+  `buildOuterDisk` rewire + engine-halo glow-semantics fix. Preserved and
+  test-locked: radial boundaries, colour law, continuum response, Keplerian
+  shear, deterministic scrubbing, zone exclusivity, WebGPU + forced WebGL2.
+  Disclosed: illustrative flared scale height (not a solved vertical model,
+  not GRMHD), limb-darkening gains, sheared procedural detail. Deliberate,
+  documented deviations: pattern contrast retuned (motion law unchanged),
+  emissive gain < 1, soft inner fade + defined outer boundary (alpha/depth
+  coherence), halo keeps no-depth-test glow semantics.
+- Gates: `npm run check` PASS (73 files / 813 unit); new unit pack 17/17;
+  AGN units 38/38; new browser spec 2/2 (WebGPU + WebGL2); AGN group 20/20
+  ×2; Firefox matrix 4/4; scientific goldens 43/43 **unmodified** (incl.
+  AGN_NUCLEAR/AGN_BLAZAR_VIEW within 6/2%); cinematic goldens 8/8 at
+  harness tolerance; zero goldens regenerated.
+- Full-suite flakes A/B: my tree 315/316 and 314/316 (+1 skip); baseline
+  `54d071f` under identical load flakes WORSE (310/316, same family plus
+  resource-leak/shared-post rows) — all failures are 60 s rAF-starvation
+  timeouts in `waitForFrames`, each green in isolation. Environmental, not
+  regressions. Verification-lane follow-up recorded in the doc §8-9.
+- Matched performance (Brave → `nvidia lovelace`, High, 972×727, GPU
+  timestamps, CPU separate, renderScale pinned 1→1, zero rejected samples):
+  WebGPU cinematic 16.91 → 16.97 ms median (no change); WebGPU scientific
+  8.59 → 8.59 (identical); forced WebGL2 cinematic +2–3% median at the
+  investigation threshold with unchanged p95 — investigated, documented,
+  accepted with the discard-path follow-up listed. The old ~41.8 ms
+  NUCLEAR CINEMATIC reference is superseded by this matched pair.
+- Phase 5 optional cinematic-only atmosphere: evaluated and REJECTED with
+  reasons in the doc §7 (no new GPU cost, no golden churn).
+
+Next priorities (doc §9): frame-advance test hardening; flagship BH disk
+fine structure (gated, measured); WebGL2 discard-path profiling; Kerr
+magenta band stays numerical-lane.
+
+---
+
 ## 2026-10-18 — visual-fidelity close-out: every deferred gate now has evidence
 
 Status: **RESOLVED (validated this session).** The two DEFERRED gates of the
