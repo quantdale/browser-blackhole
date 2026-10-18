@@ -68,9 +68,10 @@ jobs:
   browser-smoke:
     # O-03/2.3: bounded job runtime.
     timeout-minutes: 30
-    # Reliable hosted browser gate: the M0 backend-agnostic smoke on Chromium.
+    # Reliable hosted browser gate: two backend-agnostic Chromium rows on
+    # software WebGL2 — the legacy M0 smoke and the product-entry smoke.
     #
-    # WHY ONLY THE SMOKE (not the full behavioral/parity/golden suite): hosted
+    # WHY NOT THE FULL SUITE (behavioral/parity/golden): hosted
     # GitHub runners have no GPU, so every scene renders through software WebGL2
     # (SwiftShader) on 2 vCPUs. The heavy TSL lensing/Kerr shaders and the
     # full-screen hyperspace transition compile/render at seconds-per-frame, and
@@ -81,8 +82,8 @@ jobs:
     # LOCAL capable-runner gate (docs/CI_CD.md sections 2, 7, 16; run it with
     # `npm run e2e` on a WebGPU-capable machine, plus `--project=firefox`).
     #
-    # smoke.spec.ts boots the ROOT experience, which renders the CHEAP
-    # diagnostic
+    # Row 1 — smoke.spec.ts boots the LEGACY root via ?legacy=1, which renders
+    # the CHEAP diagnostic
     # gradient (no lensing/Kerr compile), plus the forced-WebGL2 gradient and
     # the
     # forced-unsupported terminal UX. It is backend-agnostic and cheap, so it is
@@ -92,7 +93,15 @@ jobs:
     # the canvas is non-zero, interaction/resize are safe, and the console/page
     # error channels stay clean (docs/CI_CD.md section 5). It is NOT a WebGPU or
     # full-scene validation.
-    name: browser-smoke (Chromium, WebGL2 fallback; M0 boot/fallback smoke)
+    #
+    # Row 2 — product-entry.spec.ts enters the BARE root (no legacy=1), asserts
+    # the /atlas/black-hole redirect and the atlas shell, and accepts
+    # ready/fallback/unsupported. It never reads a lensed pixel: host.init()
+    # resolves at the ready stage BEFORE any frame renders, so its
+    # ARRIVAL_TIMEOUT_MS ceiling (180s in CI, env-overridable) is a safety net
+    # for a hung init, not an expected wait — it is the slowest-still-bounded
+    # hosted step, and its own coverage assertion (expected 1) makes a skip fail.
+    name: browser-smoke (Chromium, WebGL2 fallback; legacy + product-entry smoke)
     needs: quality
     runs-on: ubuntu-latest
     steps:

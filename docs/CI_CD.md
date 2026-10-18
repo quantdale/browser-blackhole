@@ -44,7 +44,11 @@ Recommended jobs:
 - run `tests/browser/product-entry.spec.ts` (bare-root product entry, no `legacy=1`, atlas shell) in its own step with its own coverage assertion;
 - archive screenshot/console logs on failure.
 
-This is the reliable hosted browser gate. It boots the ROOT experience — which renders the **cheap diagnostic gradient**, not the heavy lensing/Kerr passes — plus the forced-WebGL2 gradient and the forced-unsupported terminal UX. Being backend-agnostic and cheap, it is stable on software WebGL2 while still proving the app boots to a truthful ready/fallback/unsupported terminal state, the WebGL2 fallback path renders, the canvas is non-zero, interaction/resize are safe, and the console/page error channels stay clean (section 5). It is NOT a WebGPU or full-scene validation.
+This is the reliable hosted browser gate. It runs two backend-agnostic rows on software WebGL2.
+
+The **legacy row** (`smoke.spec.ts`) boots the legacy root via `?legacy=1` — the cheap diagnostic gradient, not the heavy lensing/Kerr passes — plus the forced-WebGL2 gradient and the forced-unsupported terminal UX. Being cheap, it proves the app boots to a truthful ready/fallback/unsupported terminal state, the WebGL2 fallback path renders, the canvas is non-zero, interaction/resize are safe, and the console/page error channels stay clean (section 5). It is NOT a WebGPU or full-scene validation.
+
+The **product-entry row** (`product-entry.spec.ts`) enters the bare root with no `legacy=1`, requires the `/atlas/black-hole` redirect, and observes the atlas shell in a truthful ready, fallback, or unsupported state. It never reads a lensed pixel or waits for a hyperspace phase: `host.init()` resolves at the ready stage before any frame renders, so its `ARRIVAL_TIMEOUT_MS` ceiling (180 s in CI, env-overridable) is a safety net for a hung init rather than an expected wait. This is the slowest-still-bounded hosted step; its own `check-smoke-coverage` assertion (expected 1) makes a skip fail.
 
 Why the full behavioral/parity/golden suite is NOT a hosted job: hosted runners have no GPU, so heavy TSL lensing/Kerr shaders and the full-screen hyperspace transition compile/render at seconds-per-frame under software WebGL2, and hosted runner speed varies wildly run-to-run (a black-hole arrival measured 18s in one hosted run and >180s in another). No fixed timeout survives that variance, so the full suite cannot be a *stable* hosted gate. It is a local capable-runner gate instead (see below) — this is explicit environment routing, not silent coverage reduction.
 
