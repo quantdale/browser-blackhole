@@ -1,0 +1,116 @@
+{
+  "commit": "48df7881f4c1ca6247cbefb9cf6a966f534063c8",
+  "spin": 0.9,
+  "cameraPosition": [
+    12,
+    1.6,
+    6
+  ],
+  "escapeRadiusRg": 32,
+  "productionPoleSin": 0.04,
+  "note": "directionErrorDeg compares the f32-emulated terminal direction against the UNGATED binary64 oracle. null means the f32 run never produced a direction (non-finite, wrapped, or captured), which is itself the finding.",
+  "gatedRayCount": 4,
+  "gatedRaysWithDirectionError": 4,
+  "gatedDirectionErrorDegRange": [
+    29.561,
+    159.474
+  ],
+  "rows": [
+    {
+      "offsetRg": 1,
+      "f64Classification": "captured",
+      "f64MinSinTheta": 0.73222,
+      "f64GatedByProductionPolicy": false,
+      "f64NullResidual": 4.191e-10,
+      "f64CarterDrift": 6.873e-11,
+      "f32Classification": "captured",
+      "f32MinSinTheta": 0.7322,
+      "f32Steps": 3325,
+      "directionErrorDeg": null
+    },
+    {
+      "offsetRg": 2,
+      "f64Classification": "captured",
+      "f64MinSinTheta": 0.15461,
+      "f64GatedByProductionPolicy": false,
+      "f64NullResidual": 8.301e-12,
+      "f64CarterDrift": 1.188e-12,
+      "f32Classification": "captured",
+      "f32MinSinTheta": 0.1546,
+      "f32Steps": 6460,
+      "directionErrorDeg": null
+    },
+    {
+      "offsetRg": 3,
+      "f64Classification": "captured",
+      "f64MinSinTheta": 0.045918,
+      "f64GatedByProductionPolicy": false,
+      "f64NullResidual": 1.919e-10,
+      "f64CarterDrift": 1.859e-11,
+      "f32Classification": "captured",
+      "f32MinSinTheta": 0.045918,
+      "f32Steps": 6819,
+      "directionErrorDeg": null
+    },
+    {
+      "offsetRg": 4,
+      "f64Classification": "captured",
+      "f64MinSinTheta": 0.035348,
+      "f64GatedByProductionPolicy": false,
+      "f64NullResidual": 1.177e-9,
+      "f64CarterDrift": 3.799e-11,
+      "f32Classification": "captured",
+      "f32MinSinTheta": 0.035348,
+      "f32Steps": 7225,
+      "directionErrorDeg": null
+    },
+    {
+      "offsetRg": 5,
+      "f64Classification": "numerical-failure",
+      "f64MinSinTheta": 0.02893,
+      "f64GatedByProductionPolicy": true,
+      "f64NullResidual": 2.147e-13,
+      "f64CarterDrift": 5.492e-13,
+      "f32Classification": "escaped",
+      "f32MinSinTheta": 0.02893,
+      "f32Steps": 27071,
+      "directionErrorDeg": 29.561
+    },
+    {
+      "offsetRg": 6,
+      "f64Classification": "numerical-failure",
+      "f64MinSinTheta": 0.024693,
+      "f64GatedByProductionPolicy": true,
+      "f64NullResidual": 4.6e-14,
+      "f64CarterDrift": 4.964e-14,
+      "f32Classification": "escaped",
+      "f32MinSinTheta": 0.024693,
+      "f32Steps": 13993,
+      "directionErrorDeg": 53.331
+    },
+    {
+      "offsetRg": 8,
+      "f64Classification": "numerical-failure",
+      "f64MinSinTheta": 0.019575,
+      "f64GatedByProductionPolicy": true,
+      "f64NullResidual": 1.544e-14,
+      "f64CarterDrift": 1.311e-14,
+      "f32Classification": "escaped",
+      "f32MinSinTheta": 0.019575,
+      "f32Steps": 15929,
+      "directionErrorDeg": 136.653
+    },
+    {
+      "offsetRg": 12,
+      "f64Classification": "numerical-failure",
+      "f64MinSinTheta": 0.014945,
+      "f64GatedByProductionPolicy": true,
+      "f64NullResidual": 1.436e-14,
+      "f64CarterDrift": 1.797e-14,
+      "f32Classification": "escaped",
+      "f32MinSinTheta": 0.014945,
+      "f32Steps": 21339,
+      "directionErrorDeg": 159.474
+    }
+  ]
+}

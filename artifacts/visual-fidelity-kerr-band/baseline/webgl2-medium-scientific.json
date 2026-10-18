@@ -1,0 +1,156 @@
+{
+  "label": "webgl2-medium-scientific",
+  "commit": "1b01b7edb0cc650b697f1d7148435be3ece3b1af",
+  "backend": "webgl2",
+  "preset": "kerr-high-prograde",
+  "tier": "medium",
+  "scale": 1,
+  "bloom": 0,
+  "exposure": 1,
+  "toneMapping": "linear",
+  "adapter": "",
+  "userAgent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/155.0.0.0 Safari/537.36",
+  "cssSize": [
+    973,
+    727
+  ],
+  "internalPhysical": [
+    972,
+    727
+  ],
+  "internalStatus": [
+    972,
+    727
+  ],
+  "renderScalePhysical": 0.8,
+  "renderScaleStatus": 0.8,
+  "sameGeometry": true,
+  "physicalSnapshot": {
+    "pattern": "kerr geodesic lensing + accretion disk (numerical)",
+    "diskAtmosphereScale": 0,
+    "diskAtmosphere": "Cinematic-only finite-thickness factor on the existing g^3 disk radiance. The path-length proxy is 1/max(|n·chord|, 0.12), capped. It does not recompute redshift, does not move the geodesic hit, and is off in Scientific mode.",
+    "lensingWired": true,
+    "metric": "kerr",
+    "spin": 0.9,
+    "effectiveSpin": 0.9,
+    "spinConvention": "signed dimensionless a* = Jc/(GM^2); +Y axis; disk always +Y-corotating",
+    "kerrDiskInnerRg": 2.320883041761887,
+    "schwarzschildDiskInnerRg": 6,
+    "activePassKind": "kerr",
+    "lensingResidentPassKinds": [
+      "kerr"
+    ],
+    "lensingResidentPassCount": 1,
+    "trajectoryBackendRequested": "auto",
+    "trajectoryBackendEffective": "numerical-kerr",
+    "lutFamilyLoaded": false,
+    "lutFamilyDir": null,
+    "lutWebgl2Filterable": null,
+    "lutFallbackReason": "lut-inapplicable-while-kerr-active",
+    "criticalRegionSampling": {
+      "method": "validated radius-aware adaptive step sizing",
+      "photonSphereRg": 3,
+      "horizonFloorScale": 0.02,
+      "targetedSupersampling": false,
+      "rationale": "temporal jitter/history and the existing near-horizon step floor pass the critical-curve stability gate; extra ray bundles were not justified by the measured cost/artifact tradeoff"
+    },
+    "estimatedGpuMemoryMBIsEstimate": true,
+    "observerMode": "camera",
+    "observerReadout": {
+      "valid": true,
+      "invalidReason": null,
+      "terminalReason": null,
+      "radiusRg": 13.511476603243631,
+      "betaMagnitude": 0,
+      "gammaFactor": 0.9999999999999999,
+      "properTimeTau": 0,
+      "coordinateTimeT": 0,
+      "circularOmega": null,
+      "circularUnstable": false,
+      "positionWorld": [
+        12.000000000000002,
+        1.6000000000000012,
+        6.0000000000000036
+      ]
+    },
+    "observerProperTimeTau": 0
+  },
+  "statusSnapshot": {
+    "pattern": "kerr geodesic lensing + accretion disk (numerical)",
+    "diskAtmosphereScale": 0,
+    "diskAtmosphere": "Cinematic-only finite-thickness factor on the existing g^3 disk radiance. The path-length proxy is 1/max(|n·chord|, 0.12), capped. It does not recompute redshift, does not move the geodesic hit, and is off in Scientific mode.",
+    "lensingWired": true,
+    "metric": "kerr",
+    "spin": 0.9,
+    "effectiveSpin": 0.9,
+    "spinConvention": "signed dimensionless a* = Jc/(GM^2); +Y axis; disk always +Y-corotating",
+    "kerrDiskInnerRg": 2.320883041761887,
+    "schwarzschildDiskInnerRg": 6,
+    "activePassKind": "kerr",
+    "lensingResidentPassKinds": [
+      "kerr"
+    ],
+    "lensingResidentPassCount": 1,
+    "trajectoryBackendRequested": "auto",
+    "trajectoryBackendEffective": "numerical-kerr",
+    "lutFamilyLoaded": false,
+    "lutFamilyDir": null,
+    "lutWebgl2Filterable": null,
+    "lutFallbackReason": "lut-inapplicable-while-kerr-active",
+    "criticalRegionSampling": {
+      "method": "validated radius-aware adaptive step sizing",
+      "photonSphereRg": 3,
+      "horizonFloorScale": 0.02,
+      "targetedSupersampling": false,
+      "rationale": "temporal jitter/history and the existing near-horizon step floor pass the critical-curve stability gate; extra ray bundles were not justified by the measured cost/artifact tradeoff"
+    },
+    "estimatedGpuMemoryMBIsEstimate": true,
+    "observerMode": "camera",
+    "observerReadout": {
+      "valid": true,
+      "invalidReason": null,
+      "terminalReason": null,
+      "radiusRg": 13.511476603243631,
+      "betaMagnitude": 0,
+      "gammaFactor": 0.9999999999999999,
+      "properTimeTau": 0,
+      "coordinateTimeT": 0,
+      "circularOmega": null,
+      "circularUnstable": false,
+      "positionWorld": [
+        12.000000000000002,
+        1.6000000000000012,
+        6.0000000000000036
+      ]
+    },
+    "observerProperTimeTau": 0
+  },
+  "physicalCensus": {
+    "total": 706644,
+    "magentaPixels": 8273,
+    "magentaPercent": 1.1707,
+    "darkPercent": 52.4703,
+    "otherPercent": 46.359
+  },
+  "statusCensus": {
+    "total": 706644,
+    "capturedBlackPercent": 40.1803,
+    "escapedCyanPercent": 58.6489,
+    "maxStepsPercent": 0.1673,
+    "thetaWrapPercent": 0.0057,
+    "polePercent": 0.9978,
+    "otherMagentaPercent": 0,
+    "invalidInitialPercent": 0,
+    "blendUnclassifiedPercent": 0
+  },
+  "overlap": {
+    "bothPixels": 8273,
+    "onlyPhysicalPixels": 0,
+    "onlyStatusPixels": 0,
+    "unionPixels": 8273,
+    "iou": 1,
+    "fractionOfPhysicalMagentaExplainedByFailures": 100,
+    "fractionOfFailuresShownMagenta": 100
+  },
+  "consoleErrors": []
+}

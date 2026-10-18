@@ -1,0 +1,1132 @@
+{
+  "commit": "1b01b7edb0cc650b697f1d7148435be3ece3b1af",
+  "backend": "webgpu",
+  "tier": "high",
+  "adapter": "nvidia lovelace",
+  "internal": [
+    972,
+    727
+  ],
+  "preset": "kerr-high-prograde",
+  "spin": 0.9,
+  "aspect": 1,
+  "escapeRadiusRg": 1000,
+  "cameraPosition": [
+    12,
+    1.600000000000001,
+    6.000000000000002
+  ],
+  "rows": [
+    {
+      "label": "polar-band x=-0.06 y=0.42",
+      "ndc": [
+        -0.06,
+        0.42
+      ],
+      "dir": [
+        -0.9034865808123788,
+        0.09635979298384859,
+        -0.41764433264210205
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 6372,
+        "minSinTheta": 0.088976,
+        "nullResidualMax": 1.18e-10,
+        "carterDrift": 1.297e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 6372,
+        "minSinTheta": 0.088976,
+        "nullResidualMax": 1.18e-10,
+        "carterDrift": 1.297e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.06 y=0.5",
+      "ndc": [
+        -0.06,
+        0.5
+      ],
+      "dir": [
+        -0.8992830317920101,
+        0.13545710128116736,
+        -0.41586223974229003
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 6060,
+        "minSinTheta": 0.075242,
+        "nullResidualMax": 1.103e-9,
+        "carterDrift": 3.668e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 6060,
+        "minSinTheta": 0.075242,
+        "nullResidualMax": 1.103e-9,
+        "carterDrift": 3.668e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.06 y=0.58",
+      "ndc": [
+        -0.06,
+        0.58
+      ],
+      "dir": [
+        -0.8938120186912268,
+        0.17356684656967805,
+        -0.41349077984275695
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 7138,
+        "minSinTheta": 0.064962,
+        "nullResidualMax": 1.113e-10,
+        "carterDrift": 1.34e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 7138,
+        "minSinTheta": 0.064962,
+        "nullResidualMax": 1.113e-10,
+        "carterDrift": 1.34e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.06 y=0.66",
+      "ndc": [
+        -0.06,
+        0.66
+      ],
+      "dir": [
+        -0.8871804728241622,
+        0.21056078923691196,
+        -0.41057881420675457
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 48248,
+        "minSinTheta": 0.056986,
+        "nullResidualMax": 1.016e-12,
+        "carterDrift": 1.032e-12,
+        "turnsAngular": 3,
+        "finalDir": [
+          -0.037272898792824374,
+          0.9981581722985085,
+          -0.04786433003063068
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 48248,
+        "minSinTheta": 0.056986,
+        "nullResidualMax": 1.016e-12,
+        "carterDrift": 1.032e-12,
+        "finalDir": [
+          -0.037272898792824374,
+          0.9981581722985085,
+          -0.04786433003063068
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "polar-band x=-0.06 y=0.74",
+      "ndc": [
+        -0.06,
+        0.74
+      ],
+      "dir": [
+        -0.8795027468616277,
+        0.24633392638764892,
+        -0.4071787260814302
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 38093,
+        "minSinTheta": 0.050618,
+        "nullResidualMax": 1.288e-13,
+        "carterDrift": 5.681e-13,
+        "turnsAngular": 2,
+        "finalDir": [
+          0.25714044306606254,
+          -0.9084077302075146,
+          0.3296576834217889
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 38093,
+        "minSinTheta": 0.050618,
+        "nullResidualMax": 1.288e-13,
+        "carterDrift": 5.681e-13,
+        "finalDir": [
+          0.25714044306606254,
+          -0.9084077302075146,
+          0.3296576834217889
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "polar-band x=-0.06 y=0.82",
+      "ndc": [
+        -0.06,
+        0.82
+      ],
+      "dir": [
+        -0.8708971364489112,
+        0.2808044491194736,
+        -0.40334481412284906
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 21263,
+        "minSinTheta": 0.045413,
+        "nullResidualMax": 7.718e-14,
+        "carterDrift": 7.506e-14,
+        "turnsAngular": 1,
+        "finalDir": [
+          -0.11048324416183315,
+          -0.9773883524091328,
+          -0.18029271015334372
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 21263,
+        "minSinTheta": 0.045413,
+        "nullResidualMax": 7.718e-14,
+        "carterDrift": 7.506e-14,
+        "finalDir": [
+          -0.11048324416183315,
+          -0.9773883524091328,
+          -0.18029271015334372
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "polar-band x=-0.03 y=0.42",
+      "ndc": [
+        -0.03,
+        0.42
+      ],
+      "dir": [
+        -0.8969797298221651,
+        0.09639342296567681,
+        -0.4314344356876443
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 7907,
+        "minSinTheta": 0.020953,
+        "nullResidualMax": 1.085e-10,
+        "carterDrift": 1.042e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 7907,
+        "minSinTheta": 0.020953,
+        "nullResidualMax": 1.085e-10,
+        "carterDrift": 1.042e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.03 y=0.5",
+      "ndc": [
+        -0.03,
+        0.5
+      ],
+      "dir": [
+        -0.8928328561551518,
+        0.1355034936743581,
+        -0.42952100550715483
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 7207,
+        "minSinTheta": 0.017411,
+        "nullResidualMax": 1.386e-9,
+        "carterDrift": 7.211e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 7207,
+        "minSinTheta": 0.017411,
+        "nullResidualMax": 1.386e-9,
+        "carterDrift": 7.211e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.03 y=0.58",
+      "ndc": [
+        -0.03,
+        0.58
+      ],
+      "dir": [
+        -0.8874262866791857,
+        0.17362501605309738,
+        -0.4269999291701971
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 8112,
+        "minSinTheta": 0.014726,
+        "nullResidualMax": 5.643e-10,
+        "carterDrift": 2.751e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 8112,
+        "minSinTheta": 0.014726,
+        "nullResidualMax": 5.643e-10,
+        "carterDrift": 2.751e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.03 y=0.66",
+      "ndc": [
+        -0.03,
+        0.66
+      ],
+      "dir": [
+        -0.8808662137152152,
+        0.2106296608510981,
+        -0.42392199695789845
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 12252,
+        "minSinTheta": 0.012615,
+        "nullResidualMax": 8.29e-10,
+        "carterDrift": 2.727e-11,
+        "turnsAngular": 2,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 12252,
+        "minSinTheta": 0.012615,
+        "nullResidualMax": 8.29e-10,
+        "carterDrift": 2.727e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.03 y=0.74",
+      "ndc": [
+        -0.03,
+        0.74
+      ],
+      "dir": [
+        -0.873266216345603,
+        0.2464123702571878,
+        -0.42034159819564487
+      ],
+      "gate040": {
+        "classification": "numerical-failure",
+        "reason": "escaped through pole passage: min|sin(theta)|=1.09e-2",
+        "steps": 43122,
+        "minSinTheta": 0.010902,
+        "nullResidualMax": 4.263e-13,
+        "carterDrift": 1.088e-12,
+        "turnsAngular": 2,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 43122,
+        "minSinTheta": 0.010902,
+        "nullResidualMax": 4.263e-13,
+        "carterDrift": 1.088e-12,
+        "finalDir": [
+          0.2771633196989027,
+          -0.8262819459791086,
+          0.49034542922562385
+        ]
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=-0.03 y=0.82",
+      "ndc": [
+        -0.03,
+        0.82
+      ],
+      "dir": [
+        -0.8647438017031842,
+        0.2808913128265228,
+        -0.4163150583326487
+      ],
+      "gate040": {
+        "classification": "numerical-failure",
+        "reason": "escaped through pole passage: min|sin(theta)|=9.48e-3",
+        "steps": 26048,
+        "minSinTheta": 0.0094793,
+        "nullResidualMax": 5.05e-13,
+        "carterDrift": 5.25e-13,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 26048,
+        "minSinTheta": 0.0094793,
+        "nullResidualMax": 5.05e-13,
+        "carterDrift": 5.25e-13,
+        "finalDir": [
+          -0.08813655545924413,
+          -0.9900027885177956,
+          -0.11012005411716937
+        ]
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0 y=0.42",
+      "ndc": [
+        0,
+        0.42
+      ],
+      "dir": [
+        -0.8902611505551765,
+        0.09640464078671976,
+        -0.44513057527758837
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 7073,
+        "minSinTheta": 0.047357,
+        "nullResidualMax": 1.014e-10,
+        "carterDrift": 9.41e-12,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 7073,
+        "minSinTheta": 0.047357,
+        "nullResidualMax": 1.014e-10,
+        "carterDrift": 9.41e-12,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0 y=0.5",
+      "ndc": [
+        0,
+        0.5
+      ],
+      "dir": [
+        -0.8861758783462683,
+        0.13551896840119715,
+        -0.44308793917313427
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 6445,
+        "minSinTheta": 0.0406,
+        "nullResidualMax": 1.555e-9,
+        "carterDrift": 1.03e-10,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 6445,
+        "minSinTheta": 0.0406,
+        "nullResidualMax": 1.555e-9,
+        "carterDrift": 1.03e-10,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0 y=0.58",
+      "ndc": [
+        0,
+        0.58
+      ],
+      "dir": [
+        -0.8808394249992774,
+        0.17364441888145538,
+        -0.4404197124996388
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 7138,
+        "minSinTheta": 0.035626,
+        "nullResidualMax": 1.478e-9,
+        "carterDrift": 5.15e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 7138,
+        "minSinTheta": 0.035626,
+        "nullResidualMax": 1.478e-9,
+        "carterDrift": 5.15e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0 y=0.66",
+      "ndc": [
+        0,
+        0.66
+      ],
+      "dir": [
+        -0.874357120713146,
+        0.2106526330781828,
+        -0.4371785603565731
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 11422,
+        "minSinTheta": 0.031837,
+        "nullResidualMax": 4.697e-10,
+        "carterDrift": 3.619e-11,
+        "turnsAngular": 2,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 11422,
+        "minSinTheta": 0.031837,
+        "nullResidualMax": 4.697e-10,
+        "carterDrift": 3.619e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0 y=0.74",
+      "ndc": [
+        0,
+        0.74
+      ],
+      "dir": [
+        -0.8668416457601652,
+        0.24643853487180123,
+        -0.4334208228800827
+      ],
+      "gate040": {
+        "classification": "numerical-failure",
+        "reason": "escaped through pole passage: min|sin(theta)|=2.89e-2",
+        "steps": 30973,
+        "minSinTheta": 0.028871,
+        "nullResidualMax": 4.233e-13,
+        "carterDrift": 8.453e-13,
+        "turnsAngular": 2,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 30973,
+        "minSinTheta": 0.028871,
+        "nullResidualMax": 4.233e-13,
+        "carterDrift": 8.453e-13,
+        "finalDir": [
+          0.282957039754814,
+          -0.7053112008324007,
+          0.6499780178079483
+        ]
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0 y=0.82",
+      "ndc": [
+        0,
+        0.82
+      ],
+      "dir": [
+        -0.8584095960782807,
+        0.28092028531400853,
+        -0.42920479803914047
+      ],
+      "gate040": {
+        "classification": "numerical-failure",
+        "reason": "escaped through pole passage: min|sin(theta)|=2.65e-2",
+        "steps": 30978,
+        "minSinTheta": 0.026497,
+        "nullResidualMax": 8.559e-14,
+        "carterDrift": 8.927e-14,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 30978,
+        "minSinTheta": 0.026497,
+        "nullResidualMax": 8.559e-14,
+        "carterDrift": 8.927e-14,
+        "finalDir": [
+          -0.06896240571643254,
+          -0.9968829002700469,
+          -0.038323227251652436
+        ]
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.03 y=0.42",
+      "ndc": [
+        0.03,
+        0.42
+      ],
+      "dir": [
+        -0.8833353864434144,
+        0.09639342296567681,
+        -0.4587231224451458
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 6074,
+        "minSinTheta": 0.11506,
+        "nullResidualMax": 1.024e-10,
+        "carterDrift": 9.793e-12,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 6074,
+        "minSinTheta": 0.11506,
+        "nullResidualMax": 1.024e-10,
+        "carterDrift": 9.793e-12,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.03 y=0.5",
+      "ndc": [
+        0.03,
+        0.5
+      ],
+      "dir": [
+        -0.8793165180988148,
+        0.1355034936743581,
+        -0.4565536816198287
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 5635,
+        "minSinTheta": 0.098229,
+        "nullResidualMax": 1.607e-9,
+        "carterDrift": 1.246e-10,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 5635,
+        "minSinTheta": 0.098229,
+        "nullResidualMax": 1.607e-9,
+        "carterDrift": 1.246e-10,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.03 y=0.58",
+      "ndc": [
+        0.03,
+        0.58
+      ],
+      "dir": [
+        -0.874055715343669,
+        0.17362501605309738,
+        -0.45374107184123047
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 6118,
+        "minSinTheta": 0.085725,
+        "nullResidualMax": 2.561e-9,
+        "carterDrift": 8.898e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 6118,
+        "minSinTheta": 0.085725,
+        "nullResidualMax": 2.561e-9,
+        "carterDrift": 8.898e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.03 y=0.66",
+      "ndc": [
+        0.03,
+        0.66
+      ],
+      "dir": [
+        -0.8676573257954477,
+        0.2106296608510981,
+        -0.4503397727974332
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 11099,
+        "minSinTheta": 0.076112,
+        "nullResidualMax": 1.057e-11,
+        "carterDrift": 3.072e-13,
+        "turnsAngular": 2,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 11099,
+        "minSinTheta": 0.076112,
+        "nullResidualMax": 1.057e-11,
+        "carterDrift": 3.072e-13,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.03 y=0.74",
+      "ndc": [
+        0.03,
+        0.74
+      ],
+      "dir": [
+        -0.8602330083638777,
+        0.24641237025718782,
+        -0.4464080141590957
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 22319,
+        "minSinTheta": 0.068515,
+        "nullResidualMax": 1.328e-13,
+        "carterDrift": 2.116e-13,
+        "turnsAngular": 2,
+        "finalDir": [
+          0.2726908369747275,
+          -0.5395328907975179,
+          0.796582680691525
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 22319,
+        "minSinTheta": 0.068515,
+        "nullResidualMax": 1.328e-13,
+        "carterDrift": 2.116e-13,
+        "finalDir": [
+          0.2726908369747275,
+          -0.5395328907975179,
+          0.796582680691525
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "polar-band x=0.03 y=0.82",
+      "ndc": [
+        0.03,
+        0.82
+      ],
+      "dir": [
+        -0.8518983276880293,
+        0.2808913128265228,
+        -0.4420060063629583
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 36739,
+        "minSinTheta": 0.062377,
+        "nullResidualMax": 7.589e-14,
+        "carterDrift": 2.782e-13,
+        "turnsAngular": 1,
+        "finalDir": [
+          -0.05335684872693092,
+          -0.9980127533914123,
+          0.03352000540011103
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 36739,
+        "minSinTheta": 0.062377,
+        "nullResidualMax": 7.589e-14,
+        "carterDrift": 2.782e-13,
+        "finalDir": [
+          -0.05335684872693092,
+          -0.9980127533914123,
+          0.03352000540011103
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "polar-band x=0.06 y=0.42",
+      "ndc": [
+        0.06,
+        0.42
+      ],
+      "dir": [
+        -0.8762074146011087,
+        0.09635979298384859,
+        -0.47220266506464187
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 5485,
+        "minSinTheta": 0.1813,
+        "nullResidualMax": 1.236e-10,
+        "carterDrift": 1.221e-11,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 5485,
+        "minSinTheta": 0.1813,
+        "nullResidualMax": 1.236e-10,
+        "carterDrift": 1.221e-11,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.06 y=0.5",
+      "ndc": [
+        0.06,
+        0.5
+      ],
+      "dir": [
+        -0.8722596108690381,
+        0.1354571012811674,
+        -0.4699090815882343
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 5193,
+        "minSinTheta": 0.15493,
+        "nullResidualMax": 1.735e-9,
+        "carterDrift": 1.492e-10,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 5193,
+        "minSinTheta": 0.15493,
+        "nullResidualMax": 1.735e-9,
+        "carterDrift": 1.492e-10,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.06 y=0.58",
+      "ndc": [
+        0.06,
+        0.58
+      ],
+      "dir": [
+        -0.8670798350889417,
+        0.1735668465696781,
+        -0.4669551470473276
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 5575,
+        "minSinTheta": 0.13521,
+        "nullResidualMax": 3.988e-9,
+        "carterDrift": 1.207e-10,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 5575,
+        "minSinTheta": 0.13521,
+        "nullResidualMax": 3.988e-9,
+        "carterDrift": 1.207e-10,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.06 y=0.66",
+      "ndc": [
+        0.06,
+        0.66
+      ],
+      "dir": [
+        -0.8607713350599009,
+        0.21056078923691196,
+        -0.46339708973527716
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 10089,
+        "minSinTheta": 0.11996,
+        "nullResidualMax": 1.636e-11,
+        "carterDrift": 1.355e-12,
+        "turnsAngular": 1,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 10089,
+        "minSinTheta": 0.11996,
+        "nullResidualMax": 1.636e-11,
+        "carterDrift": 1.355e-12,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "polar-band x=0.06 y=0.74",
+      "ndc": [
+        0.06,
+        0.74
+      ],
+      "dir": [
+        -0.8534446289821205,
+        0.2463339263876489,
+        -0.4592949618404441
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 18201,
+        "minSinTheta": 0.10785,
+        "nullResidualMax": 1.406e-13,
+        "carterDrift": 1.346e-13,
+        "turnsAngular": 2,
+        "finalDir": [
+          0.24653223628663495,
+          -0.3252671800049399,
+          0.912920104983533
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 18201,
+        "minSinTheta": 0.10785,
+        "nullResidualMax": 1.406e-13,
+        "carterDrift": 1.346e-13,
+        "finalDir": [
+          0.24653223628663495,
+          -0.3252671800049399,
+          0.912920104983533
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "polar-band x=0.06 y=0.82",
+      "ndc": [
+        0.06,
+        0.82
+      ],
+      "dir": [
+        -0.8452141331676258,
+        0.2808044491194736,
+        -0.4547108206854196
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 34488,
+        "minSinTheta": 0.098023,
+        "nullResidualMax": 8.758e-14,
+        "carterDrift": 1.998e-13,
+        "turnsAngular": 2,
+        "finalDir": [
+          -0.041666722747058266,
+          -0.9937413451085902,
+          0.10364373226244536
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 34488,
+        "minSinTheta": 0.098023,
+        "nullResidualMax": 8.758e-14,
+        "carterDrift": 1.998e-13,
+        "finalDir": [
+          -0.041666722747058266,
+          -0.9937413451085902,
+          0.10364373226244536
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "control-shadow-centre",
+      "ndc": [
+        0,
+        0
+      ],
+      "dir": [
+        -0.8881338696260053,
+        -0.11841784928346744,
+        -0.44406693481300274
+      ],
+      "gate040": {
+        "classification": "captured",
+        "reason": "captured",
+        "steps": 2934,
+        "minSinTheta": 0.99123,
+        "nullResidualMax": 2.567e-9,
+        "carterDrift": 6.261e-12,
+        "turnsAngular": 0,
+        "finalDir": null
+      },
+      "gate000": {
+        "classification": "captured",
+        "steps": 2934,
+        "minSinTheta": 0.99123,
+        "nullResidualMax": 2.567e-9,
+        "carterDrift": 6.261e-12,
+        "finalDir": null
+      },
+      "directionShiftDeg": null
+    },
+    {
+      "label": "control-equator-left",
+      "ndc": [
+        -0.55,
+        0
+      ],
+      "dir": [
+        -0.9769236153745254,
+        -0.11384360981404822,
+        -0.18072045326435215
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 9242,
+        "minSinTheta": 0.99296,
+        "nullResidualMax": 6.949e-14,
+        "carterDrift": 1.992e-14,
+        "turnsAngular": 1,
+        "finalDir": [
+          0.8146479221648287,
+          -0.0208184947207413,
+          -0.5795820504381496
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 9242,
+        "minSinTheta": 0.99296,
+        "nullResidualMax": 6.949e-14,
+        "carterDrift": 1.992e-14,
+        "finalDir": [
+          0.8146479221648287,
+          -0.0208184947207413,
+          -0.5795820504381496
+        ]
+      },
+      "directionShiftDeg": 0
+    },
+    {
+      "label": "control-corner",
+      "ndc": [
+        0.85,
+        0.85
+      ],
+      "dir": [
+        -0.6248583649352776,
+        0.27207224602190355,
+        -0.7317982759716014
+      ],
+      "gate040": {
+        "classification": "escaped",
+        "reason": null,
+        "steps": 9826,
+        "minSinTheta": 0.71049,
+        "nullResidualMax": 3.389e-14,
+        "carterDrift": 2.153e-14,
+        "turnsAngular": 1,
+        "finalDir": [
+          -0.8600386325475169,
+          -0.49793434524796665,
+          -0.11133255744963419
+        ]
+      },
+      "gate000": {
+        "classification": "escaped",
+        "steps": 9826,
+        "minSinTheta": 0.71049,
+        "nullResidualMax": 3.389e-14,
+        "carterDrift": 2.153e-14,
+        "finalDir": [
+          -0.8600386325475169,
+          -0.49793434524796665,
+          -0.11133255744963419
+        ]
+      },
+      "directionShiftDeg": 0
+    }
+  ]
+}

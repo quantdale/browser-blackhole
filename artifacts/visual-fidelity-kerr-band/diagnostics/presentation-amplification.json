@@ -1,0 +1,61 @@
+{
+  "commit": "1b01b7edb0cc650b697f1d7148435be3ece3b1af",
+  "rows": [
+    {
+      "config": "scientific-nobloom-linear",
+      "bloom": 0,
+      "exposure": 1,
+      "tonemap": "linear",
+      "internal": [
+        972,
+        727
+      ],
+      "corePercent": 1.1274,
+      "tintedPercent": 1.1315,
+      "dimPurplePercent": 0.0041,
+      "spread": 1.004
+    },
+    {
+      "config": "scientific-bloom-linear",
+      "bloom": 1,
+      "exposure": 1,
+      "tonemap": "linear",
+      "internal": [
+        972,
+        727
+      ],
+      "corePercent": 1.1274,
+      "tintedPercent": 1.1315,
+      "dimPurplePercent": 0.0041,
+      "spread": 1.004
+    },
+    {
+      "config": "cinematic-shipped",
+      "bloom": 1,
+      "exposure": 1.1,
+      "tonemap": "aces-filmic",
+      "internal": [
+        972,
+        727
+      ],
+      "corePercent": 1.1274,
+      "tintedPercent": 1.1318,
+      "dimPurplePercent": 0,
+      "spread": 1.004
+    },
+    {
+      "config": "scientific-nobloom-aces",
+      "bloom": 0,
+      "exposure": 1,
+      "tonemap": "aces-filmic",
+      "internal": [
+        972,
+        727
+      ],
+      "corePercent": 1.1274,
+      "tintedPercent": 1.1318,
+      "dimPurplePercent": 0.0044,
+      "spread": 1.004
+    }
+  ]
+}

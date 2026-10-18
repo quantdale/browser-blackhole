@@ -16,6 +16,8 @@ artifacts/cinematic-visual-fidelity/*
 !artifacts/visual-fidelity-agn-jets/**
 !artifacts/visual-fidelity-agn-disk
 !artifacts/visual-fidelity-agn-disk/**
+!artifacts/visual-fidelity-kerr-band
+!artifacts/visual-fidelity-kerr-band/**
 test-results/
 playwright-report/
 blob-report/
