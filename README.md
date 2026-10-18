@@ -39,7 +39,7 @@ npm run preview # serve the production build locally
 
 ```bash
 npm ci                 # exact lockfile install
-npm run check          # format + lint + typecheck + unit tests + build
+npm run check          # format + lint + typecheck + unit tests + build + repo checks
 # Browser suite. The default (Chromium) project runs the whole behavioral +
 # numerical-parity + visual-golden suite; visual goldens need a WebGPU-capable
 # browser (their baselines are hardware-WebGPU captures).

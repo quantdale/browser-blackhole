@@ -56,6 +56,13 @@ jobs:
         run: npm run coverage:report
       - name: Command-surface check (documented commands must exist)
         run: node scripts/check-command-surface.mjs
+      # spatial-atlas-status-honesty + hosted-product-boot-coverage: these
+      # repository checks run in the hosted quality job too (they are part of
+      # `npm run check` locally, but this job invokes each step explicitly).
+      - name: Implementation-status honesty (planning-complete is not implementation-complete)
+        run: npm run check:status-honesty
+      - name: Shared-shader / legacy-state boundary
+        run: npm run check:shader-boundary
       - run: npm run build
 
   browser-smoke:

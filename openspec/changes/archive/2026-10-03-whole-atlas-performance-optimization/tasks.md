@@ -57,7 +57,7 @@ Mark a task complete only with benchmark and correctness evidence. A code change
       carries `renderTelemetry` and refuses on zero frames rendered.
 - [DEFERRED] Record startup bundle/chunk sizes and first-interactive timing. — DEFERRED: Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive timing is not, so this stays unchecked rather than half-claimed.
       Bundle/chunk bytes ARE recorded (see the WS3 artifact); first-interactive
-      timing is not, so this stays unchecked rather than half-claimed.
+      timing is not, so this stays a non-checkbox record rather than half-claimed.
 - [x] Archive baseline under benchmarks/results with exact SHA.
 
 ## 1. Shared telemetry

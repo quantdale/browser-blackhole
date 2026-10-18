@@ -1,14 +1,17 @@
 ## 2026-10-17 session (8) — all seven OpenSpec hardening changes implemented
 
-Status: **COMPLETE.** All seven implementable OpenSpec changes delivered this
-session are implemented, evidence-marked, and committed one-coherent-
-checkpoint-per-change, and the three new gates from this session
-(implementation-status honesty, archived-tasks checkbox correctness, hosted
-product-entry + shared-shader boundary) run both locally in `npm run check`
-and in the hosted quality job so every future CI run enforces them.
+Status: **COMPLETE (review-reconciled).** All seven implementable OpenSpec
+changes delivered this session are implemented, evidence-marked, and committed
+change-by-change, with the code-review follow-ups in their own focused
+commits (98d5e62/9c41748/a89e097) and this standards/spec reconciliation
+commit. Every gate from this session now has a named home: implementation-
+status honesty and the shared-shader boundary (plus both OpenSpec strict
+validators) run in the hosted QUALITY job; the product-entry atlas-shell
+smoke runs in the hosted BROWSER-SMOKE job with its own coverage assertion;
+all of them also run locally (`npm run check` covers the two repository checks).
 
 - **`openspec validate --all --strict` → 24/24 PASSED. All 7 changes valid.** Working tree clean; `npm run check` fully
-  green (format/lint/type/69-file unit/build/status-honesty/shader-boundary/no-test-hook); browsers validated separately.
+  green (format/lint/type/70-file unit/build/status-honesty/shader-boundary/no-test-hook); product-entry Playwright row passed locally; hosted jobs are the residual execution evidence.
 
 A one-time exception to the archive-edit policy was authorized by
 `archive-validation-gate` itself — checkbox form only, in the two archives
@@ -26,7 +29,22 @@ named in its proposal (evidence re-verified in MASTER_PLAN §4 + STATE 2026-10-0
   reading "**implementation status: NOT STARTED**" with the explicit
   planning-complete ≠ implementation-complete statement; no task line
   touched. This one is documented in the MASTER_PLAN as a planning-only
-  change that is NOT to be implemented — next steps are on the user.
+  change that is NOT to be implemented — kept active by user decision
+  (2026-10-17), with its banner as the honest planning record.
+
+## Review reconciliation (2026-10-17, same session)
+
+A two-axis code review (standards + spec, diff 4f35235...HEAD) found and
+this session fixed: the Kerr terminal azimuthal term had no lock (now
+mutation-verified at 98d5e62); the status check accepted header-less
+zero-completed changes (now fails, 9c41748); the shader boundary was a
+directory scan, not the spec's import-graph scope (now a closure scan over
+`src/shaders/` + all `three/webgpu` TSL modules, with transitive and
+exemption fixtures, a89e097); the LUT runtime boundary test lacked a
+compared-count floor (now floors each side of b_c); CI's quality job invoked
+no new gate (now runs `check:status-honesty`, `check:shader-boundary`, and
+both OpenSpec validators; browser-smoke runs the product-entry spec); docs
+(`README.md`, `docs/CI_CD.md`) now describe the real chain and job contents.
 
 ## 2026-10-17 session (7) — Phase 6 FINAL CERTIFICATION — the hardening campaign is COMPLETE
 

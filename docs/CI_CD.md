@@ -4,14 +4,17 @@ CI must distinguish deterministic code/physics gates from environment-sensitive 
 
 ## 1. Required local aggregate
 
-`npm run check` (or selected package manager equivalent) should eventually execute, in deterministic order:
+`npm run check` (or selected package manager equivalent) executes, in deterministic order:
 
 1. format check;
 2. lint;
 3. TypeScript typecheck;
 4. unit tests;
-5. CPU physics/reference tests;
-6. build.
+5. CPU physics/reference tests (within the unit run);
+6. build;
+7. implementation-status honesty (`check:status-honesty` — planning-complete is not implementation-complete);
+8. shared-shader / legacy-state boundary (`check:shader-boundary`);
+9. test-hook absence (`check:no-test-hook`).
 
 Browser/visual/performance suites remain separate because they may require browsers, artifacts, or GPUs.
 
@@ -28,13 +31,17 @@ Recommended jobs:
 - lint;
 - typecheck;
 - unit/reference tests;
+- implementation-status honesty check (`npm run check:status-honesty`);
+- shared-shader / legacy-state boundary check (`npm run check:shader-boundary`);
+- install the pinned OpenSpec CLI and run `openspec validate --all --strict` and `openspec validate --archived --strict`;
 - build.
 
-### browser-smoke (Chromium, WebGL2 fallback; M0 boot/fallback smoke)
+### browser-smoke (Chromium, WebGL2 fallback; M0 boot/fallback smoke + product entry)
 
 - install the pinned Playwright Chromium browser (`--with-deps chromium`);
 - build and serve the production artifact;
-- run ONLY `tests/browser/smoke.spec.ts` on the `default` project (`--workers=1`);
+- run `tests/browser/smoke.spec.ts` on the `default` project (`--workers=1`) and assert its 5-test coverage (`check-smoke-coverage.mjs`);
+- run `tests/browser/product-entry.spec.ts` (bare-root product entry, no `legacy=1`, atlas shell) in its own step with its own coverage assertion;
 - archive screenshot/console logs on failure.
 
 This is the reliable hosted browser gate. It boots the ROOT experience — which renders the **cheap diagnostic gradient**, not the heavy lensing/Kerr passes — plus the forced-WebGL2 gradient and the forced-unsupported terminal UX. Being backend-agnostic and cheap, it is stable on software WebGL2 while still proving the app boots to a truthful ready/fallback/unsupported terminal state, the WebGL2 fallback path renders, the canvas is non-zero, interaction/resize are safe, and the console/page error channels stay clean (section 5). It is NOT a WebGPU or full-scene validation.
