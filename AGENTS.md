@@ -99,3 +99,9 @@ Never allow two workers to rewrite the same central shader/module concurrently w
 ## Definition of done
 
 A task is not done because it renders one attractive screenshot. It is done when its documented acceptance criteria pass, regressions are checked, and durable state is updated.
+
+## Cross-project UX, DX, and AX principles
+
+Cut taglines, helper text and secondary labels. If a screen needs them to make sense, fix the layout.
+
+Make the best decision that will elevate all three: the user experience (UX), developer experience (DX), and agent experience (AX) always, without breaking anything.
