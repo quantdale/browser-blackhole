@@ -16,7 +16,7 @@
  *     §12  weak-field check alpha ~= 4M/b
  *     §13  dedicated stable radial path for L ~= 0
  *     §16  frequency shift convention g = nu_obs/nu_emit
- * - docs/VALIDATION_VECTORS.md (fixtures built in ./validationVectors)
+ * - docs/VALIDATION_VECTORS.md (scenario contract; executable checks live in tests/unit)
  *
  * Fidelity class: DIRECT — IEEE-754 binary64 reference for the f32 GPU path
  * (docs/NUMERICAL_METHODS.md §18). Cross-implementation tolerances are owned
@@ -43,19 +43,6 @@
 /** 3-vector tuple in r_g units, relative to the black-hole center. */
 export type Vec3 = [number, number, number];
 
-/** Horizon radius in r_g units (docs/NUMERICAL_METHODS.md §1). */
-export const HORIZON_RG = 2;
-/** Photon sphere radius in r_g units (docs/NUMERICAL_METHODS.md §1). */
-export const PHOTON_SPHERE_RG = 3;
-/** Schwarzschild ISCO radius in r_g units (docs/NUMERICAL_METHODS.md §1). */
-export const ISCO_RG = 6;
-/**
- * Analytic asymptotic critical impact parameter `3*sqrt(3)*M` in r_g
- * (docs/NUMERICAL_METHODS.md §11). {@link criticalImpactParameter} locates
- * the same boundary numerically; the two are compared by validation vectors.
- */
-// Q-08: single authority (src/physics/constants.ts).
-export { CRITICAL_IMPACT_PARAMETER_RG as CRITICAL_IMPACT_PARAMETER_ANALYTIC_RG } from '../../physics/constants.js';
 import { CAPTURE_EPSILON_DEFAULT_RG } from '../../physics/constants.js';
 
 /** Normalized null-constraint residual above which integration fails (§6). */
@@ -123,12 +110,12 @@ interface PlaneDerivatives {
  *   dphi/dlambda = L / r^2
  *   dp_r/dlambda = -0.5 E^2 f'/f^2 - 0.5 f' p_r^2 + L^2/r^3,  f' = 2M/r^2
  *
- * EXPORTED (M8-03): the offline LUT generator integrates the SAME validated
- * RHS/RK4 primitives (see tools/generate-luts) so generated tables share
- * this exact formulation; docs/ASSET_PROVENANCE.md §3.1 records that
- * lineage. Export-only — behavior unchanged.
+ * The offline LUT generator imports {@link rk4PlaneStep}, which calls this
+ * RHS, so generated tables share this formulation
+ * (docs/ASSET_PROVENANCE.md §3.1). Not exported: nothing outside this
+ * module named it.
  */
-export function planeDerivatives(
+function planeDerivatives(
   r: number,
   pr: number,
   massRg: number,

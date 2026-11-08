@@ -22,8 +22,7 @@
  */
 
 import * as THREE from 'three';
-import type { Node } from 'three/webgpu';
-import { uniform, vec3, vec4 } from 'three/tsl';
+import { uniform } from 'three/tsl';
 
 import { luminosityProxy, photosphericTemperatureK, TEMPERATURE_FLOOR_K } from './physics.js';
 import type { ResolvedScenario } from './types.js';
@@ -143,24 +142,4 @@ export function createExplosionEmissionUniforms(): EmissionUniformBundle {
 export function configureEmissionUniforms(u: EmissionUniformBundle, sample: EmissionSample): void {
   u.tint.value.set(sample.rgb[0], sample.rgb[1], sample.rgb[2]);
   u.gain.value = sample.intensity;
-}
-
-/**
- * HDR emissive color node for volume/particle materials: tint x gain in
- * linear space, alpha 1 (alpha is handled by the respective blend paths).
- * Consumes ONLY display-side uniforms — this multiplies presentation
- * radiance and never feeds back into any physical quantity.
- */
-export function buildEmissionColorNode(u: EmissionUniformBundle): Node<'vec4'> {
-  return vec4(vec3(u.tint).mul(u.gain), 1);
-}
-
-/** Mix helper kept local so callers do not import three/tsl twice. */
-export function mixRgbStops(
-  a: readonly [number, number, number],
-  b: readonly [number, number, number],
-  f: number
-): [number, number, number] {
-  const g = Math.min(1, Math.max(0, f));
-  return [a[0] + (b[0] - a[0]) * g, a[1] + (b[1] - a[1]) * g, a[2] + (b[2] - a[2]) * g];
 }
