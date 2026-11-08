@@ -37,9 +37,9 @@ not a dev-server claim.
 
 The repository ships reference fallback configurations — the deployment
 contract is validated by `tests/unit/deploymentContract.test.ts`, which
-serves `dist/` from a plain static server and asserts that deep links return
-the shell while missing assets keep their not-found status (no graphics
-device required):
+serves a temporary shell from a plain static server and asserts that deep
+links return the shell while missing assets keep their not-found status.
+It does not require a prior `dist/` build or a graphics device:
 
 - **Netlify (URL-preserving):** `netlify.toml` (repo root — Vite must not
   copy it into the site) + `public/_redirects` (copied into `dist/`). The

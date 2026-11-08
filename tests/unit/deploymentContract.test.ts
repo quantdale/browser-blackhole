@@ -16,14 +16,15 @@
  */
 
 import { createServer, type Server } from 'node:http';
-import { existsSync, readFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { extname, join, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const REPO_ROOT = fileURLToPath(new URL('../../', import.meta.url));
-const DIST = join(REPO_ROOT, 'dist');
+const SHELL = '<!doctype html><div id="app"></div>';
 
 /** Parse the committed Netlify-style _redirects into ordered rules. */
 interface RedirectRule {
@@ -58,12 +59,15 @@ function resolveRedirect(rules: RedirectRule[], path: string): RedirectRule | nu
   return null;
 }
 
-function startServer(options: { fallback: boolean }): Promise<{ server: Server; port: number }> {
+function startServer(
+  root: string,
+  options: { fallback: boolean }
+): Promise<{ server: Server; port: number }> {
   const rules = parseRedirects();
   const server = createServer((req, res) => {
     const url = new URL(req.url ?? '/', 'http://localhost');
     const requested = normalize(url.pathname).replace(/^([/\\])+/, '');
-    const filePath = join(DIST, requested);
+    const filePath = join(root, requested);
     if (requested !== '' && existsSync(filePath)) {
       res.statusCode = 200;
       res.end(readFileSync(filePath));
@@ -73,7 +77,7 @@ function startServer(options: { fallback: boolean }): Promise<{ server: Server; 
       const rule = resolveRedirect(rules, url.pathname);
       if (rule !== null) {
         const target = rule.to === '/index.html' ? 'index.html' : rule.to.replace(/^\//, '');
-        const targetPath = join(DIST, target);
+        const targetPath = join(root, target);
         if (existsSync(targetPath)) {
           res.statusCode = rule.status;
           res.end(readFileSync(targetPath));
@@ -95,15 +99,23 @@ function startServer(options: { fallback: boolean }): Promise<{ server: Server; 
 describe('deployment contract (O-01)', () => {
   let plain: { server: Server; port: number };
   let configured: { server: Server; port: number };
+  let site: string;
 
   beforeAll(async () => {
-    plain = await startServer({ fallback: false });
-    configured = await startServer({ fallback: true });
+    // Do not require `dist/`. The quality job runs unit tests before the
+    // production build, and a clean checkout has no dist. The contract under
+    // test is the redirect matcher, not Vite's emit.
+    site = mkdtempSync(join(tmpdir(), 'bb-deploy-'));
+    writeFileSync(join(site, 'index.html'), SHELL);
+    writeFileSync(join(site, 'asset.txt'), 'real-asset');
+    plain = await startServer(site, { fallback: false });
+    configured = await startServer(site, { fallback: true });
   });
 
   afterAll(async () => {
     await new Promise((r) => plain.server.close(r));
     await new Promise((r) => configured.server.close(r));
+    rmSync(site, { recursive: true, force: true });
   });
 
   it('WITHOUT the fallback configuration a deep link does not serve the shell (0.5 evidence)', async () => {
@@ -126,11 +138,10 @@ describe('deployment contract (O-01)', () => {
   });
 
   it('an existing asset is served as itself', async () => {
-    // dist/index.html is guaranteed present after `npm run build`.
-    expect(existsSync(join(DIST, 'index.html'))).toBe(true);
-    const response = await fetch(`http://127.0.0.1:${configured.port}/index.html`);
+    expect(existsSync(join(site, 'asset.txt'))).toBe(true);
+    const response = await fetch(`http://127.0.0.1:${configured.port}/asset.txt`);
     expect(response.status).toBe(200);
-    expect(await response.text()).toContain('<div id="app">');
+    expect(await response.text()).toBe('real-asset');
   });
 
   it('the committed configs carry the documented fallback shape', () => {
