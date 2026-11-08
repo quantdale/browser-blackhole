@@ -11,7 +11,7 @@ Environment verified: Node v22.23.2 / npm 10.9.8 on Windows (Git Bash). All vers
 | Package | Version | Role / rationale |
 | --- | --- | --- |
 | `three` | 0.185.1 | Runtime. Current stable release with `WebGPURenderer` + TSL. Import paths verified against the installed build: `three/webgpu` (`WebGPURenderer`, `PostProcessing`), `three/tsl` (`Fn`, `vec3`, `varying`, `uv`, ...), `three/addons/controls/OrbitControls.js`. MIT license. |
-| `vite` | 8.2.2 | Dev server/build. Current stable; requires Node `^20.19 || >=22.12` (satisfied). |
+| `vite` | 8.2.4 | Dev server/build. Same 8.2 line as 8.2.2; patched for the launch-editor and dev-server advisories that failed `npm audit --audit-level=high` (GHSA-698v-4r3x-3vcv and related). Requires Node 20.19+ or 22.12+. |
 | `typescript` | 5.9.3 | Latest stable 5.x line. TypeScript 7.x (native port) is excluded because `typescript-eslint@8.67.0` declares peer support only for `<6.1.0`. |
 | `vitest` | 4.1.11 | Unit test runner; supports Vite 8 as peer. |
 | `@playwright/test` | 1.62.1 | Browser smoke/E2E. Node >=20 satisfied. Browsers: local runs may use the system Edge channel or a Playwright-installed Chromium; CI installs its own pinned browser. Apache-2.0. |

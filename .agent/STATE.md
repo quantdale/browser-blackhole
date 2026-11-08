@@ -32,6 +32,15 @@ public-control behavior was intentionally changed.
   local `visual-fidelity/*` branches. Repository policy forbids deleting
   branches. No remote branch was deleted.
 
+Follow-up the same day: hosted CI run 42465092778 failed the pre-existing
+`npm audit --audit-level=high` gate on Vite 8.2.2 (launch-editor / dev-server
+advisories). Patched to Vite 8.2.4 only — not 8.3.x — because 8.2.3/8.2.4
+are the security fixes on this line. `npm audit --audit-level=high` then
+exited 0. Eleven moderate advisories remain (vitest 4.1.11 mocker;
+minimatch via eslint 10). They do not fail the high gate. `npm audit fix
+--force` would downgrade eslint to 9 and was not run. `npm run check`
+PASS again after the pin change (74 files / 820 unit, vite 8.2.4 build).
+
 Next action: none assigned. Do not start spatial atlas or a Kerr near-axis
 solver from this note. A planner prompt or explicit assignment is required.
 
