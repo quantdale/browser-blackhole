@@ -137,8 +137,9 @@ jobs:
           --reporter=json > product-entry-results.json
       - name: Assert product-entry coverage (a skip is not a pass)
         run: node scripts/check-smoke-coverage.mjs product-entry-results.json 1
-      - name: GC1 offline self-check + artifact freshness gate (pure-stdlib, D7)
+      - name: GC1 offline self-check + artifact freshness gate (D7)
         run: |
+          python -m pip install 'numpy>=2.0,<3'
           python tools/cosmic-data/restricted_three_body.py
           git diff --exit-code tools/cosmic-data/reports/ || {
             echo '::error::CA9 self-check report is stale';

@@ -14,9 +14,10 @@
  * STORED-VERDICT DISCLOSURE (verification-gate-integrity 6.4/V-07): these
  * rows assert from the COMMITTED report
  * `tools/cosmic-data/reports/ca9-integrator-selfcheck.json` — they verify a
- * STORED VERDICT, not a live regeneration. The GC1 pipeline is pure-stdlib
- * and its freshness is CI-gated (`git diff --exit-code` on the reports dir,
- * ci.yml); the BBH reducer (reduce_bbh_merger.py) cannot run on Python
+ * STORED VERDICT, not a live regeneration. The GC1 pipeline needs numpy
+ * (tools/cosmic-data/requirements.txt); CI installs that pin before the
+ * freshness gate (`git diff --exit-code` on the reports dir, ci.yml). The
+ * BBH reducer (reduce_bbh_merger.py) cannot run on Python
  * >= 3.12 (the `sxs` pin) and is annotated here until
  * `operations-and-deployment-readiness` fixes the toolchain. If this test
  * fails, first regenerate the report on a supported interpreter before
