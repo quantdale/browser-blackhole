@@ -1,21 +1,24 @@
-# START HERE — active campaign
+# START HERE
 
-Updated: 2026-09-30
-Planning revision: `c0ee5f5` and later. Product-code findings were derived at `dc0b3ba`; re-derive citations before editing.
+Updated: 2026-10-22
 
-The feature-completion, final-production-readiness, and whole-atlas performance campaigns are complete or complete-with-deferrals. **Do not restart M0–M12, CA9, final-production-readiness, or `whole-atlas-performance-optimization`.**
+There is no active implementation campaign. Do not invent one from this file.
 
-## Active work
+## Completed — do not restart
 
-The active campaign is the hardening plan:
+- M0–M12, CA9, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, and `whole-atlas-performance-optimization`.
+- The hardening plan in `docs/MASTER_PLAN.md` (Phases 0–6). That document is the completed record, including its file-serialization rules. It is not an open queue. Do not start at `specification-baseline-hygiene`.
 
-1. `docs/MASTER_PLAN.md` — priority, sequencing, and file ownership. §7 overrides any older parallel-lane sentence.
-2. The assigned change under `openspec/changes/`. Its proposal, design, tasks, and spec are the behavioural contract.
-3. `.agent/QUALITY_GATES.md`
+## Not authorization to implement
 
-Start with `specification-baseline-hygiene` unless a later change has already landed and the master plan's sequence says otherwise. Do not implement `spatial-atlas-continuous-navigation` as part of this campaign.
+`openspec/changes/spatial-atlas-continuous-navigation` is the only active OpenSpec change. It is 0/123 and its own header says implementation status NOT STARTED. Read it only to avoid contradicting the plan. Do not implement it unless the user, or an `ACTIVE` prompt in `.agent/EXECUTION_PROMPT.md`, assigns it.
 
-Mission: correct confirmed defects and make gates, controls, deployment, and documentation truthful. Do not add a destination or reopen a completed campaign.
+## Before editing
+
+1. `git status`, `HEAD`, and whether `origin/main` is current.
+2. The newest section of `.agent/STATE.md`.
+3. `AGENTS.md` and `.agent/QUALITY_GATES.md`.
+4. `.agent/EXECUTION_PROMPT.md` only if its status is `ACTIVE`. It is not.
 
 ## Mandatory start gate
 

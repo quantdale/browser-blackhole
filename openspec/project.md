@@ -31,18 +31,20 @@ record results as evidence, never claim them as hosted-CI PASS.
 
 ## Active campaign
 
-The live campaign is the hardening plan in `docs/MASTER_PLAN.md`, executed through the
-OpenSpec changes under `openspec/changes/` with the file-serialization rules in §7. The
-whole-atlas performance optimization campaign is complete-with-deferrals (certified at
-`179eb56`) and is not the live queue. `spatial-atlas-continuous-navigation` is planned,
-0/123, and not started. Do not restart M0–M12, CA9, final-production-readiness, or
-`whole-atlas-performance-optimization`.
+There is no live implementation campaign. The hardening plan in `docs/MASTER_PLAN.md`
+(Phases 0–6) is complete; its §7 file-serialization rules remain binding if that plan is
+ever reopened, but it is not an open queue. The whole-atlas performance optimization
+campaign is complete-with-deferrals (certified at `179eb56`).
+`spatial-atlas-continuous-navigation` is the only active OpenSpec change: 0/123, not
+started, and not authorization to implement. Do not restart M0–M12, CA9,
+final-production-readiness, or `whole-atlas-performance-optimization`.
 
-Current baseline correction: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` is authoritative for
-the Phase 0 review findings — the cinematic final certified checkpoint is `17c4644` (not
-`2fc1b5d`), archived paths are under `openspec/changes/archive/2026-10-03-*`, and validation
-counts must be quoted with command, population and lifecycle stage. At this checkpoint: 7
-archived changes, 11 active (1 complete-awaiting-archive + 10 unfinished), 6 baseline specs.
+`docs/SPECIFICATION_BASELINE_CORRECTIONS.md` remains authoritative for the Phase 0 review
+findings — the cinematic final certified checkpoint is `17c4644` (not `2fc1b5d`). The
+2026-10-03 population (7 archived, 11 active, 6 specs) is historical. Current inventory,
+quoted with command: `openspec list` shows 1 active change;
+`openspec validate --archived --strict` passed 25/25;
+`openspec validate --all --strict` passed 20/20 on 2026-10-22.
 
 ## Technical stack
 
@@ -84,18 +86,17 @@ Use narrower unit/browser/parity/golden commands during development, but close a
 
 ## Planning/execution sources of truth
 
-Read in this order for active work:
+Read in this order before editing:
 
-1. `docs/MASTER_PLAN.md` (priority, sequencing, file serialization)
-2. `.agent/START_HERE.md`
-3. `.agent/EXECUTION_PROMPT.md` (when an active planner prompt is recorded there)
-4. the active `openspec/changes/<change>/` folder
+1. `.agent/STATE.md` (newest section is the continuation point)
+2. `.agent/START_HERE.md` and `AGENTS.md`
+3. `.agent/EXECUTION_PROMPT.md` only when its status is `ACTIVE`
+4. the assigned `openspec/changes/<change>/` folder, if one is assigned
 5. `.agent/QUALITY_GATES.md`
-6. implementation-specific docs referenced by that change
-7. `.agent/STATE.md` for durable historical evidence
+6. implementation-specific docs referenced by that assignment
+7. `docs/MASTER_PLAN.md` as the completed hardening record, not as an open queue
 
-Current sources of truth: `docs/MASTER_PLAN.md` plus the audit record in `.agent/STATE.md`
-§2026-09-30. `docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md` and `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
+`docs/NEXT_CAMPAIGN_AUDIT_2026-08-26.md` and `docs/NEXT_CAMPAIGN_AUDIT_2026-08-28.md`
 are historical input documents, not active guidance.
 
 When historical text conflicts with an active OpenSpec change, do not silently choose one. Determine whether the historical statement is stale, update it as part of the appropriate truthfulness task, and preserve scientific/runtime invariants.

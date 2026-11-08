@@ -12,9 +12,10 @@ CI must distinguish deterministic code/physics gates from environment-sensitive 
 4. unit tests;
 5. CPU physics/reference tests (within the unit run);
 6. build;
-7. implementation-status honesty (`check:status-honesty` — planning-complete is not implementation-complete);
-8. shared-shader / legacy-state boundary (`check:shader-boundary`);
-9. test-hook absence (`check:no-test-hook`).
+7. command-surface check (`check:command-surface` — every documented `npm run` name exists);
+8. implementation-status honesty (`check:status-honesty` — planning-complete is not implementation-complete);
+9. shared-shader / legacy-state boundary (`check:shader-boundary`);
+10. test-hook absence (`check:no-test-hook`).
 
 Browser/visual/performance suites remain separate because they may require browsers, artifacts, or GPUs.
 
@@ -31,10 +32,12 @@ Recommended jobs:
 - lint;
 - typecheck;
 - unit/reference tests;
+- command-surface check (`node scripts/check-command-surface.mjs`);
 - implementation-status honesty check (`npm run check:status-honesty`);
 - shared-shader / legacy-state boundary check (`npm run check:shader-boundary`);
 - install the pinned OpenSpec CLI and run `openspec validate --all --strict` and `openspec validate --archived --strict`;
-- build.
+- build;
+- production test-hook absence (`npm run check:no-test-hook`).
 
 ### browser-smoke (Chromium, WebGL2 fallback; M0 boot/fallback smoke + product entry)
 

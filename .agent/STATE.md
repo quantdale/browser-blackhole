@@ -1,3 +1,42 @@
+## 2026-10-22 — repository maintenance: control-plane truth and dead reference code
+
+Status: **MAINTENANCE, not a new campaign.** No rendering, physics, or
+public-control behavior was intentionally changed.
+
+- Agent handoff no longer names the completed hardening plan as live work.
+  `AGENTS.md`, `.agent/START_HERE.md`, `.agent/EXECUTION_PROMPT.md`,
+  `.agent/EXECUTION_PROTOCOL.md`, `openspec/AGENTS.md`, `openspec/project.md`,
+  and the README continuation point now agree: hardening Phases 0–6 are
+  complete; `spatial-atlas-continuous-navigation` remains 0/123 and is not
+  authorization to implement; do not restart M0–M12, CA9, or the completed
+  performance/readiness campaigns.
+- Removed `src/phenomena/black-hole/validationVectors.ts`. Nothing imported
+  it. Running `runValidationVectors()` failed 2/19 (`radial-inward-capture`
+  stopped at r=2.00198 against a 2.001 band; `near-critical-winding-growth`
+  was not monotonic at b=5.28). It was a stale unwired corpus, not a live
+  gate. Landmark radii stay in `src/physics/constants.ts`. The cpuReference
+  comment now points at `docs/VALIDATION_VECTORS.md` and `tests/unit`.
+- Removed unused `buildEmissionColorNode` and `mixRgbStops`. The stellar
+  explosion volume march builds its emission node inline from the same
+  tint/gain uniforms.
+- `npm run check` now includes `check:command-surface`. The hosted quality
+  job runs `check:no-test-hook` after `npm run build`, matching the local
+  production-bundle gate.
+- Gate: `npm run check` PASS at this checkpoint — prettier, eslint, tsc,
+  74 files / 820 unit tests, production build, command-surface (232 files,
+  42 scripts), status-honesty (1 active change, 0/123 not-started),
+  shader-boundary, and no-test-hook (24 JS assets). Browser/golden suite
+  not re-run: no shader, uniform, or pixel path changed.
+- Git resources preserved: draft PR #7 (`phase0/specification-baseline-hygiene`),
+  open Dependabot PRs #3–#6, stash `phase0-wip-at-c0ee5f5`, and the merged
+  local `visual-fidelity/*` branches. Repository policy forbids deleting
+  branches. No remote branch was deleted.
+
+Next action: none assigned. Do not start spatial atlas or a Kerr near-axis
+solver from this note. A planner prompt or explicit assignment is required.
+
+---
+
 ## 2026-10-18 — Kerr magenta band — DIAGNOSED (solver limitation), no code change
 
 Status: **DIAGNOSED — CASE B (genuine numerical limitation).** Branch

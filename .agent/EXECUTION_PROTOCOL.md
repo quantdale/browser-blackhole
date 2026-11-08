@@ -7,9 +7,9 @@ This file defines how an implementation agent should operate over long, multi-se
 At the beginning of every fresh session:
 
 1. inspect current branch, `git status`, and last 10 commits;
-2. read `.agent/STATE.md` completely;
-3. read the current milestone in `docs/ROADMAP.md` and matching section in `docs/MILESTONE_WORK_PACKETS.md`;
-4. read only the domain specs relevant to the next packet, plus `AGENTS.md` and quality gates if not already in context;
+2. read `.agent/STATE.md`'s newest section, then earlier sections only as evidence;
+3. read `AGENTS.md` and `.agent/START_HERE.md`. Do not treat `docs/ROADMAP.md` or `docs/MILESTONE_WORK_PACKETS.md` as the live queue; they are the completed M0–M12 record;
+4. read only the domain specs relevant to the assigned work, plus quality gates if not already in context;
 5. inspect current code/tests before planning edits;
 6. identify the smallest coherent checkpoint that advances the current milestone;
 7. execute without asking the user to decompose already-documented work.
@@ -17,6 +17,8 @@ At the beginning of every fresh session:
 If repository state conflicts with `.agent/STATE.md`, trust actual Git/code/test evidence first, then repair `.agent/STATE.md` in the same checkpoint.
 
 ## 2. Work selection
+
+"Current milestone" means the assigned OpenSpec change or the next action recorded in `.agent/STATE.md`, not a packet in `docs/ROADMAP.md`. If neither an `ACTIVE` planner prompt nor an explicit user assignment exists, do not invent a campaign.
 
 Priority order:
 

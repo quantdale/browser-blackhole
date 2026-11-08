@@ -2,22 +2,14 @@
 
 ## Current status
 
-The repository holds 19 change folders: 8 complete archived under `openspec/changes/archive/` and 11 active. Of the 11 active, `specification-baseline-hygiene` is checklist-complete awaiting archive, and the remaining ten are nine unfinished hardening changes plus `spatial-atlas-continuous-navigation` (excluded from this campaign). Post-archive at this checkpoint (after `atlas-terminal-state-visibility` landed at `bbf66ea`): `--changes --strict` 11 passed / 0 failed, `--specs --strict` 7 passed / 0 failed, `--all --strict` 18 passed / 0 failed. The live campaign is `docs/MASTER_PLAN.md`, Phase 0 through Phase 6. Shared files are serialized by `docs/MASTER_PLAN.md` §7; phases are not blanket permission to edit the same file in parallel.
+Updated 2026-10-22. Quote inventory claims with the command, population, and lifecycle stage.
 
-Baseline correction record: `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` supersedes the two erroneous archived cinematic headers (`2fc1b5d` → final restored-scope certified checkpoint `17c4644`) and the Phase 0 state entry's revision/count claims. Active validation/inventory claims must be quoted with command, population and lifecycle stage.
-
-- Phase 0 (complete, checklist-landed 2026-10-03): `specification-baseline-hygiene` (46/46, awaiting archive).
-- Phase 0 review corrections (landed and archived 2026-10-03): `specification-baseline-review-corrections`; erratum at `docs/SPECIFICATION_BASELINE_CORRECTIONS.md`.
-- Phase 1, one writer at a time: `kerr-gpu-initializer-correctness` (owns `src/phenomena/black-hole/{kerr,lut,observer}/**`), then `quality-ladder-resolution-integrity`, then `transition-error-user-visibility`, then `destination-control-truthfulness`. Plus `atlas-terminal-state-visibility` (`bbf66ea`), an unplanned follow-on to `transition-error-user-visibility` and `destination-control-truthfulness` that closes the device-loss and slow-load presentation gap those two left; its gated overlay probe (tasks.md §4) showed the suspected occluding-overlay defect does **not** reproduce, so overlay rendering was left unchanged and no golden was re-baselined.
-- Phase 2: `shared-renderer-service-lifecycle` (only after quality-ladder and transition-error land).
-- Phase 3: `verification-gate-integrity`.
-- Phase 4: `benchmark-harness-integrity`.
-- Phase 5: `operations-and-deployment-readiness`, then `documentation-truthfulness-realignment`.
-- Archived, complete: `m12-neutron-star-surface-lensing`, `m12-repository-integrity`, `ca9-galaxy-collision`, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, `whole-atlas-performance-optimization` (complete-with-deferrals), and `atlas-terminal-state-visibility` (2026-10-09, `bbf66ea`).
-- `shared-renderer-service-lifecycle` (Phase 2) now owns `src/atlas/host.ts`; it must preserve `TransitionPublicState.slowLoad`, the outside-panel device-loss card, and that card's reload-only action set. See the preservation note in `openspec/changes/destination-control-truthfulness/tasks.md` and the newest `.agent/STATE.md` section.
-- Not started: `spatial-atlas-continuous-navigation` (0/123; do not implement in this campaign).
-
-Restarting M0–M12, CA9, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, or `whole-atlas-performance-optimization` is a defect.
+- Active changes: 1. `openspec list` reports `spatial-atlas-continuous-navigation` at 0/123. Its header says implementation status NOT STARTED. Do not implement it unless an explicit user instruction or an `ACTIVE` planner prompt assigns it.
+- Archived changes: 25. `openspec validate --archived --strict` passed 25/25.
+- Baseline specs plus the active change: `openspec validate --all --strict` passed 20/20 (19 specs + 1 change).
+- The hardening plan in `docs/MASTER_PLAN.md` (Phases 0–6) is complete. It is not an open queue. Do not restart it, and do not restart M0–M12, CA9, `final-production-readiness`, `cinematic-visual-fidelity-overhaul`, or `whole-atlas-performance-optimization`.
+- `docs/SPECIFICATION_BASELINE_CORRECTIONS.md` remains the erratum for the Phase 0 review (cinematic certified checkpoint `17c4644`, not `2fc1b5d`). Its 2026-10-03 population counts are historical.
+- Completed renderer work must still preserve `TransitionPublicState.slowLoad`, the outside-panel device-loss card, and that card's reload-only action set. Those invariants live in the archived `shared-renderer-service-lifecycle` and `destination-control-truthfulness` changes, not in an active writer.
 
 ## Archive policy
 
@@ -25,9 +17,8 @@ When a change completes, archive it: its delta requirements move into a baseline
 
 ## Before editing
 
-- Read `docs/MASTER_PLAN.md` (priority, sequencing, §7 serialization).
-- Read `.agent/START_HERE.md` and `.agent/STATE.md`'s newest section.
-- Read the entire active change folder (proposal, design, tasks, specs).
+- Read `.agent/START_HERE.md` and `.agent/STATE.md`'s newest section before `docs/MASTER_PLAN.md`. The master plan is the completed hardening record; use §7 only if that plan is reopened.
+- Read an active change folder only when that change is the assigned work. The sole active change is planning-only and is not an assignment by itself.
 - Inspect the current implementation and tests named by the change; do not rely only on the planning text.
 - Run and record the required baseline. A pre-existing failure must be classified before implementation.
 

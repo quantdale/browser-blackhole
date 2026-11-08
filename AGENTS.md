@@ -4,9 +4,9 @@ This repository is designed so a capable coding agent can resume work without ch
 
 ## Current work — read this before the historical list
 
-The live campaign is the hardening plan in `docs/MASTER_PLAN.md`, executed through the OpenSpec changes under `openspec/changes/`. Follow that plan's file-serialization rules. Do not resume `whole-atlas-performance-optimization`, M0–M12, CA9, or `final-production-readiness`; those campaigns are complete or complete-with-deferrals.
+There is no active implementation campaign. The hardening plan in `docs/MASTER_PLAN.md` (Phases 0–6) is complete; it is the record of that work, not an open queue. The only active OpenSpec change is `spatial-atlas-continuous-navigation` (0/123, implementation status NOT STARTED). Do not implement it unless an explicit user instruction or an `ACTIVE` planner prompt assigns it. Do not resume `whole-atlas-performance-optimization`, M0–M12, CA9, `final-production-readiness`, or the completed hardening changes.
 
-The numbered list below still contains historical planning documents. Read `docs/PHYSICS.md`, `docs/RENDERING_PIPELINE.md`, `docs/PERFORMANCE.md`, and `docs/TESTING.md` for conventions that remain in force. Do not treat `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, or `docs/BACKLOG.md` as the live work queue. `documentation-truthfulness-realignment` owns the permanent restructuring of this list.
+The numbered list below still contains historical planning documents. Read `docs/PHYSICS.md`, `docs/RENDERING_PIPELINE.md`, `docs/PERFORMANCE.md`, and `docs/TESTING.md` for conventions that remain in force. Do not treat `docs/PRODUCT_SPEC.md`, `docs/ROADMAP.md`, or `docs/BACKLOG.md` as the live work queue. Continuation evidence lives in `.agent/STATE.md`.
 
 ## Required reading before editing
 

@@ -63,7 +63,7 @@ Frame-time benchmarks report CPU-side rAF frame deltas and, when the WebGPU back
 
 ## Current development continuation point
 
-**Certified production-ready** — see **[`docs/RELEASE_CERTIFICATION.md`](docs/RELEASE_CERTIFICATION.md)** for the full evidence report (defects, CI green-run list, quality gates, fidelity, compatibility). The durable milestone state and history live in **[`.agent/STATE.md`](.agent/STATE.md)**: **M12-NS**, **M12-RI**, **CA9 (Galaxy Collision)**, and the **final-production-readiness** certification pass are all COMPLETE. M11 production hardening & release candidate is closed (compatibility matrix, mobile/touch, device-loss terminal state, resource-leak torture, accessibility, license audit, deployment contract, matched moving-observer benchmarks; M10 relativistic observer modes complete).
+**Certified production-ready** — see **[`docs/RELEASE_CERTIFICATION.md`](docs/RELEASE_CERTIFICATION.md)** for the full evidence report (defects, CI green-run list, quality gates, fidelity, compatibility). The durable milestone state and history live in **[`.agent/STATE.md`](.agent/STATE.md)**. M0–M12, CA9, final-production-readiness, and the audit hardening plan are complete. There is no open implementation campaign; `spatial-atlas-continuous-navigation` is planning-only and not authorization to implement.
 
 Hosted CI runs `quality` + a cheap `browser-smoke`; the full behavioral/parity/golden suite and the Firefox second-engine matrix are a documented local capable-runner gate (`docs/CI_CD.md` §2/§16) — hosted GPU-less runners cannot stably render the heavy scenes.
 
@@ -127,6 +127,8 @@ A fresh coding agent starts with **[`.agent/START_HERE.md`](.agent/START_HERE.md
 - [`docs/RESEARCH_REFERENCES.md`](docs/RESEARCH_REFERENCES.md) — primary references/prior art.
 
 ### Execution plan
+
+These M0–M12 documents are the completed planning record. They are not the live work queue; see their SUPERSEDED headers and `.agent/START_HERE.md`.
 
 - [`docs/IMPLEMENTATION_PLAYBOOK.md`](docs/IMPLEMENTATION_PLAYBOOK.md) — concrete implementation workflow.
 - [`docs/ROADMAP.md`](docs/ROADMAP.md) — M0–M11 integration sequence.

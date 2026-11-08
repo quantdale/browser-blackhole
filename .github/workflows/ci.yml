@@ -55,15 +55,17 @@ jobs:
       - name: Unit-test import-coverage report (report-only, D8/V-10)
         run: npm run coverage:report
       - name: Command-surface check (documented commands must exist)
-        run: node scripts/check-command-surface.mjs
+        run: npm run check:command-surface
       # spatial-atlas-status-honesty + hosted-product-boot-coverage: these
       # repository checks run in the hosted quality job too (they are part of
       # `npm run check` locally, but this job invokes each step explicitly).
-      - name: Implementation-status honesty (planning-complete is not implementation-complete)
+      - name: Implementation-status honesty
         run: npm run check:status-honesty
       - name: Shared-shader / legacy-state boundary
         run: npm run check:shader-boundary
       - run: npm run build
+      - name: Production bundle has no test hook
+        run: npm run check:no-test-hook
 
   browser-smoke:
     # O-03/2.3: bounded job runtime.
@@ -100,8 +102,8 @@ jobs:
     # resolves at the ready stage BEFORE any frame renders, so its
     # ARRIVAL_TIMEOUT_MS ceiling (180s in CI, env-overridable) is a safety net
     # for a hung init, not an expected wait — it is the slowest-still-bounded
-    # hosted step, and its own coverage assertion (expected 1) makes a skip fail.
-    name: browser-smoke (Chromium, WebGL2 fallback; legacy + product-entry smoke)
+    # hosted step. Its coverage assertion (expected 1) makes a skip fail.
+    name: browser-smoke (Chromium WebGL2; legacy + product-entry)
     needs: quality
     runs-on: ubuntu-latest
     steps:
