@@ -195,7 +195,7 @@ npm script). The documented procedure is `tools/cosmic-data/README.md` "Reproduc
 python -m pip install -r tools/cosmic-data/requirements.txt
 python tools/cosmic-data/fetch_sxs_record.py      # pinned Zenodo record, MD5-checked
 python tools/cosmic-data/reduce_bbh_merger.py     # deterministic reduction (writes tests/unit/fixtures/bbm-parity.json)
-python tools/cosmic-data/restricted_three_body.py  # GC self-check report (CI freshness-gated)
+python tools/cosmic-data/restricted_three_body.py  # GC self-check; byte freshness is local (3.13.5 + numpy 2.5.2)
 ```
 
 Generation must:
@@ -243,10 +243,11 @@ reason and the owning module — never silently omitted.
 
 - `scripts/check-smoke-coverage.mjs` — the smoke job fails when any test
   skips or fewer than the expected count executes (a skip is not a pass);
-- the GC1 offline self-check runs in CI with a `git diff --exit-code`
-  freshness gate on `tools/cosmic-data/reports/` (the BBH reducer artifacts
-  are annotated as stored-verdict evidence until the Python toolchain is
-  fixed);
+- the GC1 offline self-check runs in CI and must exit 0. Byte freshness
+  of `tools/cosmic-data/reports/` is a local gate on CPython 3.13.5 +
+  numpy 2.5.2; ubuntu-latest's Python changes the IC hash, and
+  setup-python has no 3.13.5 build for that image. The BBH reducer
+  artifacts remain stored-verdict evidence;
 - `npm run coverage:report` — static unit-test import-coverage report
   (report-only), naming modules with no unit-test importer;
 - `tests/unit/goldenInventory.test.ts` — GPU-less golden baseline inventory
