@@ -181,3 +181,73 @@ button:focus-visible {
   padding: var(--sp-6);
   color: var(--warn);
 }
+
+/* Diagnostic route uses the same surface and interaction language. */
+#app:not(.atlas-shell) #panel {
+  padding: 28px 20px;
+  background: var(--surface-0);
+}
+.panel-title {
+  font-size: 25px;
+  letter-spacing: -0.04em;
+  line-height: 1.15;
+  margin-bottom: 24px;
+}
+.status-region {
+  background: var(--surface-1);
+  padding: 20px;
+  border-color: var(--line-strong);
+  border-radius: var(--r-3);
+  box-shadow: var(--inset-top);
+}
+.status-region[data-severity='ok'] {
+  border-color: var(--line-strong);
+  border-top: 2px solid var(--ok);
+}
+.status-region[data-severity='info'] {
+  border-top: 2px solid var(--accent);
+}
+.status-region[data-severity='error'] {
+  border-color: var(--error);
+  background: var(--error-soft);
+}
+.status-headline {
+  font-size: var(--fs-lg);
+  letter-spacing: -0.02em;
+  margin-bottom: 10px;
+}
+.status-detail {
+  font-size: var(--fs-sm);
+}
+.readout-list {
+  background: var(--surface-1);
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: var(--r-2);
+}
+.readout-list li {
+  padding: 10px 0;
+  border-bottom: 1px solid var(--line);
+}
+.readout-list li:last-child {
+  border-bottom: 0;
+}
+.readout-value {
+  font-family: var(--font-mono);
+  color: var(--accent-ink);
+}
+#app:not(.atlas-shell) button {
+  min-height: 40px;
+  padding: 8px 16px;
+  transition:
+    transform var(--dur-2) var(--ease),
+    background var(--dur-1) var(--ease);
+}
+#app:not(.atlas-shell) button:active {
+  transform: scale(0.96);
+}
+@media (prefers-reduced-motion: reduce) {
+  #app:not(.atlas-shell) button {
+    transition: none;
+  }
+}

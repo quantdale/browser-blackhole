@@ -34,6 +34,7 @@
  */
 
 import '../ui/atlas/atlasPanel.css';
+import { createDestinationGallery, createDestinationMark } from '../ui/atlas/destinationGallery.js';
 import {
   BLOOM_STRENGTH_RANGE,
   CAMERA_FOV_DEG_RANGE,
@@ -183,6 +184,13 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   brand.className = 'atlas-brand';
   brand.textContent = 'Cosmic Atlas';
 
+  const exploreButton = document.createElement('button');
+  exploreButton.type = 'button';
+  exploreButton.className = 'atlas-explore atlas-btn';
+  exploreButton.append(createIcon('explore', 17), document.createTextNode('Explore'));
+  exploreButton.setAttribute('aria-haspopup', 'dialog');
+  exploreButton.disabled = true;
+
   const nav = document.createElement('nav');
   nav.className = 'atlas-nav';
   nav.setAttribute('aria-label', 'Cosmic Atlas destinations');
@@ -237,7 +245,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   });
   applyPanelVisibility();
 
-  topbar.append(brand, nav, modeHost, panelToggle);
+  topbar.append(brand, exploreButton, nav, modeHost, panelToggle);
 
   const content = document.createElement('div');
   content.className = 'atlas-content';
@@ -259,6 +267,16 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     status.setAttribute('data-severity', severity);
   };
   setStatus('Atlas: starting', 'busy');
+  // Decorative placeholders never stand in for telemetry or scientific data.
+  const loadingSkeleton = document.createElement('div');
+  loadingSkeleton.className = 'atlas-loading';
+  loadingSkeleton.setAttribute('aria-hidden', 'true');
+  for (let i = 0; i < 4; i++) {
+    const placeholder = document.createElement('div');
+    placeholder.className = 'atlas-loading-block';
+    loadingSkeleton.append(placeholder);
+  }
+  panelElement.append(status, loadingSkeleton);
 
   // --- terminal boot-failure surface (atlas-error-reporting) -----------------
   // Reached when `host.init()` rejects (no render backend, failed renderer
@@ -270,6 +288,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
   terminal.setAttribute('role', 'alert');
   terminal.hidden = true;
   const renderTerminal = (code: string | null, message: string): void => {
+    loadingSkeleton.remove();
     const backend = host.debugInventory().backend;
     const copy = buildUnsupportedMessage(backend, code ?? '');
     const card = document.createElement('div');
@@ -474,6 +493,21 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     hostOptions.forcedBackend = forcedBackend;
   }
   const host = new CosmicAtlasHost(canvas, hostOptions);
+  const gallery = createDestinationGallery({
+    destinations: () =>
+      productionDestinationIds().flatMap((id) => {
+        const entry = host.registry.get(id);
+        return entry
+          ? [{ id, title: entry.descriptor.title, fidelity: entry.descriptor.fidelity }]
+          : [];
+      }),
+    activeId: () => host.state.atlas.activeDestination,
+    onSelect: (id) => {
+      host.navigate(id);
+    }
+  });
+  root.append(gallery.root);
+  exploreButton.addEventListener('click', () => gallery.open());
 
   // Boot-failure rendering (atlas-error-reporting). Registered BEFORE
   // `host.init()` so a failure the tracker reports is rendered as it happens.
@@ -503,6 +537,8 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       chip.type = 'button';
       chip.className = 'atlas-nav-chip';
       chip.textContent = descriptor?.title ?? destination;
+      chip.prepend(createDestinationMark(destination));
+      chip.title = descriptor?.title ?? destination;
       chip.setAttribute('aria-pressed', activeId === destination ? 'true' : 'false');
       if (activeId === destination) chip.classList.add('is-active');
       chip.addEventListener('click', () => {
@@ -523,6 +559,10 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       });
       nav.append(chip);
     }
+    nav.querySelector<HTMLButtonElement>('.is-active')?.scrollIntoView({
+      block: 'nearest',
+      inline: 'nearest'
+    });
     updateNavOverflow();
   };
 
@@ -720,6 +760,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
       } fidelity`
     );
     panelElement.append(header.root);
+    header.root.prepend(createDestinationMark(destId));
 
     // Sections owned by the ACTIVE destination. Collected here (rather than
     // appended inside the branch that builds them) so they land AFTER Preset
@@ -737,8 +778,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     presetSection.body.append(
       createSelectRow({
         label: 'Scenario',
-        description:
-          'Documented scenario for this destination. Physical setup and visual quality are kept separate, so changing quality never mutates the physics.',
+        description: 'A curated physical setup, independent of display quality.',
         options: presetOptions,
         value: presetId,
         onChange: (value) => {
@@ -1465,6 +1505,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
     throw err;
   }
   setStatus('Atlas ready', 'ok');
+  exploreButton.disabled = false;
 
   // Share-link subset application (STATE_AND_ROUTES §9): the compact query
   // keys ride the SAME normalizer as runtime state. Applied once after init
@@ -1836,6 +1877,7 @@ export async function createAtlasApp(root: HTMLElement): Promise<AtlasAppHandle>
 
   return {
     dispose(): void {
+      gallery.dispose();
       if (controlPollTimer !== null) {
         clearInterval(controlPollTimer);
         controlPollTimer = null;

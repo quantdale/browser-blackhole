@@ -1,3 +1,59 @@
+## 2026-11-13 — Orbital Playground frontend overhaul
+
+Status: **COMPLETE — explicit user-assigned UI work**, not a resumed implementation campaign.
+Branch: `design/orbital-playground`. The spatial-atlas change remains **0/123, NOT STARTED**.
+
+- Rebuilt the shared frontend across all eight production destinations and the
+  legacy diagnostic surface. New neutral charcoal/amber tokens, a left inspector,
+  orbital destination symbols, rounded tactile controls, a two-row timeline,
+  responsive navigation and inset mobile drawer replace Instrument Console.
+- Added a searchable native-dialog destination gallery driven by the existing
+  launch catalog and registry. All selections use `host.navigate`; titles and
+  fidelity come from descriptors. Empty-result recovery, single-Escape dismissal
+  with populated search, focus return, fidelity descriptions and current selection
+  are exposed accessibly. The active navigation chip scrolls into view.
+- Initialization now immediately shows the real status and decorative skeletons;
+  ready controls or terminal failure remove the skeletons. Closed sections enforce
+  `[hidden]`; mobile collapse keeps the existing inert behavior and slide motion.
+  Touch targets, keyboard focus, reduced motion, native selects/ranges/radios,
+  waveform, diagnostics, fidelity disclosures and all canonical callbacks remain.
+- No physics, shader, renderer, API, canonical state, dependency or model changes.
+  At 1280x800 the viewport is still **972.813 x 727**, now at x=307.188 because the
+  inspector moved left. No scientific or cinematic golden was regenerated.
+- Refero MCP: three style angles; full Linear, Pryzm and SpaceX references; Glorify
+  editor screens; discovery-flow and settings-panel research. The reference lock,
+  token roles, interface inventory and decision ledger are in `docs/UI_DESIGN_SYSTEM.md`.
+- **Verification:** final `npm run check` PASS — formatting, lint, typecheck,
+  **820/820 unit tests (74 files)**, production build, command-surface,
+  status-honesty, shader boundary and hook-free production assets (24 JS assets).
+- **Broad browser gate:** default project **318 PASS / 1 existing skip**, 36.9m.
+  Includes **43 scientific + 8 cinematic goldens**, navigation, all destination
+  controls, state/share reflection, lifecycle/device-loss, CPU/GPU parity,
+  WebGPU/WebGL2, temporal/HDR, resources and mobile gestures. The skip remains
+  WebGL2/LUT parity: that acceleration is unsupported on WebGL2 by design.
+- **Final UI gate:** **46/46 PASS**, including Firefox matrix 4/4 and six new gallery,
+  loading, viewport, reduced-motion and touch-target cases. Later screenshot-review
+  fixes passed **13/13** gallery/accessibility rows (active chip visibility), then
+  **6/6** gallery rows (single Escape from a populated search). No assertion or
+  numerical tolerance was weakened.
+- **Rendered QA:** all eight routes, controls, waveform, Debug, fidelity, empty and
+  unsupported states inspected. Layouts at 320/390/768/1440px have matching document
+  widths with no horizontal overflow; capture reports zero unexpected console/page
+  errors. Workspace axe audit: 23 passes / 0 violations; scoped gallery audit:
+  16 passes / 0 violations / 0 incomplete. Select text/background token contrast
+  is 18.08:1 (the custom chevron is outside the text area). Mobile is browser-emulated.
+- Evidence: `D:\Documents\tryPython\_AgentArtifacts\browser-blackhole\sessions\20261113-codex-orbital-playground\`
+  (`refero-research.json`, `check-final.log`, `browser-full.log`, `browser-final-ui.log`,
+  `browser-nav-review.log`, `browser-escape-review.log`, `visual-qa.json`, `final-*.png`,
+  and axe JSON). The existing cinematic test also writes its fixed auxiliary report
+  to `artifacts/cinematic-visual-fidelity/cinematic-goldens-uncommitted-default.json`;
+  it was copied into the session as `cinematic-results.json`. The original was left
+  in place under the workspace no-delete rule and is not committed.
+
+Next action: none assigned. No new campaign is active. Do not start spatial-atlas
+implementation or reopen completed hardening from this UI handoff.
+
+---
 ## 2026-10-22 — repository maintenance: control-plane truth and dead reference code
 
 Status: **MAINTENANCE, not a new campaign.** No rendering, physics, or

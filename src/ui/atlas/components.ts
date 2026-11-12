@@ -1,6 +1,6 @@
 /**
  * Atlas UI component kit — framework-free DOM factories for the product
- * control panel (M5 productization; design refresh 2026-09-11).
+ * control panel (M5 productization; Orbital Playground refresh 2026-11-13).
  *
  * Spec sources:
  * - docs/UI_UX.md §3 (panel structure), §5 (parameter safety: bounded
@@ -44,6 +44,9 @@ interface IconPath {
 }
 
 const ICON_PATHS = {
+  close: [{ d: 'M4 4l8 8M12 4l-8 8' }],
+  search: [{ d: 'M10.8 10.8l3 3M11.5 7a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0' }],
+  explore: [{ d: 'M14 8a6 6 0 1 1-12 0 6 6 0 0 1 12 0M10.7 5.3L9 9l-3.7 1.7L7 7z' }],
   chevronRight: [{ d: 'M6 3.5l4.5 4.5-4.5 4.5' }],
   play: [{ d: 'M5 3.4l8.2 4.6-8.2 4.6z', filled: true }],
   pause: [{ d: 'M6.2 4v8' }, { d: 'M9.8 4v8' }],
@@ -111,6 +114,7 @@ export function createCollapsibleSection(
 ): CollapsibleSectionHandle {
   const root = document.createElement('section');
   root.className = 'atlas-section';
+  root.dataset.section = options.title;
 
   const toggle = document.createElement('button');
   toggle.type = 'button';
@@ -384,7 +388,10 @@ export function createSelectRow(options: SelectRowOptions): SelectRowHandle {
     head.append(label);
     const desc = document.createElement('p');
     desc.className = 'atlas-row-desc';
+    const descId = nextDomId('atlas-select-desc');
+    desc.id = descId;
     desc.textContent = options.description;
+    select.setAttribute('aria-describedby', descId);
     row.append(head, desc, select);
   } else {
     row.append(label, select);
