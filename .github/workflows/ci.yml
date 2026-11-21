@@ -172,6 +172,6 @@ jobs:
       # Immutable SHA pin: the action ref is an unbreakable 73-char token
       # (no YAML wrapping can fit it in 80 columns).
       # yamllint disable-line rule:line-length
-      - uses: actions/dependency-review-action@da24556b548a50705dd671f47852072ea4c105d9
+      - uses: actions/dependency-review-action@bbc44d14a204704ccc493733616cd1e93a0321ec
         with:
           scope: runtime
